@@ -229,13 +229,16 @@ const Timeline = () => {
 
     const handleLogout = () => {
         axios
-            .delete('/api/auth/logout')
+            .post('/api/auth/logout')  // Changed from DELETE to POST
             .then(() => {
                 dataContext.setUser(null);
                 navigate('/login');
             })
             .catch((error) => {
                 console.error('Logout failed', error);
+                // Even if logout fails, clear local state and redirect
+                dataContext.setUser(null);
+                navigate('/login');
             });
     };
 

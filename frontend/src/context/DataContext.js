@@ -1,4 +1,4 @@
-import React, {createContext, useEffect, useRef, useState} from 'react';
+import React, { createContext, useEffect, useState } from 'react';
 import {
     createComment as apiCreateComment,
     createProject as apiCreateProject,
@@ -9,7 +9,6 @@ import {
     getComments as apiGetComments,
     getNotifications,
     getProjects,
-    getUser,
     getUserByEmail,
     getUserTasks,
     reactToComment as apiReactToComment,
@@ -17,13 +16,13 @@ import {
     updateProject as apiUpdateProject,
     updateTask as apiUpdateTask,
 } from '../util/api';
-import {useNavigate} from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 export const DataContext = createContext();
 
-export const DataProvider = ({ children }) => {
+export const DataProvider = ({ children, initialUser }) => {
     const navigate = useNavigate();
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(initialUser);
     const [projects, setProjects] = useState([]);
     const [userTasks, setUserTasks] = useState([]);
     const [notifications, setNotifications] = useState([]);
@@ -31,27 +30,37 @@ export const DataProvider = ({ children }) => {
     const [error, setError] = useState(null);
 
     useEffect(() => {
+        // Only fetch data if user is authenticated
         if (user) {
-            const fetchData = async () => {
-                try {
-                    const fetchedProjects = await getProjects();
-                    setProjects(fetchedProjects);
-                    const fetchedTasks = await getUserTasks();
-                    setUserTasks(fetchedTasks);
-                    const fetchedNotifications = await getNotifications();
-                    setNotifications(fetchedNotifications);
-                } catch (err) {
-                    setError(err);
-                    navigate('/login');
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchData();
+            fetchUserData();
         } else {
             setLoading(false);
         }
-    }, [user, navigate]);
+    }, [user]);
+
+    const fetchUserData = async () => {
+        try {
+            const [fetchedProjects, fetchedTasks, fetchedNotifications] = await Promise.all([
+                getProjects(),
+                getUserTasks(),
+                getNotifications()
+            ]);
+            setProjects(fetchedProjects);
+            setUserTasks(fetchedTasks);
+            setNotifications(fetchedNotifications);
+        } catch (err) {
+            setError(err);
+            // Only redirect to login if we get a 401 and we're not already on a public page
+            if (err.response?.status === 401) {
+                const publicPaths = ['/login', '/register', '/'];
+                if (!publicPaths.includes(window.location.pathname)) {
+                    navigate('/login');
+                }
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleSetUser = (fetchedUser) => {
         setUser(fetchedUser);

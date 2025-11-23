@@ -5,6 +5,80 @@ import axios from 'axios';
 axios.defaults.baseURL = 'http://localhost:8080';
 axios.defaults.withCredentials = true;
 
+// Token refresh handling
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+    failedQueue.forEach(prom => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+    failedQueue = [];
+};
+
+// Response interceptor for automatic token refresh
+axios.interceptors.response.use(
+    (response) => {
+        // If the response is successful, just return it
+        return response;
+    },
+    async (error) => {
+        const originalRequest = error.config;
+
+        // If error is 401 and we haven't already tried to refresh
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            // Skip refresh for login and refresh endpoints
+            if (originalRequest.url === '/api/auth/login' ||
+                originalRequest.url === '/api/auth/refresh') {
+                return Promise.reject(error);
+            }
+
+            // If already refreshing, queue this request
+            if (isRefreshing) {
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                }).then(() => {
+                    return axios(originalRequest);
+                }).catch(err => {
+                    return Promise.reject(err);
+                });
+            }
+
+            originalRequest._retry = true;
+            isRefreshing = true;
+
+            try {
+                // Try to refresh the token
+                await axios.post('/api/auth/refresh');
+
+                // Process queued requests
+                processQueue(null);
+                isRefreshing = false;
+
+                // Retry the original request
+                return axios(originalRequest);
+            } catch (refreshError) {
+                // Refresh failed
+                processQueue(refreshError, null);
+                isRefreshing = false;
+
+                // Redirect to login only if not already there
+                const publicPaths = ['/login', '/register', '/'];
+                if (!publicPaths.includes(window.location.pathname)) {
+                    window.location.href = '/login';
+                }
+                return Promise.reject(refreshError);
+            }
+        }
+
+        return Promise.reject(error);
+    }
+);
+
 // User API
 export const getUser = () => {
     console.log("API call: Getting user");
@@ -13,17 +87,17 @@ export const getUser = () => {
 
 // Project APIs
 export const getProjects = () => {
-    console.log("API call: Getting projects")
+    console.log("API call: Getting projects");
     return axios.get('/api/projects').then((res) => res.data);
-}
+};
 
 export const getProject = (projectKey) => {
-    console.log("API call: Getting project")
+    console.log("API call: Getting project");
     return axios.get(`/api/projects/${projectKey}`).then((res) => res.data);
-}
+};
 
 export const createProject = (projectDTO, attachments) => {
-    console.log("API call: Creating project")
+    console.log("API call: Creating project");
     const formData = new FormData();
     formData.append('projectDTO', JSON.stringify(projectDTO));
     if (attachments) {
@@ -39,7 +113,7 @@ export const createProject = (projectDTO, attachments) => {
 };
 
 export const updateProject = (projectKey, projectDTO, attachments) => {
-    console.log("API call: Updating project")
+    console.log("API call: Updating project");
     const formData = new FormData();
     formData.append('projectDTO', JSON.stringify(projectDTO));
     if (attachments) {
@@ -56,7 +130,7 @@ export const updateProject = (projectKey, projectDTO, attachments) => {
 
 // Task APIs
 export const createTask = (projectKey, taskDTO, attachments) => {
-    console.log("API call: Creating task")
+    console.log("API call: Creating task");
     const formData = new FormData();
     formData.append('taskDTO', JSON.stringify(taskDTO));
     if (attachments) {
@@ -72,7 +146,7 @@ export const createTask = (projectKey, taskDTO, attachments) => {
 };
 
 export const updateTask = (projectKey, taskId, taskDTO, attachments) => {
-    console.log("API call: Updating task")
+    console.log("API call: Updating task");
     const formData = new FormData();
     formData.append('taskDTO', JSON.stringify(taskDTO));
     if (attachments) {
@@ -101,13 +175,13 @@ export const deleteProject = (projectKey) =>
 
 // Get all comments for a task
 export const getComments = (taskId) => {
-    console.log("API call: Getting comments")
+    console.log("API call: Getting comments");
     return axios.get(`/api/tasks/${taskId}/comments`).then((res) => res.data);
-}
+};
 
 // Create a new comment with attachments (plain text)
 export const createComment = (taskId, content, attachments, parentCommentId = null) => {
-    console.log("API call: Creating comment")
+    console.log("API call: Creating comment");
     const formData = new FormData();
     formData.append('content', content.content); // Assuming content is an object with 'content' key
     if (attachments) {
@@ -127,7 +201,7 @@ export const createComment = (taskId, content, attachments, parentCommentId = nu
 
 // Update an existing comment with attachments (plain text)
 export const updateComment = (taskId, commentId, content, attachments) => {
-    console.log("API call: Updating comment")
+    console.log("API call: Updating comment");
     const formData = new FormData();
     formData.append('content', content.content); // Assuming content is an object with 'content' key
     if (attachments) {
@@ -165,23 +239,22 @@ export const checkUserExists = (email) => {
 };
 
 export const getNotifications = () => {
-    console.log("API call: Getting notifications")
+    console.log("API call: Getting notifications");
     return axios.get('/api/notifications').then(res => res.data);
 };
 
 export const markNotificationsAsRead = (notificationIds) => {
-    console.log("API call: Marking notifications as read")
+    console.log("API call: Marking notifications as read");
     return axios.post('/api/notifications/mark-as-read', notificationIds).then(res => res.data);
 };
 
-
 export const getUserByEmail = (userEmail) => {
-    console.log("API call: Getting user by email")
+    console.log("API call: Getting user by email");
     return axios.get(`/api/users/${userEmail}`).then((res) => res.data);
-}
+};
 
 export const updateUser = (formData) => {
-    console.log("API call: Updating user")
+    console.log("API call: Updating user");
     return axios.put('/api/users', formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
@@ -190,11 +263,11 @@ export const updateUser = (formData) => {
 };
 
 export const getUserTasks = () => {
-    console.log("API call: Getting user tasks")
+    console.log("API call: Getting user tasks");
     return axios.get('/api/projects/null/tasks/assigned').then(res => res.data);
 };
 
 export const search = (query) => {
-    console.log("API call: Searching")
+    console.log("API call: Searching");
     return axios.get(`/api/search?q=${encodeURIComponent(query)}`).then(res => res.data);
 };
