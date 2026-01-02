@@ -1,11 +1,9 @@
-import React, {useState} from 'react';
-import {ErrorMessage, Field, Form, Formik} from 'formik';
+import React, { useState } from 'react';
+import { ErrorMessage, Field, Form, Formik } from 'formik';
 import * as Yup from 'yup';
-import css from './RegisterForm.module.css';
-import {useNavigate} from 'react-router-dom';
-import {request} from '../util/axios_helper';
-import {Slide, toast} from 'react-toastify';
+import { Slide, toast } from 'react-toastify';
 import EyeButton from './EyeButton';
+import { register } from '../util/api';
 
 const validationSchema = Yup.object().shape({
     firstname: Yup.string()
@@ -19,157 +17,127 @@ const validationSchema = Yup.object().shape({
     email: Yup.string()
         .email('Invalid email address format.')
         .required('Email is required.'),
-    // password: Yup.string()
-    //     .min(8, 'Password must be at least 8 characters.')
-    //     .max(20, 'Max length is 20.')
-    //     .required('Password is required.'),
+    password: Yup.string()
+        .min(6, 'Password must be at least 6 characters.')
+        .required('Password is required.'),
 });
 
-function displayNotification(message, type = 'error', duration = 2500, transition = Slide, position = 'top-center') {
+const showNotification = (message, type = 'error') => {
     toast[type](message, {
-        position: position,
-        autoClose: duration,
-        transition: transition,
+        position: 'top-center',
+        autoClose: 2500,
+        transition: Slide,
     });
-}
+};
 
 function RegisterForm({ onToggleForm }) {
-    const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
 
-    const handleRegister = (obj) => {
-        const { firstname, lastname, email, password } = obj;
-        request('POST', 'api/users', { firstname, lastname, email, password })
-            .then(() => {
-                navigate('/dashboard');
-            })
-            .catch((error) => {
-                const errorMessage =
-                    error.response && error.response.data && error.response.data.message
-                        ? error.response.data.message
-                        : 'Registration failed.';
-                displayNotification(errorMessage);
-                console.error('Register error:', error.response || error.message);
-            });
+    const handleSubmit = async (values, { setSubmitting }) => {
+        try {
+            await register(values);
+            // Force full page reload to trigger auth check with new cookies
+            window.location.href = '/dashboard';
+        } catch (error) {
+            const errorMessage = error.response?.data?.message || 'Registration failed.';
+            showNotification(errorMessage);
+            console.error('Register error:', error.response || error.message);
+        } finally {
+            setSubmitting(false);
+        }
     };
 
+    const inputClass = (hasError) => `w-full px-4 py-3 rounded-xl border ${
+        hasError
+            ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+            : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
+    } bg-slate-50 text-slate-900 text-sm transition-colors focus:ring-2 focus:outline-none`;
+
     return (
-        <div className={css['form-container']}>
-            <Formik
-                initialValues={{
-                    firstname: '',
-                    lastname: '',
-                    email: '',
-                    password: ''
-                }}
-                validationSchema={validationSchema}
-                validateOnChange={false}
-                validateOnBlur={false}
-                onSubmit={(values, {setSubmitting}) => {
-                    handleRegister(values);
-                    setSubmitting(false);
-                }}
-            >
-                {({errors}) => (
-                    <Form className="max-w-sm mx-auto">
-                        <div className={css['form-step']}>
-
-                            <div>
-                                <div className="py-3">
-                                    <h1 className="block text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-l from-blue-700 to-blue-500">
-                                        Get started
-                                    </h1>
-                                </div>
-                                <div className="flex items-start mb-6">
-                                    <label
-                                        htmlFor="terms"
-                                        className=" text-sm font-medium text-gray-900"
-                                    >
-                                        Already have an account?{' '}
-                                        <a
-                                            onClick={onToggleForm}
-                                            className="text-blue-600 hover:underline"
-                                        >
-                                            Log in
-                                        </a>
-                                    </label>
-                                </div>
-                                <div className="mb-3">
-                                    <h1 className="block text-md mt-1 font-bold text-gray-600">Create an account</h1>
-                                </div>
-                                <div className={`mb-3 ${errors.firstname ? "mb-1" : "mb-5"}`}>
-                                    <Field
-                                        type="text"
-                                        name="firstname"
-                                        className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                                        placeholder={`First name`}
-                                    ></Field>
-                                    <ErrorMessage
-                                        name="firstname"
-                                        component="span"
-                                        className={css.error}
-                                    />
-                                </div>
-                                <div className={`mb-3 ${errors.lastname ? "mb-1" : "mb-5"}`}>
-                                    <Field
-                                        type="text"
-                                        name="lastname"
-                                        className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                                        placeholder={`Last name`}
-                                    ></Field>
-                                    <ErrorMessage
-                                        name="lastname"
-                                        component="span"
-                                        className={css.error}
-                                    />
-                                </div>
-                                <div className={`mb-3 ${errors.email ? "mb-1" : "mb-5"}`}>
-                                    <Field
-                                        type="text"
-                                        name="email"
-                                        className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                                        placeholder={`Email`}
-                                    ></Field>
-                                    <ErrorMessage
-                                        name="email"
-                                        component="span"
-                                        className={css.error}
-                                    />
-                                </div>
-                                <div className={`mb-3 ${errors.password ? "mb-1" : "mb-5"}`}>
-
-                                    <div className="relative">
-                                        <Field
-                                            className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                                            type={showPassword ? "text" : "password"}
-                                            name="password"
-                                            placeholder={`Password`}
-                                        ></Field>
-                                        <EyeButton showPassword={showPassword}
-                                                   setShowPassword={setShowPassword}/>
-                                    </div>
-                                    <ErrorMessage
-                                        className={css.error}
-                                        name="password"
-                                        component="span"
-                                    />
-
-                                </div>
-
-                                <div className="relative w-full h-16">
-                                    <button
-                                        type="submit"
-                                        className="absolute top-0 right-0 text-white bg-blue-500 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5"
-                                    >
-                                        Create
-                                    </button>
-                                </div>
-                            </div>
+        <Formik
+            initialValues={{ firstname: '', lastname: '', email: '', password: '' }}
+            validationSchema={validationSchema}
+            onSubmit={handleSubmit}
+        >
+            {({ errors, touched, isSubmitting }) => (
+                <Form className="space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                First name
+                            </label>
+                            <Field
+                                type="text"
+                                name="firstname"
+                                className={inputClass(errors.firstname && touched.firstname)}
+                                placeholder="First name"
+                            />
+                            <ErrorMessage name="firstname" component="span" className="text-red-500 text-xs mt-1 block" />
                         </div>
-                    </Form>
-                )}
-            </Formik>
-        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Last name
+                            </label>
+                            <Field
+                                type="text"
+                                name="lastname"
+                                className={inputClass(errors.lastname && touched.lastname)}
+                                placeholder="Last name"
+                            />
+                            <ErrorMessage name="lastname" component="span" className="text-red-500 text-xs mt-1 block" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Email
+                        </label>
+                        <Field
+                            type="text"
+                            name="email"
+                            className={inputClass(errors.email && touched.email)}
+                            placeholder="Email"
+                        />
+                        <ErrorMessage name="email" component="span" className="text-red-500 text-xs mt-1 block" />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Password
+                        </label>
+                        <div className="relative">
+                            <Field
+                                type={showPassword ? 'text' : 'password'}
+                                name="password"
+                                className={`${inputClass(errors.password && touched.password)} pr-12`}
+                                placeholder="Password"
+                            />
+                            <EyeButton showPassword={showPassword} setShowPassword={setShowPassword} />
+                        </div>
+                        <ErrorMessage name="password" component="span" className="text-red-500 text-xs mt-1 block" />
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 disabled:opacity-50"
+                    >
+                        {isSubmitting ? 'Creating...' : 'Create'}
+                    </button>
+
+                    <p className="text-center text-sm text-slate-500">
+                        Already have an account?{' '}
+                        <button
+                            type="button"
+                            onClick={onToggleForm}
+                            className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                        >
+                            Log in
+                        </button>
+                    </p>
+                </Form>
+            )}
+        </Formik>
     );
 }
 

@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("api/auth")
-@CrossOrigin(origins = "${app.cors.allowed-origin}", allowCredentials = "true")
 public class AuthController {
 
     private final AuthService authService;

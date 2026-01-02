@@ -10,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.Base64;
 
 @Configuration
 public class JwtConfig {
@@ -26,8 +25,11 @@ public class JwtConfig {
 
     @Bean
     public SecretKey jwtSecretKey() {
+        if (secretKey == null || secretKey.length() < 32) {
+            throw new IllegalStateException("JWT secret must be at least 32 characters");
+        }
+
         try {
-            // Hash the secret key for better entropy
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(secretKey.getBytes(StandardCharsets.UTF_8));
             return new SecretKeySpec(hash, "HmacSHA256");

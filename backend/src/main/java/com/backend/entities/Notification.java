@@ -1,17 +1,18 @@
 package com.backend.entities;
 
 import jakarta.persistence.*;
-
 import java.util.Date;
 
 @Entity
-@Table(name = "notifications")
+@Table(name = "notifications", indexes = {
+        @Index(name = "idx_notification_user_read", columnList = "user_id, is_read"),
+        @Index(name = "idx_notification_user_timestamp", columnList = "user_id, timestamp")
+})
 public class Notification {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    // Recipient of the notification
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -23,7 +24,7 @@ public class Notification {
     @Column(nullable = false)
     private Date timestamp;
 
-    @Column(nullable = false)
+    @Column(name = "is_read", nullable = false)
     private Boolean isRead = false;
 
     @Enumerated(EnumType.STRING)
@@ -33,60 +34,24 @@ public class Notification {
     @Column
     private String link;
 
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
 
-    public Integer getId() {
-        return id;
-    }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
-    public void setId(Integer id) {
-        this.id = id;
-    }
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
 
-    public User getUser() {
-        return user;
-    }
+    public Date getTimestamp() { return timestamp; }
+    public void setTimestamp(Date timestamp) { this.timestamp = timestamp; }
 
-    public void setUser(User user) {
-        this.user = user;
-    }
+    public Boolean getIsRead() { return isRead; }
+    public void setIsRead(Boolean read) { isRead = read; }
 
-    public String getMessage() {
-        return message;
-    }
+    public NotificationType getType() { return type; }
+    public void setType(NotificationType type) { this.type = type; }
 
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public Date getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(Date timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public Boolean getIsRead() {
-        return isRead;
-    }
-
-    public void setIsRead(Boolean read) {
-        isRead = read;
-    }
-
-    public NotificationType getType() {
-        return type;
-    }
-
-    public void setType(NotificationType type) {
-        this.type = type;
-    }
-
-    public String getLink() {
-        return link;
-    }
-
-    public void setLink(String link) {
-        this.link = link;
-    }
+    public String getLink() { return link; }
+    public void setLink(String link) { this.link = link; }
 }

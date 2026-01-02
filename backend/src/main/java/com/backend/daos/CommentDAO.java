@@ -18,7 +18,9 @@ public class CommentDAO {
     private final CommentReactionRepository commentReactionRepository;
     private final TaskRepository taskRepository;
 
-    public CommentDAO(CommentRepository commentRepository, CommentReactionRepository commentReactionRepository, TaskRepository taskRepository) {
+    public CommentDAO(CommentRepository commentRepository,
+                      CommentReactionRepository commentReactionRepository,
+                      TaskRepository taskRepository) {
         this.commentRepository = commentRepository;
         this.commentReactionRepository = commentReactionRepository;
         this.taskRepository = taskRepository;
@@ -32,8 +34,19 @@ public class CommentDAO {
         return commentRepository.findById(id);
     }
 
-    public List<Comment> getTopLevelCommentsByTaskId(Integer taskId) {
-        return commentRepository.findByTaskIdAndParentCommentIsNull(taskId);
+    public Optional<Comment> getCommentByIdWithTaskAndProject(Integer id) {
+        return commentRepository.findByIdWithTaskAndProject(id);
+    }
+
+    public List<Comment> getTopLevelCommentsByTaskIdWithDetails(Integer taskId) {
+        return commentRepository.findTopLevelCommentsByTaskIdWithDetails(taskId);
+    }
+
+    public List<Comment> getRepliesByParentIds(List<Integer> parentIds) {
+        if (parentIds.isEmpty()) {
+            return List.of();
+        }
+        return commentRepository.findRepliesByParentIdsWithDetails(parentIds);
     }
 
     public Comment updateComment(Comment comment) {

@@ -8,7 +8,7 @@ public record ProjectDTO(
         String summary,
         String description,
         List<TaskDTO> tasks,
-        List<UserDTO> users,
+        List<UserDTO> members,      // Renamed from 'users'
         List<String> attachments,
         UserDTO owner,
         List<String> dependencies

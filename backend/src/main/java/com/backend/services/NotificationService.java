@@ -4,7 +4,9 @@ import com.backend.daos.NotificationDAO;
 import com.backend.entities.Notification;
 import com.backend.entities.NotificationType;
 import com.backend.entities.User;
+import com.backend.exception.AuthorizationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
@@ -31,8 +33,17 @@ public class NotificationService {
         return notificationDAO.getAllNotificationsByUserId(userId);
     }
 
-    public void markNotificationsAsRead(List<Integer> notificationIds) {
+    @Transactional
+    public void markNotificationsAsRead(List<Integer> notificationIds, Integer userId) {
         List<Notification> notifications = notificationDAO.findAllById(notificationIds);
+
+        // Verify ownership of all notifications
+        for (Notification notification : notifications) {
+            if (!notification.getUser().getId().equals(userId)) {
+                throw new AuthorizationException("Access denied to notification");
+            }
+        }
+
         for (Notification notification : notifications) {
             notification.setIsRead(true);
         }

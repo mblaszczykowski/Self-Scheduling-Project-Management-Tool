@@ -40,12 +40,10 @@ public class UserService {
         return userDAO.existsUserWithEmail(email);
     }
 
-    // Internal method for AuthService - doesn't throw exception
     public User findUserByEmail(String email) {
         return userDAO.getUserByEmail(email).orElse(null);
     }
 
-    // Public method for controllers - throws exception
     public User getUserByEmail(String email) {
         return userDAO.getUserByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -53,20 +51,13 @@ public class UserService {
 
     @Transactional
     public ResponseEntity<?> registerUser(UserRegistrationRequest request) {
-        // Validate request
         validateRegistrationRequest(request);
-
-        // Validate password strength
         ValidationUtil.validatePassword(request.password());
-
-        // Validate names
         ValidationUtil.validateName(request.firstname(), "First name");
         ValidationUtil.validateName(request.lastname(), "Last name");
 
-        // Hash password with BCrypt
         String hashedPassword = passwordEncoder.encode(request.password());
 
-        // Create user
         User user = new User(
                 request.firstname().trim(),
                 request.lastname().trim(),
@@ -74,9 +65,8 @@ public class UserService {
                 hashedPassword
         );
 
-        userDAO.addUser(user);
+        userDAO.save(user);
 
-        // Generate auth tokens
         TokenService.AuthTokens tokens = tokenService.createAuthTokens(user.getId());
 
         return ResponseEntity.ok()
@@ -115,7 +105,6 @@ public class UserService {
         User user = userDAO.getUserById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Validate and update names
         if (!ValidationUtil.isNullOrEmpty(firstname)) {
             ValidationUtil.validateName(firstname, "First name");
             user.setFirstname(firstname.trim());
@@ -126,13 +115,11 @@ public class UserService {
             user.setLastname(lastname.trim());
         }
 
-        // Validate and update email
         if (!ValidationUtil.isNullOrEmpty(email)) {
             if (!ValidationUtil.isValidEmail(email)) {
                 throw new ValidationException("Invalid email format");
             }
 
-            // Check if email is taken by another user
             String normalizedEmail = email.toLowerCase().trim();
             if (!normalizedEmail.equals(user.getEmail()) &&
                     userDAO.existsUserWithEmail(normalizedEmail)) {
@@ -141,41 +128,32 @@ public class UserService {
             user.setEmail(normalizedEmail);
         }
 
-        // Update password if provided
         if (!ValidationUtil.isNullOrEmpty(currentPassword) &&
                 !ValidationUtil.isNullOrEmpty(newPassword)) {
 
-            // Verify current password
             if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
                 throw new ValidationException("Current password is incorrect");
             }
 
-            // Validate new password
             ValidationUtil.validatePassword(newPassword);
-
-            // Hash and set new password
             user.setPassword(passwordEncoder.encode(newPassword));
         }
 
-        // Update profile picture if provided
         if (profilePicture != null && !profilePicture.isEmpty()) {
-            // Validate file type
             String contentType = profilePicture.getContentType();
             if (contentType == null || !contentType.startsWith("image/")) {
                 throw new ValidationException("Invalid file type. Only images are allowed");
             }
 
-            // Delete old profile picture if exists
             if (user.getProfilePicture() != null) {
                 fileStorageService.deleteFile(user.getProfilePicture());
             }
 
-            // Store new profile picture
             String profilePicturePath = fileStorageService.storeFile(profilePicture);
             user.setProfilePicture(profilePicturePath);
         }
 
-        userDAO.saveUser(user);
+        userDAO.save(user);
 
         return new UserDTO(
                 user.getId(),

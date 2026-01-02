@@ -42,8 +42,12 @@ public class NotificationController {
     }
 
     @PostMapping("/mark-as-read")
-    public ResponseEntity<Void> markAsRead(@RequestBody List<Integer> notificationIds) {
-        notificationService.markNotificationsAsRead(notificationIds);
+    public ResponseEntity<Void> markAsRead(
+            HttpServletRequest request,
+            @RequestBody List<Integer> notificationIds
+    ) {
+        Integer userId = tokenService.getUserIdFromRequest(request);
+        notificationService.markNotificationsAsRead(notificationIds, userId);
         return ResponseEntity.ok().build();
     }
 }

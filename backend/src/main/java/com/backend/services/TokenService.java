@@ -4,10 +4,10 @@ import com.backend.entities.RefreshToken;
 import com.backend.exception.AuthorizationException;
 import com.backend.repositories.RefreshTokenRepository;
 import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,19 +25,24 @@ public class TokenService {
     private final Duration accessTokenExpiration;
     private final Duration refreshTokenExpiration;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final boolean secureCookie;
+    private final String sameSite;
 
     @Autowired
     public TokenService(SecretKey jwtSecretKey,
                         Duration accessTokenExpiration,
                         Duration refreshTokenExpiration,
-                        RefreshTokenRepository refreshTokenRepository) {
+                        RefreshTokenRepository refreshTokenRepository,
+                        @Value("${app.cookie.secure:true}") boolean secureCookie,
+                        @Value("${app.cookie.same-site:Strict}") String sameSite) {
         this.jwtSecretKey = jwtSecretKey;
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.secureCookie = secureCookie;
+        this.sameSite = sameSite;
     }
 
-    // Generate Access Token
     public String generateAccessToken(Integer userId) {
         Date expiration = Date.from(Instant.now().plus(accessTokenExpiration));
 
@@ -50,13 +55,10 @@ public class TokenService {
                 .compact();
     }
 
-    // Generate Refresh Token
     @Transactional
     public String generateRefreshToken(Integer userId) {
-        // Clean up old refresh tokens for this user
         refreshTokenRepository.deleteByUserId(userId);
 
-        // Generate new refresh token
         String tokenValue = UUID.randomUUID().toString();
         Instant expiryDate = Instant.now().plus(refreshTokenExpiration);
 
@@ -70,36 +72,37 @@ public class TokenService {
         return tokenValue;
     }
 
-    // Create Auth Cookies
     public AuthTokens createAuthTokens(Integer userId) {
         String accessToken = generateAccessToken(userId);
         String refreshToken = generateRefreshToken(userId);
 
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
                 .httpOnly(true)
-                .secure(false) // Set to true in production with HTTPS
+                .secure(secureCookie)
                 .path("/")
                 .maxAge(accessTokenExpiration)
-                .sameSite("Lax")
+                .sameSite(sameSite)
                 .build();
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .secure(false) // Set to true in production with HTTPS
-                .path("/api/auth/refresh")
+                .secure(secureCookie)
+                .path("/")
                 .maxAge(refreshTokenExpiration)
-                .sameSite("Lax")
+                .sameSite(sameSite)
                 .build();
 
         return new AuthTokens(accessCookie, refreshCookie);
     }
 
-    // Getter for access token expiration (for use in AuthService)
     public Duration getAccessTokenExpiration() {
         return accessTokenExpiration;
     }
 
-    // Validate Access Token
+    public boolean isSecureCookie() {
+        return secureCookie;
+    }
+
     public Integer validateTokenAndGetUserId(String token) {
         try {
             Claims claims = Jwts.parserBuilder()
@@ -108,7 +111,6 @@ public class TokenService {
                     .parseClaimsJws(token)
                     .getBody();
 
-            // Verify it's an access token
             String tokenType = claims.get("type", String.class);
             if (!"access".equals(tokenType)) {
                 return null;
@@ -120,7 +122,6 @@ public class TokenService {
         }
     }
 
-    // Validate Refresh Token
     @Transactional
     public Integer validateRefreshToken(String token) {
         RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
@@ -136,9 +137,7 @@ public class TokenService {
         return refreshToken.getUserId();
     }
 
-    // Extract Token from Request
     public String extractTokenFromRequest(HttpServletRequest request) {
-        // Try to get from cookie first
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
                 if ("accessToken".equals(cookie.getName())) {
@@ -147,7 +146,6 @@ public class TokenService {
             }
         }
 
-        // Fallback to Authorization header (for API clients)
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7);
@@ -156,7 +154,6 @@ public class TokenService {
         return null;
     }
 
-    // Get User ID from Request (for use in controllers)
     public Integer getUserIdFromRequest(HttpServletRequest request) {
         Integer userId = (Integer) request.getAttribute("userId");
         if (userId == null) {
@@ -165,19 +162,16 @@ public class TokenService {
         return userId;
     }
 
-    // Revoke Refresh Token (for logout)
     @Transactional
     public void revokeRefreshToken(Integer userId) {
         refreshTokenRepository.deleteByUserId(userId);
     }
 
-    // Clean up expired tokens (scheduled job)
     @Transactional
     public void cleanupExpiredTokens() {
         refreshTokenRepository.deleteByExpiryDateBefore(Instant.now());
     }
 
-    // Inner class for returning both cookies
     public static class AuthTokens {
         private final ResponseCookie accessCookie;
         private final ResponseCookie refreshCookie;

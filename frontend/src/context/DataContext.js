@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useEffect, useState } from 'react';
 import {
     createComment as apiCreateComment,
     createProject as apiCreateProject,
@@ -10,7 +10,6 @@ import {
     getNotifications,
     getProjects,
     getUserByEmail,
-    getUserTasks,
     reactToComment as apiReactToComment,
     updateComment as apiUpdateComment,
     updateProject as apiUpdateProject,
@@ -24,33 +23,26 @@ export const DataProvider = ({ children, initialUser }) => {
     const navigate = useNavigate();
     const [user, setUser] = useState(initialUser);
     const [projects, setProjects] = useState([]);
-    const [userTasks, setUserTasks] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    useEffect(() => {
-        // Only fetch data if user is authenticated
-        if (user) {
-            fetchUserData();
-        } else {
-            setLoading(false);
-        }
-    }, [user]);
-
-    const fetchUserData = async () => {
+    const fetchUserData = useCallback(async (signal) => {
         try {
-            const [fetchedProjects, fetchedTasks, fetchedNotifications] = await Promise.all([
+            const [fetchedProjects, fetchedNotifications] = await Promise.all([
                 getProjects(),
-                getUserTasks(),
                 getNotifications()
             ]);
+
+            if (signal?.aborted) return;
+
             setProjects(fetchedProjects);
-            setUserTasks(fetchedTasks);
             setNotifications(fetchedNotifications);
+            setError(null);
         } catch (err) {
+            if (signal?.aborted) return;
+
             setError(err);
-            // Only redirect to login if we get a 401 and we're not already on a public page
             if (err.response?.status === 401) {
                 const publicPaths = ['/login', '/register', '/'];
                 if (!publicPaths.includes(window.location.pathname)) {
@@ -58,221 +50,138 @@ export const DataProvider = ({ children, initialUser }) => {
                 }
             }
         } finally {
-            setLoading(false);
+            if (!signal?.aborted) {
+                setLoading(false);
+            }
         }
-    };
+    }, [navigate]);
 
-    const handleSetUser = (fetchedUser) => {
-        setUser(fetchedUser);
-    };
+    useEffect(() => {
+        if (!user) {
+            setLoading(false);
+            return;
+        }
 
-    // Refresh functions
-    const refreshProjects = async () => {
+        const abortController = new AbortController();
+        fetchUserData(abortController.signal);
+
+        return () => abortController.abort();
+    }, [user, fetchUserData]);
+
+    const refreshProjects = useCallback(async () => {
         try {
             const fetchedProjects = await getProjects();
             setProjects(fetchedProjects);
         } catch (err) {
             console.error('Error refreshing projects:', err);
         }
-    };
+    }, []);
 
-    const refreshUserTasks = async () => {
-        try {
-            const fetchedUserTasks = await getUserTasks();
-            setUserTasks(fetchedUserTasks);
-        } catch (err) {
-            console.error('Error refreshing user tasks:', err);
-        }
-    };
-
-    const refreshNotifications = async () => {
+    const refreshNotifications = useCallback(async () => {
         try {
             const fetchedNotifications = await getNotifications();
             setNotifications(fetchedNotifications);
         } catch (err) {
             console.error('Error refreshing notifications:', err);
         }
-    };
+    }, []);
 
-    // API Interaction Functions
+    // Task operations
+    const createTask = useCallback(async (projectKey, taskDTO, attachments = []) => {
+        const response = await apiCreateTask(projectKey, taskDTO, attachments);
+        await refreshProjects();
+        return response;
+    }, [refreshProjects]);
 
-    // Create Task
-    const createTask = async (projectKey, taskDTO, attachments = []) => {
-        try {
-            const response = await apiCreateTask(projectKey, taskDTO, attachments);
-            await refreshProjects(); // Refresh projects to include the new task
-            await refreshUserTasks(); // Refresh user tasks if necessary
-            return response;
-        } catch (err) {
-            console.error('Error creating task:', err);
-            throw err;
-        }
-    };
+    const updateTask = useCallback(async (projectKey, taskKey, taskDTO, attachments = []) => {
+        const response = await apiUpdateTask(projectKey, taskKey, taskDTO, attachments);
+        await refreshProjects();
+        return response;
+    }, [refreshProjects]);
 
-    // Update Task
-    const updateTask = async (projectKey, taskId, taskDTO, attachments = []) => {
-        try {
-            const response = await apiUpdateTask(projectKey, taskId, taskDTO, attachments);
-            await refreshProjects(); // Refresh projects to reflect changes
-            await refreshUserTasks(); // Refresh user tasks if necessary
-            return response;
-        } catch (err) {
-            console.error('Error updating task:', err);
-            throw err;
-        }
-    };
+    const deleteTask = useCallback(async (projectKey, taskKey) => {
+        const response = await apiDeleteTask(projectKey, taskKey);
+        await refreshProjects();
+        return response;
+    }, [refreshProjects]);
 
-    // Delete Task
-    const deleteTask = async (projectKey, taskId) => {
-        try {
-            const response = await apiDeleteTask(projectKey, taskId);
-            await refreshProjects(); // Refresh projects to remove the deleted task
-            await refreshUserTasks(); // Refresh user tasks if necessary
-            return response;
-        } catch (err) {
-            console.error('Error deleting task:', err);
-            throw err;
-        }
-    };
+    // Project operations
+    const createProject = useCallback(async (projectDTO, attachments = []) => {
+        const response = await apiCreateProject(projectDTO, attachments);
+        await refreshProjects();
+        return response;
+    }, [refreshProjects]);
 
-    // Create Project
-    const createProject = async (projectDTO, attachments = []) => {
-        try {
-            const response = await apiCreateProject(projectDTO, attachments);
-            await refreshProjects(); // Refresh projects to include the new project
-            return response;
-        } catch (err) {
-            console.error('Error creating project:', err);
-            throw err;
-        }
-    };
+    const updateProject = useCallback(async (projectKey, projectDTO, attachments = []) => {
+        const response = await apiUpdateProject(projectKey, projectDTO, attachments);
+        await refreshProjects();
+        return response;
+    }, [refreshProjects]);
 
-    // Update Project
-    const updateProject = async (projectKey, projectDTO, attachments = []) => {
-        try {
-            const response = await apiUpdateProject(projectKey, projectDTO, attachments);
-            await refreshProjects(); // Refresh projects to reflect changes
-            return response;
-        } catch (err) {
-            console.error('Error updating project:', err);
-            throw err;
-        }
-    };
+    const deleteProject = useCallback(async (projectKey) => {
+        const response = await apiDeleteProject(projectKey);
+        await refreshProjects();
+        return response;
+    }, [refreshProjects]);
 
-    // Delete Project
-    const deleteProject = async (projectKey) => {
-        try {
-            const response = await apiDeleteProject(projectKey);
-            await refreshProjects(); // Refresh projects to remove the deleted project
-            return response;
-        } catch (err) {
-            console.error('Error deleting project:', err);
-            throw err;
-        }
-    };
+    // Comment operations
+    const getComments = useCallback((taskId) => apiGetComments(taskId), []);
 
-    // **Comment-Related Functions**
+    const createComment = useCallback((taskId, content, attachments, parentCommentId = null) =>
+        apiCreateComment(taskId, content, attachments, parentCommentId), []);
 
-    // Get all comments for a task
-    const getComments = async (taskId) => {
-        try {
-            const comments = await apiGetComments(taskId);
-            return comments;
-        } catch (err) {
-            console.error('Error fetching comments:', err);
-            throw err;
-        }
-    };
+    const updateComment = useCallback((taskId, commentId, content, attachments) =>
+        apiUpdateComment(taskId, commentId, content, attachments), []);
 
-    // Create a new comment
-    const createComment = async (taskId, content, attachments, parentCommentId = null) => {
-        try {
-            const comment = await apiCreateComment(taskId, content, attachments, parentCommentId);
-            return comment;
-        } catch (err) {
-            console.error('Error creating comment:', err);
-            throw err;
-        }
-    };
+    const deleteComment = useCallback((taskId, commentId) =>
+        apiDeleteComment(taskId, commentId), []);
 
-    // Update an existing comment
-    const updateComment = async (taskId, commentId, content, attachments) => {
-        try {
-            const updatedComment = await apiUpdateComment(taskId, commentId, content, attachments);
-            return updatedComment;
-        } catch (err) {
-            console.error('Error updating comment:', err);
-            throw err;
-        }
-    };
+    const reactToComment = useCallback((taskId, commentId, reactionType) =>
+        apiReactToComment(taskId, commentId, reactionType), []);
 
-    // Delete a comment
-    const deleteComment = async (taskId, commentId) => {
-        try {
-            const response = await apiDeleteComment(taskId, commentId);
-            return response;
-        } catch (err) {
-            console.error('Error deleting comment:', err);
-            throw err;
-        }
-    };
+    // User operations
+    const addUserToProject = useCallback(async (projectKey, userEmail) => {
+        const foundUser = await getUserByEmail(userEmail);
+        if (!foundUser) throw new Error('User not found');
 
-    // React to a comment
-    const reactToComment = async (taskId, commentId, reactionType) => {
-        try {
-            const response = await apiReactToComment(taskId, commentId, reactionType);
-            return response;
-        } catch (err) {
-            console.error('Error reacting to comment:', err);
-            throw err;
-        }
-    };
+        const projectToUpdate = projects.find(p => p.projectKey === projectKey);
+        if (!projectToUpdate) throw new Error('Project not found');
 
-    // User Management
-    const addUserToProject = async (projectKey, userEmail) => {
-        try {
-            const user = await getUserByEmail(userEmail);
-            if (!user) throw new Error('User not found');
-            const updatedProject = {
-                ...projects.find(p => p.projectKey === projectKey),
-                users: [...projects.find(p => p.projectKey === projectKey).users, user],
-            };
-            await updateProject(projectKey, updatedProject);
-            return updatedProject;
-        } catch (err) {
-            console.error('Error adding user to project:', err);
-            throw err;
-        }
+        const updatedProject = {
+            ...projectToUpdate,
+            members: [...projectToUpdate.members, foundUser],
+        };
+        await updateProject(projectKey, updatedProject);
+        return updatedProject;
+    }, [projects, updateProject]);
+
+    const value = {
+        user,
+        projects,
+        notifications,
+        loading,
+        error,
+        setUser,
+        setNotifications,
+        refreshProjects,
+        refreshUserTasks: refreshProjects, // Alias for compatibility
+        refreshNotifications,
+        createTask,
+        updateTask,
+        deleteTask,
+        createProject,
+        updateProject,
+        deleteProject,
+        getComments,
+        createComment,
+        updateComment,
+        deleteComment,
+        reactToComment,
+        addUserToProject,
     };
 
     return (
-        <DataContext.Provider
-            value={{
-                user,
-                projects,
-                userTasks,
-                notifications,
-                loading,
-                error,
-                refreshProjects,
-                refreshUserTasks,
-                refreshNotifications,
-                createTask,
-                updateTask,
-                deleteTask,
-                createProject,
-                updateProject,
-                deleteProject,
-                getComments,
-                createComment,
-                updateComment,
-                deleteComment,
-                reactToComment,
-                setNotifications,
-                addUserToProject,
-                setUser: handleSetUser
-            }}
-        >
+        <DataContext.Provider value={value}>
             {children}
         </DataContext.Provider>
     );

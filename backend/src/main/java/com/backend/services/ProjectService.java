@@ -10,10 +10,12 @@ import com.backend.entities.NotificationType;
 import com.backend.entities.Project;
 import com.backend.entities.Task;
 import com.backend.entities.User;
+import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.util.ValidationUtil;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
@@ -47,34 +49,46 @@ public class ProjectService {
         this.cpmHelper = new CriticalPathMethodHelper();
     }
 
+    @Transactional
     public ProjectDTO createProject(ProjectDTO projectDTO, Integer userId, List<MultipartFile> attachments) {
         validateProjectDTO(projectDTO);
-        User creator = userDAO.getUserById(userId)
+
+        if (projectDAO.existsByProjectKey(projectDTO.projectKey())) {
+            throw new ValidationException("Project key already exists: " + projectDTO.projectKey());
+        }
+
+        User owner = userDAO.getUserById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<String> attachmentUrls = new ArrayList<>();
+        if (attachments != null && !attachments.isEmpty()) {
+            attachmentUrls = fileStorageService.storeFiles(attachments);
+        }
+
         Project project = new Project();
         project.setProjectKey(projectDTO.projectKey());
         project.setSummary(projectDTO.summary());
         project.setDescription(projectDTO.description());
-        project.setUser(creator);
-        if (attachments != null && !attachments.isEmpty()) {
-            List<String> attachmentUrls = fileStorageService.storeFiles(attachments);
-            project.setAttachments(attachmentUrls);
-        }
-        Set<User> users = new HashSet<>();
-        users.add(creator);
-        if (projectDTO.users() != null) {
-            for (UserDTO userDTO : projectDTO.users()) {
-                String email = userDTO.email();
-                if (!email.equals(creator.getEmail())) {
-                    User user = userDAO.getUserByEmail(email)
-                            .orElseThrow(() -> new ValidationException("User with email " + email + " does not exist. Ask them to create an account first."));
-                    users.add(user);
+        project.setOwner(owner);
+        project.setNextTaskNumber(1);
+        project.setAttachments(attachmentUrls);
+
+        Set<User> members = new HashSet<>();
+        members.add(owner);
+
+        // Frontend sends members array with email objects
+        if (projectDTO.members() != null) {
+            for (UserDTO memberDTO : projectDTO.members()) {
+                if (!memberDTO.email().equals(owner.getEmail())) {
+                    User member = userDAO.getUserByEmail(memberDTO.email())
+                            .orElseThrow(() -> new ValidationException(
+                                    "User with email " + memberDTO.email() + " does not exist"));
+                    members.add(member);
                 }
             }
         }
-        project.setUsers(new ArrayList<>(users));
+        project.setMembers(new ArrayList<>(members));
 
-        // Handle dependencies
         if (projectDTO.dependencies() != null && !projectDTO.dependencies().isEmpty()) {
             List<Project> dependencies = projectDTO.dependencies().stream()
                     .map(depKey -> projectDAO.getProjectByKey(depKey)
@@ -83,26 +97,33 @@ public class ProjectService {
             project.setDependencies(dependencies);
         }
 
-        projectDAO.addProject(project);
-        for (User user : users) {
-            if (!user.getId().equals(creator.getId())) {
-                String message = "You have been added to the project: " + project.getSummary();
+        Project savedProject = projectDAO.save(project);
+
+        for (User member : members) {
+            if (!member.getId().equals(owner.getId())) {
+                String message = "You have been added to project: " + project.getSummary();
                 String link = "/projects/" + project.getProjectKey();
-                notificationService.createNotification(user, message, NotificationType.PROJECT_INVITATION, link);
+                notificationService.createNotification(member, message,
+                        NotificationType.PROJECT_INVITATION, link);
             }
         }
-        return convertToDTO(project);
+
+        return convertToDTO(savedProject);
     }
 
+    @Transactional(readOnly = true)
     public ProjectDTO getProjectByKey(String projectKey, Integer userId) {
         Project project = projectDAO.getProjectByKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-        if (!project.getUser().getId().equals(userId)) {
-            throw new ResourceNotFoundException("Project not found for this user");
+
+        if (!project.hasAccess(userId)) {
+            throw new ResourceNotFoundException("Project not found");
         }
+
         return convertToDTOWithCPM(project);
     }
 
+    @Transactional(readOnly = true)
     public List<ProjectDTO> getAllProjects(Integer userId) {
         List<Project> projects = projectDAO.getProjectsByUserId(userId);
         return projects.stream()
@@ -110,15 +131,20 @@ public class ProjectService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public ProjectDTO updateProject(ProjectDTO projectDTO, Integer userId, List<MultipartFile> attachments) {
         validateProjectDTO(projectDTO);
+
         Project project = projectDAO.getProjectByKey(projectDTO.projectKey())
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-        if (!project.getUser().getId().equals(userId)) {
-            throw new ResourceNotFoundException("Project not found for this user");
+
+        if (!project.isOwner(userId)) {
+            throw new AuthorizationException("Only project owner can update the project");
         }
+
         project.setSummary(projectDTO.summary());
         project.setDescription(projectDTO.description());
+
         if (attachments != null && !attachments.isEmpty()) {
             List<String> newAttachments = fileStorageService.storeFiles(attachments);
             if (project.getAttachments() != null) {
@@ -127,31 +153,35 @@ public class ProjectService {
                 project.setAttachments(newAttachments);
             }
         }
-        List<User> oldUsers = new ArrayList<>(project.getUsers());
-        if (projectDTO.users() != null) {
-            Set<User> users = new HashSet<>();
-            User currentUser = userDAO.getUserById(userId)
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-            users.add(currentUser);
-            for (UserDTO userDTO : projectDTO.users()) {
-                String email = userDTO.email();
-                if (!email.equals(currentUser.getEmail())) {
-                    User user = userDAO.getUserByEmail(email)
-                            .orElseThrow(() -> new ValidationException("User with email " + email + " does not exist. Ask them to create an account first."));
-                    users.add(user);
+
+        List<User> oldMembers = new ArrayList<>(project.getMembers());
+
+        // Handle members update - frontend sends members array
+        if (projectDTO.members() != null) {
+            Set<User> newMembers = new HashSet<>();
+            User owner = project.getOwner();
+            newMembers.add(owner);
+
+            for (UserDTO memberDTO : projectDTO.members()) {
+                if (!memberDTO.email().equals(owner.getEmail())) {
+                    User member = userDAO.getUserByEmail(memberDTO.email())
+                            .orElseThrow(() -> new ValidationException(
+                                    "User with email " + memberDTO.email() + " does not exist"));
+                    newMembers.add(member);
                 }
             }
-            project.setUsers(new ArrayList<>(users));
-            for (User user : users) {
-                if (!oldUsers.contains(user) && !user.getId().equals(currentUser.getId())) {
-                    String message = "You have been added to the project: " + project.getSummary();
+            project.setMembers(new ArrayList<>(newMembers));
+
+            for (User member : newMembers) {
+                if (!oldMembers.contains(member) && !member.getId().equals(owner.getId())) {
+                    String message = "You have been added to project: " + project.getSummary();
                     String link = "/projects/" + project.getProjectKey();
-                    notificationService.createNotification(user, message, NotificationType.PROJECT_INVITATION, link);
+                    notificationService.createNotification(member, message,
+                            NotificationType.PROJECT_INVITATION, link);
                 }
             }
         }
 
-        // Update dependencies
         if (projectDTO.dependencies() != null) {
             List<Project> dependencies = projectDTO.dependencies().stream()
                     .map(depKey -> projectDAO.getProjectByKey(depKey)
@@ -160,104 +190,116 @@ public class ProjectService {
             project.setDependencies(dependencies);
         }
 
-        projectDAO.updateProject(project);
-        return convertToDTO(project);
+        Project updatedProject = projectDAO.save(project);
+        return convertToDTO(updatedProject);
     }
 
+    @Transactional
     public void deleteProject(String projectKey, Integer userId) {
         Project project = projectDAO.getProjectByKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-        if (!project.getUser().getId().equals(userId)) {
-            throw new ResourceNotFoundException("Project not found for this user");
+
+        if (!project.isOwner(userId)) {
+            throw new AuthorizationException("Only project owner can delete the project");
         }
+
         projectDAO.deleteProject(project);
     }
 
     private void validateProjectDTO(ProjectDTO projectDTO) {
-        if (ValidationUtil.isNullOrEmpty(projectDTO.projectKey()) || ValidationUtil.isNullOrEmpty(projectDTO.summary())) {
+        if (ValidationUtil.isNullOrEmpty(projectDTO.projectKey()) ||
+                ValidationUtil.isNullOrEmpty(projectDTO.summary())) {
             throw new ValidationException("Project key and summary are required");
+        }
+
+        if (!projectDTO.projectKey().matches("^[A-Z][A-Z0-9]*$")) {
+            throw new ValidationException(
+                    "Project key must start with a letter and contain only uppercase letters and numbers");
         }
     }
 
     private ProjectDTO convertToDTO(Project project) {
         List<TaskDTO> tasks = project.getTasks() != null
-                ? project.getTasks().stream().map(taskService::convertToDTO).collect(Collectors.toList())
-                : null;
-        List<UserDTO> users = project.getUsers() != null
-                ? project.getUsers().stream()
-                .map(u -> new UserDTO(u.getId(), u.getFirstname(), u.getLastname(), u.getEmail(), u.getProfilePicture()))
+                ? project.getTasks().stream()
+                .map(taskService::convertToDTO)
                 .collect(Collectors.toList())
-                : null;
-        User owner = project.getUser();
-        UserDTO ownerDTO = new UserDTO(owner.getId(), owner.getFirstname(), owner.getLastname(), owner.getEmail(), owner.getProfilePicture());
+                : new ArrayList<>();
+
+        List<UserDTO> members = project.getMembers() != null
+                ? project.getMembers().stream()
+                .map(this::convertUserToDTO)
+                .collect(Collectors.toList())
+                : new ArrayList<>();
+
+        UserDTO ownerDTO = convertUserToDTO(project.getOwner());
+
         List<String> dependencyKeys = project.getDependencies() != null
                 ? project.getDependencies().stream()
                 .map(Project::getProjectKey)
                 .collect(Collectors.toList())
-                : null;
+                : new ArrayList<>();
+
+        List<String> attachments = project.getAttachments() != null
+                ? new ArrayList<>(project.getAttachments())
+                : new ArrayList<>();
+
         return new ProjectDTO(
                 project.getId(),
                 project.getProjectKey(),
                 project.getSummary(),
                 project.getDescription(),
                 tasks,
-                users,
-                project.getAttachments(),
+                members,
+                attachments,
                 ownerDTO,
-                dependencyKeys // Include dependencies
+                dependencyKeys
         );
     }
 
     private ProjectDTO convertToDTOWithCPM(Project project) {
-        List<Task> tasks = taskDAO.getTasksByProjectId(project.getId());
-        tasks.sort(Comparator.comparingInt(Task::getId));
-        List<TaskDTO> taskDTOs = tasks.stream().map(this::mapToTaskDTO).collect(Collectors.toList());
+        List<Task> tasks = taskDAO.getTasksByProjectIdWithDetails(project.getId());
+        tasks.sort(Comparator.comparingInt(Task::getTaskNumber));
+
+        List<TaskDTO> taskDTOs = tasks.stream()
+                .map(taskService::convertToDTO)
+                .collect(Collectors.toList());
+
         List<TaskDTO> updatedTaskDTOs = cpmHelper.calculateTaskDTOsWithCPM(taskDTOs);
+
+        List<UserDTO> members = project.getMembers().stream()
+                .map(this::convertUserToDTO)
+                .collect(Collectors.toList());
+
         List<String> dependencyKeys = project.getDependencies() != null
                 ? project.getDependencies().stream()
                 .map(Project::getProjectKey)
                 .collect(Collectors.toList())
-                : null;
+                : new ArrayList<>();
+
+        List<String> attachments = project.getAttachments() != null
+                ? new ArrayList<>(project.getAttachments())
+                : new ArrayList<>();
+
         return new ProjectDTO(
                 project.getId(),
                 project.getProjectKey(),
                 project.getSummary(),
                 project.getDescription(),
                 updatedTaskDTOs,
-                project.getUsers().stream()
-                        .map(u -> new UserDTO(u.getId(), u.getFirstname(), u.getLastname(), u.getEmail(), u.getProfilePicture()))
-                        .collect(Collectors.toList()),
-                project.getAttachments(),
-                new UserDTO(project.getUser().getId(), project.getUser().getFirstname(), project.getUser().getLastname(), project.getUser().getEmail(), project.getUser().getProfilePicture()),
+                members,
+                attachments,
+                convertUserToDTO(project.getOwner()),
                 dependencyKeys
         );
     }
 
-    private TaskDTO mapToTaskDTO(Task task) {
-        List<Integer> dependencies = task.getDependencies() != null
-                ? task.getDependencies().stream().map(Task::getId).collect(Collectors.toList())
-                : new ArrayList<>();
-        String assigneeEmail = task.getAssignee() != null ? task.getAssignee().getEmail() : null;
-        var labels = (task.getLabels() != null) ? Arrays.asList(task.getLabels().split(",")) : null;
-
-        return new TaskDTO(
-                task.getId(),
-                task.getProject().getProjectKey(),
-                task.getProject().getProjectKey() + "-" + task.getId(),
-                task.getSummary(),
-                task.getDescription(),
-                task.getStatus(),
-                task.getStartDate(),
-                task.getDueDate(),
-                assigneeEmail,
-                labels,
-                dependencies,
-                null,
-                task.getAttachments(),
-                task.getCreated(),
-                task.getUpdated(),
-                task.getProgress(),
-                task.getPriority()
+    private UserDTO convertUserToDTO(User user) {
+        return new UserDTO(
+                user.getId(),
+                user.getFirstname(),
+                user.getLastname(),
+                user.getEmail(),
+                user.getProfilePicture()
         );
     }
 }

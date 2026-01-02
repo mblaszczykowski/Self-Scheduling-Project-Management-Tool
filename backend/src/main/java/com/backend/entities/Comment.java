@@ -3,11 +3,16 @@ package com.backend.entities;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 @Entity
-@Table(name = "comments")
+@Table(name = "comments", indexes = {
+        @Index(name = "idx_comment_task", columnList = "task_id"),
+        @Index(name = "idx_comment_author", columnList = "author_id"),
+        @Index(name = "idx_comment_parent", columnList = "parent_comment_id")
+})
 public class Comment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,34 +29,28 @@ public class Comment {
     @Temporal(TemporalType.TIMESTAMP)
     private Date editedAt;
 
-    // Many-to-One relationship with Task
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "task_id", nullable = false)
     private Task task;
 
-    // Many-to-One relationship with User (author)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id", nullable = false)
     private User author;
 
-    // Self-referencing Many-to-One for replies
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_comment_id")
     private Comment parentComment;
 
-    // One-to-Many relationship for replies
     @OneToMany(mappedBy = "parentComment", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Comment> replies;
+    private List<Comment> replies = new ArrayList<>();
 
-    // One-to-Many relationship with CommentReaction
     @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CommentReaction> reactions;
+    private List<CommentReaction> reactions = new ArrayList<>();
 
-    // One-to-Many relationship for attachments
     @ElementCollection
     @CollectionTable(name = "comment_attachments", joinColumns = @JoinColumn(name = "comment_id"))
     @Column(name = "attachment_url")
-    private List<String> attachments;
+    private List<String> attachments = new ArrayList<>();
 
     public Comment() {}
 
@@ -60,9 +59,10 @@ public class Comment {
         this.author = author;
         this.parentComment = parentComment;
         this.content = content;
-        this.attachments = attachments;
+        this.attachments = attachments != null ? attachments : new ArrayList<>();
     }
 
+    // Getters and Setters
     public Integer getId() {
         return id;
     }

@@ -1,273 +1,181 @@
-// src/util/api.js
-
 import axios from 'axios';
+import config from '../config';
 
-axios.defaults.baseURL = 'http://localhost:8080';
-axios.defaults.withCredentials = true;
+// Single axios instance with proper configuration
+const api = axios.create({
+    baseURL: config.API_BASE_URL,
+    withCredentials: true,
+});
 
-// Token refresh handling
+// Token refresh logic
 let isRefreshing = false;
 let failedQueue = [];
+let refreshPromise = null;
 
-const processQueue = (error, token = null) => {
+const processQueue = (error) => {
     failedQueue.forEach(prom => {
-        if (error) {
-            prom.reject(error);
-        } else {
-            prom.resolve(token);
-        }
+        error ? prom.reject(error) : prom.resolve();
     });
     failedQueue = [];
 };
 
-// Response interceptor for automatic token refresh
-axios.interceptors.response.use(
-    (response) => {
-        // If the response is successful, just return it
-        return response;
-    },
+api.interceptors.response.use(
+    (response) => response,
     async (error) => {
         const originalRequest = error.config;
 
-        // If error is 401 and we haven't already tried to refresh
-        if (error.response?.status === 401 && !originalRequest._retry) {
-            // Skip refresh for login and refresh endpoints
-            if (originalRequest.url === '/api/auth/login' ||
-                originalRequest.url === '/api/auth/refresh') {
-                return Promise.reject(error);
-            }
-
-            // If already refreshing, queue this request
-            if (isRefreshing) {
-                return new Promise((resolve, reject) => {
-                    failedQueue.push({ resolve, reject });
-                }).then(() => {
-                    return axios(originalRequest);
-                }).catch(err => {
-                    return Promise.reject(err);
-                });
-            }
-
-            originalRequest._retry = true;
-            isRefreshing = true;
-
-            try {
-                // Try to refresh the token
-                await axios.post('/api/auth/refresh');
-
-                // Process queued requests
-                processQueue(null);
-                isRefreshing = false;
-
-                // Retry the original request
-                return axios(originalRequest);
-            } catch (refreshError) {
-                // Refresh failed
-                processQueue(refreshError, null);
-                isRefreshing = false;
-
-                // Redirect to login only if not already there
-                const publicPaths = ['/login', '/register', '/'];
-                if (!publicPaths.includes(window.location.pathname)) {
-                    window.location.href = '/login';
-                }
-                return Promise.reject(refreshError);
-            }
+        // Only handle 401 errors
+        if (error.response?.status !== 401) {
+            return Promise.reject(error);
         }
 
-        return Promise.reject(error);
+        // Don't retry if already retried or should skip refresh
+        const skipRefreshUrls = ['/api/auth/login', '/api/auth/refresh'];
+        if (originalRequest._retry || skipRefreshUrls.includes(originalRequest.url) || originalRequest._skipRefresh) {
+            return Promise.reject(error);
+        }
+
+        originalRequest._retry = true;
+
+        // If already refreshing, wait for the current refresh to complete
+        if (isRefreshing) {
+            return new Promise((resolve, reject) => {
+                failedQueue.push({ resolve, reject });
+            }).then(() => api(originalRequest))
+              .catch(err => Promise.reject(err));
+        }
+
+        isRefreshing = true;
+
+        try {
+            // Store refresh promise so all waiting requests use the same one
+            refreshPromise = api.post('/api/auth/refresh');
+            await refreshPromise;
+
+            processQueue(null);
+            return api(originalRequest);
+        } catch (refreshError) {
+            processQueue(refreshError);
+
+            // Clear any stale auth state and redirect
+            const publicPaths = ['/login', '/register', '/'];
+            if (!publicPaths.includes(window.location.pathname)) {
+                window.location.href = '/login';
+            }
+            return Promise.reject(refreshError);
+        } finally {
+            isRefreshing = false;
+            refreshPromise = null;
+        }
     }
 );
 
-// User API
-export const getUser = () => {
-    console.log("API call: Getting user");
-    return axios.get('/api/users').then((res) => res.data);
-};
-
-// Project APIs
-export const getProjects = () => {
-    console.log("API call: Getting projects");
-    return axios.get('/api/projects').then((res) => res.data);
-};
-
-export const getProject = (projectKey) => {
-    console.log("API call: Getting project");
-    return axios.get(`/api/projects/${projectKey}`).then((res) => res.data);
-};
-
-export const createProject = (projectDTO, attachments) => {
-    console.log("API call: Creating project");
+// Helper for multipart form data requests
+const createFormData = (data, attachments = [], dataKey = 'data') => {
     const formData = new FormData();
-    formData.append('projectDTO', JSON.stringify(projectDTO));
-    if (attachments) {
-        attachments.forEach((file) => {
-            formData.append('attachments', file);
-        });
-    }
-    return axios.post('/api/projects', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    }).then((res) => res.data);
+    formData.append(dataKey, JSON.stringify(data));
+    attachments.forEach(file => formData.append('attachments', file));
+    return formData;
 };
 
-export const updateProject = (projectKey, projectDTO, attachments) => {
-    console.log("API call: Updating project");
-    const formData = new FormData();
-    formData.append('projectDTO', JSON.stringify(projectDTO));
-    if (attachments) {
-        attachments.forEach((file) => {
-            formData.append('attachments', file);
-        });
-    }
-    return axios.put(`/api/projects/${projectKey}`, formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    }).then((res) => res.data);
-};
+// ============ USER API ============
+export const getUser = () => api.get('/api/users').then(res => res.data);
 
-// Task APIs
-export const createTask = (projectKey, taskDTO, attachments) => {
-    console.log("API call: Creating task");
-    const formData = new FormData();
-    formData.append('taskDTO', JSON.stringify(taskDTO));
-    if (attachments) {
-        attachments.forEach((file) => {
-            formData.append('attachments', file);
-        });
-    }
-    return axios.post(`/api/projects/${projectKey}/tasks`, formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    }).then((res) => res.data);
-};
+export const checkUserAuth = () =>
+    api.get('/api/users', { _skipRefresh: true }).then(res => res.data);
 
-export const updateTask = (projectKey, taskId, taskDTO, attachments) => {
-    console.log("API call: Updating task");
-    const formData = new FormData();
-    formData.append('taskDTO', JSON.stringify(taskDTO));
-    if (attachments) {
-        attachments.forEach((file) => {
-            formData.append('attachments', file);
-        });
-    }
-    return axios.put(`/api/projects/${projectKey}/tasks/${taskId}`, formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    }).then((res) => res.data);
-};
+export const getUserByEmail = (email) =>
+    api.get(`/api/users/${email}`).then(res => res.data);
 
-// Delete Task
-export const deleteTask = (projectKey, taskId) =>
-    console.log("API call: Deleting task") ||
-    axios.delete(`/api/projects/${projectKey}/tasks/${taskId}`).then((res) => res.data);
+export const checkUserExists = (email) =>
+    api.get('/api/users/exists', { params: { email } }).then(res => res.data.exists);
 
-// Delete Project
+export const updateUser = (formData) =>
+    api.put('/api/users', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(res => res.data);
+
+// ============ PROJECT API ============
+export const getProjects = () => api.get('/api/projects').then(res => res.data);
+
+export const getProject = (projectKey) =>
+    api.get(`/api/projects/${projectKey}`).then(res => res.data);
+
+export const createProject = (projectDTO, attachments = []) =>
+    api.post('/api/projects', createFormData(projectDTO, attachments, 'projectDTO'), {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(res => res.data);
+
+export const updateProject = (projectKey, projectDTO, attachments = []) =>
+    api.put(`/api/projects/${projectKey}`, createFormData(projectDTO, attachments, 'projectDTO'), {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(res => res.data);
+
 export const deleteProject = (projectKey) =>
-    console.log("API call: Deleting project") ||
-    axios.delete(`/api/projects/${projectKey}`).then((res) => res.data);
+    api.delete(`/api/projects/${projectKey}`).then(res => res.data);
 
-// Comment APIs
+// ============ TASK API ============
+export const createTask = (projectKey, taskDTO, attachments = []) =>
+    api.post(`/api/projects/${projectKey}/tasks`, createFormData(taskDTO, attachments, 'taskDTO'), {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(res => res.data);
 
-// Get all comments for a task
-export const getComments = (taskId) => {
-    console.log("API call: Getting comments");
-    return axios.get(`/api/tasks/${taskId}/comments`).then((res) => res.data);
-};
+export const updateTask = (projectKey, taskKey, taskDTO, attachments = []) =>
+    api.put(`/api/projects/${projectKey}/tasks/${taskKey}`, createFormData(taskDTO, attachments, 'taskDTO'), {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(res => res.data);
 
-// Create a new comment with attachments (plain text)
-export const createComment = (taskId, content, attachments, parentCommentId = null) => {
-    console.log("API call: Creating comment");
+export const deleteTask = (projectKey, taskKey) =>
+    api.delete(`/api/projects/${projectKey}/tasks/${taskKey}`).then(res => res.data);
+
+export const getUserTasks = () => api.get('/api/tasks/assigned').then(res => res.data);
+
+// ============ COMMENT API ============
+export const getComments = (taskId) =>
+    api.get(`/api/tasks/${taskId}/comments`).then(res => res.data);
+
+export const createComment = (taskId, content, attachments = [], parentCommentId = null) => {
     const formData = new FormData();
-    formData.append('content', content.content); // Assuming content is an object with 'content' key
-    if (attachments) {
-        attachments.forEach((file) => {
-            formData.append('attachments', file);
-        });
-    }
-    if (parentCommentId) {
-        formData.append('parentCommentId', parentCommentId);
-    }
-    return axios.post(`/api/tasks/${taskId}/comments`, formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    }).then((res) => res.data);
-};
-
-// Update an existing comment with attachments (plain text)
-export const updateComment = (taskId, commentId, content, attachments) => {
-    console.log("API call: Updating comment");
-    const formData = new FormData();
-    formData.append('content', content.content); // Assuming content is an object with 'content' key
-    if (attachments) {
-        attachments.forEach((file) => {
-            formData.append('attachments', file);
-        });
-    }
-    return axios.put(`/api/tasks/${taskId}/comments/${commentId}`, formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    }).then((res) => res.data);
-};
-
-// Delete a comment
-export const deleteComment = (taskId, commentId) =>
-    console.log("API call: Deleting comment") ||
-    axios.delete(`/api/tasks/${taskId}/comments/${commentId}`).then((res) => res.data);
-
-// React to a comment
-export const reactToComment = (taskId, commentId, reactionType) =>
-    console.log("API call: Reacting to comment") ||
-    axios.post(`/api/tasks/${taskId}/comments/${commentId}/react`, null, {
-        params: { type: reactionType },
-    }).then((res) => res.data);
-
-// Get reactions for a comment
-export const getReactionsForComment = (taskId, commentId) =>
-    console.log("API call: Getting reactions for comment") ||
-    axios.get(`/api/tasks/${taskId}/comments/${commentId}/reactions`).then((res) => res.data);
-
-export const checkUserExists = (email) => {
-    return axios.get('/api/users/exists', { params: { email } })
-        .then(res => res.data.exists);
-};
-
-export const getNotifications = () => {
-    console.log("API call: Getting notifications");
-    return axios.get('/api/notifications').then(res => res.data);
-};
-
-export const markNotificationsAsRead = (notificationIds) => {
-    console.log("API call: Marking notifications as read");
-    return axios.post('/api/notifications/mark-as-read', notificationIds).then(res => res.data);
-};
-
-export const getUserByEmail = (userEmail) => {
-    console.log("API call: Getting user by email");
-    return axios.get(`/api/users/${userEmail}`).then((res) => res.data);
-};
-
-export const updateUser = (formData) => {
-    console.log("API call: Updating user");
-    return axios.put('/api/users', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
+    formData.append('content', content.content);
+    attachments.forEach(file => formData.append('attachments', file));
+    if (parentCommentId) formData.append('parentCommentId', parentCommentId);
+    return api.post(`/api/tasks/${taskId}/comments`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
     }).then(res => res.data);
 };
 
-export const getUserTasks = () => {
-    console.log("API call: Getting user tasks");
-    return axios.get('/api/projects/null/tasks/assigned').then(res => res.data);
+export const updateComment = (taskId, commentId, content, attachments = []) => {
+    const formData = new FormData();
+    formData.append('content', content.content);
+    attachments.forEach(file => formData.append('attachments', file));
+    return api.put(`/api/tasks/${taskId}/comments/${commentId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(res => res.data);
 };
 
-export const search = (query) => {
-    console.log("API call: Searching");
-    return axios.get(`/api/search?q=${encodeURIComponent(query)}`).then(res => res.data);
-};
+export const deleteComment = (taskId, commentId) =>
+    api.delete(`/api/tasks/${taskId}/comments/${commentId}`).then(res => res.data);
+
+export const reactToComment = (taskId, commentId, reactionType) =>
+    api.post(`/api/tasks/${taskId}/comments/${commentId}/react`, null, {
+        params: { type: reactionType }
+    }).then(res => res.data);
+
+// ============ NOTIFICATION API ============
+export const getNotifications = () =>
+    api.get('/api/notifications').then(res => res.data);
+
+export const markNotificationsAsRead = (notificationIds) =>
+    api.post('/api/notifications/mark-as-read', notificationIds).then(res => res.data);
+
+// ============ AUTH API ============
+export const login = (email, password) =>
+    api.post('/api/auth/login', { email, password }).then(res => res.data);
+
+export const logout = () => api.post('/api/auth/logout');
+
+export const register = (userData) =>
+    api.post('/api/users', userData).then(res => res.data);
+
+// Export the axios instance for edge cases
+export default api;

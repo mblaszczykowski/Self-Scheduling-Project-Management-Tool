@@ -1,129 +1,111 @@
-import React, {useContext, useState} from 'react';
-import {ErrorMessage, Field, Form, Formik} from 'formik';
+import React, { useContext, useState } from 'react';
+import { ErrorMessage, Field, Form, Formik } from 'formik';
 import * as Yup from 'yup';
-import css from './RegisterForm.module.css';
-import {request} from '../util/axios_helper';
-import {useNavigate} from 'react-router-dom';
-import {Slide, toast} from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
+import { Slide, toast } from 'react-toastify';
 import EyeButton from './EyeButton';
-import {getUser} from "../util/api";
-import {DataContext} from "../context/DataContext";
+import { login, getUser } from '../util/api';
+import { DataContext } from '../context/DataContext';
 
-const contactSchema = Yup.object().shape({
-    login: Yup.string()
+const validationSchema = Yup.object().shape({
+    email: Yup.string()
         .email('Invalid email address format.')
         .required('Email is required.'),
     password: Yup.string().required('Password is required.'),
 });
 
-function displayNotification(message, type = 'error', duration = 2500, transition = Slide, position = 'top-center') {
+const showNotification = (message, type = 'error') => {
     toast[type](message, {
-        position: position,
-        autoClose: duration,
-        transition: transition,
+        position: 'top-center',
+        autoClose: 2500,
+        transition: Slide,
     });
-}
+};
 
 function LoginForm({ onToggleForm }) {
     const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
-    const dataContext = useContext(DataContext);
+    const { setUser } = useContext(DataContext);
 
-    const handleLogin = (obj) => {
-        const { login, password } = obj;
-        let email = login;
-        request('POST', '/api/auth/login', { email, password })
-            .then(async () => {
-                const fetchedUser = await getUser();
-                dataContext.setUser(fetchedUser);
-                navigate('/dashboard');
-            })
-            .catch((error) => {
-                const errorMessage =
-                    error.response && error.response.data && error.response.data.message
-                        ? error.response.data.message
-                        : 'Login failed. Check your credentials.';
-                displayNotification(errorMessage);
-                console.error('Login error:', error.response || error.message);
-            });
+    const handleSubmit = async (values, { setSubmitting }) => {
+        try {
+            await login(values.email, values.password);
+            const fetchedUser = await getUser();
+            setUser(fetchedUser);
+            navigate('/dashboard');
+        } catch (error) {
+            const errorMessage = error.response?.data?.message || 'Login failed. Check your credentials.';
+            showNotification(errorMessage);
+            console.error('Login error:', error.response || error.message);
+        } finally {
+            setSubmitting(false);
+        }
     };
 
+    const inputClass = (hasError) => `w-full px-4 py-3 rounded-xl border ${
+        hasError
+            ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+            : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
+    } bg-slate-50 text-slate-900 text-sm transition-colors focus:ring-2 focus:outline-none`;
+
     return (
-        <div className={css['form-container']}>
-            <Formik
-                initialValues={{
-                    login: '',
-                    password: '',
-                }}
-                onSubmit={(values) => {
-                    handleLogin(values);
-                    //setSubmitting(false);
-                }}
-                validationSchema={contactSchema}
-            >
-                <Form className="max-w-sm mx-auto">
-
-                    <div className="py-3 mt-12">
-                        <h1 className="block text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-l from-blue-700 to-blue-500">
-                            Welcome back
-                        </h1>
-
-                    </div>
-                    <div className="flex items-start mb-6">
-                        <label
-                            htmlFor="terms"
-                            className="text-sm font-medium text-gray-900"
-                        >
-                            Don't have an account?{' '}
-                            <a
-                                onClick={onToggleForm}
-                                className="text-blue-600 hover:underline"
-                            >
-                                Sign up
-                            </a>
+        <Formik
+            initialValues={{ email: '', password: '' }}
+            validationSchema={validationSchema}
+            onSubmit={handleSubmit}
+        >
+            {({ errors, touched, isSubmitting }) => (
+                <Form className="space-y-5">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Email
                         </label>
-                    </div>
-                    <div className="mb-5">
                         <Field
                             type="text"
-                            name="login"
-                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                            placeholder={`Username`}
-                        ></Field>
-                        <ErrorMessage
-                            name="login"
-                            component="span"
-                            className={css.error}
+                            name="email"
+                            className={inputClass(errors.email && touched.email)}
+                            placeholder="Enter your email"
                         />
-                    </div>
-                    <div className="mb-5">
-                        <div className="relative">
-                            <Field
-                                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                                type={showPassword ? "text" : "password"}
-                                name="password"
-                                placeholder={`Password`}
-                            ></Field>
-                            <EyeButton showPassword={showPassword} setShowPassword={setShowPassword}/>
-                        </div>
-                        <ErrorMessage
-                            className={css.error}
-                            name="password"
-                            component="span"
-                        />
+                        <ErrorMessage name="email" component="span" className="text-red-500 text-xs mt-1 block" />
                     </div>
 
-                    <div className="flex justify-between items-center">
-                        <button
-                            type="submit"
-                            className="text-white bg-blue-500 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center"
-                        >
-                            Submit
-                        </button>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Password
+                        </label>
+                        <div className="relative">
+                            <Field
+                                type={showPassword ? 'text' : 'password'}
+                                name="password"
+                                className={`${inputClass(errors.password && touched.password)} pr-12`}
+                                placeholder="Enter your password"
+                            />
+                            <EyeButton showPassword={showPassword} setShowPassword={setShowPassword} />
+                        </div>
+                        <ErrorMessage name="password" component="span" className="text-red-500 text-xs mt-1 block" />
                     </div>
+
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 disabled:opacity-50"
+                    >
+                        {isSubmitting ? 'Signing in...' : 'Sign in'}
+                    </button>
+
+                    <p className="text-center text-sm text-slate-500">
+                        Don't have an account?{' '}
+                        <button
+                            type="button"
+                            onClick={onToggleForm}
+                            className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                        >
+                            Sign up
+                        </button>
+                    </p>
                 </Form>
-            </Formik>
-        </div>
+            )}
+        </Formik>
     );
 }
 

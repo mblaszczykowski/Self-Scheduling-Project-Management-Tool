@@ -1,6 +1,7 @@
 package com.backend.controllers;
 
 import com.backend.dtos.UserDTO;
+import com.backend.entities.User;
 import com.backend.requests.UserRegistrationRequest;
 import com.backend.services.TokenService;
 import com.backend.services.UserService;
@@ -12,7 +13,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
-@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("api/users")
 public class UserController {
@@ -33,10 +33,23 @@ public class UserController {
     }
 
     @GetMapping("/{email}")
-    public ResponseEntity<?> getUserByEmail(HttpServletRequest request,
-                                            @PathVariable("email") String email) {
-        int userId = tokenService.getUserIdFromRequest(request);
-        return ResponseEntity.ok().body(userService.getUserByEmail(email));
+    public ResponseEntity<UserDTO> getUserByEmail(
+            HttpServletRequest request,
+            @PathVariable("email") String email
+    ) {
+        // Verify user is authenticated
+        tokenService.getUserIdFromRequest(request);
+
+        // Return DTO instead of entity to avoid exposing password hash
+        User user = userService.getUserByEmail(email);
+        UserDTO userDTO = new UserDTO(
+                user.getId(),
+                user.getFirstname(),
+                user.getLastname(),
+                user.getEmail(),
+                user.getProfilePicture()
+        );
+        return ResponseEntity.ok(userDTO);
     }
 
     @PostMapping
@@ -61,7 +74,8 @@ public class UserController {
             @RequestPart(value = "profilePicture", required = false) MultipartFile profilePicture
     ) {
         Integer userId = tokenService.getUserIdFromRequest(request);
-        UserDTO updatedUser = userService.updateUser(userId, firstname, lastname, email, currentPassword, newPassword, profilePicture);
+        UserDTO updatedUser = userService.updateUser(userId, firstname, lastname, email,
+                currentPassword, newPassword, profilePicture);
         return ResponseEntity.ok(updatedUser);
     }
 }

@@ -1,6 +1,7 @@
 package com.backend.daos;
 
 import com.backend.entities.Task;
+import com.backend.entities.TaskStatus;
 import com.backend.repositories.TaskRepository;
 import org.springframework.stereotype.Repository;
 
@@ -15,20 +16,28 @@ public class TaskDAO {
         this.taskRepository = taskRepository;
     }
 
-    public void addTask(Task task) {
-        taskRepository.save(task);
+    public Task save(Task task) {
+        return taskRepository.save(task);
     }
 
     public Optional<Task> getTaskById(Integer id) {
         return taskRepository.findById(id);
     }
 
+    public Optional<Task> getTaskByTaskKey(String taskKey) {
+        return taskRepository.findByTaskKey(taskKey);
+    }
+
+    public Optional<Task> getTaskByTaskKeyWithDetails(String taskKey) {
+        return taskRepository.findByTaskKeyWithDetails(taskKey);
+    }
+
     public List<Task> getTasksByProjectId(Integer projectId) {
         return taskRepository.findByProjectId(projectId);
     }
 
-    public void updateTask(Task task) {
-        taskRepository.save(task);
+    public List<Task> getTasksByProjectIdWithDetails(Integer projectId) {
+        return taskRepository.findByProjectIdWithDetails(projectId);
     }
 
     public void deleteTask(Task task) {
@@ -40,7 +49,14 @@ public class TaskDAO {
     }
 
     public List<Task> searchTasks(String query, Integer userId) {
-        return taskRepository.findBySummaryContainingIgnoreCaseAndProjectUsersId(query, userId);
+        return taskRepository.searchTasksForUser(query, userId);
     }
 
+    public List<Task> findByProjectKeyAndTaskNumbers(String projectKey, List<Integer> taskNumbers) {
+        return taskRepository.findByProjectKeyAndTaskNumbers(projectKey, taskNumbers);
+    }
+
+    public List<Task> getTasksByStatus(TaskStatus status) {
+        return taskRepository.findByStatus(status);
+    }
 }

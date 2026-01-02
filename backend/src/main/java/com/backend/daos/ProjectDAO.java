@@ -15,8 +15,8 @@ public class ProjectDAO {
         this.projectRepository = projectRepository;
     }
 
-    public void addProject(Project project) {
-        projectRepository.save(project);
+    public Project save(Project project) {
+        return projectRepository.save(project);
     }
 
     public Optional<Project> getProjectById(Integer id) {
@@ -27,16 +27,16 @@ public class ProjectDAO {
         return projectRepository.findByProjectKey(projectKey);
     }
 
+    public Optional<Project> getProjectByKeyWithLock(String projectKey) {
+        return projectRepository.findByProjectKeyWithLock(projectKey);
+    }
+
     public boolean existsByProjectKey(String projectKey) {
         return projectRepository.existsByProjectKey(projectKey);
     }
 
     public List<Project> getProjectsByUserId(Integer userId) {
-        return projectRepository.findByUsersId(userId);
-    }
-
-    public void updateProject(Project project) {
-        projectRepository.save(project);
+        return projectRepository.findAllAccessibleByUser(userId);
     }
 
     public void deleteProject(Project project) {
@@ -44,6 +44,6 @@ public class ProjectDAO {
     }
 
     public List<Project> searchProjects(String query, Integer userId) {
-        return projectRepository.findBySummaryContainingIgnoreCaseAndUsersId(query, userId);
+        return projectRepository.searchProjectsForUser(query, userId);
     }
 }

@@ -1,114 +1,105 @@
-import React, {useState} from "react";
-import RegisterForm from "./RegisterForm";
-import LoginForm from "./LoginForm";
-import {useNavigate} from "react-router-dom";
-import {CheckIcon, StarIcon} from "./Icons";
+import React, { useState } from 'react';
+import RegisterForm from './RegisterForm';
+import LoginForm from './LoginForm';
+import { useNavigate } from 'react-router-dom';
+import { StarIcon } from './Icons';
+import './Aurora.css';
+
+const FeatureBox = ({ title, description }) => (
+    <div className="p-5 bg-white/60 backdrop-blur-md rounded-2xl border border-white/50 shadow-sm hover:shadow-md transition-shadow">
+        <p className="text-xl font-bold text-slate-800 tracking-tight">{title}</p>
+        <p className="text-sm text-slate-500 mt-1">{description}</p>
+    </div>
+);
 
 export default function WelcomeContent({ show }) {
     const [showForm, setShowForm] = useState(show);
     const navigate = useNavigate();
 
-    const handleResetForm = () => {
-        navigate('/reset-password');
-    };
-
-    const handleToggleForm = () => {
-        setShowForm((prev) => (prev === "login" ? "register" : "login"));
-    };
+    const handleResetForm = () => navigate('/reset-password');
+    const handleToggleForm = () => setShowForm(prev => prev === 'login' ? 'register' : 'login');
 
     return (
-        <React.Fragment>
-            <div className="min-h-screen flex flex-col justify-between">
-                <div className="flex-grow flex items-center justify-center">
-                    <div className="relative flex items-center justify-center ">
-                        <div className="backdrop-blur-xl rounded-3xl shadow-sm bg-white bg-opacity-80 overflow-hidden w-full max-w-5xl p-10">
-                            <div className="flex flex-col md:flex-row w-full">
-                                <div className="flex flex-col justify-center md:w-1/2 p-10 bg-gradient-to-b from-white via-blue-50 to-blue-100 rounded-l-3xl">
-                                    <h1 className="pb-2 block font-semibold text-transparent bg-clip-text bg-gradient-to-l from-blue-700 to-blue-500 text-3xl md:text-5xl lg:text-4xl">
-                                        Flowlink
-                                    </h1>
-                                    <div className="pt-6">
-                                        <ul className="space-y-2 sm:space-y-4">
-                                            <li className="flex space-x-3">
-                                                <span
-                                                    className="mt-0.5 size-5 flex justify-center items-center rounded-full bg-blue-50 text-blue-600">
-                                                    <CheckIcon className="flex-shrink-0 size-3.5"/>
-                                                </span>
-                                                <span className="text-sm sm:text-base text-gray-500">
-                                                    Effortlessly <span className="font-bold">Plan and Manage</span> Interdependent Projects
-                                                </span>
-                                            </li>
-                                            <li className="flex space-x-3">
-                                                <span
-                                                    className="mt-0.5 size-5 flex justify-center items-center rounded-full bg-blue-50 text-blue-600">
-                                                    <CheckIcon className="flex-shrink-0 size-3.5"/>
-                                                </span>
-                                                <span className="text-sm sm:text-base text-gray-500">
-                                                    Track
-                                                    <span className="font-bold"> Critical Paths </span>
-                                                    with Precision and Clarity
-                                                </span>
-                                            </li>
-                                            <li className="flex space-x-3">
-                                                <span
-                                                    className="mt-0.5 size-5 flex justify-center items-center rounded-full bg-blue-50 text-blue-600">
-                                                    <CheckIcon className="flex-shrink-0 size-3.5"/>
-                                                </span>
-                                                <span className="text-sm sm:text-base text-gray-500">
-                                                    Intuitive <span className="font-bold"> Gantt Charts </span> for Streamlined Planning
-                                                </span>
-                                            </li>
-                                            <li className="flex space-x-3">
-                                                <span
-                                                    className="mt-0.5 size-5 flex justify-center items-center rounded-full bg-blue-50 text-blue-600">
-                                                    <CheckIcon className="flex-shrink-0 size-3.5"/>
-                                                </span>
-                                                <span className="text-sm sm:text-base text-gray-500">
-                                                    Enhance <span className="font-bold"> Collaboration </span> with Integrated Tools
-                                                </span>
-                                            </li>
-                                            <li className="flex space-x-3">
-                                                <span
-                                                    className="mt-0.5 size-5 flex justify-center items-center rounded-full bg-blue-50 text-blue-600">
-                                                    <CheckIcon className="flex-shrink-0 size-3.5"/>
-                                                </span>
-                                                <span className="text-sm sm:text-base text-gray-500">
-                                                    <span className="font-bold">Real-Time Visualization </span> of Dependencies and Progress
-                                                </span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div className="mt-8 flex items-center gap-x-5">
-                                        <div className="flex -space-x-2">
-                                            <span
-                                                className="inline-flex justify-center items-center h-8 w-8 rounded-full bg-blue-600 text-white ring-2 ring-white">
-                                                <StarIcon className="h-3.5 w-3.5"/>
-                                            </span>
-                                        </div>
-                                        <span className="text-sm text-gray-500">
-                                            Rated best by over 500 reviews
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="md:w-1/2 p-8 bg-white bg-opacity-90 rounded-r-3xl">
-                                    <div className="mt-6">
-                                        <div className="p-4 mt-6 sm:p-7 flex flex-col bg-white">
-                                            {showForm !== "login" ? (
-                                                <RegisterForm onToggleForm={handleToggleForm} />
-                                            ) : (
-                                                <LoginForm
-                                                    onToggleForm={handleToggleForm}
-                                                    onResetForm={handleResetForm}
-                                                />
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+        <div className="min-h-screen flex w-full relative bg-white">
+            {/* Left Side: Aurora & Marketing */}
+            <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-50 items-center justify-center p-12">
+                {/* Aurora Background */}
+                <div className="absolute inset-0 z-0 overflow-hidden">
+                    <div className="aurora-bg transform scale-110 opacity-70">
+                        <div className="aurora-blob aurora-blob-1" />
+                        <div className="aurora-blob aurora-blob-2" />
+                        <div className="aurora-blob aurora-blob-3" />
+                    </div>
+                    <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
+                </div>
+
+                {/* Content */}
+                <div className="relative z-10 max-w-lg">
+                    {/* Logo */}
+                    <div className="size-14 bg-white/80 backdrop-blur-xl rounded-2xl shadow-sm border border-white/50 flex items-center justify-center mb-10 text-blue-600">
+                        <div className="size-6 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-lg" />
+                    </div>
+
+                    <h1 className="text-6xl font-bold tracking-tight text-slate-900 mb-8 leading-[1.1]">
+                        Manage projects <br /> with <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">clarity.</span>
+                    </h1>
+
+                    <p className="text-xl text-slate-600 leading-relaxed mb-10 max-w-md">
+                        Flowlink provides the transparency your team needs to hit deadlines without the burnout.
+                    </p>
+
+                    {/* Features Grid */}
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        <FeatureBox title="Plan & Manage" description="Effortlessly manage interdependent projects" />
+                        <FeatureBox title="Critical Paths" description="Track with precision and clarity" />
+                        <FeatureBox title="Gantt Charts" description="Intuitive charts for streamlined planning" />
+                        <FeatureBox title="Real-Time Visualization" description="See dependencies and progress as they happen" />
+                    </div>
+
+                    {/* Social Proof */}
+                    <div className="flex items-center gap-3">
+                        <div className="flex -space-x-2">
+                            {['blue', 'indigo', 'violet', 'purple'].map((color, i) => (
+                                <div key={i} className={`size-8 rounded-full bg-gradient-to-br from-${color}-400 to-${color}-600 ring-2 ring-white`} />
+                            ))}
                         </div>
+                        <div className="flex items-center gap-1">
+                            {[...Array(5)].map((_, i) => (
+                                <StarIcon key={i} className="size-4 text-amber-400 fill-amber-400" />
+                            ))}
+                        </div>
+                        <span className="text-sm text-slate-600">
+                            <span className="font-semibold">500+</span> reviews
+                        </span>
                     </div>
                 </div>
             </div>
-        </React.Fragment>
+
+            {/* Right Side: Form */}
+            <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 lg:p-24 relative z-20 bg-white">
+                <div className="w-full max-w-md space-y-8">
+                    <div className="text-center lg:text-left mb-8">
+                        <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+                            {showForm === 'login' ? 'Welcome back' : 'Get started'}
+                        </h2>
+                        <p className="mt-3 text-slate-500">
+                            Enter your details to access your workspace.
+                        </p>
+                    </div>
+
+                    {showForm === 'login' ? (
+                        <LoginForm onToggleForm={handleToggleForm} onResetForm={handleResetForm} />
+                    ) : (
+                        <RegisterForm onToggleForm={handleToggleForm} />
+                    )}
+
+                    <div className="pt-8 mt-8 border-t border-slate-100 text-center lg:text-left">
+                        <p className="text-xs text-slate-400">
+                            By continuing, you agree to our Terms of Service and Privacy Policy.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
-};
+}

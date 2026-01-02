@@ -84,9 +84,5 @@ public class ValidationUtil {
         if (name.length() > 50) {
             throw new ValidationException(fieldName + " must not exceed 50 characters");
         }
-
-        if (!name.matches("^[a-zA-Z\\s'-]+$")) {
-            throw new ValidationException(fieldName + " contains invalid characters");
-        }
     }
 }

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bar, Pie } from 'react-chartjs-2';
 import {
@@ -18,108 +18,122 @@ import 'chartjs-adapter-date-fns';
 import Header from './Header';
 import { DataContext } from '../context/DataContext';
 import TaskProjectModal from './TaskProjectModal';
-import axios from "axios";
+import { logout } from '../util/api';
+import { formatLongDate, formatShortDate, getImageUrl, getAvatarColor } from '../util/helpers';
+import './Aurora.css';
 
 ChartJS.register(
-    TimeScale,
-    CategoryScale,
-    LinearScale,
-    BarElement,
-    PointElement,
-    LineElement,
-    Title,
-    Tooltip,
-    Legend,
-    ArcElement
+    TimeScale, CategoryScale, LinearScale, BarElement,
+    PointElement, LineElement, Title, Tooltip, Legend, ArcElement
+);
+
+// Professional Chart Configuration
+const chartOptions = {
+    plugins: {
+        legend: { display: false },
+        tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.96)',
+            titleFont: { size: 12, weight: '600', family: 'system-ui' },
+            bodyFont: { size: 11, family: 'system-ui' },
+            padding: 12,
+            cornerRadius: 8,
+            displayColors: false,
+            borderWidth: 1,
+            borderColor: 'rgba(148, 163, 184, 0.2)',
+        },
+    },
+    scales: {
+        x: {
+            grid: { display: false },
+            ticks: { font: { size: 10, family: 'system-ui' }, color: '#64748b' },
+            border: { display: false },
+        },
+        y: {
+            grid: { color: 'rgba(148, 163, 184, 0.1)', drawBorder: false },
+            ticks: { font: { size: 10, family: 'system-ui' }, color: '#64748b', padding: 8 },
+            border: { display: false },
+        },
+    },
+    maintainAspectRatio: false,
+};
+
+
+// Professional Section Header
+const SectionHeader = ({ title, subtitle }) => (
+    <div className="flex items-start justify-between mb-6">
+        <div>
+            <h2 className="text-lg font-semibold text-slate-900 mb-1">{title}</h2>
+            {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
+        </div>
+    </div>
+);
+
+// Chart Container
+const ChartCard = ({ title, subtitle, children, className = "" }) => (
+    <div className={`bg-white rounded-xl border border-slate-200 p-6 hover:border-slate-300 transition-colors ${className}`}>
+        <div className="mb-5">
+            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+            {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+        </div>
+        {children}
+    </div>
 );
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    const { user, projects, userTasks, loading, error, refreshProjects, refreshUserTasks } = useContext(DataContext);
-    const dataContext = useContext(DataContext);
-    const [stats, setStats] = useState({
-        totalProjects: 0,
-        totalTasks: 0,
-        criticalTasks: 0,
-        delayedTasks: 0,
-        tasksDelayedByDependency: 0,
-        tasksPerStatus: {},
-        tasksByPriority: {},
-        assignedTasks: [],
-        longestTasks: [],
-        tasksPerAssignee: {},
-        projectCompletion: [],
-        closeDeadlines: [],
-        tasksDelayedByDependencyList: [],
-    });
+    const { user, projects, refreshProjects, refreshUserTasks, setUser } = useContext(DataContext);
 
     const [modalOpen, setModalOpen] = useState(false);
-    const [modalType, setModalType] = useState(null); // 'task' or 'project'
-    const [modalMode, setModalMode] = useState(null); // 'create' or 'edit'
+    const [modalType, setModalType] = useState(null);
+    const [modalMode, setModalMode] = useState(null);
     const [currentProject, setCurrentProject] = useState(null);
     const [currentTask, setCurrentTask] = useState(null);
 
     useEffect(() => {
-        if (!user) {
-            navigate('/login');
-        }
+        if (!user) navigate('/login');
     }, [user, navigate]);
 
-    useEffect(() => {
-        if (projects.length > 0 && userTasks.length >= 0) {
-            computeStats(projects, userTasks);
-        }
-    }, [projects, userTasks]);
-
-    const computeStats = (projectsData, userTasksData) => {
-        const totalProjects = projectsData.length;
-        const allTasks = [];
+    // Compute all stats from projects
+    const stats = useMemo(() => {
         const tasksPerStatus = {};
         const tasksPerAssignee = {};
         const tasksByPriority = {};
-
-        projectsData.forEach(project => {
-            project.tasks?.forEach(task => {
-                const taskProgress = task.progress ?? 0;
-                const status = task.status || 'Unspecified';
-                tasksPerStatus[status] = (tasksPerStatus[status] || 0) + 1;
-
-                const assignee = task.assignee || 'Unassigned';
-                tasksPerAssignee[assignee] = (tasksPerAssignee[assignee] || 0) + 1;
-
-                const priority = task.priority || 'Normal';
-                tasksByPriority[priority] = (tasksByPriority[priority] || 0) + 1;
-
-                allTasks.push({ ...task, projectKey: project.projectKey, progress: taskProgress });
-            });
-        });
-
-        const totalTasks = allTasks.length;
-        const criticalTasks = allTasks.filter(task => task.isCritical).length;
+        const allTasks = [];
+        const taskMap = {};
         const today = new Date();
 
-        const delayedTasks = allTasks.filter(task => {
-            const dueDate = new Date(task.dueDate);
-            return dueDate < today && (task.progress ?? 0) < 100;
-        }).length;
+        projects.forEach(project => {
+            project.tasks?.forEach(task => {
+                const progress = task.progress ?? 0;
+                const status = task.status || 'Unspecified';
+                const assignee = task.assignee || 'Unassigned';
+                const priority = task.priority || 'MEDIUM';
+                const dependencies = task.dependencyKeys?.map(d => parseInt(d, 10)) || [];
 
-        // Build a task map for dependency checks
-        const taskMap = {};
-        allTasks.forEach(task => {
-            taskMap[task.id] = task;
-        });
-        const tasksDelayedByDependencyList = allTasks.filter(task => {
-            if (!task.dependencies || task.dependencies.length === 0) return false;
-            return task.dependencies.some(depId => {
-                const dep = taskMap[depId];
-                if (!dep) return false;
-                const depDue = new Date(dep.dueDate);
-                return depDue < today && (dep.progress ?? 0) < 100;
+                tasksPerStatus[status] = (tasksPerStatus[status] || 0) + 1;
+                tasksPerAssignee[assignee] = (tasksPerAssignee[assignee] || 0) + 1;
+                tasksByPriority[priority] = (tasksByPriority[priority] || 0) + 1;
+
+                const taskData = { ...task, projectKey: project.projectKey, progress, dependencies };
+                allTasks.push(taskData);
+                taskMap[task.id] = taskData;
             });
         });
-        const tasksDelayedByDependency = tasksDelayedByDependencyList.length;
 
-        // Longest tasks (top 5)
+        const criticalTasks = allTasks.filter(t => t.isCritical).length;
+        const delayedTasks = allTasks.filter(t => {
+            const dueDate = new Date(t.dueDate);
+            return dueDate < today && t.progress < 100;
+        }).length;
+
+        const tasksDelayedByDependencyList = allTasks.filter(task => {
+            if (!task.dependencies?.length) return false;
+            return task.dependencies.some(depId => {
+                const dep = taskMap[depId];
+                return dep && new Date(dep.dueDate) < today && dep.progress < 100;
+            });
+        });
+
         const longestTasks = allTasks
             .map(task => {
                 const start = new Date(task.startDate);
@@ -130,19 +144,16 @@ const Dashboard = () => {
             .sort((a, b) => b.duration - a.duration)
             .slice(0, 5);
 
-        // Project completion percentages
-        const projectCompletion = projectsData.map(project => {
-            const totalProjectTasks = project.tasks?.length || 0;
-            const totalProgress = project.tasks?.reduce((sum, t) => sum + (t.progress || 0), 0);
-            const completionPercentage = totalProjectTasks > 0 ? Math.round(totalProgress / totalProjectTasks) : 0;
+        const projectCompletion = projects.map(project => {
+            const totalTasks = project.tasks?.length || 0;
+            const totalProgress = project.tasks?.reduce((sum, t) => sum + (t.progress || 0), 0) || 0;
             return {
                 projectKey: project.projectKey,
                 summary: project.summary,
-                completionPercentage,
+                completionPercentage: totalTasks > 0 ? Math.round(totalProgress / totalTasks) : 0,
             };
         });
 
-        // Close deadlines (next 7 days)
         const nextWeek = new Date();
         nextWeek.setDate(today.getDate() + 7);
         const closeDeadlines = allTasks.filter(task => {
@@ -150,401 +161,477 @@ const Dashboard = () => {
             return dueDate >= today && dueDate <= nextWeek;
         });
 
-        setStats({
-            totalProjects,
-            totalTasks,
+        const myTasks = allTasks
+            .filter(task => task.assignee === user?.email)
+            .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+            .slice(0, 5);
+
+        const recentActivity = [];
+        allTasks.filter(t => t.progress === 100).slice(0, 3).forEach(task => {
+            recentActivity.push({
+                type: 'completed',
+                task,
+                message: `Task ${task.taskKey} completed`,
+                time: task.dueDate,
+            });
+        });
+
+        allTasks.filter(t => t.isCritical && t.progress < 100).slice(0, 2).forEach(task => {
+            recentActivity.push({
+                type: 'critical',
+                task,
+                message: `Critical task ${task.taskKey} needs attention`,
+                time: task.dueDate,
+            });
+        });
+
+        recentActivity.sort((a, b) => new Date(b.time) - new Date(a.time)).splice(8);
+
+        const latestProjects = projects
+            .map(project => {
+                const recentTasks = project.tasks?.filter(t => t.progress === 100).length || 0;
+                const totalTasks = project.tasks?.length || 0;
+                return { ...project, recentTasks, totalTasks };
+            })
+            .sort((a, b) => b.recentTasks - a.recentTasks)
+            .slice(0, 5);
+
+        return {
+            totalProjects: projects.length,
+            totalTasks: allTasks.length,
             criticalTasks,
             delayedTasks,
-            tasksDelayedByDependency,
+            tasksDelayedByDependency: tasksDelayedByDependencyList.length,
             tasksPerStatus,
             tasksByPriority,
-            assignedTasks: userTasksData,
             longestTasks,
             tasksPerAssignee,
             projectCompletion,
             closeDeadlines,
             tasksDelayedByDependencyList,
-        });
-    };
+            myTasks,
+            recentActivity,
+            latestProjects,
+        };
+    }, [projects, user]);
 
+    // Process projects with computed dates
     const processedProjects = useMemo(() => {
         return projects.map(project => {
             let projectStartDate = null;
             let projectDueDate = null;
-            if (project.tasks && project.tasks.length > 0) {
-                const startDates = project.tasks.map(task => new Date(task.startDate));
-                const dueDates = project.tasks.map(task => new Date(task.dueDate));
+
+            if (project.tasks?.length > 0) {
+                const startDates = project.tasks.map(t => new Date(t.startDate));
+                const dueDates = project.tasks.map(t => new Date(t.dueDate));
                 projectStartDate = new Date(Math.min(...startDates)).toISOString().split('T')[0];
                 projectDueDate = new Date(Math.max(...dueDates)).toISOString().split('T')[0];
             }
+
             return { ...project, projectStartDate, projectDueDate };
         });
     }, [projects]);
 
-    const openModal = (type, mode, project, task = null) => {
+    const openModal = useCallback((type, mode, project = null, task = null) => {
         setModalType(type);
         setModalMode(mode);
         setCurrentProject(project);
         setCurrentTask(task);
         setModalOpen(true);
-    };
+    }, []);
 
-    const closeModal = () => {
+    const closeModal = useCallback(() => {
         setModalOpen(false);
         setCurrentProject(null);
         setCurrentTask(null);
         refreshProjects();
         refreshUserTasks();
-    };
+    }, [refreshProjects, refreshUserTasks]);
 
-    const formatDate = (date) => {
-        return new Date(date).toLocaleDateString(undefined, {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric',
-        });
-    };
-
-    const handleLogout = () => {
-        axios
-            .post('/api/auth/logout')  // Changed from DELETE to POST
-            .then(() => {
-                dataContext.setUser(null);
-                navigate('/login');
-            })
-            .catch((error) => {
-                console.error('Logout failed', error);
-                // Even if logout fails, clear local state and redirect
-                dataContext.setUser(null);
-                navigate('/login');
-            });
-    };
-
-    const handleCriticalFilter = () => {
-        navigate('/list?critical=true');
-    };
-
-    const handleDelayedFilter = () => {
-        navigate('/list?delayed=true');
-    };
-
-    const handleUpcomingDeadlinesFilter = () => {
-        navigate('/list?upcomingDeadline=true');
-    };
-
-    if (loading) {
-        return <div className="flex justify-center items-center h-screen">Loading Dashboard...</div>;
-    }
-
-    if (error) {
-        return <div className="text-red-500">Error loading dashboard.</div>;
-    }
+    const handleLogout = useCallback(async () => {
+        try {
+            await logout();
+        } catch (error) {
+            console.error('Logout failed', error);
+        } finally {
+            setUser(null);
+            navigate('/login');
+        }
+    }, [navigate, setUser]);
 
     return (
-        <div className="relative p-6 text-gray-900 flex flex-col min-h-screen">
-            <div className="flex-grow rounded-3xl px-6 py-4 bg-white flex flex-col">
-                <Header
-                    onLogout={handleLogout}
-                    onCreateProject={() => openModal('project', 'create')}
-                    onCreateTask={() => openModal('task', 'create')}
-                />
+        <div className="min-h-screen bg-slate-50">
+            <Header
+                onLogout={handleLogout}
+                onCreateProject={() => openModal('project', 'create')}
+                onCreateTask={() => openModal('task', 'create')}
+            />
 
-                <div className="px-2">
-                    <div className="mb-6">
-                        <h1 className="text-2xl font-bold">Hello, {user?.firstname || 'User'}</h1>
-                        <p className="text-gray-600">Today is {formatDate(new Date())}</p>
+            {/* Hero Section */}
+            <div className="relative overflow-hidden bg-white border-b border-slate-200">
+                <div className="absolute inset-0 z-0 opacity-40">
+                    <div className="aurora-bg transform scale-110">
+                        <div className="aurora-blob aurora-blob-1" />
+                        <div className="aurora-blob aurora-blob-2" />
+                        <div className="aurora-blob aurora-blob-3" />
                     </div>
+                </div>
 
-                    {/* Quick Actions */}
-                    <h2 className="text-l font-semibold mb-1">Quick Actions</h2>
-                    <div className="flex space-x-4 mb-6">
-                        <button
-                            onClick={handleCriticalFilter}
-                            className="py-2 px-4 bg-gray-100 text-gray-800 text-base font-medium rounded-lg hover:bg-gray-200 transition duration-300"
-                        >
-                            View critical tasks
-                        </button>
-                        <button
-                            onClick={handleDelayedFilter}
-                            className="py-2 px-4 bg-gray-100 text-gray-800 text-base font-medium rounded-lg hover:bg-gray-200 transition duration-300"
-                        >
-                            View delayed tasks
-                        </button>
-                        <button
-                            onClick={handleUpcomingDeadlinesFilter}
-                            className="py-2 px-4 bg-gray-100 text-gray-800 text-base font-medium rounded-lg hover:bg-gray-200 transition duration-300"
-                        >
-                            View upcoming deadlines
-                        </button>
-                        <button
-                            onClick={() => openModal('task', 'create', null)}
-                            className="py-2 px-4 bg-gray-100 text-gray-800 text-base font-medium rounded-lg hover:bg-gray-200 transition duration-300"
-                        >
-                            Create new task
-                        </button>
-                        <button
-                            onClick={() => openModal('project', 'create')}
-                            className="py-2 px-4 bg-gray-100 text-gray-800 text-base font-medium rounded-lg hover:bg-gray-200 transition duration-300"
-                        >
-                            Create new project
-                        </button>
-                    </div>
+                <div className="relative z-10 px-8 lg:px-12 py-10 lg:py-12">
+                    <div className="max-w-[1400px] mx-auto">
+                        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+                            <div>
+                                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Dashboard</p>
+                                <h1 className="text-3xl lg:text-4xl font-semibold text-slate-900 mb-2">
+                                    Welcome back, {user?.firstname || 'User'}
+                                </h1>
+                                <p className="text-slate-600 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    {formatLongDate(new Date())}
+                                </p>
+                            </div>
 
-                    {/* Statistics Cards */}
-                    <h2 className="text-l font-semibold mb-1">Statistics</h2>
-                    <div className="mb-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div className="p-4 bg-blue-100 rounded-lg">
-                                <h3 className="text-lg font-semibold">Total Projects</h3>
-                                <p className="text-3xl font-bold">{stats.totalProjects}</p>
-                            </div>
-                            <div className="p-4 bg-green-100 rounded-lg">
-                                <h3 className="text-lg font-semibold">Total Tasks</h3>
-                                <p className="text-3xl font-bold">{stats.totalTasks}</p>
-                            </div>
-                            <div className="p-4 bg-red-100 rounded-lg">
-                                <h3 className="text-lg font-semibold">Critical Tasks</h3>
-                                <p className="text-3xl font-bold">{stats.criticalTasks}</p>
-                            </div>
-                            <div className="p-4 bg-yellow-100 rounded-lg">
-                                <h3 className="text-lg font-semibold">Delayed Tasks</h3>
-                                <p className="text-3xl font-bold">{stats.delayedTasks}</p>
+                            {/* Quick Actions */}
+                            <div className="flex flex-wrap gap-3">
+                                <button
+                                    onClick={() => navigate('/projects?critical=true')}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors border border-slate-200 hover:border-slate-300"
+                                >
+                                    <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    Critical
+                                    <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-semibold">{stats.criticalTasks}</span>
+                                </button>
+                                <button
+                                    onClick={() => navigate('/projects?delayed=true')}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors border border-slate-200 hover:border-slate-300"
+                                >
+                                    <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Delayed
+                                    <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-semibold">{stats.delayedTasks}</span>
+                                </button>
+                                <button
+                                    onClick={() => navigate('/projects?upcomingDeadline=true')}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors border border-slate-200 hover:border-slate-300"
+                                >
+                                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                    </svg>
+                                    Upcoming
+                                    <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-semibold">{stats.closeDeadlines.length}</span>
+                                </button>
                             </div>
                         </div>
                     </div>
-
-                    {/* Charts Section: 4 charts in a row */}
-                    <h2 className="text-l font-semibold mb-1">Charts</h2>
-                    <div className="mb-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            {/* Project Completion Chart */}
-                            <div className="p-4 bg-gray-100 rounded-lg h-72 flex flex-col justify-center">
-                                <h3 className="text-md font-semibold mt-2">Projects Completion</h3>
-                                {stats.projectCompletion && stats.projectCompletion.length > 0 ? (
-                                    <Bar
-                                        data={{
-                                            labels: stats.projectCompletion.map(
-                                                project => `${project.projectKey}: ${project.summary}`
-                                            ),
-                                            datasets: [
-                                                {
-                                                    label: 'Avg Completion (%)',
-                                                    data: stats.projectCompletion.map(project => project.completionPercentage),
-                                                    backgroundColor: '#4caf50',
-                                                },
-                                            ],
-                                        }}
-                                        options={{
-                                            indexAxis: 'y',
-                                            scales: {
-                                                x: { beginAtZero: true, max: 100, title: { display: true, text: 'Completion Percentage' } },
-                                                y: { title: { display: false } },
-                                            },
-                                            responsive: true,
-                                            maintainAspectRatio: false,
-                                        }}
-                                    />
-                                ) : (
-                                    <p className="text-gray-500">No project data available</p>
-                                )}
-                            </div>
-
-                            {/* Tasks per Status Chart */}
-                            <div className="p-4 bg-gray-100 rounded-lg h-72 flex flex-col justify-center">
-                                <h3 className="text-md font-semibold mt-2">Tasks per Status</h3>
-                                {stats.tasksPerStatus && Object.keys(stats.tasksPerStatus).length > 0 ? (
-                                    <Pie
-                                        data={{
-                                            labels: Object.keys(stats.tasksPerStatus),
-                                            datasets: [
-                                                {
-                                                    data: Object.values(stats.tasksPerStatus),
-                                                    backgroundColor: ['#4caf50', '#ff9800', '#f44336', '#2196f3', '#9c27b0'],
-                                                },
-                                            ],
-                                        }}
-                                        options={{ maintainAspectRatio: false, responsive: true }}
-                                    />
-                                ) : (
-                                    <p className="text-gray-500">No data available</p>
-                                )}
-                            </div>
-
-                            {/* Upcoming Deadlines List */}
-                            <div className="py-2 px-4 bg-gray-100 rounded-lg h-72 overflow-y-auto">
-                                <h3 className="text-md font-semibold mb-2">Next Week's Deadlines</h3>
-                                {stats.closeDeadlines && stats.closeDeadlines.length > 0 ? (
-                                    <ul className="list-disc list-inside space-y-2">
-                                        {stats.closeDeadlines.map(task => (
-                                            <li key={task.id} className="text-gray-700">
-                                                <a href={`timeline?selectedIssue=${task.taskKey}`} className="font-medium text-blue-600 hover:underline">
-                                                    {task.taskKey}: {task.summary}
-                                                </a>{' '}
-                                                (<em>{formatDate(task.dueDate)}</em>)
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="text-gray-500">No tasks with close deadlines</p>
-                                )}
-                                <h2 className="text-l font-semibold mb-1 mt-3">Tasks Delayed by Dependency</h2>
-                                {stats.tasksDelayedByDependencyList && stats.tasksDelayedByDependencyList.length > 0 ? (
-                                    <ul className="list-disc list-inside space-y-2">
-                                        {stats.tasksDelayedByDependencyList.map(task => (
-                                            <li key={task.id} className="text-gray-700">
-                                                <a href={`timeline?selectedIssue=${task.taskKey}`} className="font-medium text-blue-600 hover:underline">
-                                                    {task.taskKey}: {task.summary}
-                                                </a>{' '}
-                                                (<em>{formatDate(task.dueDate)}</em>)
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="text-gray-500">No tasks delayed by dependency</p>
-                                )}
-                            </div>
-
-                            {/* Longest Tasks Chart */}
-                            <div className="p-4 bg-gray-100 rounded-lg h-72 flex flex-col justify-center">
-                                <h3 className="text-md font-semibold mt-2">Top 5 Longest Tasks</h3>
-                                {stats.longestTasks && stats.longestTasks.length > 0 ? (
-                                    <Bar
-                                        data={{
-                                            labels: stats.longestTasks.map(task => `${task.projectKey}-${task.id}`),
-                                            datasets: [
-                                                {
-                                                    label: 'Duration (days)',
-                                                    data: stats.longestTasks.map(task => task.duration),
-                                                    backgroundColor: '#3f51b5',
-                                                },
-                                            ],
-                                        }}
-                                        options={{
-                                            indexAxis: 'y',
-                                            scales: { x: { beginAtZero: true } },
-                                            maintainAspectRatio: false,
-                                            responsive: true,
-                                        }}
-                                    />
-                                ) : (
-                                    <p className="text-gray-500">No data available</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Projects Shortcuts */}
-                    <div className="mb-6">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-l font-semibold">All Projects</h3>
-                        </div>
-                        {processedProjects.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                                {processedProjects.map(project => (
-                                    <div
-                                        key={project.projectKey}
-                                        onClick={() => openModal('project', 'edit', project)}
-                                        className="cursor-pointer p-4 bg-gray-50 rounded-lg shadow hover:shadow-md transition"
-                                    >
-                                        <div className="flex mb-2">
-                                            <h4 className="text-lg font-semibold">
-                                                {project.projectKey}: {project.summary}
-                                            </h4>
-                                            <div className="font-semibold text-xs bg-gray-200 p-1.5 rounded-xl px-2 ml-4">
-                                                Edit project
-                                            </div>
-                                        </div>
-                                        <div className="mt-2">
-                                            <p className="text-gray-600 font-medium text-md">
-                                                Start Date:{' '}
-                                                {project.projectStartDate ? formatDate(project.projectStartDate) : 'N/A'}
-                                            </p>
-                                            <p className="text-gray-600 font-medium text-md">
-                                                End Date:{' '}
-                                                {project.projectDueDate ? formatDate(project.projectDueDate) : 'N/A'}
-                                            </p>
-                                            <div className="flex -space-x-2 mt-2">
-                                                {project.users &&
-                                                    project.users.slice(0, 5).map(usr =>
-                                                        usr.profilePicture ? (
-                                                            <img
-                                                                key={usr.id}
-                                                                src={`http://localhost:8080${usr.profilePicture}`}
-                                                                alt={usr.firstname}
-                                                                className="w-8 h-8 rounded-full border-2 border-white"
-                                                            />
-                                                        ) : (
-                                                            <div
-                                                                key={usr.id}
-                                                                className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center"
-                                                            >
-                                                                <svg
-                                                                    xmlns="http://www.w3.org/2000/svg"
-                                                                    className="h-4 w-4 text-gray-500"
-                                                                    fill="currentColor"
-                                                                    viewBox="0 0 24 24"
-                                                                >
-                                                                    <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5S7 4.24 7 7s2.24 5 5 5zm0 2c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z" />
-                                                                </svg>
-                                                            </div>
-                                                        )
-                                                    )}
-                                                {project.users && project.users.length > 5 && (
-                                                    <span className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
-                            +{project.users.length - 5}
-                          </span>
-                                                )}
-                                            </div>
-                                            {project.dependencies && project.dependencies.length > 0 && (
-                                                <div className="mt-2">
-                                                    <p className="text-gray-600">Dependencies:</p>
-                                                    <ul className="list-disc list-inside">
-                                                        {project.dependencies.map(dep => (
-                                                            <li key={dep}>{dep}</li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="mt-4 flex space-x-2">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    navigate(`/timeline?projectKey=${project.projectKey}`);
-                                                }}
-                                                className="py-1 px-2 bg-blue-100 text-gray-800 text-base font-medium rounded-lg hover:bg-blue-200 transition duration-300"
-                                            >
-                                                View on Timeline
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    navigate(`/list?projectKey=${project.projectKey}`);
-                                                }}
-                                                className="py-1 px-2 bg-green-100 text-gray-800 text-base font-medium rounded-lg hover:bg-green-200 transition duration-300"
-                                            >
-                                                View on List
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-gray-500">No projects available</p>
-                        )}
-                    </div>
-
-                    {modalOpen && (
-                        <TaskProjectModal
-                            modalType={modalType}
-                            modalMode={modalMode}
-                            project={currentProject}
-                            task={currentTask}
-                            onClose={closeModal}
-                        />
-                    )}
                 </div>
             </div>
+
+            {/* Main Content */}
+            <div className="px-8 lg:px-12 py-8">
+                <div className="max-w-[1400px] mx-auto space-y-10">
+                    {/* Projects Grid */}
+                    <section>
+                        <SectionHeader
+                            title="Projects"
+                            subtitle="Active project portfolio"
+                        />
+
+                        {processedProjects.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                                {processedProjects.map(project => {
+                                    const completion = stats.projectCompletion.find(p => p.projectKey === project.projectKey)?.completionPercentage || 0;
+
+                                    return (
+                                        <div
+                                            key={project.projectKey}
+                                            onClick={() => openModal('project', 'edit', project)}
+                                            className="group cursor-pointer bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-all duration-200 overflow-hidden"
+                                        >
+                                            {/* Header */}
+                                            <div className="p-5 pb-4 border-b border-slate-100">
+                                                <div className="flex items-start justify-between mb-3">
+                                                    <div className="flex-1 min-w-0">
+                                                        <span className="text-xs font-medium text-slate-600 mb-2 block">{project.projectKey}</span>
+                                                        <h4 className="text-base font-semibold text-slate-900 line-clamp-2">
+                                                            {project.summary}
+                                                        </h4>
+                                                    </div>
+                                                </div>
+
+                                                {/* Progress */}
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-1.5">
+                                                        <span className="text-xs text-slate-500">Progress</span>
+                                                        <span className="text-xs font-semibold text-slate-900">{completion}%</span>
+                                                    </div>
+                                                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-slate-900 rounded-full transition-all duration-500"
+                                                            style={{ width: `${completion}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Body */}
+                                            <div className="p-5 space-y-3">
+                                                {/* Dates */}
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <p className="text-xs text-slate-500 mb-1">Start</p>
+                                                        <p className="text-sm font-medium text-slate-900">{project.projectStartDate ? formatShortDate(project.projectStartDate) : '—'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-slate-500 mb-1">Due</p>
+                                                        <p className="text-sm font-medium text-slate-900">{project.projectDueDate ? formatShortDate(project.projectDueDate) : '—'}</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Team & Action */}
+                                                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                                                    <div className="flex -space-x-2">
+                                                        {project.members?.slice(0, 4).map(member => (
+                                                            member.profilePicture ? (
+                                                                <img
+                                                                    key={member.id}
+                                                                    src={getImageUrl(member.profilePicture)}
+                                                                    alt={member.firstname}
+                                                                    className="w-7 h-7 rounded-full border-2 border-white object-cover"
+                                                                />
+                                                            ) : (
+                                                                <div
+                                                                    key={member.id}
+                                                                    className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(member.firstname)} rounded-full flex items-center justify-center border-2 border-white`}
+                                                                >
+                                                                    <span className="text-xs font-medium text-white">{member.firstname?.[0] || 'U'}</span>
+                                                                </div>
+                                                            )
+                                                        ))}
+                                                        {project.members?.length > 4 && (
+                                                            <span className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium text-slate-700 border-2 border-white">
+                                                                +{project.members.length - 4}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); navigate(`/projects?projectKey=${project.projectKey}`); }}
+                                                        className="text-sm font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1 transition-colors"
+                                                    >
+                                                        View
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-slate-200">
+                                <div className="w-14 h-14 bg-slate-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                    <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-base font-semibold text-slate-900 mb-1">No projects yet</h3>
+                                <p className="text-slate-500 mb-4">Create your first project to get started</p>
+                                <button
+                                    onClick={() => openModal('project', 'create')}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Create Project
+                                </button>
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Analytics Charts */}
+                    <section>
+                        <SectionHeader title="Analytics" subtitle="Project and task insights" />
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+                            {/* Project Progress */}
+                            <ChartCard title="Project Progress" subtitle="Completion by project">
+                                <div className="h-56">
+                                    {stats.projectCompletion?.length > 0 ? (
+                                        <Bar
+                                            data={{
+                                                labels: stats.projectCompletion.map(p => p.projectKey),
+                                                datasets: [{
+                                                    data: stats.projectCompletion.map(p => p.completionPercentage),
+                                                    backgroundColor: 'rgba(71, 85, 105, 0.8)',
+                                                    hoverBackgroundColor: 'rgba(51, 65, 85, 1)',
+                                                    borderRadius: 6,
+                                                    borderSkipped: false,
+                                                }],
+                                            }}
+                                            options={{
+                                                ...chartOptions,
+                                                indexAxis: 'y',
+                                                scales: {
+                                                    ...chartOptions.scales,
+                                                    x: {
+                                                        ...chartOptions.scales.x,
+                                                        beginAtZero: true,
+                                                        max: 100,
+                                                        grid: { display: true, color: 'rgba(148, 163, 184, 0.1)' }
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                                            <svg className="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                            </svg>
+                                            <p className="text-xs">No data</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </ChartCard>
+
+                            {/* Task Status */}
+                            <ChartCard title="Task Status" subtitle="Status distribution">
+                                <div className="h-56">
+                                    {Object.keys(stats.tasksPerStatus).length > 0 ? (
+                                        <Pie
+                                            data={{
+                                                labels: Object.keys(stats.tasksPerStatus),
+                                                datasets: [{
+                                                    data: Object.values(stats.tasksPerStatus),
+                                                    backgroundColor: [
+                                                        'rgba(16, 185, 129, 0.8)',
+                                                        'rgba(245, 158, 11, 0.8)',
+                                                        'rgba(239, 68, 68, 0.8)',
+                                                        'rgba(59, 130, 246, 0.8)',
+                                                        'rgba(139, 92, 246, 0.8)'
+                                                    ],
+                                                    borderWidth: 2,
+                                                    borderColor: '#fff',
+                                                    hoverOffset: 8,
+                                                }],
+                                            }}
+                                            options={{
+                                                maintainAspectRatio: false,
+                                                plugins: {
+                                                    legend: {
+                                                        position: 'bottom',
+                                                        labels: {
+                                                            padding: 16,
+                                                            usePointStyle: true,
+                                                            pointStyle: 'circle',
+                                                            font: { size: 11, family: 'system-ui' },
+                                                            color: '#475569'
+                                                        }
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                                            <svg className="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                                            </svg>
+                                            <p className="text-xs">No data</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </ChartCard>
+
+                            {/* Upcoming Deadlines */}
+                            <ChartCard title="Upcoming Deadlines" subtitle="Next 7 days" className="lg:col-span-2">
+                                <div className="h-56 overflow-y-auto pr-2 space-y-2">
+                                    {stats.closeDeadlines?.length > 0 ? (
+                                        <>
+                                            {stats.closeDeadlines.map(task => (
+                                                <a
+                                                    key={task.id}
+                                                    href={`/projects?selectedIssue=${task.taskKey}`}
+                                                    className="block p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="text-xs font-medium text-slate-900">{task.taskKey}</span>
+                                                                {task.isCritical && (
+                                                                    <span className="text-xs text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Critical</span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-sm text-slate-600 line-clamp-1">{task.summary}</p>
+                                                            <div className="flex items-center gap-2 mt-1.5">
+                                                                <span className="text-xs text-slate-500">{task.progress}%</span>
+                                                                <div className="h-1 flex-1 bg-slate-200 rounded-full overflow-hidden max-w-[100px]">
+                                                                    <div className="h-full bg-slate-600 rounded-full" style={{ width: `${task.progress}%` }} />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-xs text-slate-500 whitespace-nowrap">{formatShortDate(task.dueDate)}</span>
+                                                    </div>
+                                                </a>
+                                            ))}
+                                        </>
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                                            <svg className="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <p className="text-xs">No upcoming deadlines</p>
+                                        </div>
+                                    )}
+
+                                    {stats.tasksDelayedByDependencyList?.length > 0 && (
+                                        <>
+                                            <div className="flex items-center gap-3 my-4">
+                                                <div className="flex-1 h-px bg-slate-200" />
+                                                <span className="text-xs text-slate-500 uppercase">Blocked</span>
+                                                <div className="flex-1 h-px bg-slate-200" />
+                                            </div>
+                                            {stats.tasksDelayedByDependencyList.map(task => (
+                                                <a
+                                                    key={task.id}
+                                                    href={`/projects?selectedIssue=${task.taskKey}`}
+                                                    className="block p-3 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="text-xs font-medium text-slate-900">{task.taskKey}</span>
+                                                            </div>
+                                                            <p className="text-sm text-slate-600 line-clamp-1">{task.summary}</p>
+                                                        </div>
+                                                        <span className="text-xs text-slate-500 whitespace-nowrap">{formatShortDate(task.dueDate)}</span>
+                                                    </div>
+                                                </a>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            </ChartCard>
+                        </div>
+                    </section>
+
+
+                </div>
+            </div>
+
+            {modalOpen && (
+                <TaskProjectModal
+                    modalType={modalType}
+                    modalMode={modalMode}
+                    project={currentProject}
+                    task={currentTask}
+                    onClose={closeModal}
+                />
+            )}
         </div>
     );
 };

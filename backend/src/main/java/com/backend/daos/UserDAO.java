@@ -14,8 +14,8 @@ public class UserDAO {
         this.userRepository = userRepository;
     }
 
-    public void addUser(User user) {
-        userRepository.save(user);
+    public User save(User user) {
+        return userRepository.save(user);
     }
 
     public Optional<User> getUserById(Integer id) {
@@ -28,17 +28,5 @@ public class UserDAO {
 
     public boolean existsUserWithEmail(String email) {
         return userRepository.existsByEmail(email);
-    }
-
-    public void updateUser(User user) {
-        userRepository.save(user);
-    }
-
-    public Optional<User> getById(Integer userId) {
-        return userRepository.findById(userId);
-    }
-
-    public void saveUser(User user) {
-        userRepository.save(user);
     }
 }

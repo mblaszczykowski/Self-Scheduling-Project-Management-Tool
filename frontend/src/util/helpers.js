@@ -1,0 +1,129 @@
+import config from '../config';
+
+// ============ URL HELPERS ============
+export const getImageUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    return `${config.API_BASE_URL}${path}`;
+};
+
+// ============ DATE HELPERS ============
+export const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toISOString().split('T')[0];
+};
+
+export const formatDateTime = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleString();
+};
+
+export const formatShortDate = (date) => {
+    return new Date(date).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+    });
+};
+
+export const formatLongDate = (date) => {
+    return new Date(date).toLocaleDateString(undefined, {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+    });
+};
+
+export const isOverdue = (dueDate, progress = 0) => {
+    if (!dueDate) return false;
+    return new Date(dueDate) < new Date() && progress < 100;
+};
+
+export const isUpcomingDeadline = (dueDate, daysThreshold = 4) => {
+    if (!dueDate) return false;
+    const due = new Date(dueDate);
+    const today = new Date();
+    const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+    return diffDays <= daysThreshold && diffDays >= 0;
+};
+
+export const calculateDuration = (startDate, dueDate) => {
+    if (!startDate || !dueDate) return 'N/A';
+    const start = new Date(startDate);
+    const due = new Date(dueDate);
+    const diffDays = Math.ceil((due - start) / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 ? diffDays : 'N/A';
+};
+
+// ============ FILE HELPERS ============
+export const getFileTypeFromPath = (path) => {
+    const extension = path.split('.').pop().toLowerCase();
+    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+    if (imageExts.includes(extension)) return 'image';
+    if (extension === 'pdf') return 'pdf';
+    return 'file';
+};
+
+export const getFileInfo = (attachment) => {
+    const isFile = attachment instanceof File;
+    const url = isFile ? URL.createObjectURL(attachment) : getImageUrl(attachment);
+    const fileName = isFile ? attachment.name : attachment.split('/').pop();
+    const fileType = isFile ? attachment.type.split('/')[0] : getFileTypeFromPath(attachment);
+    return { isFile, url, fileName, fileType };
+};
+
+// ============ TASK HELPERS ============
+export const getStatusConfig = () => ({
+    'BACKLOG': { label: 'Backlog', color: 'bg-slate-50 text-slate-600', dot: 'bg-slate-400' },
+    'TODO': { label: 'To Do', color: 'bg-blue-50 text-blue-600', dot: 'bg-blue-500' },
+    'IN_PROGRESS': { label: 'In Progress', color: 'bg-amber-50 text-amber-600', dot: 'bg-amber-500' },
+    'IN_TEST': { label: 'In Test', color: 'bg-purple-50 text-purple-600', dot: 'bg-purple-500' },
+    'TO_TEST': { label: 'To Test', color: 'bg-indigo-50 text-indigo-600', dot: 'bg-indigo-500' },
+    'TO_REVIEW': { label: 'To Review', color: 'bg-cyan-50 text-cyan-600', dot: 'bg-cyan-500' },
+    'READY_TO_MERGE': { label: 'Ready to Merge', color: 'bg-teal-50 text-teal-600', dot: 'bg-teal-500' },
+    'READY_TO_DEPLOY': { label: 'Ready to Deploy', color: 'bg-emerald-50 text-emerald-600', dot: 'bg-emerald-500' },
+    'DONE': { label: 'Done', color: 'bg-green-50 text-green-600', dot: 'bg-green-500' },
+    'RELEASED': { label: 'Released', color: 'bg-green-50 text-green-700', dot: 'bg-green-600' },
+    'WITHDRAWN': { label: 'Withdrawn', color: 'bg-red-50 text-red-600', dot: 'bg-red-500' },
+    'GATHERING_INTEREST': { label: 'Gathering Interest', color: 'bg-orange-50 text-orange-600', dot: 'bg-orange-500' },
+});
+
+export const getPriorityConfig = () => ({
+    'LOWEST': { label: 'Lowest', icon: '↓↓', color: 'bg-slate-100 text-slate-600' },
+    'LOW': { label: 'Low', icon: '↓', color: 'bg-blue-50 text-blue-600' },
+    'MEDIUM': { label: 'Medium', icon: '—', color: 'bg-amber-50 text-amber-600' },
+    'HIGH': { label: 'High', icon: '↑', color: 'bg-orange-50 text-orange-600' },
+    'HIGHEST': { label: 'Highest', icon: '↑↑', color: 'bg-red-50 text-red-600' },
+});
+
+export const getAvatarColor = (name) => {
+    const colors = [
+        'from-blue-500 to-indigo-600',
+        'from-emerald-500 to-teal-600',
+        'from-orange-500 to-red-500',
+        'from-purple-500 to-pink-600',
+        'from-cyan-500 to-blue-600'
+    ];
+    const index = name ? name.charCodeAt(0) % colors.length : 0;
+    return colors[index];
+};
+
+// ============ TIMELINE HELPERS ============
+export const calculateTaskPosition = (startDate, dueDate, timelineStart) => {
+    const start = new Date(startDate);
+    const due = new Date(dueDate);
+    const tlStart = new Date(timelineStart);
+    const dayWidth = 25;
+
+    const daysOffset = Math.round((start - tlStart) / (1000 * 60 * 60 * 24));
+    const durationDays = Math.round((due - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    return {
+        marginLeft: daysOffset * dayWidth,
+        width: durationDays * dayWidth,
+    };
+};
+
+export const generateBezierPath = (startX, startY, endX, endY) => {
+    const offset = Math.abs(endX - startX) / 2;
+    return `M ${startX} ${startY} C ${startX + offset} ${startY}, ${endX - offset} ${endY}, ${endX} ${endY}`;
+};

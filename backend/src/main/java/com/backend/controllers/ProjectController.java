@@ -18,10 +18,13 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final TokenService tokenService;
+    private final ObjectMapper objectMapper;
 
-    public ProjectController(ProjectService projectService, TokenService tokenService) {
+    public ProjectController(ProjectService projectService, TokenService tokenService,
+                             ObjectMapper objectMapper) {
         this.projectService = projectService;
         this.tokenService = tokenService;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping
@@ -32,7 +35,10 @@ public class ProjectController {
     }
 
     @GetMapping("/{projectKey}")
-    public ResponseEntity<ProjectDTO> getProject(HttpServletRequest request, @PathVariable String projectKey) {
+    public ResponseEntity<ProjectDTO> getProject(
+            HttpServletRequest request,
+            @PathVariable String projectKey
+    ) {
         int userId = tokenService.getUserIdFromRequest(request);
         ProjectDTO project = projectService.getProjectByKey(projectKey, userId);
         return ResponseEntity.ok(project);
@@ -42,9 +48,9 @@ public class ProjectController {
     public ResponseEntity<ProjectDTO> createProject(
             HttpServletRequest request,
             @RequestPart("projectDTO") String projectDTOStr,
-            @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments) throws JsonProcessingException {
+            @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
+    ) throws JsonProcessingException {
         int userId = tokenService.getUserIdFromRequest(request);
-        ObjectMapper objectMapper = new ObjectMapper();
         ProjectDTO projectDTO = objectMapper.readValue(projectDTOStr, ProjectDTO.class);
         ProjectDTO createdProject = projectService.createProject(projectDTO, userId, attachments);
         return ResponseEntity.ok(createdProject);
@@ -53,12 +59,12 @@ public class ProjectController {
     @PutMapping(value = "/{projectKey}", consumes = {"multipart/form-data"})
     public ResponseEntity<ProjectDTO> updateProject(
             HttpServletRequest request,
+            @PathVariable String projectKey,
             @RequestPart("projectDTO") String projectDTOStr,
-            @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments) throws JsonProcessingException {
+            @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
+    ) throws JsonProcessingException {
         int userId = tokenService.getUserIdFromRequest(request);
-        ObjectMapper objectMapper = new ObjectMapper();
         ProjectDTO projectDTO = objectMapper.readValue(projectDTOStr, ProjectDTO.class);
-
         ProjectDTO updatedProject = projectService.updateProject(projectDTO, userId, attachments);
         return ResponseEntity.ok(updatedProject);
     }
@@ -66,7 +72,8 @@ public class ProjectController {
     @DeleteMapping("/{projectKey}")
     public ResponseEntity<Void> deleteProject(
             HttpServletRequest request,
-            @PathVariable String projectKey) {
+            @PathVariable String projectKey
+    ) {
         int userId = tokenService.getUserIdFromRequest(request);
         projectService.deleteProject(projectKey, userId);
         return ResponseEntity.noContent().build();

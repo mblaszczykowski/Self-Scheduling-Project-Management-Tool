@@ -22,11 +22,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final TokenService tokenService;
     private final ObjectMapper objectMapper;
 
-    // Public endpoints that don't require authentication
     private static final Set<String> PUBLIC_ENDPOINTS = Set.of(
             "/api/auth/login",
             "/api/auth/refresh",
-            "/api/users"  // POST only for registration
+            "/api/users",
+            "/api/users/exists"
     );
 
     public JwtAuthenticationFilter(TokenService tokenService, ObjectMapper objectMapper) {
@@ -42,36 +42,36 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        // Skip authentication for public endpoints
         if (isPublicEndpoint(path, method)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Skip OPTIONS requests (CORS preflight)
         if ("OPTIONS".equalsIgnoreCase(method)) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        // Allow file access without authentication (files are accessed by URL)
+        if (path.startsWith("/files/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         try {
-            // Extract and validate token
             String token = tokenService.extractTokenFromRequest(request);
             if (token == null) {
                 sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Missing authentication token");
                 return;
             }
 
-            // Validate and get user ID
             Integer userId = tokenService.validateTokenAndGetUserId(token);
             if (userId == null) {
                 sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
                 return;
             }
 
-            // Store user ID in request for downstream use
             request.setAttribute("userId", userId);
-
             filterChain.doFilter(request, response);
 
         } catch (Exception e) {
@@ -80,16 +80,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private boolean isPublicEndpoint(String path, String method) {
-        // Check exact matches
         if (PUBLIC_ENDPOINTS.contains(path)) {
-            // Special case: /api/users is only public for POST (registration)
             if ("/api/users".equals(path)) {
                 return "POST".equalsIgnoreCase(method);
             }
             return true;
         }
 
-        // Check if it's a static resource or error endpoint
         return path.startsWith("/static/") ||
                 path.startsWith("/uploads/") ||
                 path.equals("/error");

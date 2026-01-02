@@ -4,20 +4,19 @@ import com.backend.daos.ProjectDAO;
 import com.backend.daos.TaskDAO;
 import com.backend.daos.UserDAO;
 import com.backend.dtos.TaskDTO;
-import com.backend.entities.NotificationType;
-import com.backend.entities.Project;
-import com.backend.entities.Task;
-import com.backend.entities.User;
+import com.backend.entities.*;
+import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.util.ValidationUtil;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,35 +28,42 @@ public class TaskService {
     private final UserDAO userDAO;
     private final NotificationService notificationService;
 
-    public TaskService(TaskDAO taskDAO, ProjectDAO projectDAO, FileStorageService fileStorageService, UserDAO userDAO, NotificationService notificationService) {
+    public TaskService(TaskDAO taskDAO, ProjectDAO projectDAO, FileStorageService fileStorageService,
+                       UserDAO userDAO, NotificationService notificationService) {
         this.taskDAO = taskDAO;
         this.projectDAO = projectDAO;
         this.fileStorageService = fileStorageService;
         this.userDAO = userDAO;
         this.notificationService = notificationService;
     }
+
+    @Transactional
     public TaskDTO createTask(String projectKey, TaskDTO taskDTO, Integer userId, List<MultipartFile> files) {
         validateTaskDTO(taskDTO);
 
-        Project project = projectDAO.getProjectByKey(projectKey)
+        List<String> attachmentUrls = new ArrayList<>();
+        if (files != null && !files.isEmpty()) {
+            attachmentUrls = fileStorageService.storeFiles(files);
+        }
+
+        Project project = projectDAO.getProjectByKeyWithLock(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
-        if (!project.getUser().getId().equals(userId)) {
-            throw new ResourceNotFoundException("Project not found for this user");
+        if (!project.hasAccess(userId)) {
+            throw new ResourceNotFoundException("Project not found");
         }
 
         Task task = new Task();
         task.setSummary(taskDTO.summary());
         task.setDescription(taskDTO.description());
-        task.setStatus(taskDTO.status());
+        task.setStatus(taskDTO.status() != null ? taskDTO.status() : TaskStatus.BACKLOG);
         task.setStartDate(taskDTO.startDate());
         task.setDueDate(taskDTO.dueDate());
-        task.setPriority(taskDTO.priority());
-
+        task.setPriority(taskDTO.priority() != null ? taskDTO.priority() : TaskPriority.MEDIUM);
         task.setProgress(taskDTO.progress() != null ? taskDTO.progress() : 0);
-
-        task.setCreated(taskDTO.created() != null ? taskDTO.created() : new Date());
-        task.setUpdated(taskDTO.updated() != null ? taskDTO.updated() : new Date());
+        task.setProject(project);
+        task.setTaskNumber(project.allocateNextTaskNumber());
+        task.setAttachments(attachmentUrls);
 
         if (taskDTO.assignee() != null && !taskDTO.assignee().isEmpty()) {
             User assignee = userDAO.getUserByEmail(taskDTO.assignee())
@@ -65,44 +71,43 @@ public class TaskService {
             task.setAssignee(assignee);
         }
 
-        task.setProject(project);
-
-        if (files != null && !files.isEmpty()) {
-            List<String> attachmentUrls = fileStorageService.storeFiles(files);
-            task.setAttachments(attachmentUrls);
+        if (taskDTO.labels() != null && !taskDTO.labels().isEmpty()) {
+            task.setLabels(String.join(",", taskDTO.labels()));
         }
 
-        if (taskDTO.dependencies() != null && !taskDTO.dependencies().isEmpty()) {
-            List<Task> dependencies = taskDTO.dependencies().stream()
-                    .map(depKey -> taskDAO.getTaskById(depKey)
-                            .orElseThrow(() -> new ResourceNotFoundException("Dependency task not found: " + depKey)))
-                    .collect(Collectors.toList());
+        // Handle dependencies - frontend sends task IDs as integers
+        if (taskDTO.dependencyKeys() != null && !taskDTO.dependencyKeys().isEmpty()) {
+            List<Task> dependencies = resolveDependencies(taskDTO.dependencyKeys());
             task.setDependencies(dependencies);
         }
 
-        taskDAO.addTask(task);
+        projectDAO.save(project);
+        Task savedTask = taskDAO.save(task);
 
         if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
             String message = "You have been assigned to task: " + task.getSummary();
-            String link = "/timeline?selectedIssue=" + task.getProject().getProjectKey() + "-" + task.getId();
-            notificationService.createNotification(task.getAssignee(), message, NotificationType.TASK_ASSIGNED, link);
+            String link = "/projects?selectedIssue=" + savedTask.getTaskKey();
+            notificationService.createNotification(task.getAssignee(), message,
+                    NotificationType.TASK_ASSIGNED, link);
         }
 
-        return convertToDTO(task);
+        return convertToDTO(savedTask);
     }
 
-    public TaskDTO updateTask(String projectKey, String taskId, TaskDTO taskDTO, Integer userId, List<MultipartFile> files) {
+    @Transactional
+    public TaskDTO updateTask(String projectKey, String taskKey, TaskDTO taskDTO,
+                              Integer userId, List<MultipartFile> files) {
         validateTaskDTO(taskDTO);
 
         Project project = projectDAO.getProjectByKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
-        if (!project.getUser().getId().equals(userId)) {
-            throw new ResourceNotFoundException("Project not found for this user");
+        if (!project.hasAccess(userId)) {
+            throw new ResourceNotFoundException("Project not found");
         }
 
-        Task task = taskDAO.getTaskById(Integer.valueOf(taskId))
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
+        Task task = taskDAO.getTaskByTaskKey(taskKey)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
 
         if (!task.getProject().getId().equals(project.getId())) {
             throw new ValidationException("Task does not belong to the specified project");
@@ -110,13 +115,11 @@ public class TaskService {
 
         task.setSummary(taskDTO.summary());
         task.setDescription(taskDTO.description());
-        task.setStatus(taskDTO.status());
+        task.setStatus(taskDTO.status() != null ? taskDTO.status() : TaskStatus.BACKLOG);
         task.setStartDate(taskDTO.startDate());
         task.setDueDate(taskDTO.dueDate());
-
         task.setProgress(taskDTO.progress() != null ? taskDTO.progress() : 0);
-
-        task.setUpdated(taskDTO.updated() != null ? taskDTO.updated() : new Date());
+        task.setPriority(taskDTO.priority() != null ? taskDTO.priority() : TaskPriority.MEDIUM);
 
         if (taskDTO.assignee() != null && !taskDTO.assignee().isEmpty()) {
             User assignee = userDAO.getUserByEmail(taskDTO.assignee())
@@ -130,8 +133,6 @@ public class TaskService {
             task.setLabels(String.join(",", taskDTO.labels()));
         }
 
-        task.setPriority(taskDTO.priority());
-
         if (taskDTO.attachments() != null) {
             task.setAttachments(new ArrayList<>(taskDTO.attachments()));
         } else {
@@ -143,75 +144,37 @@ public class TaskService {
             task.getAttachments().addAll(newAttachments);
         }
 
-        if (taskDTO.dependencies() != null) {
-            List<Task> dependencies = taskDTO.dependencies().stream()
-                    .map(depKey -> taskDAO.getTaskById(depKey)
-                            .orElseThrow(() -> new ResourceNotFoundException("Dependency task not found: " + depKey)))
-                    .collect(Collectors.toList());
+        // Handle dependencies - can be task IDs (integers) or task keys (strings)
+        if (taskDTO.dependencyKeys() != null) {
+            List<Task> dependencies = resolveDependencies(taskDTO.dependencyKeys());
             task.setDependencies(dependencies);
         } else {
-            task.setDependencies(null);
+            task.setDependencies(new ArrayList<>());
         }
 
-        taskDAO.updateTask(task);
+        Task updatedTask = taskDAO.save(task);
 
         if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
             String message = "Task '" + task.getSummary() + "' has been updated";
-            String link = "/timeline?selectedIssue=" + task.getProject().getProjectKey() + "-" + task.getId();
-            notificationService.createNotification(task.getAssignee(), message, NotificationType.TASK_UPDATED, link);
+            String link = "/projects?selectedIssue=" + updatedTask.getTaskKey();
+            notificationService.createNotification(task.getAssignee(), message,
+                    NotificationType.TASK_UPDATED, link);
         }
 
-        return convertToDTO(task);
+        return convertToDTO(updatedTask);
     }
 
-    public void validateTaskDTO(TaskDTO taskDTO) {
-        if (ValidationUtil.isNullOrEmpty(taskDTO.summary()) || ValidationUtil.isNullOrEmpty(taskDTO.status())) {
-            throw new ValidationException("Summary, and status are required");
-        }
-    }
-
-    public TaskDTO convertToDTO(Task task) {
-        List<Integer> dependencies = null;
-        if (task.getDependencies() != null) {
-            dependencies = task.getDependencies().stream()
-                    .map(Task::getId)
-                    .collect(Collectors.toList());
-        }
-        String taskKey = task.getProject().getProjectKey() + "-" + task.getId();
-        String assigneeEmail = (task.getAssignee() != null) ? task.getAssignee().getEmail() : null;
-        List<String> labels = (task.getLabels() != null) ? Arrays.asList(task.getLabels().split(",")) : null;
-
-        return new TaskDTO(
-                task.getId(),
-                taskKey,
-                task.getProject().getProjectKey(),
-                task.getSummary(),
-                task.getDescription(),
-                task.getStatus(),
-                task.getStartDate(),
-                task.getDueDate(),
-                assigneeEmail,
-                labels,
-                dependencies,
-                null,
-                task.getAttachments(),
-                task.getCreated(),
-                task.getUpdated(),
-                task.getProgress(),
-                task.getPriority()
-        );
-    }
-
-    public void deleteTask(String projectKey, String taskId, Integer userId) {
+    @Transactional
+    public void deleteTask(String projectKey, String taskKey, Integer userId) {
         Project project = projectDAO.getProjectByKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
-        if (!project.getUser().getId().equals(userId)) {
-            throw new ResourceNotFoundException("Project not found for this user");
+        if (!project.isOwner(userId)) {
+            throw new AuthorizationException("Only project owner can delete tasks");
         }
 
-        Task task = taskDAO.getTaskById(Integer.valueOf(taskId))
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
+        Task task = taskDAO.getTaskByTaskKey(taskKey)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
 
         if (!task.getProject().getId().equals(project.getId())) {
             throw new ValidationException("Task does not belong to the specified project");
@@ -220,8 +183,90 @@ public class TaskService {
         taskDAO.deleteTask(task);
     }
 
+    @Transactional(readOnly = true)
     public List<TaskDTO> getTasksAssignedToUser(Integer userId) {
         List<Task> tasks = taskDAO.getTasksAssignedToUser(userId);
-        return tasks.stream().map(this::convertToDTO).collect(Collectors.toList());
+        return tasks.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public void validateTaskDTO(TaskDTO taskDTO) {
+        if (ValidationUtil.isNullOrEmpty(taskDTO.summary())) {
+            throw new ValidationException("Summary is required");
+        }
+        if (taskDTO.status() == null) {
+            throw new ValidationException("Status is required");
+        }
+    }
+
+    public TaskDTO convertToDTO(Task task) {
+        // Return dependency IDs as strings (task IDs)
+        List<String> dependencyKeys = null;
+        if (task.getDependencies() != null && !task.getDependencies().isEmpty()) {
+            dependencyKeys = task.getDependencies().stream()
+                    .map(t -> String.valueOf(t.getId()))
+                    .collect(Collectors.toList());
+        }
+
+        List<String> labels = null;
+        if (task.getLabels() != null && !task.getLabels().isEmpty()) {
+            labels = Arrays.asList(task.getLabels().split(","));
+        }
+
+        String assigneeEmail = task.getAssignee() != null ? task.getAssignee().getEmail() : null;
+
+        List<String> attachments = task.getAttachments() != null
+                ? new ArrayList<>(task.getAttachments())
+                : new ArrayList<>();
+
+        return new TaskDTO(
+                task.getId(),
+                task.getTaskNumber(),
+                task.getTaskKey(),
+                task.getProject().getProjectKey(),
+                task.getSummary(),
+                task.getDescription(),
+                task.getStatus(),
+                task.getStartDate(),
+                task.getDueDate(),
+                assigneeEmail,
+                labels,
+                dependencyKeys,
+                null,
+                attachments,
+                task.getCreated(),
+                task.getUpdated(),
+                task.getProgress(),
+                task.getPriority()
+        );
+    }
+
+    /**
+     * Resolves dependency references - accepts both task IDs (integers) and task keys (PROJECT-123)
+     */
+    private List<Task> resolveDependencies(List<String> dependencyRefs) {
+        if (dependencyRefs == null || dependencyRefs.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Task> dependencies = new ArrayList<>();
+
+        for (String ref : dependencyRefs) {
+            if (ref == null) continue;
+
+            // Try parsing as integer ID first
+            try {
+                Integer taskId = Integer.parseInt(ref);
+                taskDAO.getTaskById(taskId).ifPresent(dependencies::add);
+            } catch (NumberFormatException e) {
+                // Not an integer, try as task key (PROJECT-123)
+                if (ref.contains("-")) {
+                    taskDAO.getTaskByTaskKey(ref).ifPresent(dependencies::add);
+                }
+            }
+        }
+
+        return dependencies;
     }
 }
