@@ -91,6 +91,10 @@ public class CommentService {
         Comment comment = new Comment(task, user, parentComment, sanitizedContent, attachmentUrls);
         Comment savedComment = commentDAO.addComment(comment);
 
+        // Force initialization of lazy collections before transaction ends
+        savedComment.getAttachments().size();
+        savedComment.getReactions().size();
+
         if (parentComment != null && !parentComment.getAuthor().getId().equals(userId)) {
             String message = "Someone replied to your comment on task: " + task.getSummary();
             String link = "/projects?selectedIssue=" + task.getTaskKey();
@@ -127,6 +131,11 @@ public class CommentService {
         }
 
         Comment updatedComment = commentDAO.updateComment(comment);
+
+        // Force initialization of lazy collections before transaction ends
+        updatedComment.getAttachments().size();
+        updatedComment.getReactions().size();
+
         return convertToDTO(updatedComment);
     }
 
@@ -178,6 +187,11 @@ public class CommentService {
 
         Comment refreshedComment = commentDAO.getCommentById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+
+        // Force initialization of lazy collections before transaction ends
+        refreshedComment.getAttachments().size();
+        refreshedComment.getReactions().size();
+
         return convertToDTO(refreshedComment);
     }
 

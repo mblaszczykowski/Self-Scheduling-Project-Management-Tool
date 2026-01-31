@@ -3,7 +3,7 @@ import Modal from 'react-modal';
 import { ErrorMessage, Field, Form, Formik } from 'formik';
 import * as Yup from 'yup';
 import { updateUser } from '../util/api';
-import { getImageUrl } from '../util/helpers';
+import { getImageUrl, getAvatarColor, getAvatarInitials } from '../util/helpers';
 
 Modal.setAppElement('#root');
 
@@ -20,6 +20,16 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
     const [profilePreview, setProfilePreview] = useState(
         user.profilePicture ? getImageUrl(user.profilePicture) : null
     );
+    const [isVisible, setIsVisible] = useState(false);
+
+    React.useEffect(() => {
+        requestAnimationFrame(() => setIsVisible(true));
+    }, []);
+
+    const handleClose = React.useCallback(() => {
+        setIsVisible(false);
+        setTimeout(onClose, 200);
+    }, [onClose]);
 
     const initialValues = {
         firstname: user.firstname || '',
@@ -49,7 +59,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
         try {
             const updatedUser = await updateUser(formData);
             onUpdateUser?.(updatedUser);
-            onClose();
+            handleClose();
         } catch (error) {
             console.error('Error updating user:', error);
             if (error.response?.data?.errors) {
@@ -71,16 +81,16 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
     return (
         <Modal
             isOpen={true}
-            onRequestClose={onClose}
+            onRequestClose={handleClose}
             contentLabel="Account Settings"
-            className="max-w-lg mx-auto mt-10 bg-white rounded-xl shadow-2xl outline-none z-50 max-h-[90vh] overflow-y-auto"
-            overlayClassName="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50"
+            className={`max-w-lg mx-auto mt-10 bg-white rounded-xl shadow-2xl outline-none z-50 max-h-[90vh] overflow-y-auto transition-all duration-300 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
+            overlayClassName={`fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
         >
             {/* Header */}
             <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 rounded-t-xl">
                 <div className="flex justify-between items-center">
                     <h2 className="text-xl font-bold text-slate-900">Account Settings</h2>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                    <button onClick={handleClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -102,13 +112,13 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                     <img
                                         src={profilePreview}
                                         alt="Profile Preview"
-                                        className="h-20 w-20 rounded-full object-cover ring-4 ring-white shadow-lg"
+                                        className="h-20 w-20 rounded-lg object-cover ring-4 ring-white shadow-lg"
                                     />
                                 ) : (
-                                    <div className="h-20 w-20 bg-slate-200 rounded-full flex items-center justify-center ring-4 ring-white shadow-lg">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-slate-400" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5S7 4.24 7 7s2.24 5 5 5zm0 2c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z" />
-                                        </svg>
+                                    <div className={`h-20 w-20 bg-gradient-to-br ${getAvatarColor(user)} rounded-lg flex items-center justify-center ring-4 ring-white shadow-lg`}>
+                                        <span className="text-2xl font-bold text-white">
+                                            {getAvatarInitials(user)}
+                                        </span>
                                     </div>
                                 )}
                                 <div className="flex-1">
@@ -217,7 +227,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                             <div className="flex gap-4 pt-4">
                                 <button
                                     type="button"
-                                    onClick={onClose}
+                                    onClick={handleClose}
                                     className="flex-1 py-3 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
                                 >
                                     Cancel

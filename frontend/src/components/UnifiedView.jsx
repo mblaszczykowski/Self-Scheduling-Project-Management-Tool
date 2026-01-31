@@ -493,41 +493,191 @@ const UnifiedView = () => {
 
                 {/* Content */}
                 {viewMode === 'list' ? (
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-grow">
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full">
-                                <thead className="bg-slate-50 border-b border-slate-200">
-                                <tr>
-                                    {[['projectKey','Project'],['taskKey','Task'],['summary','Summary'],['status','Status'],['assignee','Assignee'],['startDate','Start'],['dueDate','Due'],['duration','Duration'],['progress','Progress'],['priority','Priority'],['labels','Labels'],['dependencies','Dependencies'],['isCritical','Critical'],['isDelayed','Status']].map(([f, label]) => (
-                                        <th key={f} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 cursor-pointer hover:text-slate-900 transition-colors" onClick={() => !['labels','dependencies'].includes(f) && handleSort(f)}>
-                                            {label} {sortField === f && (sortOrder === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                    ))}
-                                </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                {filteredTasks.map(task => (
-                                    <tr key={task.taskKey} className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => openModal('task', 'edit', processedProjects.find(p => p.projectKey === task.projectKey), task)}>
-                                        <td className="px-4 py-3 text-sm text-slate-700">{task.projectSummary} <span className="text-slate-400">({task.projectKey})</span></td>
-                                        <td className="px-4 py-3 text-sm font-medium"><span className={task.isCritical ? 'text-red-600' : 'text-slate-900'}>{task.taskKey}</span></td>
-                                        <td className="px-4 py-3 text-sm text-slate-700 max-w-xs truncate">{task.summary}</td>
-                                        <td className="px-4 py-3"><span className={`inline-flex items-center py-1 px-2.5 rounded-lg text-xs font-medium ${STATUS_CONFIG[task.status]?.color || 'bg-slate-100 text-slate-600'}`}>{STATUS_CONFIG[task.status]?.label || task.status}</span></td>
-                                        <td className="px-4 py-3 text-sm text-slate-700">{task.assignee || <span className="text-slate-400">Unassigned</span>}</td>
-                                        <td className="px-4 py-3 text-sm text-slate-600">{task.startDate ? formatShortDate(task.startDate) : 'N/A'}</td>
-                                        <td className="px-4 py-3 text-sm text-slate-600">{task.dueDate ? formatShortDate(task.dueDate) : 'N/A'}</td>
-                                        <td className="px-4 py-3 text-sm text-slate-700">{task.duration !== 'N/A' ? `${task.duration}d` : 'N/A'}</td>
-                                        <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-16 bg-slate-200 rounded-full h-1.5"><div className="bg-slate-900 h-1.5 rounded-full" style={{ width: `${task.progress}%` }} /></div><span className="text-xs text-slate-600 font-medium">{task.progress}%</span></div></td>
-                                        <td className="px-4 py-3">{renderPriority(task.priority)}</td>
-                                        <td className="px-4 py-3">{renderLabels(task.labels)}</td>
-                                        <td className="px-4 py-3 text-sm">{renderDependencies(task)}</td>
-                                        <td className="px-4 py-3"><span className={`inline-flex items-center py-1 px-2.5 rounded-lg text-xs font-medium ${task.isCritical ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}>{task.isCritical ? 'Critical' : 'Normal'}</span></td>
-                                        <td className="px-4 py-3"><span className={`inline-flex items-center py-1 px-2.5 rounded-lg text-xs font-medium ${task.isDelayed ? 'bg-red-50 text-red-600' : task.isUpcomingDeadline ? 'bg-amber-50 text-amber-600' : task.isDelayedByDependency ? 'bg-violet-50 text-violet-600' : 'bg-slate-100 text-slate-600'}`}>{task.isDelayed ? 'Delayed' : task.isUpcomingDeadline ? 'Upcoming' : task.isDelayedByDependency ? 'Blocked' : 'On Time'}</span></td>
-                                    </tr>
-                                ))}
-                                </tbody>
-                            </table>
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-grow flex flex-col">
+                        <div className="overflow-x-auto flex-grow">
+                            <div className="inline-block min-w-full align-middle">
+                                <div className="overflow-hidden">
+                                    {/* Header */}
+                                    <div className="bg-slate-50 border-b border-slate-200">
+                                        <div className="grid grid-cols-[85px_85px_minmax(220px,1fr)_105px_145px_90px_90px_75px_110px_95px_125px_125px_85px_95px] gap-3 px-5 py-3">
+                                            {[
+                                                ['projectKey', 'Project'],
+                                                ['taskKey', 'Task'],
+                                                ['summary', 'Summary'],
+                                                ['status', 'Status'],
+                                                ['assignee', 'Assignee'],
+                                                ['startDate', 'Start'],
+                                                ['dueDate', 'Due'],
+                                                ['duration', 'Days'],
+                                                ['progress', 'Progress'],
+                                                ['priority', 'Priority'],
+                                                ['labels', 'Labels'],
+                                                ['dependencies', 'Depends'],
+                                                ['isCritical', 'Critical'],
+                                                ['isDelayed', 'Status']
+                                            ].map(([field, label]) => (
+                                                <button
+                                                    key={field}
+                                                    onClick={() => !['labels', 'dependencies'].includes(field) && handleSort(field)}
+                                                    className={`text-left text-xs font-semibold uppercase tracking-wide text-slate-600 flex items-center gap-1 ${!['labels', 'dependencies'].includes(field) ? 'hover:text-slate-900 cursor-pointer' : 'cursor-default'}`}
+                                                >
+                                                    {label}
+                                                    {sortField === field && (
+                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sortOrder === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'} />
+                                                        </svg>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Body */}
+                                    <div className="divide-y divide-slate-100">
+                                        {filteredTasks.map(task => (
+                                            <div
+                                                key={task.taskKey}
+                                                onClick={() => openModal('task', 'edit', processedProjects.find(p => p.projectKey === task.projectKey), task)}
+                                                className="grid grid-cols-[85px_85px_minmax(220px,1fr)_105px_145px_90px_90px_75px_110px_95px_125px_125px_85px_95px] gap-3 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors group"
+                                            >
+                                                {/* Project */}
+                                                <div className="flex flex-col justify-center min-w-0">
+                                                    <span className="text-[13px] font-semibold text-slate-900 truncate">{task.projectKey}</span>
+                                                    <span className="text-xs text-slate-500 truncate">{task.projectSummary}</span>
+                                                </div>
+
+                                                {/* Task Key */}
+                                                <div className="flex items-center">
+                                                    <span className={`text-[13px] font-bold ${task.isCritical ? 'text-red-600' : 'text-slate-900'}`}>
+                                                        {task.taskKey}
+                                                    </span>
+                                                </div>
+
+                                                {/* Summary */}
+                                                <div className="flex items-center min-w-0">
+                                                    <span className="text-[13px] text-slate-700 line-clamp-2 leading-snug">{task.summary}</span>
+                                                </div>
+
+                                                {/* Status */}
+                                                <div className="flex items-center">
+                                                    <span className={`inline-flex items-center py-1 px-2 rounded text-[11px] font-medium ${STATUS_CONFIG[task.status]?.color || 'bg-slate-100 text-slate-600'}`}>
+                                                        {STATUS_CONFIG[task.status]?.label || task.status}
+                                                    </span>
+                                                </div>
+
+                                                {/* Assignee */}
+                                                <div className="flex items-center min-w-0">
+                                                    <span className="text-[13px] text-slate-700 truncate">
+                                                        {task.assignee || <span className="text-slate-400">Unassigned</span>}
+                                                    </span>
+                                                </div>
+
+                                                {/* Start Date */}
+                                                <div className="flex items-center">
+                                                    <span className="text-[13px] text-slate-600">{task.startDate ? formatShortDate(task.startDate) : '—'}</span>
+                                                </div>
+
+                                                {/* Due Date */}
+                                                <div className="flex items-center">
+                                                    <span className="text-[13px] text-slate-600">{task.dueDate ? formatShortDate(task.dueDate) : '—'}</span>
+                                                </div>
+
+                                                {/* Duration */}
+                                                <div className="flex items-center justify-center">
+                                                    <span className="text-[13px] font-semibold text-slate-900">
+                                                        {task.duration !== 'N/A' ? `${task.duration}` : '—'}
+                                                    </span>
+                                                </div>
+
+                                                {/* Progress */}
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-slate-900 rounded-full transition-all"
+                                                            style={{ width: `${task.progress}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[11px] font-semibold text-slate-700 w-7 text-right">{task.progress}%</span>
+                                                </div>
+
+                                                {/* Priority */}
+                                                <div className="flex items-center">
+                                                    <span className={`inline-flex items-center py-1 px-2 rounded text-[11px] font-medium ${PRIORITY_CONFIG[task.priority]?.color || 'bg-slate-100 text-slate-600'}`}>
+                                                        {PRIORITY_CONFIG[task.priority]?.label || task.priority}
+                                                    </span>
+                                                </div>
+
+                                                {/* Labels */}
+                                                <div className="flex items-center flex-wrap gap-1">
+                                                    {!task.labels?.length ? (
+                                                        <span className="text-slate-400 text-xs">—</span>
+                                                    ) : (
+                                                        task.labels.slice(0, 2).map((l, i) => (
+                                                            <span key={i} className="inline-block bg-slate-100 text-slate-600 text-[11px] px-1.5 py-0.5 rounded">{l}</span>
+                                                        ))
+                                                    )}
+                                                    {task.labels?.length > 2 && (
+                                                        <span className="text-[11px] text-slate-500">+{task.labels.length - 2}</span>
+                                                    )}
+                                                </div>
+
+                                                {/* Dependencies */}
+                                                <div className="flex items-center flex-wrap gap-1">
+                                                    {!task.dependencies?.length ? (
+                                                        <span className="text-slate-400 text-xs">—</span>
+                                                    ) : (
+                                                        task.dependencies.slice(0, 2).map(depId => {
+                                                            const dep = taskIdToTaskMap.get(depId);
+                                                            return dep ? (
+                                                                <span key={depId} className="text-slate-700 hover:text-slate-900 cursor-pointer text-[11px] font-medium">
+                                                                    {dep.projectKey}-{dep.id}
+                                                                </span>
+                                                            ) : (
+                                                                <span key={depId} className="text-slate-400 text-[11px]">{depId}</span>
+                                                            );
+                                                        })
+                                                    )}
+                                                    {task.dependencies?.length > 2 && (
+                                                        <span className="text-[11px] text-slate-500">+{task.dependencies.length - 2}</span>
+                                                    )}
+                                                </div>
+
+                                                {/* Critical */}
+                                                <div className="flex items-center justify-center">
+                                                    <span className={`inline-flex items-center py-1 px-2 rounded text-[11px] font-medium ${task.isCritical ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
+                                                        {task.isCritical ? 'Yes' : 'No'}
+                                                    </span>
+                                                </div>
+
+                                                {/* Status Indicator */}
+                                                <div className="flex items-center">
+                                                    <span className={`inline-flex items-center py-1 px-2 rounded text-[11px] font-medium ${
+                                                        task.isDelayed
+                                                            ? 'bg-red-50 text-red-600'
+                                                            : task.isUpcomingDeadline
+                                                                ? 'bg-amber-50 text-amber-600'
+                                                                : task.isDelayedByDependency
+                                                                    ? 'bg-violet-50 text-violet-600'
+                                                                    : 'bg-green-50 text-green-600'
+                                                    }`}>
+                                                        {task.isDelayed ? 'Delayed' : task.isUpcomingDeadline ? 'Soon' : task.isDelayedByDependency ? 'Blocked' : 'On Track'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="px-4 py-4 border-t border-slate-200 bg-slate-50"><p className="text-sm text-slate-600"><span className="font-semibold text-slate-900">{filteredTasks.length}</span> results</p></div>
+
+                        {/* Footer */}
+                        <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs text-slate-600">
+                                    <span className="font-semibold text-slate-900">{filteredTasks.length}</span> {filteredTasks.length === 1 ? 'task' : 'tasks'}
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 ) : (
                     <>

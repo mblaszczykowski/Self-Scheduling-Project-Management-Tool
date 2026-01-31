@@ -7,6 +7,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Dashboard from './components/Dashboard';
 import { DataContext, DataProvider } from './context/DataContext';
 import { checkUserAuth } from './util/api';
+import PageTransition from './components/PageTransition';
 
 const LoadingSpinner = () => (
     <div className="flex justify-center items-center h-screen bg-slate-50">
@@ -48,7 +49,9 @@ function AppRoutes() {
                     path="/"
                     element={
                         <PublicRoute>
-                            <WelcomeContent show="register" />
+                            <PageTransition>
+                                <WelcomeContent show="register" />
+                            </PageTransition>
                         </PublicRoute>
                     }
                 />
@@ -56,7 +59,9 @@ function AppRoutes() {
                     path="/login"
                     element={
                         <PublicRoute>
-                            <WelcomeContent show="login" />
+                            <PageTransition>
+                                <WelcomeContent show="login" />
+                            </PageTransition>
                         </PublicRoute>
                     }
                 />
@@ -64,7 +69,9 @@ function AppRoutes() {
                     path="/register"
                     element={
                         <PublicRoute>
-                            <WelcomeContent show="register" />
+                            <PageTransition>
+                                <WelcomeContent show="register" />
+                            </PageTransition>
                         </PublicRoute>
                     }
                 />
@@ -72,7 +79,9 @@ function AppRoutes() {
                     path="/dashboard"
                     element={
                         <ProtectedRoute>
-                            <Dashboard />
+                            <PageTransition>
+                                <Dashboard />
+                            </PageTransition>
                         </ProtectedRoute>
                     }
                 />
@@ -80,7 +89,9 @@ function AppRoutes() {
                     path="/projects"
                     element={
                         <ProtectedRoute>
-                            <UnifiedView />
+                            <PageTransition>
+                                <UnifiedView />
+                            </PageTransition>
                         </ProtectedRoute>
                     }
                 />

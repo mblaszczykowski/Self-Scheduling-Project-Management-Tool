@@ -19,7 +19,7 @@ import Header from './Header';
 import { DataContext } from '../context/DataContext';
 import TaskProjectModal from './TaskProjectModal';
 import { logout } from '../util/api';
-import { formatLongDate, formatShortDate, getImageUrl, getAvatarColor } from '../util/helpers';
+import { formatLongDate, formatShortDate, getImageUrl, getAvatarColor, getAvatarInitials } from '../util/helpers';
 import './Aurora.css';
 
 ChartJS.register(
@@ -88,10 +88,22 @@ const Dashboard = () => {
     const [modalMode, setModalMode] = useState(null);
     const [currentProject, setCurrentProject] = useState(null);
     const [currentTask, setCurrentTask] = useState(null);
+    const [cardsVisible, setCardsVisible] = useState([]);
 
     useEffect(() => {
         if (!user) navigate('/login');
     }, [user, navigate]);
+
+    useEffect(() => {
+        // Staggered fade-in for project cards
+        const timeouts = projects.map((_, index) =>
+            setTimeout(() => {
+                setCardsVisible(prev => [...prev, index]);
+            }, index * 50)
+        );
+
+        return () => timeouts.forEach(clearTimeout);
+    }, [projects]);
 
     // Compute all stats from projects
     const stats = useMemo(() => {
@@ -343,14 +355,16 @@ const Dashboard = () => {
 
                         {processedProjects.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-                                {processedProjects.map(project => {
+                                {processedProjects.map((project, index) => {
                                     const completion = stats.projectCompletion.find(p => p.projectKey === project.projectKey)?.completionPercentage || 0;
 
                                     return (
                                         <div
                                             key={project.projectKey}
                                             onClick={() => openModal('project', 'edit', project)}
-                                            className="group cursor-pointer bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-all duration-200 overflow-hidden"
+                                            className={`group cursor-pointer bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-all duration-300 overflow-hidden ${
+                                                cardsVisible.includes(index) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                                            }`}
                                         >
                                             {/* Header */}
                                             <div className="p-5 pb-4 border-b border-slate-100">
@@ -401,19 +415,19 @@ const Dashboard = () => {
                                                                     key={member.id}
                                                                     src={getImageUrl(member.profilePicture)}
                                                                     alt={member.firstname}
-                                                                    className="w-7 h-7 rounded-full border-2 border-white object-cover"
+                                                                    className="w-7 h-7 rounded-lg border-2 border-white object-cover"
                                                                 />
                                                             ) : (
                                                                 <div
                                                                     key={member.id}
-                                                                    className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(member.firstname)} rounded-full flex items-center justify-center border-2 border-white`}
+                                                                    className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(member)} rounded-lg flex items-center justify-center border-2 border-white`}
                                                                 >
-                                                                    <span className="text-xs font-medium text-white">{member.firstname?.[0] || 'U'}</span>
+                                                                    <span className="text-xs font-medium text-white">{getAvatarInitials(member)}</span>
                                                                 </div>
                                                             )
                                                         ))}
                                                         {project.members?.length > 4 && (
-                                                            <span className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium text-slate-700 border-2 border-white">
+                                                            <span className="w-7 h-7 bg-slate-200 rounded-lg flex items-center justify-center text-xs font-medium text-slate-700 border-2 border-white">
                                                                 +{project.members.length - 4}
                                                             </span>
                                                         )}

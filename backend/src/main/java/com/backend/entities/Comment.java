@@ -47,7 +47,7 @@ public class Comment {
     @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CommentReaction> reactions = new ArrayList<>();
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "comment_attachments", joinColumns = @JoinColumn(name = "comment_id"))
     @Column(name = "attachment_url")
     private List<String> attachments = new ArrayList<>();

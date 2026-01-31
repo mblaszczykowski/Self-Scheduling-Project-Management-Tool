@@ -95,16 +95,42 @@ export const getPriorityConfig = () => ({
     'HIGHEST': { label: 'Highest', icon: '↑↑', color: 'bg-red-50 text-red-600' },
 });
 
-export const getAvatarColor = (name) => {
+// Generate consistent avatar color based on user email (always present and unique)
+export const getAvatarColor = (user) => {
     const colors = [
-        'from-blue-500 to-indigo-600',
-        'from-emerald-500 to-teal-600',
-        'from-orange-500 to-red-500',
-        'from-purple-500 to-pink-600',
-        'from-cyan-500 to-blue-600'
+        'from-slate-600 to-slate-700',
+        'from-blue-600 to-blue-700',
+        'from-indigo-600 to-indigo-700',
+        'from-violet-600 to-violet-700',
+        'from-purple-600 to-purple-700',
+        'from-emerald-600 to-emerald-700',
+        'from-teal-600 to-teal-700',
+        'from-cyan-600 to-cyan-700'
     ];
-    const index = name ? name.charCodeAt(0) % colors.length : 0;
+
+    // Use email as the consistent identifier (always present)
+    const identifier = typeof user === 'string' ? user : (user?.email || user?.firstname || '');
+    const index = identifier ? identifier.charCodeAt(0) % colors.length : 0;
     return colors[index];
+};
+
+// Get avatar initials from user
+export const getAvatarInitials = (user) => {
+    if (!user) return 'U';
+
+    if (user.firstname && user.lastname) {
+        return `${user.firstname[0]}${user.lastname[0]}`.toUpperCase();
+    }
+
+    if (user.firstname) {
+        return user.firstname[0].toUpperCase();
+    }
+
+    if (user.email) {
+        return user.email[0].toUpperCase();
+    }
+
+    return 'U';
 };
 
 // ============ TIMELINE HELPERS ============

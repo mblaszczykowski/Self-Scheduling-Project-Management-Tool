@@ -5,7 +5,7 @@ import * as Yup from 'yup';
 import { FaDownload, FaFileAlt, FaFilePdf, FaPlus, FaTimes } from 'react-icons/fa';
 import { MdAccountCircle, MdDelete, MdEdit, MdReply, MdThumbDown, MdThumbUp } from 'react-icons/md';
 import { formatDistanceToNow } from 'date-fns';
-import { getImageUrl, getFileInfo } from '../util/helpers';
+import { getImageUrl, getFileInfo, getAvatarColor, getAvatarInitials } from '../util/helpers';
 
 const CommentSchema = Yup.object().shape({
     content: Yup.string().required('Comment cannot be empty'),
@@ -13,17 +13,28 @@ const CommentSchema = Yup.object().shape({
 
 // Preview Modal Component
 const PreviewModal = ({ preview, onClose }) => {
+    const [isVisible, setIsVisible] = React.useState(false);
+
+    React.useEffect(() => {
+        requestAnimationFrame(() => setIsVisible(true));
+    }, []);
+
+    const handleClose = React.useCallback(() => {
+        setIsVisible(false);
+        setTimeout(onClose, 200);
+    }, [onClose]);
+
     if (!preview) return null;
 
     return (
         <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-[60]"
-            onClick={onClose}
+            className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-[60] transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+            onClick={handleClose}
         >
-            <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className={`relative bg-white rounded-xl shadow-2xl p-6 max-w-[90vw] max-h-[90vh] transition-all duration-300 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`} onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-slate-900">{preview.fileName}</h3>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                    <button onClick={handleClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
                         <FaTimes className="text-slate-500" />
                     </button>
                 </div>
@@ -227,17 +238,26 @@ export default function Comments({ taskId, currentUserId }) {
         </Formik>
     );
 
-    const CommentItem = ({ comment, level = 0 }) => (
-        <div className={`mt-4 ${level > 0 ? 'ml-8' : ''}`}>
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
+    const CommentItem = ({ comment, level = 0 }) => {
+        const [isVisible, setIsVisible] = React.useState(false);
+
+        React.useEffect(() => {
+            requestAnimationFrame(() => setIsVisible(true));
+        }, []);
+
+        return (
+            <div className={`mt-4 ${level > 0 ? 'ml-8' : ''} transition-all duration-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
                 {/* Header */}
                 <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-3">
                         {comment.authorProfilePicture ? (
-                            <img src={getImageUrl(comment.authorProfilePicture)} alt="Profile" className="h-9 w-9 rounded-full object-cover ring-2 ring-white shadow-sm" />
+                            <img src={getImageUrl(comment.authorProfilePicture)} alt="Profile" className="h-9 w-9 rounded-lg object-cover ring-2 ring-white shadow-sm" />
                         ) : (
-                            <div className="h-9 w-9 bg-slate-200 rounded-full flex items-center justify-center ring-2 ring-white shadow-sm">
-                                <MdAccountCircle className="h-5 w-5 text-slate-500" />
+                            <div className={`h-9 w-9 bg-gradient-to-br ${getAvatarColor({ firstname: comment.authorName?.split(' ')[0], lastname: comment.authorName?.split(' ')[1] })} rounded-lg flex items-center justify-center ring-2 ring-white shadow-sm`}>
+                                <span className="text-sm font-semibold text-white">
+                                    {getAvatarInitials({ firstname: comment.authorName?.split(' ')[0], lastname: comment.authorName?.split(' ')[1] })}
+                                </span>
                             </div>
                         )}
                         <div className="flex flex-col">
@@ -362,7 +382,8 @@ export default function Comments({ taskId, currentUserId }) {
                 ))}
             </div>
         </div>
-    );
+        );
+    };
 
     return (
         <div>
@@ -376,7 +397,7 @@ export default function Comments({ taskId, currentUserId }) {
                     <FaPlus className="h-3 w-3" /> <span>Add comment</span>
                 </button>
             ) : (
-                <div className="mb-6 p-4 bg-white border border-slate-200 rounded-xl">
+                <div className="mb-6 p-4 bg-white border border-slate-200 rounded-xl animate-[fadeInSlide_0.3s_ease-out]">
                     <CommentForm
                         onSubmit={(values, actions) => handleAddComment(values, actions, null)}
                         buttonText="Publish"

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { DataContext } from '../context/DataContext';
 import AccountModal from './AccountModal';
 import { markNotificationsAsRead } from '../util/api';
-import { getImageUrl } from '../util/helpers';
+import { getImageUrl, getAvatarColor, getAvatarInitials } from '../util/helpers';
 
 export default function Header({ onLogout, onCreateProject, onCreateTask }) {
     const { user, notifications, setNotifications, setUser } = useContext(DataContext);
@@ -56,11 +56,6 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
         </Link>
     );
 
-    const getAvatarFallback = (name) => {
-        if (!name) return 'U';
-        return name.charAt(0).toUpperCase();
-    };
-
     return (
         <header className="w-full bg-white border-b border-slate-200 sticky top-0 z-50">
             <nav className="mx-auto px-6 lg:px-12 py-4 flex items-center justify-between">
@@ -91,7 +86,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                                 </svg>
                             </button>
                             {createDropdownOpen && (
-                                <div className="absolute left-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                                <div className="absolute left-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden animate-[slideDown_0.2s_ease-out]">
                                     <div className="py-1">
                                         <button
                                             onClick={() => { setCreateDropdownOpen(false); onCreateProject(); }}
@@ -151,7 +146,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                             )}
                         </button>
                         {dropdownOpen && (
-                            <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                            <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden animate-[slideDown_0.2s_ease-out]">
                                 <div className="max-h-96 overflow-y-auto">
                                     <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
                                         <span className="text-xs font-semibold text-slate-900 uppercase tracking-wide">Notifications</span>
@@ -218,12 +213,12 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                             <img
                                 src={getImageUrl(user.profilePicture)}
                                 alt="Profile"
-                                className="h-7 w-7 rounded object-cover"
+                                className="h-7 w-7 rounded-lg object-cover"
                             />
                         ) : (
-                            <div className="h-7 w-7 rounded bg-slate-100 flex items-center justify-center">
-                                <span className="text-xs font-semibold text-slate-700">
-                                    {getAvatarFallback(user?.firstname)}
+                            <div className={`h-7 w-7 rounded-lg bg-gradient-to-br ${getAvatarColor(user)} flex items-center justify-center`}>
+                                <span className="text-xs font-semibold text-white">
+                                    {getAvatarInitials(user)}
                                 </span>
                             </div>
                         )}
@@ -245,7 +240,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
 
             {/* Mobile menu */}
             {mobileMenuOpen && (
-                <div className="xl:hidden border-t border-slate-200 bg-white">
+                <div className="xl:hidden border-t border-slate-200 bg-white animate-[slideDown_0.2s_ease-out]">
                     <div className="px-6 py-4 space-y-1">
                         <Link
                             to="/dashboard"
