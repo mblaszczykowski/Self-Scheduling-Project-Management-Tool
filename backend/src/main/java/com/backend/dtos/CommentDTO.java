@@ -1,6 +1,6 @@
 package com.backend.dtos;
 
-import java.util.Date;
+import java.time.Instant;
 import java.util.List;
 
 public record CommentDTO(
@@ -10,8 +10,8 @@ public record CommentDTO(
         String authorName,
         String authorProfilePicture,
         String content,
-        Date timestamp,
-        Date editedAt,
+        Instant timestamp,
+        Instant editedAt,
         List<String> attachments,
         Integer likeCount,
         Integer dislikeCount,

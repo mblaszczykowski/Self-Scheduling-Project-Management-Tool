@@ -37,11 +37,16 @@ public class UserController {
             HttpServletRequest request,
             @PathVariable("email") String email
     ) {
-        // Verify user is authenticated
-        tokenService.getUserIdFromRequest(request);
+        Integer requestingUserId = tokenService.getUserIdFromRequest(request);
+        User user = userService.getRequiredUserByEmail(email);
 
-        // Return DTO instead of entity to avoid exposing password hash
-        User user = userService.getUserByEmail(email);
+        boolean canAccessProfile = user.getId().equals(requestingUserId) ||
+                userService.shareProjectWith(requestingUserId, user.getId());
+
+        if (!canAccessProfile) {
+            throw new com.backend.exception.ResourceNotFoundException("User not found");
+        }
+
         UserDTO userDTO = new UserDTO(
                 user.getId(),
                 user.getFirstname(),

@@ -14,38 +14,38 @@ public class CriticalPathMethodHelper {
             return tasks;
         }
 
-        List<TaskDTO> validTasks = tasks.stream()
+        var validTasks = tasks.stream()
                 .filter(t -> t.startDate() != null && t.dueDate() != null)
-                .collect(Collectors.toList());
+                .toList();
 
         if (validTasks.isEmpty()) {
             return tasks;
         }
 
-        Map<String, TaskCPM> taskGraph = buildTaskGraph(validTasks);
+        var taskGraph = buildTaskGraph(validTasks);
         performCPM(taskGraph);
 
-        Map<String, Boolean> criticalMap = taskGraph.entrySet().stream()
+        var criticalMap = taskGraph.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().isCritical));
 
         return tasks.stream()
                 .map(t -> updateTaskDTOWithIsCritical(t, criticalMap.getOrDefault(t.taskKey(), false)))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private Map<String, TaskCPM> buildTaskGraph(List<TaskDTO> tasks) {
-        Map<String, TaskCPM> taskMap = new HashMap<>();
+        var taskMap = new HashMap<String, TaskCPM>();
 
-        for (TaskDTO task : tasks) {
-            int duration = calculateTaskDuration(task.startDate(), task.dueDate());
-            List<String> deps = task.dependencyKeys() != null ? task.dependencyKeys() : new ArrayList<>();
-            TaskCPM taskCPM = new TaskCPM(task.taskKey(), duration, deps);
+        for (var task : tasks) {
+            var duration = calculateTaskDuration(task.startDate(), task.dueDate());
+            var deps = task.dependencyKeys() != null ? task.dependencyKeys() : new ArrayList<String>();
+            var taskCPM = new TaskCPM(task.taskKey(), duration, deps);
             taskMap.put(task.taskKey(), taskCPM);
         }
 
-        for (TaskCPM task : taskMap.values()) {
-            for (String depKey : task.dependencies) {
-                TaskCPM depTask = taskMap.get(depKey);
+        for (var task : taskMap.values()) {
+            for (var depKey : task.dependencies) {
+                var depTask = taskMap.get(depKey);
                 if (depTask != null) {
                     depTask.successors.add(task.taskKey);
                 }
@@ -61,8 +61,8 @@ public class CriticalPathMethodHelper {
     }
 
     private void forwardPass(Map<String, TaskCPM> taskMap) {
-        Set<String> visited = new HashSet<>();
-        for (TaskCPM task : taskMap.values()) {
+        var visited = new HashSet<String>();
+        for (var task : taskMap.values()) {
             calculateEarliestTimes(task, taskMap, visited);
         }
     }
@@ -72,9 +72,9 @@ public class CriticalPathMethodHelper {
         visited.add(task.taskKey);
 
         if (!task.dependencies.isEmpty()) {
-            int maxEarliestFinish = 0;
-            for (String depKey : task.dependencies) {
-                TaskCPM depTask = taskMap.get(depKey);
+            var maxEarliestFinish = 0;
+            for (var depKey : task.dependencies) {
+                var depTask = taskMap.get(depKey);
                 if (depTask != null) {
                     calculateEarliestTimes(depTask, taskMap, visited);
                     maxEarliestFinish = Math.max(maxEarliestFinish, depTask.earliestFinish);
@@ -86,19 +86,19 @@ public class CriticalPathMethodHelper {
     }
 
     private void backwardPass(Map<String, TaskCPM> taskMap) {
-        int projectFinish = taskMap.values().stream()
+        var projectFinish = taskMap.values().stream()
                 .mapToInt(t -> t.earliestFinish)
                 .max()
                 .orElse(0);
 
-        for (TaskCPM task : taskMap.values()) {
+        for (var task : taskMap.values()) {
             if (task.successors.isEmpty()) {
                 task.latestFinish = projectFinish;
             }
         }
 
-        Set<String> visited = new HashSet<>();
-        for (TaskCPM task : taskMap.values()) {
+        var visited = new HashSet<String>();
+        for (var task : taskMap.values()) {
             if (task.successors.isEmpty()) {
                 calculateLatestTimes(task, taskMap, visited);
             }
@@ -113,8 +113,8 @@ public class CriticalPathMethodHelper {
         task.totalFloat = task.latestStart - task.earliestStart;
         task.isCritical = task.totalFloat == 0;
 
-        for (String depKey : task.dependencies) {
-            TaskCPM depTask = taskMap.get(depKey);
+        for (var depKey : task.dependencies) {
+            var depTask = taskMap.get(depKey);
             if (depTask != null) {
                 if (depTask.latestFinish > task.latestStart) {
                     depTask.latestFinish = task.latestStart;
@@ -128,7 +128,7 @@ public class CriticalPathMethodHelper {
         if (startDate == null || dueDate == null) {
             return 1;
         }
-        long days = ChronoUnit.DAYS.between(startDate, dueDate);
+        var days = ChronoUnit.DAYS.between(startDate, dueDate);
         return Math.max(1, (int) days + 1);
     }
 

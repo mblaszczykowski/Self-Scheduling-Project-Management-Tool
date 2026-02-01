@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 import {
     createComment as apiCreateComment,
     createProject as apiCreateProject,
@@ -16,6 +17,15 @@ import {
     updateTask as apiUpdateTask,
 } from '../util/api';
 import { useNavigate } from 'react-router-dom';
+
+// Helper to extract user-friendly error message
+const getErrorMessage = (err) => {
+    if (err.response?.data?.message) return err.response.data.message;
+    if (err.response?.data?.error) return err.response.data.error;
+    if (err.message === 'Network Error') return 'Unable to connect to server';
+    if (err.code === 'ECONNABORTED') return 'Request timed out';
+    return err.message || 'An unexpected error occurred';
+};
 
 export const DataContext = createContext();
 
@@ -68,12 +78,15 @@ export const DataProvider = ({ children, initialUser }) => {
         return () => abortController.abort();
     }, [user, fetchUserData]);
 
+    const clearError = useCallback(() => setError(null), []);
+
     const refreshProjects = useCallback(async () => {
         try {
             const fetchedProjects = await getProjects();
             setProjects(fetchedProjects);
         } catch (err) {
             console.error('Error refreshing projects:', err);
+            toast.error(getErrorMessage(err));
         }
     }, []);
 
@@ -83,46 +96,112 @@ export const DataProvider = ({ children, initialUser }) => {
             setNotifications(fetchedNotifications);
         } catch (err) {
             console.error('Error refreshing notifications:', err);
+            // Don't show toast for notification refresh failures - too noisy
         }
     }, []);
 
-    // Task operations
+    // Poll notifications every 30 seconds (only when tab is visible)
+    useEffect(() => {
+        if (!user) return;
+
+        let intervalId = null;
+
+        const startPolling = () => {
+            if (intervalId) return;
+            intervalId = setInterval(() => {
+                refreshNotifications();
+            }, 30000);
+        };
+
+        const stopPolling = () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                refreshNotifications(); // Refresh immediately when tab becomes visible
+                startPolling();
+            } else {
+                stopPolling();
+            }
+        };
+
+        // Start polling if tab is visible
+        if (document.visibilityState === 'visible') {
+            startPolling();
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            stopPolling();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [user, refreshNotifications]);
+
+    // Task operations - update local state instead of refetching all projects
     const createTask = useCallback(async (projectKey, taskDTO, attachments = []) => {
-        const response = await apiCreateTask(projectKey, taskDTO, attachments);
-        await refreshProjects();
-        return response;
-    }, [refreshProjects]);
+        const newTask = await apiCreateTask(projectKey, taskDTO, attachments);
+        // Update local state with new task
+        setProjects(prev => prev.map(p =>
+            p.projectKey === projectKey
+                ? { ...p, tasks: [...(p.tasks || []), newTask] }
+                : p
+        ));
+        return newTask;
+    }, []);
 
     const updateTask = useCallback(async (projectKey, taskKey, taskDTO, attachments = []) => {
-        const response = await apiUpdateTask(projectKey, taskKey, taskDTO, attachments);
-        await refreshProjects();
-        return response;
-    }, [refreshProjects]);
+        const updatedTask = await apiUpdateTask(projectKey, taskKey, taskDTO, attachments);
+        // Update local state with updated task
+        setProjects(prev => prev.map(p =>
+            p.projectKey === projectKey
+                ? {
+                    ...p,
+                    tasks: (p.tasks || []).map(t =>
+                        t.taskKey === taskKey ? updatedTask : t
+                    )
+                }
+                : p
+        ));
+        return updatedTask;
+    }, []);
 
     const deleteTask = useCallback(async (projectKey, taskKey) => {
-        const response = await apiDeleteTask(projectKey, taskKey);
-        await refreshProjects();
-        return response;
-    }, [refreshProjects]);
+        await apiDeleteTask(projectKey, taskKey);
+        // Remove task from local state
+        setProjects(prev => prev.map(p =>
+            p.projectKey === projectKey
+                ? { ...p, tasks: (p.tasks || []).filter(t => t.taskKey !== taskKey) }
+                : p
+        ));
+    }, []);
 
-    // Project operations
+    // Project operations - update local state instead of refetching all projects
     const createProject = useCallback(async (projectDTO, attachments = []) => {
-        const response = await apiCreateProject(projectDTO, attachments);
-        await refreshProjects();
-        return response;
-    }, [refreshProjects]);
+        const newProject = await apiCreateProject(projectDTO, attachments);
+        // Add new project to local state
+        setProjects(prev => [...prev, newProject]);
+        return newProject;
+    }, []);
 
     const updateProject = useCallback(async (projectKey, projectDTO, attachments = []) => {
-        const response = await apiUpdateProject(projectKey, projectDTO, attachments);
-        await refreshProjects();
-        return response;
-    }, [refreshProjects]);
+        const updatedProject = await apiUpdateProject(projectKey, projectDTO, attachments);
+        // Update project in local state
+        setProjects(prev => prev.map(p =>
+            p.projectKey === projectKey ? updatedProject : p
+        ));
+        return updatedProject;
+    }, []);
 
     const deleteProject = useCallback(async (projectKey) => {
-        const response = await apiDeleteProject(projectKey);
-        await refreshProjects();
-        return response;
-    }, [refreshProjects]);
+        await apiDeleteProject(projectKey);
+        // Remove project from local state
+        setProjects(prev => prev.filter(p => p.projectKey !== projectKey));
+    }, []);
 
     // Comment operations
     const getComments = useCallback((taskId) => apiGetComments(taskId), []);
@@ -141,18 +220,24 @@ export const DataProvider = ({ children, initialUser }) => {
 
     // User operations
     const addUserToProject = useCallback(async (projectKey, userEmail) => {
-        const foundUser = await getUserByEmail(userEmail);
-        if (!foundUser) throw new Error('User not found');
+        try {
+            const foundUser = await getUserByEmail(userEmail);
+            if (!foundUser) throw new Error('User not found');
 
-        const projectToUpdate = projects.find(p => p.projectKey === projectKey);
-        if (!projectToUpdate) throw new Error('Project not found');
+            const projectToUpdate = projects.find(p => p.projectKey === projectKey);
+            if (!projectToUpdate) throw new Error('Project not found');
 
-        const updatedProject = {
-            ...projectToUpdate,
-            members: [...projectToUpdate.members, foundUser],
-        };
-        await updateProject(projectKey, updatedProject);
-        return updatedProject;
+            const updatedProject = {
+                ...projectToUpdate,
+                members: [...projectToUpdate.members, foundUser],
+            };
+            const result = await updateProject(projectKey, updatedProject);
+            return result;
+        } catch (err) {
+            const message = getErrorMessage(err);
+            toast.error(`Failed to add user: ${message}`);
+            throw err;
+        }
     }, [projects, updateProject]);
 
     const value = {
@@ -161,6 +246,7 @@ export const DataProvider = ({ children, initialUser }) => {
         notifications,
         loading,
         error,
+        clearError,
         setUser,
         setNotifications,
         refreshProjects,

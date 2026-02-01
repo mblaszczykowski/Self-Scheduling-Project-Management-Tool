@@ -1,6 +1,7 @@
 package com.backend.services;
 
 import com.backend.exception.FileStorageException;
+import com.backend.util.FileValidationConstants;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,21 +18,6 @@ import java.util.stream.Collectors;
 public class FileStorageService {
 
     private final Path fileStorageLocation;
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
-
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            "jpg", "jpeg", "png", "gif", "webp",
-            "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-            "txt", "csv", "json", "xml"
-    );
-
-    private static final Map<String, byte[]> MAGIC_BYTES = Map.of(
-            "jpg", new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF},
-            "jpeg", new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF},
-            "png", new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47},
-            "gif", new byte[]{0x47, 0x49, 0x46},
-            "pdf", new byte[]{0x25, 0x50, 0x44, 0x46}
-    );
 
     public FileStorageService(@Value("${file.upload-dir}") String uploadDir) {
         this.fileStorageLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
@@ -43,6 +29,10 @@ public class FileStorageService {
     }
 
     public List<String> storeFiles(List<MultipartFile> files) {
+        if (files.size() > FileValidationConstants.MAX_ATTACHMENTS_PER_REQUEST) {
+            throw new FileStorageException("Too many files. Maximum " +
+                    FileValidationConstants.MAX_ATTACHMENTS_PER_REQUEST + " files per request");
+        }
         return files.stream()
                 .map(this::storeFile)
                 .collect(Collectors.toList());
@@ -53,40 +43,28 @@ public class FileStorageService {
             throw new FileStorageException("Cannot store empty file");
         }
 
-        String originalFileName = file.getOriginalFilename();
+        var originalFileName = file.getOriginalFilename();
         if (originalFileName == null || originalFileName.isBlank()) {
             throw new FileStorageException("Invalid filename");
         }
 
-        // Extract and validate extension
-        String extension = getExtension(originalFileName).toLowerCase();
-        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+        var extension = getExtension(originalFileName).toLowerCase();
+        if (!FileValidationConstants.ALLOWED_EXTENSIONS.contains(extension)) {
             throw new FileStorageException("File type not allowed: " + extension);
         }
 
-        // Validate file size
-        if (file.getSize() > MAX_FILE_SIZE) {
+        if (file.getSize() > FileValidationConstants.MAX_FILE_SIZE) {
             throw new FileStorageException("File size exceeds maximum allowed size of 5 MB");
         }
 
-        // Validate magic bytes for known types
-        if (MAGIC_BYTES.containsKey(extension)) {
+        if (FileValidationConstants.MAGIC_BYTES_BY_EXTENSION.containsKey(extension)) {
             validateMagicBytes(file, extension);
         }
 
         try {
-            // Generate safe filename - completely remove original name
-            String safeFileName = UUID.randomUUID() + "." + extension;
-
-            Path targetLocation = this.fileStorageLocation.resolve(safeFileName).normalize();
-
-            // Security check: ensure resolved path is within storage directory
-            if (!targetLocation.startsWith(this.fileStorageLocation)) {
-                throw new FileStorageException("Invalid file path detected");
-            }
-
+            var safeFileName = generateSafeFileName(extension);
+            var targetLocation = resolveAndValidatePath(safeFileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-
             return "/files/" + safeFileName;
         } catch (IOException ex) {
             throw new FileStorageException("Could not store file. Please try again");
@@ -95,23 +73,9 @@ public class FileStorageService {
 
     public void deleteFile(String filePath) {
         try {
-            // Extract filename from path like "/files/uuid.ext"
-            String fileName = filePath;
-            if (fileName.startsWith("/files/")) {
-                fileName = fileName.substring(7);
-            }
-
-            // Security: reject any path traversal attempts
-            if (fileName.contains("/") || fileName.contains("\\") || fileName.contains("..")) {
-                throw new FileStorageException("Invalid filename");
-            }
-
-            Path resolvedPath = this.fileStorageLocation.resolve(fileName).normalize();
-
-            // Security check: ensure path is within storage directory
-            if (!resolvedPath.startsWith(this.fileStorageLocation)) {
-                throw new FileStorageException("Invalid file path");
-            }
+            var fileName = extractFileNameFromPath(filePath);
+            rejectPathTraversalAttempts(fileName);
+            var resolvedPath = resolveAndValidatePath(fileName);
 
             if (Files.exists(resolvedPath)) {
                 Files.delete(resolvedPath);
@@ -122,22 +86,37 @@ public class FileStorageService {
     }
 
     public Path getFilePath(String fileName) {
-        // Security: reject path traversal
+        rejectPathTraversalAttempts(fileName);
+        return resolveAndValidatePath(fileName);
+    }
+
+    private String generateSafeFileName(String extension) {
+        return UUID.randomUUID() + "." + extension;
+    }
+
+    private String extractFileNameFromPath(String filePath) {
+        if (filePath.startsWith("/files/")) {
+            return filePath.substring(7);
+        }
+        return filePath;
+    }
+
+    private void rejectPathTraversalAttempts(String fileName) {
         if (fileName.contains("/") || fileName.contains("\\") || fileName.contains("..")) {
             throw new FileStorageException("Invalid filename");
         }
+    }
 
-        Path resolvedPath = this.fileStorageLocation.resolve(fileName).normalize();
-
+    private Path resolveAndValidatePath(String fileName) {
+        var resolvedPath = this.fileStorageLocation.resolve(fileName).normalize();
         if (!resolvedPath.startsWith(this.fileStorageLocation)) {
             throw new FileStorageException("Invalid file path");
         }
-
         return resolvedPath;
     }
 
     private String getExtension(String filename) {
-        int lastDot = filename.lastIndexOf('.');
+        var lastDot = filename.lastIndexOf('.');
         if (lastDot == -1 || lastDot == filename.length() - 1) {
             throw new FileStorageException("File must have an extension");
         }
@@ -146,17 +125,11 @@ public class FileStorageService {
 
     private void validateMagicBytes(MultipartFile file, String extension) {
         try {
-            byte[] fileBytes = file.getBytes();
-            byte[] expected = MAGIC_BYTES.get(extension);
+            var fileBytes = file.getBytes();
+            var expectedMagicBytes = FileValidationConstants.MAGIC_BYTES_BY_EXTENSION.get(extension);
 
-            if (fileBytes.length < expected.length) {
+            if (!FileValidationConstants.startsWithMagicBytes(fileBytes, expectedMagicBytes)) {
                 throw new FileStorageException("File content doesn't match declared type");
-            }
-
-            for (int i = 0; i < expected.length; i++) {
-                if (fileBytes[i] != expected[i]) {
-                    throw new FileStorageException("File content doesn't match declared type");
-                }
             }
         } catch (IOException e) {
             throw new FileStorageException("Could not validate file content");

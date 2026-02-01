@@ -2,12 +2,12 @@ package com.backend.dtos;
 
 import com.backend.entities.NotificationType;
 
-import java.util.Date;
+import java.time.Instant;
 
 public record NotificationDTO(
         Integer id,
         String message,
-        Date timestamp,
+        Instant timestamp,
         Boolean isRead,
         NotificationType type,
         String link

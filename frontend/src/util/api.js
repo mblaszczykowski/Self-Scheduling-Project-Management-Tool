@@ -5,6 +5,51 @@ import config from '../config';
 const api = axios.create({
     baseURL: config.API_BASE_URL,
     withCredentials: true,
+    timeout: 30000, // 30 second timeout to prevent indefinite waits
+});
+
+/**
+ * Get CSRF token from cookie.
+ * The server sets XSRF-TOKEN cookie on GET requests.
+ * Uses proper cookie parsing with URL decoding for reliability.
+ */
+const getCsrfToken = () => {
+    if (!document.cookie) return null;
+
+    const cookies = document.cookie.split('; ').reduce((acc, cookie) => {
+        const [key, ...valueParts] = cookie.split('=');
+        if (key && valueParts.length > 0) {
+            acc[key] = valueParts.join('='); // Handle values containing '='
+        }
+        return acc;
+    }, {});
+
+    const token = cookies['XSRF-TOKEN'];
+    if (!token) return null;
+
+    try {
+        return decodeURIComponent(token);
+    } catch {
+        return token; // Return raw value if decoding fails
+    }
+};
+
+/**
+ * Request interceptor to add CSRF token to state-changing requests.
+ * This implements the Double-Submit Cookie pattern.
+ */
+api.interceptors.request.use((config) => {
+    const method = config.method?.toUpperCase();
+
+    // Add CSRF token for non-safe methods (POST, PUT, DELETE, PATCH)
+    if (method && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+        const csrfToken = getCsrfToken();
+        if (csrfToken) {
+            config.headers['X-CSRF-Token'] = csrfToken;
+        }
+    }
+
+    return config;
 });
 
 // Token refresh logic
@@ -60,6 +105,8 @@ api.interceptors.response.use(
             // Clear any stale auth state and redirect
             const publicPaths = ['/login', '/register', '/'];
             if (!publicPaths.includes(window.location.pathname)) {
+                // Store message to show on login page
+                sessionStorage.setItem('session_expired', 'Your session has expired. Please sign in again.');
                 window.location.href = '/login';
             }
             return Promise.reject(refreshError);
@@ -82,7 +129,7 @@ const createFormData = (data, attachments = [], dataKey = 'data') => {
 export const getUser = () => api.get('/api/users').then(res => res.data);
 
 export const checkUserAuth = () =>
-    api.get('/api/users', { _skipRefresh: true }).then(res => res.data);
+    api.get('/api/users').then(res => res.data);
 
 export const getUserByEmail = (email) =>
     api.get(`/api/users/${email}`).then(res => res.data);
@@ -176,6 +223,19 @@ export const logout = () => api.post('/api/auth/logout');
 
 export const register = (userData) =>
     api.post('/api/users', userData).then(res => res.data);
+
+/**
+ * Initialize CSRF token by making a GET request.
+ * Call this on app initialization to ensure CSRF token is set.
+ */
+export const initCsrfToken = async () => {
+    try {
+        // Any GET request will set the CSRF token cookie
+        await api.get('/api/users/exists', { params: { email: '' }, _skipRefresh: true });
+    } catch (e) {
+        // Ignore errors - this is just to get the CSRF cookie
+    }
+};
 
 // Export the axios instance for edge cases
 export default api;

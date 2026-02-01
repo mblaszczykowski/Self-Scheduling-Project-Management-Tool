@@ -6,6 +6,7 @@ import com.backend.services.TokenService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,8 +30,8 @@ public class ProjectController {
 
     @GetMapping
     public ResponseEntity<List<ProjectDTO>> getAllProjects(HttpServletRequest request) {
-        int userId = tokenService.getUserIdFromRequest(request);
-        List<ProjectDTO> projects = projectService.getAllProjects(userId);
+        var userId = tokenService.getUserIdFromRequest(request);
+        var projects = projectService.getAllProjects(userId);
         return ResponseEntity.ok(projects);
     }
 
@@ -39,8 +40,8 @@ public class ProjectController {
             HttpServletRequest request,
             @PathVariable String projectKey
     ) {
-        int userId = tokenService.getUserIdFromRequest(request);
-        ProjectDTO project = projectService.getProjectByKey(projectKey, userId);
+        var userId = tokenService.getUserIdFromRequest(request);
+        var project = projectService.getProjectByKey(projectKey, userId);
         return ResponseEntity.ok(project);
     }
 
@@ -50,10 +51,10 @@ public class ProjectController {
             @RequestPart("projectDTO") String projectDTOStr,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
-        int userId = tokenService.getUserIdFromRequest(request);
-        ProjectDTO projectDTO = objectMapper.readValue(projectDTOStr, ProjectDTO.class);
-        ProjectDTO createdProject = projectService.createProject(projectDTO, userId, attachments);
-        return ResponseEntity.ok(createdProject);
+        var userId = tokenService.getUserIdFromRequest(request);
+        var projectDTO = objectMapper.readValue(projectDTOStr, ProjectDTO.class);
+        var createdProject = projectService.createProject(projectDTO, userId, attachments);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdProject);
     }
 
     @PutMapping(value = "/{projectKey}", consumes = {"multipart/form-data"})
@@ -63,9 +64,9 @@ public class ProjectController {
             @RequestPart("projectDTO") String projectDTOStr,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
-        int userId = tokenService.getUserIdFromRequest(request);
-        ProjectDTO projectDTO = objectMapper.readValue(projectDTOStr, ProjectDTO.class);
-        ProjectDTO updatedProject = projectService.updateProject(projectDTO, userId, attachments);
+        var userId = tokenService.getUserIdFromRequest(request);
+        var projectDTO = objectMapper.readValue(projectDTOStr, ProjectDTO.class);
+        var updatedProject = projectService.updateProject(projectDTO, userId, attachments);
         return ResponseEntity.ok(updatedProject);
     }
 
@@ -74,7 +75,7 @@ public class ProjectController {
             HttpServletRequest request,
             @PathVariable String projectKey
     ) {
-        int userId = tokenService.getUserIdFromRequest(request);
+        var userId = tokenService.getUserIdFromRequest(request);
         projectService.deleteProject(projectKey, userId);
         return ResponseEntity.noContent().build();
     }

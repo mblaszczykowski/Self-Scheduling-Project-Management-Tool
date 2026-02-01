@@ -2,6 +2,8 @@ package com.backend.daos;
 
 import com.backend.entities.Notification;
 import com.backend.repositories.NotificationRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -24,6 +26,10 @@ public class NotificationDAO {
 
     public List<Notification> getAllNotificationsByUserId(Integer userId) {
         return notificationRepository.findByUserIdOrderByTimestampDesc(userId);
+    }
+
+    public Page<Notification> getAllNotificationsByUserIdPaged(Integer userId, Pageable pageable) {
+        return notificationRepository.findByUserIdOrderByTimestampDesc(userId, pageable);
     }
 
     public List<Notification> findAllById(List<Integer> ids) {

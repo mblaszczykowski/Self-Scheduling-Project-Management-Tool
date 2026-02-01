@@ -5,6 +5,12 @@ import java.util.regex.Pattern;
 
 public class ValidationUtil {
 
+    // Content length limits
+    public static final int MAX_SUMMARY_LENGTH = 200;
+    public static final int MAX_DESCRIPTION_LENGTH = 5000;
+    public static final int MAX_COMMENT_LENGTH = 10000;
+    public static final int MAX_PROJECT_KEY_LENGTH = 10;
+
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
             "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
             Pattern.CASE_INSENSITIVE
@@ -20,6 +26,9 @@ public class ValidationUtil {
 
     public static boolean isValidEmail(String email) {
         if (isNullOrEmpty(email) || email.length() > 255) {
+            return false;
+        }
+        if (email.contains("..")) {
             return false;
         }
         return EMAIL_PATTERN.matcher(email).matches();

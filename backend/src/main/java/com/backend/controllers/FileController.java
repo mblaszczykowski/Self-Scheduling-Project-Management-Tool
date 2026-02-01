@@ -29,26 +29,25 @@ public class FileController {
     @GetMapping("/{fileName:.+}")
     public ResponseEntity<Resource> serveFile(@PathVariable String fileName) {
         try {
-            Path filePath = fileStorageService.getFilePath(fileName);
-            Resource resource = new UrlResource(filePath.toUri());
+            var filePath = fileStorageService.getFilePath(fileName);
+            var resource = new UrlResource(filePath.toUri());
 
             if (!resource.exists() || !resource.isReadable()) {
                 throw new FileStorageException("File not found: " + fileName);
             }
 
-            String contentType = Files.probeContentType(filePath);
+            var contentType = Files.probeContentType(filePath);
             if (contentType == null) {
                 contentType = "application/octet-stream";
             }
 
-            // Sanitise filename for Content-Disposition header
-            String safeFilename = resource.getFilename() != null
-                    ? resource.getFilename().replaceAll("[^a-zA-Z0-9._-]", "_")
-                    : "download";
+            var sanitizedFilename = sanitizeFilename(resource.getFilename());
 
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeFilename + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + sanitizedFilename + "\"")
                     .header(HttpHeaders.CONTENT_TYPE, contentType)
+                    .header("X-Content-Type-Options", "nosniff")
+                    .header("Cache-Control", "private, no-cache, no-store, must-revalidate")
                     .body(resource);
 
         } catch (MalformedURLException ex) {
@@ -56,5 +55,12 @@ public class FileController {
         } catch (IOException ex) {
             throw new FileStorageException("Could not determine file type");
         }
+    }
+
+    private String sanitizeFilename(String filename) {
+        if (filename == null) {
+            return "download";
+        }
+        return filename.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 }

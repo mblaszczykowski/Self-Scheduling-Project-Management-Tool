@@ -19,6 +19,8 @@ import java.util.stream.Collectors;
 @Service
 public class CommentService {
 
+    private static final int MAX_COMMENT_LENGTH = 2000;
+
     private final CommentDAO commentDAO;
     private final UserDAO userDAO;
     private final FileStorageService fileStorageService;
@@ -35,50 +37,35 @@ public class CommentService {
 
     @Transactional(readOnly = true)
     public List<CommentDTO> getCommentsByTask(Integer taskId, Integer userId) {
-        Task task = commentDAO.getTaskById(taskId)
+        var task = commentDAO.getTaskById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
 
         verifyProjectAccess(task.getProject(), userId);
 
-        List<Comment> topLevelComments = commentDAO.getTopLevelCommentsByTaskIdWithDetails(taskId);
-
-        // Batch load replies to avoid N+1
-        List<Integer> topLevelIds = topLevelComments.stream()
-                .map(Comment::getId)
-                .collect(Collectors.toList());
-
-        Map<Integer, List<Comment>> repliesByParent = new HashMap<>();
-        if (!topLevelIds.isEmpty()) {
-            List<Comment> allReplies = commentDAO.getRepliesByParentIds(topLevelIds);
-            repliesByParent = allReplies.stream()
-                    .collect(Collectors.groupingBy(c -> c.getParentComment().getId()));
-        }
-
-        Map<Integer, List<Comment>> finalReplies = repliesByParent;
+        var topLevelComments = commentDAO.getTopLevelCommentsByTaskIdWithDetails(taskId);
+        var repliesByParentId = batchLoadReplies(topLevelComments);
         return topLevelComments.stream()
                 .sorted(Comparator.comparing(Comment::getTimestamp))
-                .map(c -> convertToDTOWithReplies(c, finalReplies))
-                .collect(Collectors.toList());
+                .map(c -> convertToDTOWithReplies(c, repliesByParentId))
+                .toList();
     }
 
     @Transactional
     public CommentDTO addComment(Integer taskId, Integer userId, String content,
                                  List<MultipartFile> files, Integer parentCommentId) {
-        if (content == null || content.trim().isEmpty()) {
-            throw new ValidationException("Comment content cannot be empty");
-        }
+        validateCommentContent(content);
 
-        Task task = commentDAO.getTaskById(taskId)
+        var task = commentDAO.getTaskById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
 
         verifyProjectAccess(task.getProject(), userId);
 
-        User user = userDAO.getUserById(userId)
+        var user = userDAO.getUserById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        List<String> attachmentUrls = (files != null && !files.isEmpty())
+        var attachmentUrls = (files != null && !files.isEmpty())
                 ? fileStorageService.storeFiles(files)
-                : new ArrayList<>();
+                : new ArrayList<String>();
 
         Comment parentComment = null;
         if (parentCommentId != null) {
@@ -86,113 +73,80 @@ public class CommentService {
                     .orElseThrow(() -> new ResourceNotFoundException("Parent comment not found"));
         }
 
-        String sanitizedContent = Jsoup.clean(content, Safelist.none());
+        var sanitizedContent = Jsoup.clean(content, Safelist.none());
 
-        Comment comment = new Comment(task, user, parentComment, sanitizedContent, attachmentUrls);
-        Comment savedComment = commentDAO.addComment(comment);
-
-        // Force initialization of lazy collections before transaction ends
-        savedComment.getAttachments().size();
-        savedComment.getReactions().size();
-
-        if (parentComment != null && !parentComment.getAuthor().getId().equals(userId)) {
-            String message = "Someone replied to your comment on task: " + task.getSummary();
-            String link = "/projects?selectedIssue=" + task.getTaskKey();
-            notificationService.createNotification(parentComment.getAuthor(), message,
-                    NotificationType.COMMENT_REPLY, link);
-        }
-
+        var comment = new Comment(task, user, parentComment, sanitizedContent, attachmentUrls);
+        var savedComment = commentDAO.addComment(comment);
+        initializeLazyCollections(savedComment);
+        notifyParentCommentAuthorIfDifferentUser(parentComment, userId, task);
         return convertToDTO(savedComment);
     }
 
     @Transactional
     public CommentDTO updateComment(Integer commentId, Integer userId, String content,
                                     List<MultipartFile> files) {
-        if (content == null || content.trim().isEmpty()) {
-            throw new ValidationException("Comment content cannot be empty");
-        }
+        validateCommentContent(content);
 
-        Comment comment = commentDAO.getCommentByIdWithTaskAndProject(commentId)
+        var comment = commentDAO.getCommentByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         verifyProjectAccess(comment.getTask().getProject(), userId);
+        verifyCommentOwnership(comment, userId);
 
-        if (!comment.getAuthor().getId().equals(userId)) {
-            throw new AuthorizationException("User not authorized to edit this comment");
-        }
-
-        String sanitizedContent = Jsoup.clean(content, Safelist.none());
+        var sanitizedContent = Jsoup.clean(content, Safelist.none());
         comment.setContent(sanitizedContent);
         comment.setEditedAt(new Date());
 
         if (files != null && !files.isEmpty()) {
-            List<String> newAttachments = fileStorageService.storeFiles(files);
+            var newAttachments = fileStorageService.storeFiles(files);
             comment.getAttachments().addAll(newAttachments);
         }
 
-        Comment updatedComment = commentDAO.updateComment(comment);
-
-        // Force initialization of lazy collections before transaction ends
-        updatedComment.getAttachments().size();
-        updatedComment.getReactions().size();
-
+        var updatedComment = commentDAO.updateComment(comment);
+        initializeLazyCollections(updatedComment);
         return convertToDTO(updatedComment);
     }
 
     @Transactional
     public void deleteComment(Integer commentId, Integer userId) {
-        Comment comment = commentDAO.getCommentByIdWithTaskAndProject(commentId)
+        var comment = commentDAO.getCommentByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         verifyProjectAccess(comment.getTask().getProject(), userId);
-
-        if (!comment.getAuthor().getId().equals(userId)) {
-            throw new AuthorizationException("User not authorized to delete this comment");
-        }
+        verifyCommentOwnership(comment, userId);
 
         commentDAO.deleteComment(comment);
     }
 
     @Transactional
     public CommentDTO reactToComment(Integer commentId, Integer userId, ReactionType reactionType) {
-        Comment comment = commentDAO.getCommentByIdWithTaskAndProject(commentId)
+        var comment = commentDAO.getCommentByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         verifyProjectAccess(comment.getTask().getProject(), userId);
 
-        User user = userDAO.getUserById(userId)
+        var user = userDAO.getUserById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        Optional<CommentReaction> existingReactionOpt = commentDAO.findReaction(commentId, userId);
+        var isNewReaction = processReaction(comment, user, reactionType, commentId);
 
-        if (existingReactionOpt.isPresent()) {
-            CommentReaction existingReaction = existingReactionOpt.get();
-            if (existingReaction.getType() == reactionType) {
-                commentDAO.removeReaction(existingReaction);
-            } else {
-                existingReaction.setType(reactionType);
-                commentDAO.updateReaction(existingReaction);
-            }
-        } else {
-            CommentReaction newReaction = new CommentReaction(comment, user, reactionType);
-            commentDAO.addReaction(newReaction);
+        if (isNewReaction && isNotCommentAuthor(comment, userId)) {
+            notifyCommentAuthorOfReaction(comment);
         }
 
-        if (!comment.getAuthor().getId().equals(userId)) {
-            String message = "Someone reacted to your comment on task: " + comment.getTask().getSummary();
-            String link = "/projects?selectedIssue=" + comment.getTask().getTaskKey();
-            notificationService.createNotification(comment.getAuthor(), message,
-                    NotificationType.COMMENT_REACTION, link);
-        }
-
-        Comment refreshedComment = commentDAO.getCommentById(commentId)
+        var refreshedComment = commentDAO.getCommentById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
-
-        // Force initialization of lazy collections before transaction ends
-        refreshedComment.getAttachments().size();
-        refreshedComment.getReactions().size();
-
+        initializeLazyCollections(refreshedComment);
         return convertToDTO(refreshedComment);
+    }
+
+    private void validateCommentContent(String content) {
+        if (content == null || content.trim().isEmpty()) {
+            throw new ValidationException("Comment content cannot be empty");
+        }
+        if (content.length() > MAX_COMMENT_LENGTH) {
+            throw new ValidationException("Comment exceeds maximum length of " + MAX_COMMENT_LENGTH + " characters");
+        }
     }
 
     private void verifyProjectAccess(Project project, Integer userId) {
@@ -201,12 +155,80 @@ public class CommentService {
         }
     }
 
+    private void verifyCommentOwnership(Comment comment, Integer userId) {
+        if (!comment.getAuthor().getId().equals(userId)) {
+            throw new AuthorizationException("User not authorized to modify this comment");
+        }
+    }
+
+    private Map<Integer, List<Comment>> batchLoadReplies(List<Comment> topLevelComments) {
+        var parentIds = topLevelComments.stream()
+                .map(Comment::getId)
+                .toList();
+
+        if (parentIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        var allReplies = commentDAO.getRepliesByParentIds(parentIds);
+        return allReplies.stream()
+                .collect(Collectors.groupingBy(c -> c.getParentComment().getId()));
+    }
+
+    private void initializeLazyCollections(Comment comment) {
+        comment.getAttachments().size();
+        comment.getReactions().size();
+    }
+
+    private void notifyParentCommentAuthorIfDifferentUser(Comment parentComment, Integer userId, Task task) {
+        if (parentComment == null || parentComment.getAuthor().getId().equals(userId)) {
+            return;
+        }
+        var message = "Someone replied to your comment on task: " + task.getSummary();
+        var link = "/projects?selectedIssue=" + task.getTaskKey();
+        notificationService.createNotification(parentComment.getAuthor(), message,
+                NotificationType.COMMENT_REPLY, link);
+    }
+
+    private boolean processReaction(Comment comment, User user, ReactionType reactionType, Integer commentId) {
+        var existingReaction = commentDAO.findReaction(commentId, user.getId());
+
+        if (existingReaction.isPresent()) {
+            handleExistingReaction(existingReaction.get(), reactionType);
+            return false;
+        }
+
+        var newReaction = new CommentReaction(comment, user, reactionType);
+        commentDAO.addReaction(newReaction);
+        return true;
+    }
+
+    private void handleExistingReaction(CommentReaction existingReaction, ReactionType newType) {
+        if (existingReaction.getType() == newType) {
+            commentDAO.removeReaction(existingReaction);
+        } else {
+            existingReaction.setType(newType);
+            commentDAO.updateReaction(existingReaction);
+        }
+    }
+
+    private boolean isNotCommentAuthor(Comment comment, Integer userId) {
+        return !comment.getAuthor().getId().equals(userId);
+    }
+
+    private void notifyCommentAuthorOfReaction(Comment comment) {
+        var message = "Someone reacted to your comment on task: " + comment.getTask().getSummary();
+        var link = "/projects?selectedIssue=" + comment.getTask().getTaskKey();
+        notificationService.createNotification(comment.getAuthor(), message,
+                NotificationType.COMMENT_REACTION, link);
+    }
+
     private CommentDTO convertToDTOWithReplies(Comment comment, Map<Integer, List<Comment>> repliesMap) {
-        List<CommentDTO> replies = repliesMap.getOrDefault(comment.getId(), Collections.emptyList())
+        var replies = repliesMap.getOrDefault(comment.getId(), Collections.emptyList())
                 .stream()
                 .sorted(Comparator.comparing(Comment::getTimestamp))
                 .map(c -> convertToDTOWithReplies(c, repliesMap))
-                .collect(Collectors.toList());
+                .toList();
 
         return buildCommentDTO(comment, replies);
     }
@@ -216,31 +238,32 @@ public class CommentService {
     }
 
     private CommentDTO buildCommentDTO(Comment comment, List<CommentDTO> replies) {
-        List<String> likedByUsernames = Optional.ofNullable(comment.getReactions())
-                .orElse(Collections.emptyList())
-                .stream()
+        var reactions = Optional.ofNullable(comment.getReactions()).orElse(Collections.emptyList());
+
+        var likedByUsernames = reactions.stream()
                 .filter(r -> r.getType() == ReactionType.LIKE)
                 .map(r -> r.getUser() != null ? r.getUser().getFullName() : null)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .toList();
 
-        List<String> dislikedByUsernames = Optional.ofNullable(comment.getReactions())
-                .orElse(Collections.emptyList())
-                .stream()
+        var dislikedByUsernames = reactions.stream()
                 .filter(r -> r.getType() == ReactionType.DISLIKE)
                 .map(r -> r.getUser() != null ? r.getUser().getFullName() : null)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .toList();
+
+        var author = comment.getAuthor();
+        var task = comment.getTask();
 
         return new CommentDTO(
                 comment.getId(),
-                comment.getTask() != null ? comment.getTask().getId() : null,
-                comment.getAuthor() != null ? comment.getAuthor().getId() : null,
-                comment.getAuthor() != null ? comment.getAuthor().getFullName() : null,
-                comment.getAuthor() != null ? comment.getAuthor().getProfilePicture() : null,
+                task != null ? task.getId() : null,
+                author != null ? author.getId() : null,
+                author != null ? author.getFullName() : null,
+                author != null ? author.getProfilePicture() : null,
                 comment.getContent(),
-                comment.getTimestamp(),
-                comment.getEditedAt(),
+                comment.getTimestamp() != null ? comment.getTimestamp().toInstant() : null,
+                comment.getEditedAt() != null ? comment.getEditedAt().toInstant() : null,
                 Optional.ofNullable(comment.getAttachments()).orElse(Collections.emptyList()),
                 likedByUsernames.size(),
                 dislikedByUsernames.size(),

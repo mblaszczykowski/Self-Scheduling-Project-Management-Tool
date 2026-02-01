@@ -1,5 +1,6 @@
 package com.backend.filter;
 
+import com.backend.config.PublicEndpoints;
 import com.backend.services.TokenService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
@@ -12,22 +13,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final TokenService tokenService;
     private final ObjectMapper objectMapper;
-
-    private static final Set<String> PUBLIC_ENDPOINTS = Set.of(
-            "/api/auth/login",
-            "/api/auth/refresh",
-            "/api/users",
-            "/api/users/exists"
-    );
 
     public JwtAuthenticationFilter(TokenService tokenService, ObjectMapper objectMapper) {
         this.tokenService = tokenService;
@@ -42,18 +36,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        if (isPublicEndpoint(path, method)) {
+        // Skip authentication for public endpoints and static content
+        if (PublicEndpoints.isPublicForJwt(path, method)) {
             filterChain.doFilter(request, response);
             return;
         }
 
         if ("OPTIONS".equalsIgnoreCase(method)) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        // Allow file access without authentication (files are accessed by URL)
-        if (path.startsWith("/files/")) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -79,30 +68,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    private boolean isPublicEndpoint(String path, String method) {
-        if (PUBLIC_ENDPOINTS.contains(path)) {
-            if ("/api/users".equals(path)) {
-                return "POST".equalsIgnoreCase(method);
-            }
-            return true;
-        }
-
-        return path.startsWith("/static/") ||
-                path.startsWith("/uploads/") ||
-                path.equals("/error");
-    }
-
     private void sendErrorResponse(HttpServletResponse response,
                                    HttpStatus status,
                                    String message) throws IOException {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        Map<String, Object> error = new HashMap<>();
+        // Use same format as GlobalExceptionHandler for consistency
+        Map<String, Object> error = new LinkedHashMap<>();
         error.put("status", status.value());
         error.put("error", status.getReasonPhrase());
+        error.put("code", "AUTH_ERROR");
         error.put("message", message);
-        error.put("timestamp", System.currentTimeMillis());
+        error.put("timestamp", Instant.now().toString());
 
         objectMapper.writeValue(response.getWriter(), error);
     }

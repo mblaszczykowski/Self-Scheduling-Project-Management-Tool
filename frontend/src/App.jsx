@@ -1,13 +1,14 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import UnifiedView from './components/UnifiedView';
-import WelcomeContent from './components/WelcomeContent';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import UnifiedView from './components/projects/UnifiedView';
+import WelcomeContent from './components/auth/WelcomeContent';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Dashboard from './components/Dashboard';
+import Dashboard from './components/dashboard/Dashboard';
 import { DataContext, DataProvider } from './context/DataContext';
 import { checkUserAuth } from './util/api';
-import PageTransition from './components/PageTransition';
+import PageTransition from './components/common/PageTransition';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 const LoadingSpinner = () => (
     <div className="flex justify-center items-center h-screen bg-slate-50">
@@ -131,9 +132,11 @@ function App() {
     if (!authChecked) return <LoadingSpinner />;
 
     return (
-        <DataProvider initialUser={initialUser}>
-            <AppRoutes />
-        </DataProvider>
+        <ErrorBoundary>
+            <DataProvider initialUser={initialUser}>
+                <AppRoutes />
+            </DataProvider>
+        </ErrorBoundary>
     );
 }
 

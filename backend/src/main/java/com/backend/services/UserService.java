@@ -5,7 +5,9 @@ import com.backend.dtos.UserDTO;
 import com.backend.entities.User;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
+import com.backend.repositories.ProjectRepository;
 import com.backend.requests.UserRegistrationRequest;
+import com.backend.util.FileValidationConstants;
 import com.backend.util.ValidationUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.Map;
 
 @Service
@@ -24,27 +27,34 @@ public class UserService {
     private final UserDAO userDAO;
     private final TokenService tokenService;
     private final FileStorageService fileStorageService;
+    private final ProjectRepository projectRepository;
     private final BCryptPasswordEncoder passwordEncoder;
 
     @Autowired
     public UserService(UserDAO userDAO,
                        TokenService tokenService,
-                       FileStorageService fileStorageService) {
+                       FileStorageService fileStorageService,
+                       ProjectRepository projectRepository) {
         this.userDAO = userDAO;
         this.tokenService = tokenService;
         this.fileStorageService = fileStorageService;
+        this.projectRepository = projectRepository;
         this.passwordEncoder = new BCryptPasswordEncoder(12);
+    }
+
+    public boolean shareProjectWith(Integer userId1, Integer userId2) {
+        return projectRepository.doUsersShareProject(userId1, userId2);
     }
 
     public boolean existsUserByEmail(String email) {
         return userDAO.existsUserWithEmail(email);
     }
 
-    public User findUserByEmail(String email) {
+    public User findUserByEmailOrNull(String email) {
         return userDAO.getUserByEmail(email).orElse(null);
     }
 
-    public User getUserByEmail(String email) {
+    public User getRequiredUserByEmail(String email) {
         return userDAO.getUserByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
@@ -56,9 +66,9 @@ public class UserService {
         ValidationUtil.validateName(request.firstname(), "First name");
         ValidationUtil.validateName(request.lastname(), "Last name");
 
-        String hashedPassword = passwordEncoder.encode(request.password());
+        var hashedPassword = passwordEncoder.encode(request.password());
 
-        User user = new User(
+        var user = new User(
                 request.firstname().trim(),
                 request.lastname().trim(),
                 request.email().toLowerCase().trim(),
@@ -67,7 +77,7 @@ public class UserService {
 
         userDAO.save(user);
 
-        TokenService.AuthTokens tokens = tokenService.createAuthTokens(user.getId());
+        var tokens = tokenService.createAuthTokens(user.getId());
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, tokens.getAccessCookie().toString())
@@ -80,8 +90,8 @@ public class UserService {
     }
 
     public ResponseEntity<?> getUserDetails(Integer userId) {
-        User user = getUserById(userId);
-        UserDTO userDTO = new UserDTO(
+        var user = getUserById(userId);
+        var userDTO = new UserDTO(
                 user.getId(),
                 user.getFirstname(),
                 user.getLastname(),
@@ -102,7 +112,7 @@ public class UserService {
                               String newPassword,
                               MultipartFile profilePicture) {
 
-        User user = userDAO.getUserById(userId)
+        var user = userDAO.getUserById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (!ValidationUtil.isNullOrEmpty(firstname)) {
@@ -120,7 +130,7 @@ public class UserService {
                 throw new ValidationException("Invalid email format");
             }
 
-            String normalizedEmail = email.toLowerCase().trim();
+            var normalizedEmail = email.toLowerCase().trim();
             if (!normalizedEmail.equals(user.getEmail()) &&
                     userDAO.existsUserWithEmail(normalizedEmail)) {
                 throw new ValidationException("Email already in use");
@@ -140,17 +150,8 @@ public class UserService {
         }
 
         if (profilePicture != null && !profilePicture.isEmpty()) {
-            String contentType = profilePicture.getContentType();
-            if (contentType == null || !contentType.startsWith("image/")) {
-                throw new ValidationException("Invalid file type. Only images are allowed");
-            }
-
-            if (user.getProfilePicture() != null) {
-                fileStorageService.deleteFile(user.getProfilePicture());
-            }
-
-            String profilePicturePath = fileStorageService.storeFile(profilePicture);
-            user.setProfilePicture(profilePicturePath);
+            validateProfilePictureUpload(profilePicture);
+            replaceProfilePicture(user, profilePicture);
         }
 
         userDAO.save(user);
@@ -183,6 +184,33 @@ public class UserService {
 
         if (userDAO.existsUserWithEmail(request.email().toLowerCase().trim())) {
             throw new ValidationException("Email already registered");
+        }
+    }
+
+    private void validateProfilePictureUpload(MultipartFile profilePicture) {
+        var contentType = profilePicture.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new ValidationException("Invalid file type. Only images are allowed");
+        }
+        validateImageMagicBytes(profilePicture);
+    }
+
+    private void replaceProfilePicture(User user, MultipartFile profilePicture) {
+        if (user.getProfilePicture() != null) {
+            fileStorageService.deleteFile(user.getProfilePicture());
+        }
+        var profilePicturePath = fileStorageService.storeFile(profilePicture);
+        user.setProfilePicture(profilePicturePath);
+    }
+
+    private void validateImageMagicBytes(MultipartFile file) {
+        try {
+            var fileBytes = file.getBytes();
+            if (!FileValidationConstants.isValidImageByMagicBytes(fileBytes)) {
+                throw new ValidationException("File content doesn't match image type. Upload a valid image file.");
+            }
+        } catch (IOException e) {
+            throw new ValidationException("Could not validate image file");
         }
     }
 }

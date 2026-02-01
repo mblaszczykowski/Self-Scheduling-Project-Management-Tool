@@ -27,6 +27,13 @@ public class ProjectDAO {
         return projectRepository.findByProjectKey(projectKey);
     }
 
+    /**
+     * Get project with owner and members eagerly loaded to avoid N+1 queries.
+     */
+    public Optional<Project> getProjectByKeyWithDetails(String projectKey) {
+        return projectRepository.findByProjectKeyWithDetails(projectKey);
+    }
+
     public Optional<Project> getProjectByKeyWithLock(String projectKey) {
         return projectRepository.findByProjectKeyWithLock(projectKey);
     }
@@ -35,8 +42,21 @@ public class ProjectDAO {
         return projectRepository.existsByProjectKey(projectKey);
     }
 
+    /**
+     * Get all projects accessible by user with owner and members eagerly loaded.
+     */
     public List<Project> getProjectsByUserId(Integer userId) {
         return projectRepository.findAllAccessibleByUser(userId);
+    }
+
+    /**
+     * Fetch tasks for multiple projects in a single query to avoid N+1.
+     */
+    public List<Project> getProjectsWithTasks(List<Integer> projectIds) {
+        if (projectIds.isEmpty()) {
+            return List.of();
+        }
+        return projectRepository.findByIdsWithTasks(projectIds);
     }
 
     public void deleteProject(Project project) {

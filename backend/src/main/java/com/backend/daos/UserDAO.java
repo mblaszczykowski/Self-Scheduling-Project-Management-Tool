@@ -4,7 +4,10 @@ import com.backend.entities.User;
 import com.backend.repositories.UserRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Repository
 public class UserDAO {
@@ -28,5 +31,17 @@ public class UserDAO {
 
     public boolean existsUserWithEmail(String email) {
         return userRepository.existsByEmail(email);
+    }
+
+    /**
+     * Batch load users by email addresses.
+     * Returns a map of email -> User for efficient lookup.
+     */
+    public Map<String, User> findByEmailsAsMap(Collection<String> emails) {
+        if (emails == null || emails.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findByEmailIn(emails).stream()
+                .collect(Collectors.toMap(User::getEmail, user -> user));
     }
 }

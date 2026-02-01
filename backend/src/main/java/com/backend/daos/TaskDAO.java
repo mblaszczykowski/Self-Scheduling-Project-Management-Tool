@@ -59,4 +59,24 @@ public class TaskDAO {
     public List<Task> getTasksByStatus(TaskStatus status) {
         return taskRepository.findByStatus(status);
     }
+
+    /**
+     * Batch fetch tasks by IDs with all details - for dependency resolution.
+     */
+    public List<Task> getTasksByIdsWithDetails(List<Integer> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return taskRepository.findByIdsWithDetails(ids);
+    }
+
+    /**
+     * Batch fetch tasks by task keys.
+     */
+    public List<Task> getTasksByTaskKeys(List<String> taskKeys) {
+        if (taskKeys.isEmpty()) {
+            return List.of();
+        }
+        return taskRepository.findByTaskKeys(taskKeys);
+    }
 }

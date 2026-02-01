@@ -7,6 +7,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,7 +26,6 @@ public class TaskController {
         this.taskService = taskService;
         this.tokenService = tokenService;
         this.objectMapper = objectMapper;
-        // Register JavaTimeModule for LocalDate support
         this.objectMapper.registerModule(new JavaTimeModule());
     }
 
@@ -36,10 +36,10 @@ public class TaskController {
             @RequestPart("taskDTO") String taskDTOStr,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
-        int userId = tokenService.getUserIdFromRequest(request);
-        TaskDTO taskDTO = objectMapper.readValue(taskDTOStr, TaskDTO.class);
-        TaskDTO createdTask = taskService.createTask(projectKey, taskDTO, userId, attachments);
-        return ResponseEntity.ok(createdTask);
+        var userId = tokenService.getUserIdFromRequest(request);
+        var taskDTO = objectMapper.readValue(taskDTOStr, TaskDTO.class);
+        var createdTask = taskService.createTask(projectKey, taskDTO, userId, attachments);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdTask);
     }
 
     @PutMapping(value = "/{taskKey}", consumes = {"multipart/form-data"})
@@ -50,9 +50,9 @@ public class TaskController {
             @RequestPart("taskDTO") String taskDTOStr,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
-        int userId = tokenService.getUserIdFromRequest(request);
-        TaskDTO taskDTO = objectMapper.readValue(taskDTOStr, TaskDTO.class);
-        TaskDTO updatedTask = taskService.updateTask(projectKey, taskKey, taskDTO, userId, attachments);
+        var userId = tokenService.getUserIdFromRequest(request);
+        var taskDTO = objectMapper.readValue(taskDTOStr, TaskDTO.class);
+        var updatedTask = taskService.updateTask(projectKey, taskKey, taskDTO, userId, attachments);
         return ResponseEntity.ok(updatedTask);
     }
 
@@ -62,7 +62,7 @@ public class TaskController {
             @PathVariable String projectKey,
             @PathVariable String taskKey
     ) {
-        int userId = tokenService.getUserIdFromRequest(request);
+        var userId = tokenService.getUserIdFromRequest(request);
         taskService.deleteTask(projectKey, taskKey, userId);
         return ResponseEntity.noContent().build();
     }

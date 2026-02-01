@@ -153,3 +153,7 @@ export const generateBezierPath = (startX, startY, endX, endY) => {
     const offset = Math.abs(endX - startX) / 2;
     return `M ${startX} ${startY} C ${startX + offset} ${startY}, ${endX - offset} ${endY}, ${endX} ${endY}`;
 };
+
+// Pre-computed config exports (avoid repeated function calls)
+export const STATUS_CONFIG = getStatusConfig();
+export const PRIORITY_CONFIG = getPriorityConfig();

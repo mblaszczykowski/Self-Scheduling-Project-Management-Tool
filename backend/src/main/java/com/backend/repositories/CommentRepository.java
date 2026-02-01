@@ -14,6 +14,7 @@ public interface CommentRepository extends JpaRepository<Comment, Integer> {
             "LEFT JOIN FETCH c.author " +
             "LEFT JOIN FETCH c.reactions r " +
             "LEFT JOIN FETCH r.user " +
+            "LEFT JOIN FETCH c.attachments " +
             "WHERE c.task.id = :taskId AND c.parentComment IS NULL " +
             "ORDER BY c.timestamp")
     List<Comment> findTopLevelCommentsByTaskIdWithDetails(@Param("taskId") Integer taskId);
@@ -22,6 +23,7 @@ public interface CommentRepository extends JpaRepository<Comment, Integer> {
             "LEFT JOIN FETCH c.author " +
             "LEFT JOIN FETCH c.reactions r " +
             "LEFT JOIN FETCH r.user " +
+            "LEFT JOIN FETCH c.attachments " +
             "WHERE c.parentComment.id IN :parentIds " +
             "ORDER BY c.timestamp")
     List<Comment> findRepliesByParentIdsWithDetails(@Param("parentIds") List<Integer> parentIds);

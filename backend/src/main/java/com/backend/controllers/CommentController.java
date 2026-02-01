@@ -5,6 +5,7 @@ import com.backend.entities.ReactionType;
 import com.backend.services.CommentService;
 import com.backend.services.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,8 +29,8 @@ public class CommentController {
             HttpServletRequest request,
             @PathVariable Integer taskId
     ) {
-        Integer userId = tokenService.getUserIdFromRequest(request);
-        List<CommentDTO> comments = commentService.getCommentsByTask(taskId, userId);
+        var userId = tokenService.getUserIdFromRequest(request);
+        var comments = commentService.getCommentsByTask(taskId, userId);
         return ResponseEntity.ok(comments);
     }
 
@@ -41,10 +42,10 @@ public class CommentController {
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments,
             @RequestParam(value = "parentCommentId", required = false) Integer parentCommentId
     ) {
-        Integer userId = tokenService.getUserIdFromRequest(request);
-        CommentDTO createdComment = commentService.addComment(taskId, userId, content,
+        var userId = tokenService.getUserIdFromRequest(request);
+        var createdComment = commentService.addComment(taskId, userId, content,
                 attachments, parentCommentId);
-        return ResponseEntity.ok(createdComment);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdComment);
     }
 
     @PutMapping(value = "/{commentId}", consumes = {"multipart/form-data"})
@@ -55,8 +56,8 @@ public class CommentController {
             @RequestPart("content") String content,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) {
-        Integer userId = tokenService.getUserIdFromRequest(request);
-        CommentDTO updatedComment = commentService.updateComment(commentId, userId, content, attachments);
+        var userId = tokenService.getUserIdFromRequest(request);
+        var updatedComment = commentService.updateComment(commentId, userId, content, attachments);
         return ResponseEntity.ok(updatedComment);
     }
 
@@ -66,7 +67,7 @@ public class CommentController {
             @PathVariable Integer taskId,
             @PathVariable Integer commentId
     ) {
-        Integer userId = tokenService.getUserIdFromRequest(request);
+        var userId = tokenService.getUserIdFromRequest(request);
         commentService.deleteComment(commentId, userId);
         return ResponseEntity.noContent().build();
     }
@@ -78,8 +79,8 @@ public class CommentController {
             @PathVariable Integer commentId,
             @RequestParam("type") ReactionType reactionType
     ) {
-        Integer userId = tokenService.getUserIdFromRequest(request);
-        CommentDTO updatedComment = commentService.reactToComment(commentId, userId, reactionType);
+        var userId = tokenService.getUserIdFromRequest(request);
+        var updatedComment = commentService.reactToComment(commentId, userId, reactionType);
         return ResponseEntity.ok(updatedComment);
     }
 }

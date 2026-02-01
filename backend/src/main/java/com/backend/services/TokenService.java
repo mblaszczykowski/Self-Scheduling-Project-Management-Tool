@@ -44,7 +44,7 @@ public class TokenService {
     }
 
     public String generateAccessToken(Integer userId) {
-        Date expiration = Date.from(Instant.now().plus(accessTokenExpiration));
+        var expiration = Date.from(Instant.now().plus(accessTokenExpiration));
 
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
@@ -59,10 +59,10 @@ public class TokenService {
     public String generateRefreshToken(Integer userId) {
         refreshTokenRepository.deleteByUserId(userId);
 
-        String tokenValue = UUID.randomUUID().toString();
-        Instant expiryDate = Instant.now().plus(refreshTokenExpiration);
+        var tokenValue = UUID.randomUUID().toString();
+        var expiryDate = Instant.now().plus(refreshTokenExpiration);
 
-        RefreshToken refreshToken = new RefreshToken();
+        var refreshToken = new RefreshToken();
         refreshToken.setToken(tokenValue);
         refreshToken.setUserId(userId);
         refreshToken.setExpiryDate(expiryDate);
@@ -73,10 +73,10 @@ public class TokenService {
     }
 
     public AuthTokens createAuthTokens(Integer userId) {
-        String accessToken = generateAccessToken(userId);
-        String refreshToken = generateRefreshToken(userId);
+        var accessToken = generateAccessToken(userId);
+        var refreshToken = generateRefreshToken(userId);
 
-        ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
+        var accessCookie = ResponseCookie.from("accessToken", accessToken)
                 .httpOnly(true)
                 .secure(secureCookie)
                 .path("/")
@@ -84,7 +84,7 @@ public class TokenService {
                 .sameSite(sameSite)
                 .build();
 
-        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
+        var refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
                 .secure(secureCookie)
                 .path("/")
@@ -104,14 +104,17 @@ public class TokenService {
     }
 
     public Integer validateTokenAndGetUserId(String token) {
+        if (token == null || token.isEmpty()) {
+            return null;
+        }
         try {
-            Claims claims = Jwts.parserBuilder()
+            var claims = Jwts.parserBuilder()
                     .setSigningKey(jwtSecretKey)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
 
-            String tokenType = claims.get("type", String.class);
+            var tokenType = claims.get("type", String.class);
             if (!"access".equals(tokenType)) {
                 return null;
             }
@@ -124,7 +127,7 @@ public class TokenService {
 
     @Transactional
     public Integer validateRefreshToken(String token) {
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
+        var refreshToken = refreshTokenRepository.findByToken(token)
                 .orElse(null);
 
         if (refreshToken == null || refreshToken.getExpiryDate().isBefore(Instant.now())) {
@@ -139,14 +142,14 @@ public class TokenService {
 
     public String extractTokenFromRequest(HttpServletRequest request) {
         if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
+            for (var cookie : request.getCookies()) {
                 if ("accessToken".equals(cookie.getName())) {
                     return cookie.getValue();
                 }
             }
         }
 
-        String authHeader = request.getHeader("Authorization");
+        var authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7);
         }
@@ -155,7 +158,7 @@ public class TokenService {
     }
 
     public Integer getUserIdFromRequest(HttpServletRequest request) {
-        Integer userId = (Integer) request.getAttribute("userId");
+        var userId = (Integer) request.getAttribute("userId");
         if (userId == null) {
             throw new AuthorizationException("User not authenticated");
         }

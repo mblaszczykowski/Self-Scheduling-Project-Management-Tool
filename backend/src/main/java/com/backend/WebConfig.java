@@ -16,9 +16,16 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/**")
                 .allowedOrigins(allowedOrigin)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-                .allowedHeaders("*")
-                .exposedHeaders("Set-Cookie")
+                // Restrict to specific headers instead of wildcard for security
+                .allowedHeaders(
+                        "Content-Type",
+                        "Accept",
+                        "X-Requested-With",
+                        "Cache-Control",
+                        "X-CSRF-Token"
+                )
+                .exposedHeaders("Set-Cookie", "X-CSRF-Token")
                 .allowCredentials(true)
-                .maxAge(3600);
+                .maxAge(600); // Reduced to 10 minutes
     }
 }

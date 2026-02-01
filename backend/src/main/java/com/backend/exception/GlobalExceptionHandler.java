@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestControllerAdvice
@@ -49,6 +50,11 @@ public class GlobalExceptionHandler {
                 "Invalid value for parameter: " + ex.getName());
     }
 
+    @ExceptionHandler(TooManyAttemptsException.class)
+    public ResponseEntity<Map<String, Object>> handleTooManyAttempts(TooManyAttemptsException ex) {
+        return buildResponse(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
         log.error("Unexpected error", ex);
@@ -56,11 +62,16 @@ public class GlobalExceptionHandler {
                 "An unexpected error occurred");
     }
 
+    /**
+     * Builds a standardized error response with consistent format.
+     */
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String code, String message) {
-        return ResponseEntity.status(status).body(Map.of(
-                "code", code,
-                "message", message,
-                "timestamp", Instant.now().toString()
-        ));
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", status.value());
+        body.put("error", status.getReasonPhrase());
+        body.put("code", code);
+        body.put("message", message);
+        body.put("timestamp", Instant.now().toString());
+        return ResponseEntity.status(status).body(body);
     }
 }
