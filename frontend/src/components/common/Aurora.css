@@ -1,0 +1,171 @@
+/* Aurora Background - Light Apple-inspired */
+.aurora-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    z-index: 0;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
+}
+
+.aurora-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    filter: blur(100px);
+    opacity: 0.6;
+}
+
+.aurora-blob {
+    position: absolute;
+    border-radius: 50%;
+}
+
+.aurora-blob-1 {
+    width: 70vmax;
+    height: 70vmax;
+    background: radial-gradient(
+            circle at center,
+            rgba(99, 102, 241, 0.4) 0%,
+            rgba(99, 102, 241, 0.1) 40%,
+            transparent 70%
+    );
+    top: -30%;
+    left: -20%;
+    animation: aurora-float-1 20s ease-in-out infinite;
+}
+
+.aurora-blob-2 {
+    width: 60vmax;
+    height: 60vmax;
+    background: radial-gradient(
+            circle at center,
+            rgba(236, 72, 153, 0.3) 0%,
+            rgba(236, 72, 153, 0.1) 40%,
+            transparent 70%
+    );
+    top: 20%;
+    right: -25%;
+    animation: aurora-float-2 25s ease-in-out infinite;
+}
+
+.aurora-blob-3 {
+    width: 50vmax;
+    height: 50vmax;
+    background: radial-gradient(
+            circle at center,
+            rgba(34, 211, 238, 0.35) 0%,
+            rgba(34, 211, 238, 0.1) 40%,
+            transparent 70%
+    );
+    bottom: -20%;
+    left: 30%;
+    animation: aurora-float-3 18s ease-in-out infinite;
+}
+
+@keyframes aurora-float-1 {
+    0%, 100% {
+        transform: translate(0, 0) scale(1);
+    }
+    25% {
+        transform: translate(5%, 10%) scale(1.05);
+    }
+    50% {
+        transform: translate(10%, 5%) scale(1.1);
+    }
+    75% {
+        transform: translate(5%, -5%) scale(1.02);
+    }
+}
+
+@keyframes aurora-float-2 {
+    0%, 100% {
+        transform: translate(0, 0) scale(1);
+    }
+    25% {
+        transform: translate(-8%, 5%) scale(1.08);
+    }
+    50% {
+        transform: translate(-5%, 10%) scale(1.05);
+    }
+    75% {
+        transform: translate(-10%, 3%) scale(1.1);
+    }
+}
+
+@keyframes aurora-float-3 {
+    0%, 100% {
+        transform: translate(0, 0) scale(1);
+    }
+    25% {
+        transform: translate(8%, -8%) scale(1.1);
+    }
+    50% {
+        transform: translate(3%, -5%) scale(1.05);
+    }
+    75% {
+        transform: translate(10%, -3%) scale(1.08);
+    }
+}
+
+/* Noise texture overlay for depth */
+.aurora-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.02;
+    pointer-events: none;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+    .aurora-blob {
+        animation: none;
+    }
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+    .aurora-container {
+        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    }
+
+    .aurora-bg {
+        opacity: 0.4;
+    }
+
+    .aurora-blob-1 {
+        background: radial-gradient(
+                circle at center,
+                rgba(99, 102, 241, 0.5) 0%,
+                rgba(99, 102, 241, 0.15) 40%,
+                transparent 70%
+        );
+    }
+
+    .aurora-blob-2 {
+        background: radial-gradient(
+                circle at center,
+                rgba(236, 72, 153, 0.4) 0%,
+                rgba(236, 72, 153, 0.1) 40%,
+                transparent 70%
+        );
+    }
+
+    .aurora-blob-3 {
+        background: radial-gradient(
+                circle at center,
+                rgba(34, 211, 238, 0.45) 0%,
+                rgba(34, 211, 238, 0.15) 40%,
+                transparent 70%
+        );
+    }
+}
