@@ -112,10 +112,10 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                     <img
                                         src={profilePreview}
                                         alt="Profile Preview"
-                                        className="h-20 w-20 rounded-lg object-cover ring-4 ring-white shadow-lg"
+                                        className="h-20 w-20 rounded-full object-cover ring-4 ring-white shadow-lg"
                                     />
                                 ) : (
-                                    <div className={`h-20 w-20 bg-gradient-to-br ${getAvatarColor(user)} rounded-lg flex items-center justify-center ring-4 ring-white shadow-lg`}>
+                                    <div className={`h-20 w-20 bg-gradient-to-br ${getAvatarColor(user)} rounded-full flex items-center justify-center ring-4 ring-white shadow-lg`}>
                                         <span className="text-2xl font-bold text-white">
                                             {getAvatarInitials(user)}
                                         </span>
@@ -146,7 +146,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                         type="text"
                                         id="firstname"
                                         name="firstname"
-                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
                                     />
                                     <ErrorMessage name="firstname" component="div" className="text-red-500 text-xs mt-1" />
                                 </div>
@@ -158,7 +158,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                         type="text"
                                         id="lastname"
                                         name="lastname"
-                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
                                     />
                                     <ErrorMessage name="lastname" component="div" className="text-red-500 text-xs mt-1" />
                                 </div>
@@ -173,7 +173,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                     type="email"
                                     id="email"
                                     name="email"
-                                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
+                                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
                                 />
                                 <ErrorMessage name="email" component="div" className="text-red-500 text-xs mt-1" />
                             </div>
@@ -190,7 +190,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                             type="password"
                                             id="currentPassword"
                                             name="currentPassword"
-                                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
+                                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
                                         />
                                         <ErrorMessage name="currentPassword" component="div" className="text-red-500 text-xs mt-1" />
                                     </div>
@@ -203,7 +203,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                                 type="password"
                                                 id="newPassword"
                                                 name="newPassword"
-                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
+                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
                                             />
                                             <ErrorMessage name="newPassword" component="div" className="text-red-500 text-xs mt-1" />
                                         </div>
@@ -215,7 +215,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                                 type="password"
                                                 id="confirmNewPassword"
                                                 name="confirmNewPassword"
-                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
+                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
                                             />
                                             <ErrorMessage name="confirmNewPassword" component="div" className="text-red-500 text-xs mt-1" />
                                         </div>
@@ -224,18 +224,18 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="flex gap-4 pt-4">
+                            <div className="flex gap-3 pt-4">
                                 <button
                                     type="button"
                                     onClick={handleClose}
-                                    className="flex-1 py-3 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+                                    className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="flex-1 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all font-medium disabled:opacity-50"
+                                    className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all text-sm font-medium disabled:opacity-50"
                                 >
                                     {isSubmitting ? 'Saving...' : 'Save Changes'}
                                 </button>

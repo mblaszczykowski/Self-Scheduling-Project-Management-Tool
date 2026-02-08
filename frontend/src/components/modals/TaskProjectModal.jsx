@@ -3,8 +3,7 @@ import { DataContext } from '../../context/DataContext';
 import { Form, Formik } from 'formik';
 import * as Yup from 'yup';
 import { toast, Slide } from 'react-toastify';
-import { FaPlus, FaTimes, FaTrashAlt, FaSave } from 'react-icons/fa';
-import { getUserByEmail } from '../../util/api';
+import { HiOutlinePlus, HiOutlineX, HiOutlineTrash, HiOutlineCheck } from 'react-icons/hi';
 import { formatDateTime, formatDate } from '../../util/helpers';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import TaskForm from './TaskForm';
@@ -230,23 +229,25 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
         setIsDirty(true);
     };
 
-    const handleAddMember = async (email, values, setFieldValue) => {
+    const handleAddMember = (email, values, setFieldValue) => {
         if (!email) return;
-        setEmailLoading(true);
-        setEmailError('');
-        try {
-            const found = await getUserByEmail(email);
-            if (found && !values.members.some(u => u.email === found.email)) {
-                setFieldValue('members', [...values.members, found]);
-                setFieldValue('newUserEmail', '');
-            } else if (found) {
-                setEmailError('Already a member');
-            }
-        } catch (err) {
-            setEmailError(err.response?.status === 404 ? 'User not found' : 'Error adding user');
-        } finally {
-            setEmailLoading(false);
+        const normalizedEmail = email.toLowerCase().trim();
+
+        // Basic email format check
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+            setEmailError('Invalid email format');
+            return;
         }
+
+        if (values.members.some(u => u.email === normalizedEmail)) {
+            setEmailError('Already added');
+            return;
+        }
+
+        setEmailError('');
+        setFieldValue('members', [...values.members, { email: normalizedEmail }]);
+        setFieldValue('newUserEmail', '');
+        // Backend validates if user exists when project is saved
     };
 
     const modalTitle = modalType === 'task'
@@ -283,7 +284,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                                 </div>
                             </div>
                             <button onClick={handleCloseAttempt} aria-label="Close dialog" className="p-2 hover:bg-slate-100 rounded-lg transition-colors group">
-                                <FaTimes className="text-slate-400 group-hover:text-slate-600" />
+                                <HiOutlineX className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
                             </button>
                         </div>
                     </div>
@@ -318,13 +319,13 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                     <div className="flex items-center gap-3">
                         <button type="button" onClick={() => formikRef.current?.submitForm()} disabled={formikRef.current?.isSubmitting}
                             className="flex-1 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
-                            {modalMode === 'create' ? <FaPlus className="text-xs" /> : <FaSave className="text-xs" />}
+                            {modalMode === 'create' ? <HiOutlinePlus className="w-4 h-4" /> : <HiOutlineCheck className="w-4 h-4" />}
                             <span>{modalMode === 'create' ? 'Create' : 'Save Changes'}</span>
                         </button>
-                        <button type="button" onClick={handleCloseAttempt} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium">Cancel</button>
+                        <button type="button" onClick={handleCloseAttempt} className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium">Cancel</button>
                         {modalMode === 'edit' && (
-                            <button type="button" onClick={() => setDeleteConfirmOpen(true)} className="px-5 py-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium flex items-center gap-2">
-                                <FaTrashAlt className="text-xs" />Delete
+                            <button type="button" onClick={() => setDeleteConfirmOpen(true)} className="px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium flex items-center gap-2">
+                                <HiOutlineTrash className="w-4 h-4" />Delete
                             </button>
                         )}
                     </div>

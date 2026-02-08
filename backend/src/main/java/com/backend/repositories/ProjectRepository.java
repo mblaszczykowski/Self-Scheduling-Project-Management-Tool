@@ -31,11 +31,13 @@ public interface ProjectRepository extends JpaRepository<Project, Integer> {
     // Find projects where user is a member
     List<Project> findByMembersId(Integer memberId);
 
-    // Find all projects user has access to (owner or member) - optimized with JOIN FETCH
+    // Find all projects user has access to (owner or member)
+    // Note: We use a subquery for access check to avoid filtering the fetched members
     @Query("SELECT DISTINCT p FROM Project p " +
             "LEFT JOIN FETCH p.owner " +
-            "LEFT JOIN FETCH p.members m " +
-            "WHERE p.owner.id = :userId OR m.id = :userId")
+            "LEFT JOIN FETCH p.members " +
+            "WHERE p.owner.id = :userId OR p.id IN " +
+            "(SELECT p2.id FROM Project p2 JOIN p2.members m2 WHERE m2.id = :userId)")
     List<Project> findAllAccessibleByUser(@Param("userId") Integer userId);
 
     // Separate query to fetch tasks for projects (avoids cartesian product)

@@ -44,7 +44,17 @@ function AppRoutes() {
 
     return (
         <div className="App min-h-screen">
-            <ToastContainer />
+            <ToastContainer
+                position="top-center"
+                autoClose={2500}
+                hideProgressBar={false}
+                newestOnTop
+                closeOnClick
+                pauseOnFocusLoss={false}
+                draggable={false}
+                pauseOnHover
+                theme="light"
+            />
             <Routes>
                 <Route
                     path="/"

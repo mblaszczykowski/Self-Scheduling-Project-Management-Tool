@@ -238,7 +238,7 @@ public class CommentService {
     }
 
     private CommentDTO buildCommentDTO(Comment comment, List<CommentDTO> replies) {
-        var reactions = Optional.ofNullable(comment.getReactions()).orElse(Collections.emptyList());
+        var reactions = Optional.ofNullable(comment.getReactions()).orElse(Collections.emptySet());
 
         var likedByUsernames = reactions.stream()
                 .filter(r -> r.getType() == ReactionType.LIKE)
@@ -254,6 +254,9 @@ public class CommentService {
 
         var author = comment.getAuthor();
         var task = comment.getTask();
+        var attachments = comment.getAttachments() != null
+                ? new ArrayList<>(comment.getAttachments())
+                : Collections.<String>emptyList();
 
         return new CommentDTO(
                 comment.getId(),
@@ -264,7 +267,7 @@ public class CommentService {
                 comment.getContent(),
                 comment.getTimestamp() != null ? comment.getTimestamp().toInstant() : null,
                 comment.getEditedAt() != null ? comment.getEditedAt().toInstant() : null,
-                Optional.ofNullable(comment.getAttachments()).orElse(Collections.emptyList()),
+                attachments,
                 likedByUsernames.size(),
                 dislikedByUsernames.size(),
                 likedByUsernames,

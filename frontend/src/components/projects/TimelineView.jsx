@@ -1,6 +1,7 @@
 import React from 'react';
 import { formatShortDate, STATUS_CONFIG, calculateTaskPosition, generateBezierPath } from '../../util/helpers';
 import { TIMELINE_CONSTANTS, getTaskRowHeight } from '../../hooks/timelineConstants';
+import { EmptyState } from '../common';
 const { DAY_WIDTH, CROSS_PROJECT_DEPENDENCY_OFFSET } = TIMELINE_CONSTANTS;
 
 const TimelineView = ({
@@ -89,7 +90,7 @@ const TimelineView = ({
                         ) : (
                             <div className="p-3">
                                 <div className="flex items-center gap-2.5">
-                                    <button onClick={() => onToggleExpand(project.projectKey)} className="w-6 h-6 flex items-center justify-center rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors flex-shrink-0" title={isExpanded ? 'Collapse tasks' : 'Expand tasks'}>
+                                    <button onClick={() => onToggleExpand(project.projectKey)} className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors flex-shrink-0" title={isExpanded ? 'Collapse tasks' : 'Expand tasks'}>
                                         <svg className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                         </svg>
@@ -107,7 +108,7 @@ const TimelineView = ({
                                             <span className="text-xs text-slate-400">- {project.tasks?.length || 0} tasks</span>
                                         </div>
                                     </div>
-                                    <button onClick={() => onOpenTaskModal(project, null)} className="w-6 h-6 flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 text-white transition-colors flex-shrink-0" title="Add task">
+                                    <button onClick={() => onOpenTaskModal(project, null)} className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors flex-shrink-0" title="Add task">
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                         </svg>
@@ -240,6 +241,23 @@ const TimelineView = ({
         );
     };
 
+    const visibleProjects = processedProjects
+        .filter(p => !projectKeyFilter || p.projectKey === projectKeyFilter)
+        .filter(p => filteredProjectKeys.has(p.projectKey) || !hasActiveFilters);
+
+    if (visibleProjects.length === 0) {
+        return (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-grow flex flex-col">
+                <EmptyState
+                    variant={hasActiveFilters ? 'search' : 'timeline'}
+                    title={hasActiveFilters ? 'No matching projects' : 'No projects yet'}
+                    description={hasActiveFilters ? 'Try adjusting your filters to see more results.' : 'Create your first project to see it on the timeline.'}
+                    className="flex-grow"
+                />
+            </div>
+        );
+    }
+
     return (
         <>
             {/* Timeline Header */}
@@ -248,7 +266,7 @@ const TimelineView = ({
                     className="sticky left-0 z-10 flex items-center justify-between bg-white border-r border-slate-200 transition-all duration-200"
                     style={{ minWidth: `${sidebarWidth}px`, width: `${sidebarWidth}px` }}
                 >
-                    <button onClick={onSidebarToggle} className="p-2 ml-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors" title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+                    <button onClick={onSidebarToggle} className="p-2 ml-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
                         <svg className={`w-4 h-4 transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                         </svg>
@@ -260,10 +278,7 @@ const TimelineView = ({
 
             {/* Timeline Content */}
             <div className="space-y-2 overflow-auto flex-grow" ref={timelineRef} onScroll={syncScroll}>
-                {processedProjects
-                    .filter(p => !projectKeyFilter || p.projectKey === projectKeyFilter)
-                    .filter(p => filteredProjectKeys.has(p.projectKey) || !hasActiveFilters)
-                    .map((project, idx) => renderProjectRow(project, processedProjects.indexOf(project)))}
+                {visibleProjects.map((project) => renderProjectRow(project, processedProjects.indexOf(project)))}
             </div>
         </>
     );

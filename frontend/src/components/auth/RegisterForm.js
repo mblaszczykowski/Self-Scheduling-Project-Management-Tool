@@ -84,8 +84,8 @@ function RegisterForm({ onToggleForm }) {
     const inputClass = (hasError) => `w-full px-4 py-3 rounded-xl border ${
         hasError
             ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-            : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
-    } bg-slate-50 text-slate-900 text-sm transition-colors focus:ring-2 focus:outline-none`;
+            : 'border-slate-200 focus:ring-slate-900 focus:border-slate-900'
+    } bg-slate-50 text-slate-900 text-sm transition-colors focus:ring-1 focus:outline-none`;
 
     return (
         <Formik

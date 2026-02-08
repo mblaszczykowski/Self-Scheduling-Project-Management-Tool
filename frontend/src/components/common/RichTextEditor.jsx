@@ -575,7 +575,7 @@ const RichTextEditor = ({
     }, [editor, value]);
 
     return (
-        <div className="rounded-xl border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-slate-900 focus-within:border-slate-900 transition-all duration-200 hover:border-slate-300 bg-white shadow-sm hover:shadow-md">
+        <div className="rounded-lg border border-slate-200 overflow-hidden focus-within:ring-1 focus-within:ring-slate-900 focus-within:border-slate-900 transition-all hover:border-slate-300 bg-white">
             {showMenuBar && <MenuBar editor={editor} />}
             {showBubbleMenu && <BubbleMenuBar editor={editor} />}
             {showFloatingMenu && <FloatingMenuBar editor={editor} />}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { HiOutlineLogout } from 'react-icons/hi';
 import { getImageUrl, getAvatarColor, getAvatarInitials } from '../../util/helpers';
 
 export default function UserMenu({
@@ -11,18 +12,18 @@ export default function UserMenu({
             <button
                 type="button"
                 aria-label="Account settings"
-                className="p-1.5 bg-white rounded-lg hover:bg-slate-50 focus:outline-none transition-colors border border-slate-200"
+                className="p-2 bg-white rounded-lg hover:bg-slate-50 focus:outline-none transition-colors border border-slate-200"
                 onClick={onOpenAccountModal}
             >
                 {user?.profilePicture ? (
                     <img
                         src={getImageUrl(user.profilePicture)}
                         alt={`${user.firstname || ''} ${user.lastname || ''}'s profile`}
-                        className="h-7 w-7 rounded-lg object-cover"
+                        className="h-5 w-5 rounded-full object-cover"
                     />
                 ) : (
-                    <div className={`h-7 w-7 rounded-lg bg-gradient-to-br ${getAvatarColor(user)} flex items-center justify-center`}>
-                        <span className="text-xs font-semibold text-white">
+                    <div className={`h-5 w-5 rounded-full bg-gradient-to-br ${getAvatarColor(user)} flex items-center justify-center`}>
+                        <span className="text-[10px] font-semibold text-white">
                             {getAvatarInitials(user)}
                         </span>
                     </div>
@@ -35,9 +36,7 @@ export default function UserMenu({
                 onClick={onLogoutClick}
                 title="Log out"
             >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
+                <HiOutlineLogout className="h-5 w-5" />
             </button>
         </div>
     );
@@ -59,9 +58,7 @@ export function LogoutConfirmDialog({ isOpen, onClose, onConfirm }) {
                 <div className="p-6">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
+                            <HiOutlineLogout className="w-5 h-5 text-red-600" />
                         </div>
                         <h3 id="logout-title" className="text-lg font-semibold text-slate-900">Log out?</h3>
                     </div>

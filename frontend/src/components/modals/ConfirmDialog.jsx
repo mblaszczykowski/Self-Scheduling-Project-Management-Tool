@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaExclamationTriangle } from 'react-icons/fa';
+import { HiOutlineExclamation } from 'react-icons/hi';
 
 /**
  * Reusable confirmation dialog component
@@ -56,7 +56,7 @@ const ConfirmDialog = ({
                 <div className="p-6">
                     <div className="flex items-center gap-3 mb-4">
                         <div className={`w-10 h-10 rounded-full ${styles.iconBg} flex items-center justify-center`}>
-                            <FaExclamationTriangle className={`w-5 h-5 ${styles.iconColor}`} />
+                            <HiOutlineExclamation className={`w-5 h-5 ${styles.iconColor}`} />
                         </div>
                         <h3 id="confirm-dialog-title" className="text-lg font-semibold text-slate-900">
                             {title}

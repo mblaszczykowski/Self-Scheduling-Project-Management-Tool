@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
+import { toast, Slide } from 'react-toastify';
 import {
     createComment as apiCreateComment,
     createProject as apiCreateProject,
@@ -25,6 +25,14 @@ const getErrorMessage = (err) => {
     if (err.message === 'Network Error') return 'Unable to connect to server';
     if (err.code === 'ECONNABORTED') return 'Request timed out';
     return err.message || 'An unexpected error occurred';
+};
+
+const showToast = (message, type = 'error') => {
+    toast[type](message, {
+        position: 'top-center',
+        autoClose: 2500,
+        transition: Slide,
+    });
 };
 
 export const DataContext = createContext();
@@ -86,7 +94,7 @@ export const DataProvider = ({ children, initialUser }) => {
             setProjects(fetchedProjects);
         } catch (err) {
             console.error('Error refreshing projects:', err);
-            toast.error(getErrorMessage(err));
+            showToast(getErrorMessage(err));
         }
     }, []);
 
@@ -235,7 +243,7 @@ export const DataProvider = ({ children, initialUser }) => {
             return result;
         } catch (err) {
             const message = getErrorMessage(err);
-            toast.error(`Failed to add user: ${message}`);
+            showToast(`Failed to add user: ${message}`);
             throw err;
         }
     }, [projects, updateProject]);

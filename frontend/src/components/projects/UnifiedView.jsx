@@ -276,22 +276,36 @@ const UnifiedView = () => {
         }
     };
 
-    // Timeline calculations
+    // Timeline calculations - ensure minimum 4 months to fill screen
     const getTimelineBounds = () => {
+        const today = new Date();
+        const minMonths = 4; // Minimum months to display to fill screen
+
         const allDates = processedProjects.flatMap(p =>
             (p.tasks || []).flatMap(t => [new Date(t.startDate).getTime(), new Date(t.dueDate).getTime()])
         );
+
+        let timelineStart, timelineEnd;
+
         if (allDates.length === 0) {
-            const start = new Date(), end = new Date();
-            end.setDate(end.getDate() + 21);
-            return { timelineStart: start, timelineEnd: end };
+            // No tasks: show current month + next 3 months
+            timelineStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            timelineEnd = new Date(today.getFullYear(), today.getMonth() + minMonths, 0);
+        } else {
+            const earliest = new Date(Math.min(...allDates));
+            const latest = new Date(Math.max(...allDates));
+            timelineStart = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
+            timelineEnd = new Date(latest.getFullYear(), latest.getMonth() + 1, 0);
+
+            // Ensure minimum span of minMonths
+            const monthSpan = (timelineEnd.getFullYear() - timelineStart.getFullYear()) * 12 +
+                              (timelineEnd.getMonth() - timelineStart.getMonth()) + 1;
+            if (monthSpan < minMonths) {
+                timelineEnd = new Date(timelineStart.getFullYear(), timelineStart.getMonth() + minMonths, 0);
+            }
         }
-        const earliest = new Date(Math.min(...allDates));
-        const latest = new Date(Math.max(...allDates));
-        return {
-            timelineStart: new Date(earliest.getFullYear(), earliest.getMonth(), 1),
-            timelineEnd: new Date(latest.getFullYear(), latest.getMonth() + 1, 0)
-        };
+
+        return { timelineStart, timelineEnd };
     };
 
     const { timelineStart, timelineEnd } = getTimelineBounds();
@@ -319,7 +333,7 @@ const UnifiedView = () => {
         <div className="min-h-screen bg-slate-50 flex flex-col">
             <Header onLogout={handleLogout} onCreateProject={() => openModal('project', 'create')} onCreateTask={() => openModal('task', 'create')} />
 
-            <div className="flex-grow flex flex-col px-8 lg:px-12 py-8">
+            <div className="flex-grow flex flex-col px-4 lg:px-6 py-6">
                 {/* Filters & View Toggle Row */}
                 <div className="mb-4 flex items-center gap-4">
                     <FilterBar
@@ -343,7 +357,7 @@ const UnifiedView = () => {
                     />
 
                     {/* View Toggle */}
-                    <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 shrink-0">
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shrink-0">
                         {['timeline', 'list'].map(mode => (
                             <button key={mode} onClick={() => setViewMode(mode)} className={`py-2 px-4 text-sm font-medium rounded-lg transition-colors ${viewMode === mode ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'}`}>
                                 <span className="flex items-center gap-2">

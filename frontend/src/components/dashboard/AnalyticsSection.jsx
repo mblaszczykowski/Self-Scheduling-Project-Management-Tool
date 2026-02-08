@@ -14,20 +14,20 @@ const AnalyticsSection = ({ stats }) => {
 
                 {/* 1. Critical Path Health Score */}
                 <ChartCard title="Critical Path Health" subtitle="Overall critical task status">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-start justify-between mb-4">
                         <div>
-                            <div className="text-5xl font-bold text-slate-900 mb-2">
+                            <div className="text-4xl font-bold text-slate-900 mb-1">
                                 {stats.criticalHealthScore}%
                             </div>
                             <div className="text-xs text-slate-500">
                                 {stats.criticalTasksList.length} critical tasks
                             </div>
                         </div>
-                        <div className={`w-20 h-20 rounded-xl flex items-center justify-center ${
+                        <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${
                             stats.criticalHealthScore >= 80 ? 'bg-green-100' :
                             stats.criticalHealthScore >= 60 ? 'bg-yellow-100' : 'bg-red-100'
                         }`}>
-                            <svg className={`w-10 h-10 ${
+                            <svg className={`w-7 h-7 ${
                                 stats.criticalHealthScore >= 80 ? 'text-green-600' :
                                 stats.criticalHealthScore >= 60 ? 'text-yellow-600' : 'text-red-600'
                             }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -192,7 +192,7 @@ const OverdueCriticalCard = ({ stats }) => (
 
 const BlockedTasksCard = ({ stats }) => (
     <ChartCard title="Blocked Tasks" subtitle="Waiting on dependencies">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-start justify-between mb-4">
             <div>
                 <div className="text-4xl font-bold text-slate-900 mb-1">
                     {stats.blockedTasks.length}
@@ -201,8 +201,8 @@ const BlockedTasksCard = ({ stats }) => (
                     {stats.blockedCriticalTasks.length} are critical
                 </div>
             </div>
-            <div className={`w-16 h-16 ${stats.blockedTasks.length > 0 ? 'bg-red-100' : 'bg-slate-100'} rounded-xl flex items-center justify-center`}>
-                <svg className={`w-8 h-8 ${stats.blockedTasks.length > 0 ? 'text-red-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className={`w-14 h-14 ${stats.blockedTasks.length > 0 ? 'bg-red-100' : 'bg-slate-100'} rounded-xl flex items-center justify-center shrink-0`}>
+                <svg className={`w-7 h-7 ${stats.blockedTasks.length > 0 ? 'text-red-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                 </svg>
             </div>
@@ -268,7 +268,7 @@ const CriticalWorkloadCard = ({ stats }) => (
 
 const NearCriticalCard = ({ stats }) => (
     <ChartCard title="Near-Critical Tasks" subtitle="Tasks at risk of becoming critical">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-start justify-between mb-4">
             <div>
                 <div className="text-4xl font-bold text-slate-900 mb-1">
                     {stats.nearCriticalTasks.length}
@@ -277,8 +277,8 @@ const NearCriticalCard = ({ stats }) => (
                     {stats.nearCriticalTasks.length === 0 ? 'No risks' : 'Tasks with low slack'}
                 </div>
             </div>
-            <div className={`w-16 h-16 ${stats.nearCriticalTasks.length > 0 ? 'bg-amber-100' : 'bg-slate-100'} rounded-xl flex items-center justify-center`}>
-                <svg className={`w-8 h-8 ${stats.nearCriticalTasks.length > 0 ? 'text-amber-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className={`w-14 h-14 ${stats.nearCriticalTasks.length > 0 ? 'bg-amber-100' : 'bg-slate-100'} rounded-xl flex items-center justify-center shrink-0`}>
+                <svg className={`w-7 h-7 ${stats.nearCriticalTasks.length > 0 ? 'text-amber-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
             </div>
@@ -379,11 +379,13 @@ const EmptyState = ({ icon, message, fullHeight = false }) => {
     };
 
     return (
-        <div className={`${fullHeight ? 'h-full' : ''} flex flex-col items-center justify-center text-slate-400 ${fullHeight ? '' : 'py-8'}`}>
-            <svg className="w-10 h-10 mb-2 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={icons[icon]} />
-            </svg>
-            <p className="text-xs">{message}</p>
+        <div className={`${fullHeight ? 'h-full min-h-[180px]' : 'py-8'} flex flex-col items-center justify-center text-slate-400`}>
+            <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={icons[icon]} />
+                </svg>
+            </div>
+            <p className="text-xs text-slate-500">{message}</p>
         </div>
     );
 };

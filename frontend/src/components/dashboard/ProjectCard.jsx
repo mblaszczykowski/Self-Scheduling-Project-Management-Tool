@@ -73,19 +73,19 @@ const ProjectCard = ({
                                     key={member.id}
                                     src={getImageUrl(member.profilePicture)}
                                     alt={member.firstname}
-                                    className="w-7 h-7 rounded-lg border-2 border-white object-cover"
+                                    className="w-7 h-7 rounded-full border-2 border-white object-cover"
                                 />
                             ) : (
                                 <div
                                     key={member.id}
-                                    className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(member)} rounded-lg flex items-center justify-center border-2 border-white`}
+                                    className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(member)} rounded-full flex items-center justify-center border-2 border-white`}
                                 >
                                     <span className="text-xs font-medium text-white">{getAvatarInitials(member)}</span>
                                 </div>
                             )
                         ))}
                         {project.members?.length > 4 && (
-                            <span className="w-7 h-7 bg-slate-200 rounded-lg flex items-center justify-center text-xs font-medium text-slate-700 border-2 border-white">
+                            <span className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium text-slate-700 border-2 border-white">
                                 +{project.members.length - 4}
                             </span>
                         )}

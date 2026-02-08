@@ -5,7 +5,9 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "comments", indexes = {
@@ -45,12 +47,12 @@ public class Comment {
     private List<Comment> replies = new ArrayList<>();
 
     @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CommentReaction> reactions = new ArrayList<>();
+    private Set<CommentReaction> reactions = new HashSet<>();
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "comment_attachments", joinColumns = @JoinColumn(name = "comment_id"))
     @Column(name = "attachment_url")
-    private List<String> attachments = new ArrayList<>();
+    private Set<String> attachments = new HashSet<>();
 
     public Comment() {}
 
@@ -59,7 +61,7 @@ public class Comment {
         this.author = author;
         this.parentComment = parentComment;
         this.content = content;
-        this.attachments = attachments != null ? attachments : new ArrayList<>();
+        this.attachments = attachments != null ? new HashSet<>(attachments) : new HashSet<>();
     }
 
     // Getters and Setters
@@ -123,19 +125,19 @@ public class Comment {
         this.replies = replies;
     }
 
-    public List<CommentReaction> getReactions() {
+    public Set<CommentReaction> getReactions() {
         return reactions;
     }
 
-    public void setReactions(List<CommentReaction> reactions) {
+    public void setReactions(Set<CommentReaction> reactions) {
         this.reactions = reactions;
     }
 
-    public List<String> getAttachments() {
+    public Set<String> getAttachments() {
         return attachments;
     }
 
-    public void setAttachments(List<String> attachments) {
+    public void setAttachments(Set<String> attachments) {
         this.attachments = attachments;
     }
 }

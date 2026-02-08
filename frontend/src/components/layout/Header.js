@@ -1,5 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { HiOutlineMenu, HiOutlineX } from 'react-icons/hi';
 import { DataContext } from '../../context/DataContext';
 import AccountModal from '../modals/AccountModal';
 import NotificationDropdown from './NotificationDropdown';
@@ -73,22 +74,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                     </div>
                 </div>
 
-                <div className="flex xl:hidden items-center">
-                    <button
-                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        aria-expanded={mobileMenuOpen}
-                        aria-controls="mobile-menu"
-                        aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-                        className="p-2 hover:bg-slate-100 rounded-lg focus:outline-none transition-colors"
-                    >
-                        <svg className="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                  d={mobileMenuOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16'} />
-                        </svg>
-                    </button>
-                </div>
-
-                <div className="hidden xl:flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     <NotificationDropdown
                         notifications={notifications}
                         isOpen={notificationsOpen}
@@ -96,11 +82,26 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                         onClose={() => setNotificationsOpen(false)}
                         onMarkAsRead={handleMarkNotificationsAsRead}
                     />
-                    <UserMenu
-                        user={user}
-                        onOpenAccountModal={() => setAccountModalOpen(true)}
-                        onLogoutClick={handleLogoutClick}
-                    />
+                    <div className="hidden xl:flex items-center gap-2">
+                        <UserMenu
+                            user={user}
+                            onOpenAccountModal={() => setAccountModalOpen(true)}
+                            onLogoutClick={handleLogoutClick}
+                        />
+                    </div>
+                    <button
+                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                        aria-expanded={mobileMenuOpen}
+                        aria-controls="mobile-menu"
+                        aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                        className="xl:hidden p-2 hover:bg-slate-100 rounded-lg focus:outline-none transition-colors"
+                    >
+                        {mobileMenuOpen ? (
+                            <HiOutlineX className="h-5 w-5 text-slate-600" aria-hidden="true" />
+                        ) : (
+                            <HiOutlineMenu className="h-5 w-5 text-slate-600" aria-hidden="true" />
+                        )}
+                    </button>
                 </div>
             </nav>
 

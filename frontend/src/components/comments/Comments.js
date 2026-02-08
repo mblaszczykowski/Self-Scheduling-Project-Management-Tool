@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { DataContext } from '../../context/DataContext';
 import { ErrorMessage, Field, Form, Formik } from 'formik';
 import * as Yup from 'yup';
-import { FaDownload, FaFileAlt, FaFilePdf, FaPlus, FaTimes } from 'react-icons/fa';
+import { HiOutlineDownload, HiOutlineDocument, HiOutlineDocumentText, HiOutlinePlus, HiOutlineX, HiOutlineChatAlt2 } from 'react-icons/hi';
 import { formatDistanceToNow } from 'date-fns';
 import { getImageUrl, getFileInfo, getAvatarColor, getAvatarInitials } from '../../util/helpers';
 
@@ -34,7 +34,7 @@ const PreviewModal = ({ preview, onClose }) => {
                 <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-white">
                     <h3 className="text-sm font-semibold text-slate-900 truncate max-w-md">{preview.fileName}</h3>
                     <button onClick={handleClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors" title="Close">
-                        <FaTimes className="text-slate-500" />
+                        <HiOutlineX className="w-5 h-5 text-slate-500" />
                     </button>
                 </div>
                 <div className="p-5 bg-slate-50">
@@ -48,9 +48,9 @@ const PreviewModal = ({ preview, onClose }) => {
                     <a
                         href={preview.url}
                         download={preview.fileName}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-semibold"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium"
                     >
-                        <FaDownload className="text-xs" /> Download
+                        <HiOutlineDownload className="w-4 h-4" /> Download
                     </a>
                 </div>
             </div>
@@ -170,12 +170,12 @@ export default function Comments({ taskId, currentUserId }) {
                     <img src={url} alt={fileName} className="h-10 w-10 object-cover rounded border border-slate-200 hover:border-slate-300 transition-colors" />
                 ) : fileType === 'pdf' ? (
                     <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded border border-slate-200 hover:border-slate-300 transition-colors">
-                        <FaFilePdf className="text-red-500 text-[10px]" />
+                        <HiOutlineDocumentText className="w-3 h-3 text-red-500" />
                         <span className="text-[10px] text-slate-600 truncate max-w-[60px]">{fileName}</span>
                     </div>
                 ) : (
                     <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded border border-slate-200 hover:border-slate-300 transition-colors">
-                        <FaFileAlt className="text-slate-400 text-[10px]" />
+                        <HiOutlineDocument className="w-3 h-3 text-slate-400" />
                         <span className="text-[10px] text-slate-600 truncate max-w-[60px]">{fileName}</span>
                     </div>
                 )}
@@ -185,7 +185,7 @@ export default function Comments({ taskId, currentUserId }) {
                     className="absolute -top-1 -right-1 w-4 h-4 bg-slate-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Remove"
                 >
-                    <FaTimes size={6} />
+                    <HiOutlineX className="w-2.5 h-2.5" />
                 </button>
             </div>
         );
@@ -213,7 +213,7 @@ export default function Comments({ taskId, currentUserId }) {
                         <div className="flex items-center gap-1.5">
                             {newAttachments.map((f, idx) => renderAttachmentPreview(f, false, idx))}
                             <label className="cursor-pointer flex items-center justify-center w-7 h-7 bg-slate-100 rounded hover:bg-slate-200 transition-colors" title="Add attachment">
-                                <FaPlus className="text-slate-400 text-[10px]" />
+                                <HiOutlinePlus className="w-3 h-3 text-slate-400" />
                                 <input type="file" multiple onChange={handleAddNewAttachments} className="hidden" />
                             </label>
                         </div>
@@ -223,7 +223,7 @@ export default function Comments({ taskId, currentUserId }) {
                             <button type="button" onClick={onCancel} className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors">
                                 Cancel
                             </button>
-                            <button type="submit" disabled={isSubmitting} className="px-3 py-1.5 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors text-xs font-medium disabled:opacity-50">
+                            <button type="submit" disabled={isSubmitting} className="px-3 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-xs font-medium disabled:opacity-50">
                                 {isSubmitting ? '...' : buttonText}
                             </button>
                         </div>
@@ -363,7 +363,7 @@ export default function Comments({ taskId, currentUserId }) {
                 {!showCommentForm && (
                     <button
                         onClick={() => setShowCommentForm(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors text-xs font-medium"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-xs font-medium"
                     >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -393,9 +393,7 @@ export default function Comments({ taskId, currentUserId }) {
                 </div>
             ) : (
                 <div className="text-center py-6 bg-slate-50 rounded-lg">
-                    <svg className="w-8 h-8 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
+                    <HiOutlineChatAlt2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                     <p className="text-xs text-slate-500">No comments yet</p>
                 </div>
             )}

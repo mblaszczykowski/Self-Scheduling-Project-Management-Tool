@@ -79,7 +79,7 @@ public class ProjectService {
             var dependencies = projectDTO.dependencies().stream()
                     .map(depKey -> projectDAO.getProjectByKey(depKey)
                             .orElseThrow(() -> new ValidationException("Dependency project not found: " + depKey)))
-                    .toList();
+                    .collect(Collectors.toList());
             validateNoProjectCycles(project, dependencies);
             project.setDependencies(dependencies);
         }
@@ -140,7 +140,7 @@ public class ProjectService {
             var dependencies = projectDTO.dependencies().stream()
                     .map(depKey -> projectDAO.getProjectByKey(depKey)
                             .orElseThrow(() -> new ValidationException("Dependency project not found: " + depKey)))
-                    .toList();
+                    .collect(Collectors.toList());
             validateNoProjectCycles(project, dependencies);
             project.setDependencies(dependencies);
         }

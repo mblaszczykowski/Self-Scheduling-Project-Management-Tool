@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatShortDate, STATUS_CONFIG, PRIORITY_CONFIG } from '../../util/helpers';
+import { EmptyState } from '../common';
 
 const TaskListView = ({
     filteredTasks,
@@ -48,6 +49,19 @@ const TaskListView = ({
             </>
         );
     };
+
+    if (filteredTasks.length === 0) {
+        return (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-grow flex flex-col">
+                <EmptyState
+                    variant={hasActiveFilters ? 'search' : 'table'}
+                    title={hasActiveFilters ? 'No matching tasks' : 'No tasks yet'}
+                    description={hasActiveFilters ? 'Try adjusting your filters to see more results.' : 'Create your first task to get started with tracking your work.'}
+                    className="flex-grow"
+                />
+            </div>
+        );
+    }
 
     return (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-grow flex flex-col">

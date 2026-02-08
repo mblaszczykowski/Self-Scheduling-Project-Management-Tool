@@ -57,3 +57,80 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Custom Toast Notifications - match app design */
+.Toastify__toast {
+  border-radius: 0.75rem !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+  border: 1px solid #e2e8f0 !important;
+  padding: 1rem !important;
+  font-family: inherit !important;
+}
+
+.Toastify__toast-body {
+  padding: 0 !important;
+  font-size: 0.875rem !important;
+  color: #334155 !important;
+}
+
+.Toastify__toast--success {
+  background: #f0fdf4 !important;
+  border-color: #bbf7d0 !important;
+}
+
+.Toastify__toast--success .Toastify__toast-icon svg {
+  fill: #16a34a !important;
+}
+
+.Toastify__toast--error {
+  background: #fef2f2 !important;
+  border-color: #fecaca !important;
+}
+
+.Toastify__toast--error .Toastify__toast-icon svg {
+  fill: #dc2626 !important;
+}
+
+.Toastify__toast--info {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+.Toastify__toast--info .Toastify__toast-icon svg {
+  fill: #0f172a !important;
+}
+
+.Toastify__toast--warning {
+  background: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+
+.Toastify__toast--warning .Toastify__toast-icon svg {
+  fill: #d97706 !important;
+}
+
+.Toastify__progress-bar {
+  background: #0f172a !important;
+  height: 3px !important;
+}
+
+.Toastify__toast--success .Toastify__progress-bar {
+  background: #16a34a !important;
+}
+
+.Toastify__toast--error .Toastify__progress-bar {
+  background: #dc2626 !important;
+}
+
+.Toastify__toast--warning .Toastify__progress-bar {
+  background: #d97706 !important;
+}
+
+.Toastify__close-button {
+  color: #64748b !important;
+  opacity: 0.7 !important;
+}
+
+.Toastify__close-button:hover {
+  opacity: 1 !important;
+}

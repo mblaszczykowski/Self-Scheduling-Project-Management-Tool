@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * Professional Section Header - reusable header for dashboard sections
@@ -14,16 +14,28 @@ export const SectionHeader = ({ title, subtitle }) => (
 
 /**
  * Chart Container - reusable card wrapper for charts and analytics
+ * Includes entrance animation like ProjectCard
  */
-export const ChartCard = ({ title, subtitle, children, className = "" }) => (
-    <div className={`bg-white rounded-xl border border-slate-200 p-6 hover:border-slate-300 transition-colors ${className}`}>
-        <div className="mb-5">
-            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-            {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+export const ChartCard = ({ title, subtitle, children, className = "" }) => {
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect(() => {
+        const timer = requestAnimationFrame(() => setIsVisible(true));
+        return () => cancelAnimationFrame(timer);
+    }, []);
+
+    return (
+        <div className={`bg-white rounded-xl border border-slate-200 p-6 hover:border-slate-300 transition-all duration-300 ${
+            isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        } ${className}`}>
+            <div className="mb-5">
+                <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+                {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+            </div>
+            {children}
         </div>
-        {children}
-    </div>
-);
+    );
+};
 
 /**
  * Professional Chart Configuration - shared chart options

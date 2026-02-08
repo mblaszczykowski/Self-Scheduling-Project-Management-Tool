@@ -123,7 +123,7 @@ const FilterBar = ({
                                     type="date"
                                     value={filters[field] || ''}
                                     onChange={e => { onFilterChange(field, e.target.value); if (e.target.value) onFilterDropdownToggle(null); }}
-                                    className="px-2 py-1.5 bg-white border border-slate-200 rounded text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                                    className="px-2 py-1.5 bg-white border border-slate-200 rounded text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-900"
                                     autoFocus
                                 />
                                 {filters[field] && (
@@ -157,7 +157,7 @@ const FilterBar = ({
                                 placeholder="Search tasks..."
                                 value={searchInput}
                                 onChange={e => onSearchInputChange(e.target.value)}
-                                className="px-2 py-1.5 bg-white border border-slate-200 rounded text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900 w-40"
+                                className="px-2 py-1.5 bg-white border border-slate-200 rounded text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-900 w-40"
                                 autoFocus
                             />
                         </div>
@@ -181,7 +181,7 @@ const FilterBar = ({
                         onClick={onClearAllFilters}
                         onMouseEnter={(e) => handleButtonMouseEnter(e, 'Clear all filters')}
                         onMouseLeave={onFilterTooltipHide}
-                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>

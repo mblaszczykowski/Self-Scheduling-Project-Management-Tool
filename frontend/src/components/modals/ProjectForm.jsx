@@ -1,6 +1,6 @@
 import React from 'react';
 import { ErrorMessage, Field } from 'formik';
-import { FaChevronDown, FaProjectDiagram, FaTimes, FaCloudUploadAlt } from 'react-icons/fa';
+import { HiOutlineChevronDown, HiOutlineFolder, HiOutlineX, HiOutlineCloudUpload } from 'react-icons/hi';
 import RichTextEditor from '../common/RichTextEditor';
 import AttachmentUploader from './AttachmentUploader';
 import { SectionHeader, InputLabel, inputClass, selectClass } from './formHelpers';
@@ -26,6 +26,7 @@ const ProjectForm = ({
     emailLoading,
     emailError
 }) => {
+    const isOwner = modalMode === 'create' || (currentUser && project?.owner?.id === currentUser.id);
     return (
         <>
             {/* Left Column - Main Content */}
@@ -50,7 +51,7 @@ const ProjectForm = ({
 
                 {/* Attachments */}
                 <div className="mb-6">
-                    <SectionHeader icon={FaCloudUploadAlt} title="Attachments" />
+                    <SectionHeader icon={HiOutlineCloudUpload} title="Attachments" />
                     <AttachmentUploader
                         existingAttachments={existingAttachments}
                         newAttachments={newAttachments}
@@ -79,31 +80,37 @@ const ProjectForm = ({
                         <InputLabel>Team Members</InputLabel>
                         {values.members?.length > 0 && (
                             <div className="space-y-2 mb-3">
-                                {values.members.map((m, i) => (
-                                    <div key={i} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg border border-slate-200 group hover:border-slate-300 transition-colors">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${getAvatarColor(m)} flex items-center justify-center text-[10px] font-bold text-white`}>
-                                                {getAvatarInitials(m)}
+                                {values.members.map((m, i) => {
+                                    const isMemberOwner = project?.owner?.id === m.id;
+                                    return (
+                                        <div key={m.id || m.email || i} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg border border-slate-200 group hover:border-slate-300 transition-colors">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${getAvatarColor(m)} flex items-center justify-center text-[10px] font-bold text-white`}>
+                                                    {getAvatarInitials(m)}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-xs font-medium text-slate-800 truncate">
+                                                        {m.firstname ? `${m.firstname} ${m.lastname}` : m.email}
+                                                        {isMemberOwner && <span className="ml-1.5 text-[10px] text-slate-400">(Owner)</span>}
+                                                    </div>
+                                                    {m.firstname && <div className="text-[10px] text-slate-400 truncate">{m.email}</div>}
+                                                </div>
                                             </div>
-                                            <div className="min-w-0">
-                                                <div className="text-xs font-medium text-slate-800 truncate">{m.firstname ? `${m.firstname} ${m.lastname}` : m.email}</div>
-                                                {m.firstname && <div className="text-[10px] text-slate-400 truncate">{m.email}</div>}
-                                            </div>
+                                            {isOwner && !isMemberOwner && (
+                                                <button type="button" onClick={() => setFieldValue('members', values.members.filter((_, idx) => idx !== i))} className="text-xs text-red-500 opacity-0 group-hover:opacity-100 font-medium transition-opacity">
+                                                    Remove
+                                                </button>
+                                            )}
                                         </div>
-                                        {currentUser && (project?.owner ? currentUser.id === project.owner.id && m.id !== project.owner.id : true) && (
-                                            <button type="button" onClick={() => setFieldValue('members', values.members.filter((_, idx) => idx !== i))} className="text-xs text-red-500 opacity-0 group-hover:opacity-100 font-medium transition-opacity">
-                                                Remove
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
-                        {currentUser && (
+                        {isOwner && (
                             <div className="flex gap-2">
                                 <Field type="email" name="newUserEmail" placeholder="Email address..." className={`${inputClass} flex-1`} />
                                 <button type="button" onClick={() => onAddMember(values.newUserEmail, values, setFieldValue)} disabled={emailLoading} className="px-4 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all text-sm font-semibold disabled:opacity-50">
-                                    {emailLoading ? '...' : 'Add'}
+                                    Add
                                 </button>
                             </div>
                         )}
@@ -119,10 +126,10 @@ const ProjectForm = ({
                                     const depProject = projects.find(p => p.projectKey === depKey);
                                     return (
                                         <span key={depKey} className="inline-flex items-center gap-2 px-2.5 py-1 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold">
-                                            <FaProjectDiagram className="text-[10px] text-slate-500" />
+                                            <HiOutlineFolder className="w-3 h-3 text-slate-500" />
                                             {depProject?.projectKey || depKey}
                                             <button type="button" onClick={() => setDependencies(prev => prev.filter(d => d !== depKey))} className="text-slate-400 hover:text-red-500 transition-colors">
-                                                <FaTimes className="text-[10px]" />
+                                                <HiOutlineX className="w-3 h-3" />
                                             </button>
                                         </span>
                                     );
@@ -134,7 +141,7 @@ const ProjectForm = ({
                                 <option value="">Add dependency...</option>
                                 {projects.filter(p => p.projectKey !== project?.projectKey).map(p => <option key={p.projectKey} value={p.projectKey}>{p.projectKey} — {p.summary}</option>)}
                             </select>
-                            <FaChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none" />
+                            <HiOutlineChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                         </div>
                     </div>
                 </div>

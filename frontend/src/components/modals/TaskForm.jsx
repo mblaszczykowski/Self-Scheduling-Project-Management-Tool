@@ -1,6 +1,6 @@
 import React from 'react';
 import { ErrorMessage, Field } from 'formik';
-import { FaChevronDown, FaLink, FaTimes, FaCloudUploadAlt } from 'react-icons/fa';
+import { HiOutlineChevronDown, HiOutlineLink, HiOutlineX, HiOutlineCloudUpload } from 'react-icons/hi';
 import RichTextEditor from '../common/RichTextEditor';
 import AttachmentUploader from './AttachmentUploader';
 import Comments from '../comments/Comments';
@@ -53,7 +53,7 @@ const TaskForm = ({
 
                 {/* Attachments */}
                 <div className="mb-6">
-                    <SectionHeader icon={FaCloudUploadAlt} title="Attachments" />
+                    <SectionHeader icon={HiOutlineCloudUpload} title="Attachments" />
                     <AttachmentUploader
                         existingAttachments={existingAttachments}
                         newAttachments={newAttachments}
@@ -82,7 +82,7 @@ const TaskForm = ({
                                 <option value="">Select project...</option>
                                 {projects.map(p => <option key={p.projectKey} value={p.projectKey}>{p.summary} ({p.projectKey})</option>)}
                             </Field>
-                            <FaChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none" />
+                            <HiOutlineChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                         </div>
                         <ErrorMessage name="projectKey" component="div" className="text-red-500 text-xs mt-1.5 font-medium" />
                     </div>
@@ -96,7 +96,7 @@ const TaskForm = ({
                                 <Field as="select" id="status" name="status" className={`${selectClass} pl-9`}>
                                     {Object.entries(STATUS_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                                 </Field>
-                                <FaChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none" />
+                                <HiOutlineChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                             </div>
                         </div>
                         <div>
@@ -108,7 +108,7 @@ const TaskForm = ({
                                 <Field as="select" id="priority" name="priority" className={`${selectClass} pl-9`}>
                                     {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                                 </Field>
-                                <FaChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none" />
+                                <HiOutlineChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                             </div>
                         </div>
                     </div>
@@ -121,7 +121,7 @@ const TaskForm = ({
                                 <option value="">Unassigned</option>
                                 {project?.members?.map(u => <option key={u.id} value={u.email}>{u.firstname} {u.lastname}</option>)}
                             </Field>
-                            <FaChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none" />
+                            <HiOutlineChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                         </div>
                     </div>
 
@@ -197,10 +197,10 @@ const TaskForm = ({
                                     const depTask = allTasks.find(t => t.id === depId);
                                     return (
                                         <span key={depId} className="inline-flex items-center gap-2 px-2.5 py-1 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold">
-                                            <FaLink className="text-[10px] text-slate-500" />
+                                            <HiOutlineLink className="w-3 h-3 text-slate-500" />
                                             {depTask?.taskKey || `#${depId}`}
                                             <button type="button" onClick={() => setDependencies(prev => prev.filter(id => id !== depId))} className="text-slate-400 hover:text-red-500 transition-colors">
-                                                <FaTimes className="text-[10px]" />
+                                                <HiOutlineX className="w-3 h-3" />
                                             </button>
                                         </span>
                                     );
@@ -212,7 +212,7 @@ const TaskForm = ({
                                 <option value="">Add dependency...</option>
                                 {allTasks.filter(t => t.id !== task?.id).map(t => <option key={t.id} value={t.id}>{t.taskKey} — {t.summary}</option>)}
                             </select>
-                            <FaChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none" />
+                            <HiOutlineChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                         </div>
                     </div>
 
