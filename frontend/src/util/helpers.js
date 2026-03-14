@@ -1,16 +1,21 @@
 import config from '../config';
+import { TIMELINE_CONSTANTS } from '../config/timelineConstants';
 
-// ============ URL HELPERS ============
+export const MS_PER_DAY = 86400000;
+
+const UPCOMING_DEADLINE_DAYS = 4;
+
+export const toDateString = (date) => new Date(date).toISOString().split('T')[0];
+
 export const getImageUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
     return `${config.API_BASE_URL}${path}`;
 };
 
-// ============ DATE HELPERS ============
 export const formatDate = (dateString) => {
     if (!dateString) return '';
-    return new Date(dateString).toISOString().split('T')[0];
+    return toDateString(dateString);
 };
 
 export const formatDateTime = (dateString) => {
@@ -38,11 +43,11 @@ export const isOverdue = (dueDate, progress = 0) => {
     return new Date(dueDate) < new Date() && progress < 100;
 };
 
-export const isUpcomingDeadline = (dueDate, daysThreshold = 4) => {
+export const isUpcomingDeadline = (dueDate, daysThreshold = UPCOMING_DEADLINE_DAYS) => {
     if (!dueDate) return false;
     const due = new Date(dueDate);
     const today = new Date();
-    const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil((due - today) / MS_PER_DAY);
     return diffDays <= daysThreshold && diffDays >= 0;
 };
 
@@ -50,11 +55,10 @@ export const calculateDuration = (startDate, dueDate) => {
     if (!startDate || !dueDate) return 'N/A';
     const start = new Date(startDate);
     const due = new Date(dueDate);
-    const diffDays = Math.ceil((due - start) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil((due - start) / MS_PER_DAY);
     return diffDays >= 0 ? diffDays : 'N/A';
 };
 
-// ============ FILE HELPERS ============
 export const getFileTypeFromPath = (path) => {
     const extension = path.split('.').pop().toLowerCase();
     const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
@@ -71,7 +75,6 @@ export const getFileInfo = (attachment) => {
     return { isFile, url, fileName, fileType };
 };
 
-// ============ TASK HELPERS ============
 export const getStatusConfig = () => ({
     'BACKLOG': { label: 'Backlog', color: 'bg-slate-50 text-slate-600', dot: 'bg-slate-400' },
     'TODO': { label: 'To Do', color: 'bg-blue-50 text-blue-600', dot: 'bg-blue-500' },
@@ -95,7 +98,6 @@ export const getPriorityConfig = () => ({
     'HIGHEST': { label: 'Highest', icon: '↑↑', color: 'bg-red-50 text-red-600' },
 });
 
-// Generate consistent avatar color based on user email (always present and unique)
 export const getAvatarColor = (user) => {
     const colors = [
         'from-slate-600 to-slate-700',
@@ -108,13 +110,11 @@ export const getAvatarColor = (user) => {
         'from-cyan-600 to-cyan-700'
     ];
 
-    // Use email as the consistent identifier (always present)
     const identifier = typeof user === 'string' ? user : (user?.email || user?.firstname || '');
     const index = identifier ? identifier.charCodeAt(0) % colors.length : 0;
     return colors[index];
 };
 
-// Get avatar initials from user
 export const getAvatarInitials = (user) => {
     if (!user) return 'U';
 
@@ -133,15 +133,14 @@ export const getAvatarInitials = (user) => {
     return 'U';
 };
 
-// ============ TIMELINE HELPERS ============
 export const calculateTaskPosition = (startDate, dueDate, timelineStart) => {
     const start = new Date(startDate);
     const due = new Date(dueDate);
     const tlStart = new Date(timelineStart);
-    const dayWidth = 25;
+    const dayWidth = TIMELINE_CONSTANTS.DAY_WIDTH;
 
-    const daysOffset = Math.round((start - tlStart) / (1000 * 60 * 60 * 24));
-    const durationDays = Math.round((due - start) / (1000 * 60 * 60 * 24)) + 1;
+    const daysOffset = Math.round((start - tlStart) / MS_PER_DAY);
+    const durationDays = Math.round((due - start) / MS_PER_DAY) + 1;
 
     return {
         marginLeft: daysOffset * dayWidth,
@@ -154,6 +153,21 @@ export const generateBezierPath = (startX, startY, endX, endY) => {
     return `M ${startX} ${startY} C ${startX + offset} ${startY}, ${endX - offset} ${endY}, ${endX} ${endY}`;
 };
 
-// Pre-computed config exports (avoid repeated function calls)
+export const getErrorMessage = (err) => {
+    if (err.response?.data?.message) return err.response.data.message;
+    if (err.response?.data?.error) return err.response.data.error;
+    if (err.message === 'Network Error') return 'Unable to connect to server';
+    if (err.code === 'ECONNABORTED') return 'Request timed out';
+    return err.message || 'An unexpected error occurred';
+};
+
+export const daysBetween = (date1, date2) => {
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    const utc1 = Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate());
+    const utc2 = Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
+    return Math.round((utc2 - utc1) / MS_PER_DAY);
+};
+
 export const STATUS_CONFIG = getStatusConfig();
 export const PRIORITY_CONFIG = getPriorityConfig();

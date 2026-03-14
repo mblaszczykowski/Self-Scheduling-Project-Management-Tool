@@ -1,5 +1,3 @@
-// src/main/java/com/backend/entities/CommentReaction.java
-
 package com.backend.entities;
 
 import jakarta.persistence.*;
@@ -17,12 +15,10 @@ public class CommentReaction {
     @Column(nullable = false)
     private ReactionType type;
 
-    // Many-to-One relationship with Comment
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "comment_id", nullable = false)
     private Comment comment;
 
-    // Many-to-One relationship with User
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

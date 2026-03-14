@@ -36,7 +36,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        // Skip authentication for public endpoints and static content
         if (PublicEndpoints.isPublicForJwt(path, method)) {
             filterChain.doFilter(request, response);
             return;
@@ -74,8 +73,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        // Use same format as GlobalExceptionHandler for consistency
-        Map<String, Object> error = new LinkedHashMap<>();
+        var error = new LinkedHashMap<String, Object>();
         error.put("status", status.value());
         error.put("error", status.getReasonPhrase());
         error.put("code", "AUTH_ERROR");

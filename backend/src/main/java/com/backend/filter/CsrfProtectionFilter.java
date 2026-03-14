@@ -8,8 +8,10 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -18,19 +20,6 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Map;
 
-/**
- * CSRF protection using Double-Submit Cookie pattern.
- *
- * How it works:
- * 1. Server sets a random CSRF token in a readable cookie (XSRF-TOKEN)
- * 2. Client reads this cookie and sends it back in a header (X-CSRF-Token)
- * 3. Server validates that cookie value matches header value
- *
- * This works because:
- * - Attacker sites cannot read cookies from other domains (Same-Origin Policy)
- * - Attacker sites can make cross-origin requests but cannot set custom headers
- * - Only legitimate frontend can read the cookie and set the matching header
- */
 @Component
 public class CsrfProtectionFilter extends OncePerRequestFilter {
 
@@ -59,22 +48,18 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        // Skip CSRF for safe methods (GET, HEAD, OPTIONS)
         if (isSafeMethod(method)) {
-            // For GET requests, ensure CSRF token cookie is set
             ensureCsrfTokenCookie(request, response);
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Skip CSRF for exempt endpoints and static content
         if (PublicEndpoints.isCsrfExempt(path, method)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Validate CSRF token for state-changing requests
-        String cookieToken = getCsrfTokenFromCookie(request);
+        var cookieToken = getCsrfTokenFromCookie(request);
         String headerToken = request.getHeader(CSRF_HEADER_NAME);
 
         if (cookieToken == null || headerToken == null || !cookieToken.equals(headerToken)) {
@@ -92,16 +77,18 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
     }
 
     private void ensureCsrfTokenCookie(HttpServletRequest request, HttpServletResponse response) {
-        String existingToken = getCsrfTokenFromCookie(request);
+        var existingToken = getCsrfTokenFromCookie(request);
 
         if (existingToken == null) {
-            String newToken = generateCsrfToken();
-            Cookie cookie = new Cookie(CSRF_COOKIE_NAME, newToken);
-            cookie.setPath("/");
-            cookie.setHttpOnly(false); // Must be readable by JavaScript
-            cookie.setSecure(secureCookie);
-            cookie.setMaxAge(3600); // 1 hour
-            response.addCookie(cookie);
+            var newToken = generateCsrfToken();
+            var cookie = ResponseCookie.from(CSRF_COOKIE_NAME, newToken)
+                    .path("/")
+                    .httpOnly(false)
+                    .secure(secureCookie)
+                    .maxAge(3600)
+                    .sameSite(sameSite)
+                    .build();
+            response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         }
     }
 

@@ -1,14 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatShortDate, getImageUrl, getAvatarColor, getAvatarInitials } from '../../util/helpers';
 
-/**
- * Single project card component for the dashboard grid
- */
+const AvatarImage = ({ member }) => {
+    const [hasError, setHasError] = useState(false);
+
+    if (hasError || !member.profilePicture) {
+        return (
+            <div className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(member)} rounded-full flex items-center justify-center border-2 border-white`}>
+                <span className="text-xs font-medium text-white">{getAvatarInitials(member)}</span>
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={getImageUrl(member.profilePicture)}
+            alt={member.firstname}
+            className="w-7 h-7 rounded-full border-2 border-white object-cover"
+            onError={() => setHasError(true)}
+        />
+    );
+};
+
 const ProjectCard = ({
     project,
     completionPercentage,
-    isVisible,
+    animationDelay = 0,
     onEditProject
 }) => {
     const navigate = useNavigate();
@@ -16,11 +34,9 @@ const ProjectCard = ({
     return (
         <div
             onClick={() => onEditProject(project)}
-            className={`group cursor-pointer bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-all duration-300 overflow-hidden ${
-                isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            }`}
+            className="group cursor-pointer bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-all duration-300 overflow-hidden animate-[fadeInSlide_0.3s_ease-out_both]"
+            style={{ animationDelay: `${animationDelay}ms` }}
         >
-            {/* Header */}
             <div className="p-5 pb-4 border-b border-slate-100">
                 <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
@@ -31,7 +47,6 @@ const ProjectCard = ({
                     </div>
                 </div>
 
-                {/* Progress */}
                 <div>
                     <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs text-slate-500">Progress</span>
@@ -46,9 +61,7 @@ const ProjectCard = ({
                 </div>
             </div>
 
-            {/* Body */}
             <div className="p-5 space-y-3">
-                {/* Dates */}
                 <div className="grid grid-cols-2 gap-3">
                     <div>
                         <p className="text-xs text-slate-500 mb-1">Start</p>
@@ -64,25 +77,10 @@ const ProjectCard = ({
                     </div>
                 </div>
 
-                {/* Team & Action */}
                 <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                     <div className="flex -space-x-2">
                         {project.members?.slice(0, 4).map(member => (
-                            member.profilePicture ? (
-                                <img
-                                    key={member.id}
-                                    src={getImageUrl(member.profilePicture)}
-                                    alt={member.firstname}
-                                    className="w-7 h-7 rounded-full border-2 border-white object-cover"
-                                />
-                            ) : (
-                                <div
-                                    key={member.id}
-                                    className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(member)} rounded-full flex items-center justify-center border-2 border-white`}
-                                >
-                                    <span className="text-xs font-medium text-white">{getAvatarInitials(member)}</span>
-                                </div>
-                            )
+                            <AvatarImage key={member.id} member={member} />
                         ))}
                         {project.members?.length > 4 && (
                             <span className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium text-slate-700 border-2 border-white">

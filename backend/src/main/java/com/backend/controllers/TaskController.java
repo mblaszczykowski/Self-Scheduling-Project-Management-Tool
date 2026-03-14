@@ -5,7 +5,6 @@ import com.backend.services.TaskService;
 import com.backend.services.TokenService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
-@RequestMapping("api/projects/{projectKey}/tasks")
+@RequestMapping("/api/projects/{projectKey}/tasks")
 public class TaskController {
 
     private final TaskService taskService;
@@ -26,7 +25,6 @@ public class TaskController {
         this.taskService = taskService;
         this.tokenService = tokenService;
         this.objectMapper = objectMapper;
-        this.objectMapper.registerModule(new JavaTimeModule());
     }
 
     @PostMapping(consumes = {"multipart/form-data"})

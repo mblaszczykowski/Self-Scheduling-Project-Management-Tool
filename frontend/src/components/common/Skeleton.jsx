@@ -1,16 +1,9 @@
 import React from 'react';
 
-/**
- * Base skeleton component with pulse animation.
- * Use className to customize dimensions.
- */
 export const Skeleton = ({ className = '' }) => (
     <div className={`animate-pulse bg-slate-200 rounded ${className}`} />
 );
 
-/**
- * Skeleton for stat cards on the dashboard.
- */
 export const StatCardSkeleton = () => (
     <div className="bg-white rounded-xl p-5 border border-slate-200">
         <div className="flex items-center justify-between mb-3">
@@ -22,9 +15,6 @@ export const StatCardSkeleton = () => (
     </div>
 );
 
-/**
- * Skeleton for a task row in a list.
- */
 export const TaskRowSkeleton = () => (
     <div className="flex items-center gap-4 py-3 px-4 border-b border-slate-100">
         <Skeleton className="h-4 w-16" />
@@ -35,9 +25,6 @@ export const TaskRowSkeleton = () => (
     </div>
 );
 
-/**
- * Skeleton for project cards.
- */
 export const ProjectCardSkeleton = () => (
     <div className="bg-white rounded-xl p-5 border border-slate-200">
         <div className="flex items-start justify-between mb-4">
@@ -60,9 +47,6 @@ export const ProjectCardSkeleton = () => (
     </div>
 );
 
-/**
- * Skeleton for timeline rows.
- */
 export const TimelineRowSkeleton = () => (
     <div className="flex items-center h-10 border-b border-slate-100">
         <div className="w-64 px-4 flex items-center gap-2">
@@ -75,13 +59,8 @@ export const TimelineRowSkeleton = () => (
     </div>
 );
 
-/**
- * Dashboard loading skeleton.
- * Shows placeholder UI while data is loading.
- */
 export const DashboardSkeleton = () => (
     <div className="p-6 space-y-6">
-        {/* Stats row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCardSkeleton />
             <StatCardSkeleton />
@@ -89,7 +68,6 @@ export const DashboardSkeleton = () => (
             <StatCardSkeleton />
         </div>
 
-        {/* Charts row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl p-5 border border-slate-200">
                 <Skeleton className="h-5 w-32 mb-4" />
@@ -101,7 +79,6 @@ export const DashboardSkeleton = () => (
             </div>
         </div>
 
-        {/* Tasks list */}
         <div className="bg-white rounded-xl border border-slate-200">
             <div className="px-5 py-4 border-b border-slate-200">
                 <Skeleton className="h-5 w-40" />

@@ -1,6 +1,7 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { HiOutlineBell } from 'react-icons/hi';
+import { useClickOutside } from '../../hooks/useClickOutside';
 
 export default function NotificationDropdown({
     notifications,
@@ -10,17 +11,13 @@ export default function NotificationDropdown({
     onMarkAsRead
 }) {
     const dropdownRef = useRef(null);
-    const unreadCount = notifications.filter(n => !n.isRead).length;
+    useClickOutside(dropdownRef, onClose);
 
-    useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-                onClose();
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [onClose]);
+    const { unreadNotifications, readNotifications, unreadCount } = useMemo(() => ({
+        unreadNotifications: notifications.filter(n => !n.isRead),
+        readNotifications: notifications.filter(n => n.isRead),
+        unreadCount: notifications.filter(n => !n.isRead).length,
+    }), [notifications]);
 
     const handleClick = async () => {
         if (isOpen) {
@@ -30,9 +27,6 @@ export default function NotificationDropdown({
             onToggle();
         }
     };
-
-    const unreadNotifications = notifications.filter(n => !n.isRead);
-    const readNotifications = notifications.filter(n => n.isRead);
 
     return (
         <div ref={dropdownRef} className="relative">

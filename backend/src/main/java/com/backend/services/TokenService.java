@@ -175,21 +175,5 @@ public class TokenService {
         refreshTokenRepository.deleteByExpiryDateBefore(Instant.now());
     }
 
-    public static class AuthTokens {
-        private final ResponseCookie accessCookie;
-        private final ResponseCookie refreshCookie;
-
-        public AuthTokens(ResponseCookie accessCookie, ResponseCookie refreshCookie) {
-            this.accessCookie = accessCookie;
-            this.refreshCookie = refreshCookie;
-        }
-
-        public ResponseCookie getAccessCookie() {
-            return accessCookie;
-        }
-
-        public ResponseCookie getRefreshCookie() {
-            return refreshCookie;
-        }
-    }
+    public record AuthTokens(ResponseCookie accessCookie, ResponseCookie refreshCookie) {}
 }

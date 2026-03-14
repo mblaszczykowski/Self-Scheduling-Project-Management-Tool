@@ -2,6 +2,7 @@ package com.backend.services;
 
 import com.backend.entities.User;
 import com.backend.exception.ValidationException;
+import com.backend.filter.RateLimitFilter;
 import com.backend.requests.LoginRequest;
 import com.backend.util.ValidationUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +24,7 @@ public class AuthService {
 
     private final UserService userService;
     private final TokenService tokenService;
+    private final RateLimitFilter rateLimitFilter;
     private final BCryptPasswordEncoder passwordEncoder;
     private final boolean secureCookie;
     private final String sameSite;
@@ -30,11 +32,14 @@ public class AuthService {
     @Autowired
     public AuthService(UserService userService,
                        TokenService tokenService,
+                       RateLimitFilter rateLimitFilter,
+                       BCryptPasswordEncoder passwordEncoder,
                        @Value("${app.cookie.secure:true}") boolean secureCookie,
                        @Value("${app.cookie.same-site:Strict}") String sameSite) {
         this.userService = userService;
         this.tokenService = tokenService;
-        this.passwordEncoder = new BCryptPasswordEncoder(12);
+        this.rateLimitFilter = rateLimitFilter;
+        this.passwordEncoder = passwordEncoder;
         this.secureCookie = secureCookie;
         this.sameSite = sameSite;
     }
@@ -42,15 +47,17 @@ public class AuthService {
     private static final String TIMING_ATTACK_PREVENTION_HASH = "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYIWWwK6W6Wy";
 
     @Transactional
-    public ResponseEntity<?> authenticateUser(LoginRequest request) {
-        validateLoginRequest(request);
+    public ResponseEntity<?> authenticateUser(LoginRequest loginRequest, HttpServletRequest httpRequest) {
+        validateLoginRequest(loginRequest);
 
-        var user = userService.findUserByEmailOrNull(request.email());
-        var credentialsValid = verifyCredentialsWithConstantTime(user, request.password());
+        var user = userService.findUserByEmailOrNull(loginRequest.email());
+        var credentialsValid = verifyCredentialsWithConstantTime(user, loginRequest.password());
 
         if (!credentialsValid) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid email or password"));
         }
+
+        rateLimitFilter.resetLoginAttempts(getClientIp(httpRequest));
 
         var tokens = tokenService.createAuthTokens(user.getId());
 
@@ -62,10 +69,22 @@ public class AuthService {
         );
 
         var headers = new HttpHeaders();
-        headers.add(HttpHeaders.SET_COOKIE, tokens.getAccessCookie().toString());
-        headers.add(HttpHeaders.SET_COOKIE, tokens.getRefreshCookie().toString());
+        headers.add(HttpHeaders.SET_COOKIE, tokens.accessCookie().toString());
+        headers.add(HttpHeaders.SET_COOKIE, tokens.refreshCookie().toString());
 
         return ResponseEntity.ok().headers(headers).body(response);
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        var xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        var xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty()) {
+            return xRealIp;
+        }
+        return request.getRemoteAddr();
     }
 
     @Transactional
@@ -94,8 +113,8 @@ public class AuthService {
         var rotatedTokens = tokenService.createAuthTokens(userId);
 
         var headers = new HttpHeaders();
-        headers.add(HttpHeaders.SET_COOKIE, rotatedTokens.getAccessCookie().toString());
-        headers.add(HttpHeaders.SET_COOKIE, rotatedTokens.getRefreshCookie().toString());
+        headers.add(HttpHeaders.SET_COOKIE, rotatedTokens.accessCookie().toString());
+        headers.add(HttpHeaders.SET_COOKIE, rotatedTokens.refreshCookie().toString());
 
         return ResponseEntity.ok().headers(headers).body(Map.of("message", "Token refreshed successfully"));
     }

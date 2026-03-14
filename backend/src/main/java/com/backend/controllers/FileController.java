@@ -2,6 +2,8 @@ package com.backend.controllers;
 
 import com.backend.exception.FileStorageException;
 import com.backend.services.FileStorageService;
+import com.backend.services.TokenService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
@@ -14,20 +16,22 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 
 @RestController
 @RequestMapping("/files")
 public class FileController {
 
     private final FileStorageService fileStorageService;
+    private final TokenService tokenService;
 
-    public FileController(FileStorageService fileStorageService) {
+    public FileController(FileStorageService fileStorageService, TokenService tokenService) {
         this.fileStorageService = fileStorageService;
+        this.tokenService = tokenService;
     }
 
     @GetMapping("/{fileName:.+}")
-    public ResponseEntity<Resource> serveFile(@PathVariable String fileName) {
+    public ResponseEntity<Resource> serveFile(@PathVariable String fileName, HttpServletRequest request) {
+        tokenService.getUserIdFromRequest(request);
         try {
             var filePath = fileStorageService.getFilePath(fileName);
             var resource = new UrlResource(filePath.toUri());
@@ -47,7 +51,7 @@ public class FileController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + sanitizedFilename + "\"")
                     .header(HttpHeaders.CONTENT_TYPE, contentType)
                     .header("X-Content-Type-Options", "nosniff")
-                    .header("Cache-Control", "private, no-cache, no-store, must-revalidate")
+                    .header("Cache-Control", "private, max-age=3600")
                     .body(resource);
 
         } catch (MalformedURLException ex) {

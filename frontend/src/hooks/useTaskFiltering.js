@@ -1,8 +1,6 @@
 import { useMemo, useCallback } from 'react';
+import { toDateString } from '../util/helpers';
 
-/**
- * Checks if a task matches a specific time status filter.
- */
 const matchesTimeStatus = (task, statusFilter) => {
     const statusMatchers = {
         'Delayed': () => task.isDelayed,
@@ -13,9 +11,6 @@ const matchesTimeStatus = (task, statusFilter) => {
     return statusMatchers[statusFilter]?.() ?? false;
 };
 
-/**
- * Checks if a task matches a single filter criterion.
- */
 const taskMatchesFilter = (task, filterField, filterValue) => {
     if (!filterValue || filterValue === 'All') return true;
 
@@ -26,7 +21,7 @@ const taskMatchesFilter = (task, filterField, filterValue) => {
             return task.assignee === filterValue;
         case 'startDate':
         case 'dueDate':
-            return task[filterField] && new Date(task[filterField]).toISOString().split('T')[0] === filterValue;
+            return task[filterField] && toDateString(task[filterField]) === filterValue;
         case 'priority':
             return task.priority === filterValue;
         case 'criticality':
@@ -38,9 +33,6 @@ const taskMatchesFilter = (task, filterField, filterValue) => {
     }
 };
 
-/**
- * Priority sort order mapping.
- */
 const PRIORITY_ORDER = {
     'LOWEST': 1,
     'LOW': 2,
@@ -49,9 +41,6 @@ const PRIORITY_ORDER = {
     'HIGHEST': 5,
 };
 
-/**
- * Gets comparable value for sorting based on field type.
- */
 const getSortValue = (task, field) => {
     const value = task[field];
 
@@ -70,9 +59,6 @@ const getSortValue = (task, field) => {
     return value;
 };
 
-/**
- * Applies URL-based filters to tasks.
- */
 const applyUrlFilters = (tasks, urlParams, userEmail) => {
     const params = new URLSearchParams(urlParams);
     let filtered = [...tasks];
@@ -97,18 +83,12 @@ const applyUrlFilters = (tasks, urlParams, userEmail) => {
     return filtered;
 };
 
-/**
- * Applies state-based filters to tasks.
- */
 const applyStateFilters = (tasks, filters) => {
     return tasks.filter(task =>
         Object.entries(filters).every(([field, value]) => taskMatchesFilter(task, field, value))
     );
 };
 
-/**
- * Applies assigned-to-me filter.
- */
 const applyAssignedToMeFilter = (tasks, assignedToMe, user) => {
     if (!assignedToMe || !user?.email) return tasks;
 
@@ -117,9 +97,6 @@ const applyAssignedToMeFilter = (tasks, assignedToMe, user) => {
     );
 };
 
-/**
- * Applies search query filter.
- */
 const applySearchFilter = (tasks, searchQuery) => {
     if (!searchQuery?.trim()) return tasks;
 
@@ -127,9 +104,6 @@ const applySearchFilter = (tasks, searchQuery) => {
     return tasks.filter(task => task.summary.toLowerCase().includes(query));
 };
 
-/**
- * Sorts tasks by specified field and order.
- */
 const applySorting = (tasks, sortField, sortOrder) => {
     return [...tasks].sort((a, b) => {
         const valueA = getSortValue(a, sortField);
@@ -141,20 +115,6 @@ const applySorting = (tasks, sortField, sortOrder) => {
     });
 };
 
-/**
- * Custom hook for filtering and sorting tasks.
- * Extracts complex filtering logic from UnifiedView component.
- *
- * @param {Object} options - Configuration options
- * @param {Array} options.tasks - All tasks to filter
- * @param {Object} options.filters - State-based filter values
- * @param {string} options.searchQuery - Search query string
- * @param {boolean} options.assignedToMe - Filter to current user's tasks
- * @param {Object} options.currentUser - Current user object
- * @param {string} options.sortField - Field to sort by
- * @param {string} options.sortOrder - Sort direction ('asc' or 'desc')
- * @param {string} options.urlParams - URL search params string
- */
 export const useTaskFiltering = ({
     tasks,
     filters,

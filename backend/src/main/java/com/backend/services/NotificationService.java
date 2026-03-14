@@ -1,24 +1,24 @@
 package com.backend.services;
 
-import com.backend.daos.NotificationDAO;
 import com.backend.entities.Notification;
 import com.backend.entities.NotificationType;
 import com.backend.entities.User;
 import com.backend.exception.AuthorizationException;
+import com.backend.repositories.NotificationRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
+import java.time.Instant;
 import java.util.List;
 
 @Service
 public class NotificationService {
-    private final NotificationDAO notificationDAO;
+    private final NotificationRepository notificationRepository;
 
-    public NotificationService(NotificationDAO notificationDAO) {
-        this.notificationDAO = notificationDAO;
+    public NotificationService(NotificationRepository notificationRepository) {
+        this.notificationRepository = notificationRepository;
     }
 
     @Transactional
@@ -27,27 +27,27 @@ public class NotificationService {
         notification.setUser(recipient);
         notification.setMessage(message);
         notification.setType(type);
-        notification.setTimestamp(new Date());
+        notification.setTimestamp(Instant.now());
         notification.setLink(link);
-        notificationDAO.saveNotification(notification);
+        notificationRepository.save(notification);
     }
 
     @Transactional(readOnly = true)
     public List<Notification> getAllNotifications(Integer userId) {
-        return notificationDAO.getAllNotificationsByUserId(userId);
+        return notificationRepository.findByUserIdOrderByTimestampDesc(userId);
     }
 
     @Transactional(readOnly = true)
     public Page<Notification> getAllNotificationsPaged(Integer userId, Pageable pageable) {
-        return notificationDAO.getAllNotificationsByUserIdPaged(userId, pageable);
+        return notificationRepository.findByUserIdOrderByTimestampDesc(userId, pageable);
     }
 
     @Transactional
     public void markNotificationsAsRead(List<Integer> notificationIds, Integer userId) {
-        var notifications = notificationDAO.findAllById(notificationIds);
+        var notifications = notificationRepository.findAllById(notificationIds);
         verifyOwnershipOfAllNotifications(notifications, userId);
         markAllAsRead(notifications);
-        notificationDAO.saveAll(notifications);
+        notificationRepository.saveAll(notifications);
     }
 
     private void verifyOwnershipOfAllNotifications(List<Notification> notifications, Integer userId) {

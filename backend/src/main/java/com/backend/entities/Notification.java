@@ -1,7 +1,7 @@
 package com.backend.entities;
 
 import jakarta.persistence.*;
-import java.util.Date;
+import java.time.Instant;
 
 @Entity
 @Table(name = "notifications", indexes = {
@@ -17,12 +17,11 @@ public class Notification {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String message;
 
-    @Temporal(TemporalType.TIMESTAMP)
     @Column(nullable = false)
-    private Date timestamp;
+    private Instant timestamp;
 
     @Column(name = "is_read", nullable = false)
     private Boolean isRead = false;
@@ -43,8 +42,8 @@ public class Notification {
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
 
-    public Date getTimestamp() { return timestamp; }
-    public void setTimestamp(Date timestamp) { this.timestamp = timestamp; }
+    public Instant getTimestamp() { return timestamp; }
+    public void setTimestamp(Instant timestamp) { this.timestamp = timestamp; }
 
     public Boolean getIsRead() { return isRead; }
     public void setIsRead(Boolean read) { isRead = read; }

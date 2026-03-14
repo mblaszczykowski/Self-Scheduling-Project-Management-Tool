@@ -3,10 +3,6 @@ package com.backend.util;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Centralized file type validation constants including magic bytes,
- * allowed extensions, and size limits.
- */
 public final class FileValidationConstants {
 
     private FileValidationConstants() {}
@@ -24,7 +20,6 @@ public final class FileValidationConstants {
             "jpg", "jpeg", "png", "gif", "webp"
     );
 
-    // Magic bytes for file type validation - prevents MIME spoofing
     public static final byte[] JPEG_MAGIC = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
     public static final byte[] PNG_MAGIC = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
     public static final byte[] GIF_MAGIC = new byte[]{0x47, 0x49, 0x46};
@@ -36,6 +31,7 @@ public final class FileValidationConstants {
             "jpeg", JPEG_MAGIC,
             "png", PNG_MAGIC,
             "gif", GIF_MAGIC,
+            "webp", WEBP_RIFF_MAGIC,
             "pdf", PDF_MAGIC
     );
 

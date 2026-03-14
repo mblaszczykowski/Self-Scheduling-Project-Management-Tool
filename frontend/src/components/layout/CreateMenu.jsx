@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { HiOutlineChevronDown, HiOutlineFolderOpen, HiOutlineClipboardList } from 'react-icons/hi';
+import { useClickOutside } from '../../hooks/useClickOutside';
 
 export default function CreateMenu({
     isOpen,
@@ -9,16 +10,7 @@ export default function CreateMenu({
     onCreateTask
 }) {
     const dropdownRef = useRef(null);
-
-    useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-                onClose();
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [onClose]);
+    useClickOutside(dropdownRef, onClose);
 
     const handleCreateProject = () => {
         onClose();

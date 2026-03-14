@@ -5,7 +5,6 @@ import java.util.regex.Pattern;
 
 public class ValidationUtil {
 
-    // Content length limits
     public static final int MAX_SUMMARY_LENGTH = 200;
     public static final int MAX_DESCRIPTION_LENGTH = 5000;
     public static final int MAX_COMMENT_LENGTH = 10000;
@@ -39,37 +38,30 @@ public class ValidationUtil {
             throw new ValidationException("Password is required");
         }
 
-        // Check minimum length
         if (password.length() < 8) {
             throw new ValidationException("Password must be at least 8 characters long");
         }
 
-        // Check maximum length
         if (password.length() > 128) {
             throw new ValidationException("Password must not exceed 128 characters");
         }
 
-        // Check for at least one uppercase letter
         if (!password.matches(".*[A-Z].*")) {
             throw new ValidationException("Password must contain at least one uppercase letter");
         }
 
-        // Check for at least one lowercase letter
         if (!password.matches(".*[a-z].*")) {
             throw new ValidationException("Password must contain at least one lowercase letter");
         }
 
-        // Check for at least one digit
         if (!password.matches(".*\\d.*")) {
             throw new ValidationException("Password must contain at least one number");
         }
 
-        // Check for at least one special character
         if (!SPECIAL_CHAR_PATTERN.matcher(password).find()) {
             throw new ValidationException("Password must contain at least one special character");
         }
 
-        // Check for spaces
         if (password.contains(" ")) {
             throw new ValidationException("Password must not contain spaces");
         }

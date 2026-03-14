@@ -1,48 +1,11 @@
 import React, { useState } from 'react';
-import { HiOutlineCloudUpload, HiOutlineDownload, HiOutlineDocument, HiOutlineDocumentText, HiOutlineX } from 'react-icons/hi';
+import { HiOutlineCloudUpload, HiOutlineDocument, HiOutlineDocumentText, HiOutlineX } from 'react-icons/hi';
 import { getFileInfo } from '../../util/helpers';
+import { showToast } from '../../util/toast';
+import PreviewModal from '../common/PreviewModal';
 
-/**
- * Preview modal for viewing attachments
- */
-const PreviewModal = ({ preview, onClose }) => {
-    if (!preview) return null;
-    return (
-        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[70]" onClick={onClose}>
-            <div className="relative bg-white rounded-xl shadow-2xl max-w-[90vw] max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-white">
-                    <h3 className="text-sm font-semibold text-slate-900 truncate max-w-md">{preview.fileName}</h3>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors" title="Close">
-                        <HiOutlineX className="w-5 h-5 text-slate-500" />
-                    </button>
-                </div>
-                <div className="p-5 bg-slate-50">
-                    {preview.fileType === 'image' ? (
-                        <img src={preview.url} alt={preview.fileName} className="max-h-[70vh] max-w-full rounded-lg shadow-lg" />
-                    ) : (
-                        <iframe src={preview.url} title={preview.fileName} className="w-[80vw] h-[70vh] rounded-lg border border-slate-200" />
-                    )}
-                </div>
-                <div className="px-5 py-4 border-t border-slate-200 flex justify-end bg-white">
-                    <a href={preview.url} download={preview.fileName} className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-semibold">
-                        <HiOutlineDownload className="w-4 h-4" /> Download
-                    </a>
-                </div>
-            </div>
-        </div>
-    );
-};
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-/**
- * Reusable attachment uploader component with drag & drop support
- *
- * @param {Array} existingAttachments - Already saved attachments (strings/objects)
- * @param {Array} newAttachments - New File objects to be uploaded
- * @param {function} onAddAttachments - Callback when files are added (receives File[])
- * @param {function} onRemoveAttachment - Callback when attachment is removed
- * @param {string} inputId - Unique ID for the file input element
- * @param {string} label - Optional label text
- */
 const AttachmentUploader = ({
     existingAttachments = [],
     newAttachments = [],
@@ -54,18 +17,28 @@ const AttachmentUploader = ({
     const [isDragging, setIsDragging] = useState(false);
     const [preview, setPreview] = useState(null);
 
-    const handleDrop = (e) => {
-        e.preventDefault();
-        setIsDragging(false);
-        if (onAddAttachments) {
-            onAddAttachments(Array.from(e.dataTransfer.files));
+    const validateAndAdd = (files) => {
+        const valid = [];
+        for (const file of files) {
+            if (file.size > MAX_FILE_SIZE) {
+                showToast(`File "${file.name}" exceeds 10MB limit`);
+            } else {
+                valid.push(file);
+            }
+        }
+        if (valid.length > 0 && onAddAttachments) {
+            onAddAttachments(valid);
         }
     };
 
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        validateAndAdd(Array.from(e.dataTransfer.files));
+    };
+
     const handleFileChange = (e) => {
-        if (onAddAttachments) {
-            onAddAttachments(Array.from(e.target.files));
-        }
+        validateAndAdd(Array.from(e.target.files));
     };
 
     const openPreview = (attachment) => {
@@ -138,7 +111,7 @@ const AttachmentUploader = ({
                         <HiOutlineCloudUpload className="w-5 h-5 text-white" />
                     </div>
                     <span className="text-sm font-medium text-slate-600">{label}</span>
-                    <span className="text-xs text-slate-400 mt-0.5">Images, PDFs, documents</span>
+                    <span className="text-xs text-slate-400 mt-0.5">Images, PDFs, documents (max 10MB)</span>
                     <input
                         type="file"
                         id={inputId}

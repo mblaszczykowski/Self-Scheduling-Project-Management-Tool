@@ -1,5 +1,4 @@
 import React, { createContext, useCallback, useEffect, useState } from 'react';
-import { toast, Slide } from 'react-toastify';
 import {
     createComment as apiCreateComment,
     createProject as apiCreateProject,
@@ -11,34 +10,20 @@ import {
     getNotifications,
     getProjects,
     getUserByEmail,
+    logout,
     reactToComment as apiReactToComment,
     updateComment as apiUpdateComment,
     updateProject as apiUpdateProject,
     updateTask as apiUpdateTask,
 } from '../util/api';
-import { useNavigate } from 'react-router-dom';
+import { showToast } from '../util/toast';
+import { getErrorMessage } from '../util/helpers';
 
-// Helper to extract user-friendly error message
-const getErrorMessage = (err) => {
-    if (err.response?.data?.message) return err.response.data.message;
-    if (err.response?.data?.error) return err.response.data.error;
-    if (err.message === 'Network Error') return 'Unable to connect to server';
-    if (err.code === 'ECONNABORTED') return 'Request timed out';
-    return err.message || 'An unexpected error occurred';
-};
-
-const showToast = (message, type = 'error') => {
-    toast[type](message, {
-        position: 'top-center',
-        autoClose: 2500,
-        transition: Slide,
-    });
-};
+const NOTIFICATION_POLL_MS = 30000;
 
 export const DataContext = createContext();
 
 export const DataProvider = ({ children, initialUser }) => {
-    const navigate = useNavigate();
     const [user, setUser] = useState(initialUser);
     const [projects, setProjects] = useState([]);
     const [notifications, setNotifications] = useState([]);
@@ -61,18 +46,12 @@ export const DataProvider = ({ children, initialUser }) => {
             if (signal?.aborted) return;
 
             setError(err);
-            if (err.response?.status === 401) {
-                const publicPaths = ['/login', '/register', '/'];
-                if (!publicPaths.includes(window.location.pathname)) {
-                    navigate('/login');
-                }
-            }
         } finally {
             if (!signal?.aborted) {
                 setLoading(false);
             }
         }
-    }, [navigate]);
+    }, []);
 
     useEffect(() => {
         if (!user) {
@@ -104,11 +83,9 @@ export const DataProvider = ({ children, initialUser }) => {
             setNotifications(fetchedNotifications);
         } catch (err) {
             console.error('Error refreshing notifications:', err);
-            // Don't show toast for notification refresh failures - too noisy
         }
     }, []);
 
-    // Poll notifications every 30 seconds (only when tab is visible)
     useEffect(() => {
         if (!user) return;
 
@@ -118,7 +95,7 @@ export const DataProvider = ({ children, initialUser }) => {
             if (intervalId) return;
             intervalId = setInterval(() => {
                 refreshNotifications();
-            }, 30000);
+            }, NOTIFICATION_POLL_MS);
         };
 
         const stopPolling = () => {
@@ -130,14 +107,13 @@ export const DataProvider = ({ children, initialUser }) => {
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                refreshNotifications(); // Refresh immediately when tab becomes visible
+                refreshNotifications();
                 startPolling();
             } else {
                 stopPolling();
             }
         };
 
-        // Start polling if tab is visible
         if (document.visibilityState === 'visible') {
             startPolling();
         }
@@ -150,21 +126,19 @@ export const DataProvider = ({ children, initialUser }) => {
         };
     }, [user, refreshNotifications]);
 
-    // Task operations - update local state instead of refetching all projects
     const createTask = useCallback(async (projectKey, taskDTO, attachments = []) => {
         const newTask = await apiCreateTask(projectKey, taskDTO, attachments);
-        // Update local state with new task
         setProjects(prev => prev.map(p =>
             p.projectKey === projectKey
                 ? { ...p, tasks: [...(p.tasks || []), newTask] }
                 : p
         ));
+        refreshProjects();
         return newTask;
-    }, []);
+    }, [refreshProjects]);
 
     const updateTask = useCallback(async (projectKey, taskKey, taskDTO, attachments = []) => {
         const updatedTask = await apiUpdateTask(projectKey, taskKey, taskDTO, attachments);
-        // Update local state with updated task
         setProjects(prev => prev.map(p =>
             p.projectKey === projectKey
                 ? {
@@ -175,30 +149,28 @@ export const DataProvider = ({ children, initialUser }) => {
                 }
                 : p
         ));
+        refreshProjects();
         return updatedTask;
-    }, []);
+    }, [refreshProjects]);
 
     const deleteTask = useCallback(async (projectKey, taskKey) => {
         await apiDeleteTask(projectKey, taskKey);
-        // Remove task from local state
         setProjects(prev => prev.map(p =>
             p.projectKey === projectKey
                 ? { ...p, tasks: (p.tasks || []).filter(t => t.taskKey !== taskKey) }
                 : p
         ));
-    }, []);
+        refreshProjects();
+    }, [refreshProjects]);
 
-    // Project operations - update local state instead of refetching all projects
     const createProject = useCallback(async (projectDTO, attachments = []) => {
         const newProject = await apiCreateProject(projectDTO, attachments);
-        // Add new project to local state
         setProjects(prev => [...prev, newProject]);
         return newProject;
     }, []);
 
     const updateProject = useCallback(async (projectKey, projectDTO, attachments = []) => {
         const updatedProject = await apiUpdateProject(projectKey, projectDTO, attachments);
-        // Update project in local state
         setProjects(prev => prev.map(p =>
             p.projectKey === projectKey ? updatedProject : p
         ));
@@ -207,11 +179,9 @@ export const DataProvider = ({ children, initialUser }) => {
 
     const deleteProject = useCallback(async (projectKey) => {
         await apiDeleteProject(projectKey);
-        // Remove project from local state
         setProjects(prev => prev.filter(p => p.projectKey !== projectKey));
     }, []);
 
-    // Comment operations
     const getComments = useCallback((taskId) => apiGetComments(taskId), []);
 
     const createComment = useCallback((taskId, content, attachments, parentCommentId = null) =>
@@ -226,7 +196,16 @@ export const DataProvider = ({ children, initialUser }) => {
     const reactToComment = useCallback((taskId, commentId, reactionType) =>
         apiReactToComment(taskId, commentId, reactionType), []);
 
-    // User operations
+    const handleLogout = useCallback(async () => {
+        try {
+            await logout();
+        } catch (err) {
+            console.error('Logout failed', err);
+        } finally {
+            setUser(null);
+        }
+    }, []);
+
     const addUserToProject = useCallback(async (projectKey, userEmail) => {
         try {
             const foundUser = await getUserByEmail(userEmail);
@@ -258,7 +237,6 @@ export const DataProvider = ({ children, initialUser }) => {
         setUser,
         setNotifications,
         refreshProjects,
-        refreshUserTasks: refreshProjects, // Alias for compatibility
         refreshNotifications,
         createTask,
         updateTask,
@@ -272,6 +250,7 @@ export const DataProvider = ({ children, initialUser }) => {
         deleteComment,
         reactToComment,
         addUserToProject,
+        handleLogout,
     };
 
     return (

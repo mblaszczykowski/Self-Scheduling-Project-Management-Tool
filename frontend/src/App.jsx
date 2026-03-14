@@ -1,14 +1,14 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import UnifiedView from './components/projects/UnifiedView';
-import WelcomeContent from './components/auth/WelcomeContent';
+import AuthPage from './pages/AuthPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Dashboard from './components/dashboard/Dashboard';
+import DashboardPage from './pages/DashboardPage';
 import { DataContext, DataProvider } from './context/DataContext';
 import { checkUserAuth } from './util/api';
 import PageTransition from './components/common/PageTransition';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import ProjectsPage from './pages/ProjectsPage';
 
 const LoadingSpinner = () => (
     <div className="flex justify-center items-center h-screen bg-slate-50">
@@ -61,7 +61,7 @@ function AppRoutes() {
                     element={
                         <PublicRoute>
                             <PageTransition>
-                                <WelcomeContent show="register" />
+                                <AuthPage show="register" />
                             </PageTransition>
                         </PublicRoute>
                     }
@@ -71,7 +71,7 @@ function AppRoutes() {
                     element={
                         <PublicRoute>
                             <PageTransition>
-                                <WelcomeContent show="login" />
+                                <AuthPage show="login" />
                             </PageTransition>
                         </PublicRoute>
                     }
@@ -81,7 +81,7 @@ function AppRoutes() {
                     element={
                         <PublicRoute>
                             <PageTransition>
-                                <WelcomeContent show="register" />
+                                <AuthPage show="register" />
                             </PageTransition>
                         </PublicRoute>
                     }
@@ -91,7 +91,7 @@ function AppRoutes() {
                     element={
                         <ProtectedRoute>
                             <PageTransition>
-                                <Dashboard />
+                                <DashboardPage />
                             </PageTransition>
                         </ProtectedRoute>
                     }
@@ -101,15 +101,13 @@ function AppRoutes() {
                     element={
                         <ProtectedRoute>
                             <PageTransition>
-                                <UnifiedView />
+                                <ProjectsPage />
                             </PageTransition>
                         </ProtectedRoute>
                     }
                 />
-                {/* Legacy routes - redirect to unified view */}
                 <Route path="/timeline" element={<Navigate to="/projects" replace />} />
                 <Route path="/list" element={<Navigate to="/projects" replace />} />
-                {/* Catch all */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </div>

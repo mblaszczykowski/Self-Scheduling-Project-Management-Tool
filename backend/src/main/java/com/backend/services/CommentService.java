@@ -1,48 +1,58 @@
 package com.backend.services;
 
-import com.backend.daos.CommentDAO;
-import com.backend.daos.UserDAO;
 import com.backend.dtos.CommentDTO;
 import com.backend.entities.*;
 import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
+import com.backend.repositories.CommentReactionRepository;
+import com.backend.repositories.CommentRepository;
+import com.backend.repositories.TaskRepository;
+import com.backend.repositories.UserRepository;
+import com.backend.util.ValidationUtil;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class CommentService {
 
-    private static final int MAX_COMMENT_LENGTH = 2000;
 
-    private final CommentDAO commentDAO;
-    private final UserDAO userDAO;
+    private final CommentRepository commentRepository;
+    private final CommentReactionRepository commentReactionRepository;
+    private final TaskRepository taskRepository;
+    private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final NotificationService notificationService;
 
-    public CommentService(CommentDAO commentDAO, UserDAO userDAO,
+    public CommentService(CommentRepository commentRepository,
+                          CommentReactionRepository commentReactionRepository,
+                          TaskRepository taskRepository,
+                          UserRepository userRepository,
                           FileStorageService fileStorageService,
                           NotificationService notificationService) {
-        this.commentDAO = commentDAO;
-        this.userDAO = userDAO;
+        this.commentRepository = commentRepository;
+        this.commentReactionRepository = commentReactionRepository;
+        this.taskRepository = taskRepository;
+        this.userRepository = userRepository;
         this.fileStorageService = fileStorageService;
         this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
     public List<CommentDTO> getCommentsByTask(Integer taskId, Integer userId) {
-        var task = commentDAO.getTaskById(taskId)
+        var task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
 
         verifyProjectAccess(task.getProject(), userId);
 
-        var topLevelComments = commentDAO.getTopLevelCommentsByTaskIdWithDetails(taskId);
+        var topLevelComments = commentRepository.findTopLevelCommentsByTaskIdWithDetails(taskId);
         var repliesByParentId = batchLoadReplies(topLevelComments);
         return topLevelComments.stream()
                 .sorted(Comparator.comparing(Comment::getTimestamp))
@@ -55,12 +65,12 @@ public class CommentService {
                                  List<MultipartFile> files, Integer parentCommentId) {
         validateCommentContent(content);
 
-        var task = commentDAO.getTaskById(taskId)
+        var task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
 
         verifyProjectAccess(task.getProject(), userId);
 
-        var user = userDAO.getUserById(userId)
+        var user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         var attachmentUrls = (files != null && !files.isEmpty())
@@ -69,14 +79,14 @@ public class CommentService {
 
         Comment parentComment = null;
         if (parentCommentId != null) {
-            parentComment = commentDAO.getCommentById(parentCommentId)
+            parentComment = commentRepository.findById(parentCommentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Parent comment not found"));
         }
 
         var sanitizedContent = Jsoup.clean(content, Safelist.none());
 
         var comment = new Comment(task, user, parentComment, sanitizedContent, attachmentUrls);
-        var savedComment = commentDAO.addComment(comment);
+        var savedComment = commentRepository.save(comment);
         initializeLazyCollections(savedComment);
         notifyParentCommentAuthorIfDifferentUser(parentComment, userId, task);
         return convertToDTO(savedComment);
@@ -87,7 +97,7 @@ public class CommentService {
                                     List<MultipartFile> files) {
         validateCommentContent(content);
 
-        var comment = commentDAO.getCommentByIdWithTaskAndProject(commentId)
+        var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         verifyProjectAccess(comment.getTask().getProject(), userId);
@@ -95,37 +105,37 @@ public class CommentService {
 
         var sanitizedContent = Jsoup.clean(content, Safelist.none());
         comment.setContent(sanitizedContent);
-        comment.setEditedAt(new Date());
+        comment.setEditedAt(Instant.now());
 
         if (files != null && !files.isEmpty()) {
             var newAttachments = fileStorageService.storeFiles(files);
             comment.getAttachments().addAll(newAttachments);
         }
 
-        var updatedComment = commentDAO.updateComment(comment);
+        var updatedComment = commentRepository.save(comment);
         initializeLazyCollections(updatedComment);
         return convertToDTO(updatedComment);
     }
 
     @Transactional
     public void deleteComment(Integer commentId, Integer userId) {
-        var comment = commentDAO.getCommentByIdWithTaskAndProject(commentId)
+        var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         verifyProjectAccess(comment.getTask().getProject(), userId);
         verifyCommentOwnership(comment, userId);
 
-        commentDAO.deleteComment(comment);
+        commentRepository.delete(comment);
     }
 
     @Transactional
     public CommentDTO reactToComment(Integer commentId, Integer userId, ReactionType reactionType) {
-        var comment = commentDAO.getCommentByIdWithTaskAndProject(commentId)
+        var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         verifyProjectAccess(comment.getTask().getProject(), userId);
 
-        var user = userDAO.getUserById(userId)
+        var user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         var isNewReaction = processReaction(comment, user, reactionType, commentId);
@@ -134,7 +144,7 @@ public class CommentService {
             notifyCommentAuthorOfReaction(comment);
         }
 
-        var refreshedComment = commentDAO.getCommentById(commentId)
+        var refreshedComment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
         initializeLazyCollections(refreshedComment);
         return convertToDTO(refreshedComment);
@@ -144,8 +154,8 @@ public class CommentService {
         if (content == null || content.trim().isEmpty()) {
             throw new ValidationException("Comment content cannot be empty");
         }
-        if (content.length() > MAX_COMMENT_LENGTH) {
-            throw new ValidationException("Comment exceeds maximum length of " + MAX_COMMENT_LENGTH + " characters");
+        if (content.length() > ValidationUtil.MAX_COMMENT_LENGTH) {
+            throw new ValidationException("Comment exceeds maximum length of " + ValidationUtil.MAX_COMMENT_LENGTH + " characters");
         }
     }
 
@@ -162,17 +172,25 @@ public class CommentService {
     }
 
     private Map<Integer, List<Comment>> batchLoadReplies(List<Comment> topLevelComments) {
-        var parentIds = topLevelComments.stream()
+        var allRepliesMap = new HashMap<Integer, List<Comment>>();
+        var currentParentIds = topLevelComments.stream()
                 .map(Comment::getId)
                 .toList();
 
-        if (parentIds.isEmpty()) {
-            return new HashMap<>();
+        while (!currentParentIds.isEmpty()) {
+            var replies = commentRepository.findRepliesByParentIdsWithDetails(currentParentIds);
+            if (replies.isEmpty()) break;
+
+            for (var reply : replies) {
+                allRepliesMap.computeIfAbsent(reply.getParentComment().getId(), k -> new ArrayList<>()).add(reply);
+            }
+
+            currentParentIds = replies.stream()
+                    .map(Comment::getId)
+                    .toList();
         }
 
-        var allReplies = commentDAO.getRepliesByParentIds(parentIds);
-        return allReplies.stream()
-                .collect(Collectors.groupingBy(c -> c.getParentComment().getId()));
+        return allRepliesMap;
     }
 
     private void initializeLazyCollections(Comment comment) {
@@ -191,7 +209,7 @@ public class CommentService {
     }
 
     private boolean processReaction(Comment comment, User user, ReactionType reactionType, Integer commentId) {
-        var existingReaction = commentDAO.findReaction(commentId, user.getId());
+        var existingReaction = commentReactionRepository.findByCommentIdAndUserId(commentId, user.getId());
 
         if (existingReaction.isPresent()) {
             handleExistingReaction(existingReaction.get(), reactionType);
@@ -199,16 +217,16 @@ public class CommentService {
         }
 
         var newReaction = new CommentReaction(comment, user, reactionType);
-        commentDAO.addReaction(newReaction);
+        commentReactionRepository.save(newReaction);
         return true;
     }
 
     private void handleExistingReaction(CommentReaction existingReaction, ReactionType newType) {
         if (existingReaction.getType() == newType) {
-            commentDAO.removeReaction(existingReaction);
+            commentReactionRepository.delete(existingReaction);
         } else {
             existingReaction.setType(newType);
-            commentDAO.updateReaction(existingReaction);
+            commentReactionRepository.save(existingReaction);
         }
     }
 
@@ -265,8 +283,8 @@ public class CommentService {
                 author != null ? author.getFullName() : null,
                 author != null ? author.getProfilePicture() : null,
                 comment.getContent(),
-                comment.getTimestamp() != null ? comment.getTimestamp().toInstant() : null,
-                comment.getEditedAt() != null ? comment.getEditedAt().toInstant() : null,
+                comment.getTimestamp(),
+                comment.getEditedAt(),
                 attachments,
                 likedByUsernames.size(),
                 dislikedByUsernames.size(),

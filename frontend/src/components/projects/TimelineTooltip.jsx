@@ -1,8 +1,5 @@
 import React from 'react';
 
-/**
- * Tooltip displayed on task/project hover in timeline view.
- */
 export const TaskTooltip = ({ tooltip }) => {
     if (!tooltip.visible || !tooltip.content) return null;
 
@@ -10,10 +7,11 @@ export const TaskTooltip = ({ tooltip }) => {
 
     return (
         <div
+            role="tooltip"
             className="fixed z-[100] px-3 py-2 bg-slate-900 text-white text-xs rounded-lg shadow-xl pointer-events-none"
             style={{
-                left: tooltip.x + 12,
-                top: tooltip.y - 10,
+                left: Math.min(tooltip.x + 12, window.innerWidth - 240),
+                top: Math.max(tooltip.y - 10, 60),
                 transform: 'translateY(-100%)'
             }}
         >
@@ -44,14 +42,12 @@ export const TaskTooltip = ({ tooltip }) => {
     );
 };
 
-/**
- * Tooltip displayed on filter button hover.
- */
 export const FilterTooltip = ({ filterTooltip }) => {
     if (!filterTooltip.visible || !filterTooltip.text) return null;
 
     return (
         <div
+            role="tooltip"
             className="fixed z-[100] px-2 py-1 bg-slate-800 text-white text-xs rounded shadow-lg pointer-events-none whitespace-nowrap"
             style={{
                 left: filterTooltip.x,
@@ -64,4 +60,3 @@ export const FilterTooltip = ({ filterTooltip }) => {
     );
 };
 
-export default { TaskTooltip, FilterTooltip };

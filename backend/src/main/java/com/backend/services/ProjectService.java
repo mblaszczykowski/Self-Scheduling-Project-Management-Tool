@@ -1,8 +1,5 @@
 package com.backend.services;
 
-import com.backend.daos.ProjectDAO;
-import com.backend.daos.TaskDAO;
-import com.backend.daos.UserDAO;
 import com.backend.dtos.ProjectDTO;
 import com.backend.dtos.TaskDTO;
 import com.backend.dtos.UserDTO;
@@ -13,6 +10,9 @@ import com.backend.entities.User;
 import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
+import com.backend.repositories.ProjectRepository;
+import com.backend.repositories.TaskRepository;
+import com.backend.util.CriticalPathMethodHelper;
 import com.backend.util.ValidationUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,26 +24,26 @@ import java.util.stream.Collectors;
 @Service
 public class ProjectService {
 
-    private final ProjectDAO projectDAO;
-    private final UserDAO userDAO;
+    private final ProjectRepository projectRepository;
+    private final UserService userService;
     private final TaskService taskService;
-    private final TaskDAO taskDAO;
+    private final TaskRepository taskRepository;
     private final NotificationService notificationService;
     private final FileStorageService fileStorageService;
     private final CriticalPathMethodHelper cpmHelper;
 
     public ProjectService(
-            ProjectDAO projectDAO,
-            UserDAO userDAO,
+            ProjectRepository projectRepository,
+            UserService userService,
             TaskService taskService,
-            TaskDAO taskDAO,
+            TaskRepository taskRepository,
             NotificationService notificationService,
             FileStorageService fileStorageService
     ) {
-        this.projectDAO = projectDAO;
-        this.userDAO = userDAO;
+        this.projectRepository = projectRepository;
+        this.userService = userService;
         this.taskService = taskService;
-        this.taskDAO = taskDAO;
+        this.taskRepository = taskRepository;
         this.notificationService = notificationService;
         this.fileStorageService = fileStorageService;
         this.cpmHelper = new CriticalPathMethodHelper();
@@ -53,12 +53,11 @@ public class ProjectService {
     public ProjectDTO createProject(ProjectDTO projectDTO, Integer userId, List<MultipartFile> attachments) {
         validateProjectDTO(projectDTO);
 
-        if (projectDAO.existsByProjectKey(projectDTO.projectKey())) {
+        if (projectRepository.existsByProjectKey(projectDTO.projectKey())) {
             throw new ValidationException("Project key already exists: " + projectDTO.projectKey());
         }
 
-        var owner = userDAO.getUserById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        var owner = userService.getRequiredUserById(userId);
 
         var attachmentUrls = (attachments != null && !attachments.isEmpty())
                 ? fileStorageService.storeFiles(attachments)
@@ -77,21 +76,21 @@ public class ProjectService {
 
         if (projectDTO.dependencies() != null && !projectDTO.dependencies().isEmpty()) {
             var dependencies = projectDTO.dependencies().stream()
-                    .map(depKey -> projectDAO.getProjectByKey(depKey)
+                    .map(depKey -> projectRepository.findByProjectKey(depKey)
                             .orElseThrow(() -> new ValidationException("Dependency project not found: " + depKey)))
                     .collect(Collectors.toList());
             validateNoProjectCycles(project, dependencies);
             project.setDependencies(dependencies);
         }
 
-        var savedProject = projectDAO.save(project);
+        var savedProject = projectRepository.save(project);
         notifyNewMembersExcludingOwner(members, owner, savedProject);
         return convertToDTO(savedProject);
     }
 
     @Transactional(readOnly = true)
     public ProjectDTO getProjectByKey(String projectKey, Integer userId) {
-        var project = projectDAO.getProjectByKey(projectKey)
+        var project = projectRepository.findByProjectKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         if (!project.hasAccess(userId)) {
@@ -103,17 +102,26 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<ProjectDTO> getAllProjects(Integer userId) {
-        var projects = projectDAO.getProjectsByUserId(userId);
+        var projects = projectRepository.findAllAccessibleByUser(userId);
+        if (projects.isEmpty()) {
+            return List.of();
+        }
+
+        var projectIds = projects.stream().map(Project::getId).toList();
+        var allTasks = taskRepository.findByProjectIdsWithDetails(projectIds);
+        var tasksByProjectId = allTasks.stream()
+                .collect(Collectors.groupingBy(t -> t.getProject().getId()));
+
         return projects.stream()
-                .map(this::convertToDTOWithCPM)
+                .map(p -> convertToDTOWithCPM(p, tasksByProjectId.getOrDefault(p.getId(), List.of())))
                 .toList();
     }
 
     @Transactional
-    public ProjectDTO updateProject(ProjectDTO projectDTO, Integer userId, List<MultipartFile> attachments) {
+    public ProjectDTO updateProject(String projectKey, ProjectDTO projectDTO, Integer userId, List<MultipartFile> attachments) {
         validateProjectDTO(projectDTO);
 
-        var project = projectDAO.getProjectByKey(projectDTO.projectKey())
+        var project = projectRepository.findByProjectKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         if (!project.isOwner(userId)) {
@@ -138,20 +146,20 @@ public class ProjectService {
 
         if (projectDTO.dependencies() != null) {
             var dependencies = projectDTO.dependencies().stream()
-                    .map(depKey -> projectDAO.getProjectByKey(depKey)
+                    .map(depKey -> projectRepository.findByProjectKey(depKey)
                             .orElseThrow(() -> new ValidationException("Dependency project not found: " + depKey)))
                     .collect(Collectors.toList());
             validateNoProjectCycles(project, dependencies);
             project.setDependencies(dependencies);
         }
 
-        var updatedProject = projectDAO.save(project);
+        var updatedProject = projectRepository.save(project);
         return convertToDTO(updatedProject);
     }
 
     @Transactional
     public void deleteProject(String projectKey, Integer userId) {
-        var project = projectDAO.getProjectByKey(projectKey)
+        var project = projectRepository.findByProjectKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         if (!project.isOwner(userId)) {
@@ -159,7 +167,7 @@ public class ProjectService {
         }
 
         deleteAllProjectAttachmentsSilently(project);
-        projectDAO.deleteProject(project);
+        projectRepository.delete(project);
     }
 
     private Set<User> resolveMembersFromEmails(List<UserDTO> memberDTOs, User owner) {
@@ -167,7 +175,6 @@ public class ProjectService {
         members.add(owner);
         if (memberDTOs == null || memberDTOs.isEmpty()) return members;
 
-        // Collect emails to fetch (excluding owner)
         var emailsToFetch = memberDTOs.stream()
                 .map(UserDTO::email)
                 .filter(email -> !email.equals(owner.getEmail()))
@@ -175,10 +182,8 @@ public class ProjectService {
 
         if (emailsToFetch.isEmpty()) return members;
 
-        // Batch load all users in single query
-        var usersByEmail = userDAO.findByEmailsAsMap(emailsToFetch);
+        var usersByEmail = userService.findByEmailsAsMap(emailsToFetch);
 
-        // Verify all requested users were found and add to members
         for (String email : emailsToFetch) {
             var user = usersByEmail.get(email);
             if (user == null) {
@@ -226,10 +231,13 @@ public class ProjectService {
         deleteAttachmentsSilently(project.getAttachments());
         for (Task task : project.getTasks()) {
             deleteAttachmentsSilently(task.getAttachments());
+            for (var comment : task.getComments()) {
+                deleteAttachmentsSilently(comment.getAttachments());
+            }
         }
     }
 
-    private void deleteAttachmentsSilently(List<String> attachments) {
+    private void deleteAttachmentsSilently(Collection<String> attachments) {
         if (attachments == null) return;
         for (String attachment : attachments) {
             try {
@@ -243,6 +251,10 @@ public class ProjectService {
         if (ValidationUtil.isNullOrEmpty(projectDTO.projectKey()) ||
                 ValidationUtil.isNullOrEmpty(projectDTO.summary())) {
             throw new ValidationException("Project key and summary are required");
+        }
+
+        if (projectDTO.projectKey().length() > ValidationUtil.MAX_PROJECT_KEY_LENGTH) {
+            throw new ValidationException("Project key exceeds maximum length of " + ValidationUtil.MAX_PROJECT_KEY_LENGTH + " characters");
         }
 
         if (!projectDTO.projectKey().matches("^[A-Z][A-Z0-9]*$")) {
@@ -311,10 +323,15 @@ public class ProjectService {
     }
 
     private ProjectDTO convertToDTOWithCPM(Project project) {
-        var tasks = taskDAO.getTasksByProjectIdWithDetails(project.getId());
-        tasks.sort(Comparator.comparingInt(Task::getTaskNumber));
+        var tasks = taskRepository.findByProjectIdWithDetails(project.getId());
+        return convertToDTOWithCPM(project, tasks);
+    }
 
-        var taskDTOs = tasks.stream()
+    private ProjectDTO convertToDTOWithCPM(Project project, List<Task> tasks) {
+        var sortedTasks = new ArrayList<>(tasks);
+        sortedTasks.sort(Comparator.comparingInt(Task::getTaskNumber));
+
+        var taskDTOs = sortedTasks.stream()
                 .map(taskService::convertToDTO)
                 .toList();
 

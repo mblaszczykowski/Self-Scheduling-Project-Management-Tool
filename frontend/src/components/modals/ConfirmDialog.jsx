@@ -1,18 +1,6 @@
 import React from 'react';
 import { HiOutlineExclamation } from 'react-icons/hi';
 
-/**
- * Reusable confirmation dialog component
- *
- * @param {boolean} isOpen - Whether the dialog is open
- * @param {function} onClose - Function to close the dialog
- * @param {function} onConfirm - Function to call when confirmed
- * @param {string} title - Dialog title
- * @param {string} message - Dialog message/description
- * @param {string} confirmText - Text for confirm button (default: "Confirm")
- * @param {string} cancelText - Text for cancel button (default: "Cancel")
- * @param {string} variant - Color variant: "danger" (red) or "warning" (amber)
- */
 const ConfirmDialog = ({
     isOpen,
     onClose,

@@ -17,21 +17,15 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Simple in-memory rate limiting filter to prevent brute force attacks.
- * Limits requests to sensitive endpoints based on IP address.
- */
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final ObjectMapper objectMapper;
 
-    // Rate limit configuration
     private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final int MAX_REGISTER_ATTEMPTS = 3;
-    private static final long WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+    private static final long WINDOW_MS = 15 * 60 * 1000;
 
-    // In-memory storage for rate limiting (use Redis in production for distributed systems)
     private final ConcurrentHashMap<String, RateLimitEntry> loginAttempts = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RateLimitEntry> registerAttempts = new ConcurrentHashMap<>();
 
@@ -48,7 +42,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String method = request.getMethod();
         String clientIp = getClientIp(request);
 
-        // Rate limit login attempts
         if (PublicEndpoints.RATE_LIMIT_LOGIN.equals(path) && "POST".equalsIgnoreCase(method)) {
             if (isRateLimited(clientIp, loginAttempts, MAX_LOGIN_ATTEMPTS)) {
                 sendRateLimitResponse(response, "Too many login attempts. Please try again in 15 minutes.");
@@ -57,7 +50,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
             incrementAttempts(clientIp, loginAttempts);
         }
 
-        // Rate limit registration attempts
         if (PublicEndpoints.RATE_LIMIT_REGISTER.equals(path) && "POST".equalsIgnoreCase(method)) {
             if (isRateLimited(clientIp, registerAttempts, MAX_REGISTER_ATTEMPTS)) {
                 sendRateLimitResponse(response, "Too many registration attempts. Please try again later.");
@@ -72,7 +64,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private String getClientIp(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            // Take first IP if multiple are present
             return xForwardedFor.split(",")[0].trim();
         }
         String xRealIp = request.getHeader("X-Real-IP");
@@ -90,7 +81,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         long now = System.currentTimeMillis();
 
-        // Reset if window has passed
         if (now - entry.windowStart > WINDOW_MS) {
             attempts.remove(clientIp);
             return false;
@@ -111,17 +101,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
         });
     }
 
-    /**
-     * Call this method on successful login to reset the rate limit for a user's IP.
-     */
     public void resetLoginAttempts(String clientIp) {
         loginAttempts.remove(clientIp);
     }
 
-    /**
-     * Scheduled cleanup of expired rate limit entries to prevent memory leaks.
-     * Runs every minute to remove entries older than twice the window period.
-     */
     @Scheduled(fixedRate = 60000)
     public void cleanupExpiredEntries() {
         long now = System.currentTimeMillis();

@@ -13,7 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
-@RequestMapping("api/tasks/{taskId}/comments")
+@RequestMapping("/api/tasks/{taskId}/comments")
 public class CommentController {
 
     private final CommentService commentService;

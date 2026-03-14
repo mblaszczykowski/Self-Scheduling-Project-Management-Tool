@@ -1,17 +1,15 @@
 import { useMemo } from 'react';
+import { MS_PER_DAY } from '../util/helpers';
 
-/**
- * Flattens all tasks from projects into a single array with computed properties.
- */
 const flattenProjectTasks = (projects) => {
     const today = new Date();
-    const taskMap = {};
+    const taskKeyMap = {};
     const allTasks = [];
 
     projects.forEach(project => {
         project.tasks?.forEach(task => {
             const progress = task.progress ?? 0;
-            const dependencies = task.dependencyKeys?.map(d => parseInt(d, 10)) || [];
+            const dependencies = task.dependencyKeys || [];
 
             const taskData = {
                 ...task,
@@ -21,17 +19,14 @@ const flattenProjectTasks = (projects) => {
             };
 
             allTasks.push(taskData);
-            taskMap[task.id] = taskData;
+            taskKeyMap[task.taskKey] = taskData;
         });
     });
 
-    return { allTasks, taskMap, today };
+    return { allTasks, taskKeyMap, today };
 };
 
-/**
- * Computes basic task counts by status, assignee, and priority.
- */
-const computeTaskCounts = (allTasks, taskMap, today) => {
+const computeTaskCounts = (allTasks, taskKeyMap, today) => {
     const tasksPerStatus = {};
     const tasksPerAssignee = {};
     const tasksByPriority = {};
@@ -54,8 +49,8 @@ const computeTaskCounts = (allTasks, taskMap, today) => {
 
     const tasksDelayedByDependency = allTasks.filter(task => {
         if (!task.dependencies?.length) return false;
-        return task.dependencies.some(depId => {
-            const dep = taskMap[depId];
+        return task.dependencies.some(depKey => {
+            const dep = taskKeyMap[depKey];
             return dep && new Date(dep.dueDate) < today && dep.progress < 100;
         });
     });
@@ -70,9 +65,6 @@ const computeTaskCounts = (allTasks, taskMap, today) => {
     };
 };
 
-/**
- * Computes critical path health metrics.
- */
 const computeCriticalPathHealth = (allTasks, today) => {
     const criticalTasksList = allTasks.filter(t => t.isCritical);
     const activeCriticalTasks = criticalTasksList.filter(t => t.progress < 100);
@@ -89,7 +81,7 @@ const computeCriticalPathHealth = (allTasks, today) => {
 
     const criticalAtRisk = criticalTasksList.filter(t => {
         const dueDate = new Date(t.dueDate);
-        const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+        const daysUntilDue = Math.ceil((dueDate - today) / MS_PER_DAY);
         const expectedProgress = t.startDate
             ? ((today - new Date(t.startDate)) / (dueDate - new Date(t.startDate))) * 100
             : 50;
@@ -110,9 +102,6 @@ const computeCriticalPathHealth = (allTasks, today) => {
     };
 };
 
-/**
- * Computes critical path timeline by project.
- */
 const computeCriticalPathTimeline = (projects, today) => {
     return projects.map(project => {
         const projectCriticalTasks = project.tasks?.filter(t => t.isCritical) || [];
@@ -122,7 +111,7 @@ const computeCriticalPathTimeline = (projects, today) => {
         const startDates = projectCriticalTasks.map(t => new Date(t.startDate));
         const earliestStart = new Date(Math.min(...startDates));
         const latestDue = new Date(Math.max(...dueDates));
-        const criticalPathDays = Math.ceil((latestDue - earliestStart) / (1000 * 60 * 60 * 24));
+        const criticalPathDays = Math.ceil((latestDue - earliestStart) / MS_PER_DAY);
 
         const delayedCritical = projectCriticalTasks.filter(t => {
             const dueDate = new Date(t.dueDate);
@@ -142,9 +131,6 @@ const computeCriticalPathTimeline = (projects, today) => {
     }).filter(Boolean).sort((a, b) => b.criticalPathDays - a.criticalPathDays);
 };
 
-/**
- * Computes overdue critical tasks grouped by project.
- */
 const computeOverdueCriticalByProject = (projects, today) => {
     return projects.map(project => {
         const overdueCritical = project.tasks?.filter(task => {
@@ -161,16 +147,13 @@ const computeOverdueCriticalByProject = (projects, today) => {
     }).filter(p => p.overdueCount > 0).sort((a, b) => b.overdueCount - a.overdueCount);
 };
 
-/**
- * Computes blocked tasks waiting on incomplete dependencies.
- */
-const computeBlockedTasks = (allTasks, taskMap) => {
+const computeBlockedTasks = (allTasks, taskKeyMap) => {
     const blockedTasks = allTasks.filter(task => {
         if (!task.dependencies?.length) return false;
         if (task.progress === 100) return false;
 
-        return task.dependencies.some(depId => {
-            const dep = taskMap[depId];
+        return task.dependencies.some(depKey => {
+            const dep = taskKeyMap[depKey];
             return dep && dep.progress < 100;
         });
     });
@@ -180,9 +163,6 @@ const computeBlockedTasks = (allTasks, taskMap) => {
     return { blockedTasks, blockedCriticalTasks };
 };
 
-/**
- * Computes team workload on critical path.
- */
 const computeCriticalWorkload = (criticalTasksList, tasksPerAssignee, today) => {
     return Object.entries(tasksPerAssignee)
         .filter(([assignee]) => assignee !== 'Unassigned')
@@ -206,26 +186,20 @@ const computeCriticalWorkload = (criticalTasksList, tasksPerAssignee, today) => 
         .sort((a, b) => b.criticalCount - a.criticalCount);
 };
 
-/**
- * Computes tasks at risk of becoming critical (low slack/float).
- */
 const computeNearCriticalTasks = (allTasks, today) => {
     return allTasks.filter(task => {
         if (task.isCritical || task.progress === 100) return false;
 
         const dueDate = new Date(task.dueDate);
-        const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+        const daysUntilDue = Math.ceil((dueDate - today) / MS_PER_DAY);
         const blocksCriticalTasks = allTasks.some(t =>
-            t.dependencies?.includes(task.id) && t.isCritical
+            t.dependencies?.includes(task.taskKey) && t.isCritical
         );
 
         return (daysUntilDue <= 5 && daysUntilDue > 0) || blocksCriticalTasks;
     });
 };
 
-/**
- * Computes cross-project dependencies.
- */
 const computeCrossProjectDependencies = (projects) => {
     return projects
         .filter(p => p.dependencies && p.dependencies.length > 0)
@@ -240,9 +214,6 @@ const computeCrossProjectDependencies = (projects) => {
         }));
 };
 
-/**
- * Computes upcoming critical deadlines in next 7 days.
- */
 const computeUpcomingCriticalDeadlines = (criticalTasksList, today) => {
     const nextWeek = new Date();
     nextWeek.setDate(today.getDate() + 7);
@@ -253,9 +224,6 @@ const computeUpcomingCriticalDeadlines = (criticalTasksList, today) => {
     }).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 };
 
-/**
- * Computes project completion percentages.
- */
 const computeProjectCompletion = (projects) => {
     return projects.map(project => {
         const totalTasks = project.tasks?.length || 0;
@@ -269,34 +237,15 @@ const computeProjectCompletion = (projects) => {
     });
 };
 
-/**
- * Computes longest tasks by duration.
- */
-const computeLongestTasks = (allTasks) => {
-    return allTasks
-        .map(task => {
-            const start = new Date(task.startDate);
-            const due = new Date(task.dueDate);
-            const duration = Math.ceil((due - start) / (1000 * 60 * 60 * 24));
-            return { ...task, duration };
-        })
-        .sort((a, b) => b.duration - a.duration)
-        .slice(0, 5);
-};
-
-/**
- * Custom hook that computes all dashboard statistics from projects.
- * Extracts complex computation logic from Dashboard component.
- */
 export const useDashboardStats = (projects) => {
     return useMemo(() => {
-        const { allTasks, taskMap, today } = flattenProjectTasks(projects);
+        const { allTasks, taskKeyMap, today } = flattenProjectTasks(projects);
 
-        const taskCounts = computeTaskCounts(allTasks, taskMap, today);
+        const taskCounts = computeTaskCounts(allTasks, taskKeyMap, today);
         const criticalHealth = computeCriticalPathHealth(allTasks, today);
         const criticalPathTimeline = computeCriticalPathTimeline(projects, today);
         const overdueCriticalByProject = computeOverdueCriticalByProject(projects, today);
-        const { blockedTasks, blockedCriticalTasks } = computeBlockedTasks(allTasks, taskMap);
+        const { blockedTasks, blockedCriticalTasks } = computeBlockedTasks(allTasks, taskKeyMap);
         const criticalWorkload = computeCriticalWorkload(
             criticalHealth.criticalTasksList,
             taskCounts.tasksPerAssignee,

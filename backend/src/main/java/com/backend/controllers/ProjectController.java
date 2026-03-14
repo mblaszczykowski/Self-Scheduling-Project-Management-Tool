@@ -14,7 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
-@RequestMapping("api/projects")
+@RequestMapping("/api/projects")
 public class ProjectController {
 
     private final ProjectService projectService;
@@ -66,7 +66,7 @@ public class ProjectController {
     ) throws JsonProcessingException {
         var userId = tokenService.getUserIdFromRequest(request);
         var projectDTO = objectMapper.readValue(projectDTOStr, ProjectDTO.class);
-        var updatedProject = projectService.updateProject(projectDTO, userId, attachments);
+        var updatedProject = projectService.updateProject(projectKey, projectDTO, userId, attachments);
         return ResponseEntity.ok(updatedProject);
     }
 

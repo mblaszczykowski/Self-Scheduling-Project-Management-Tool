@@ -1,19 +1,20 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Bar } from 'react-chartjs-2';
-import { SectionHeader, ChartCard, chartOptions } from './DashboardComponents';
+import { SectionHeader, ChartCard, chartOptions } from './ChartComponents';
 import { formatShortDate } from '../../util/helpers';
+import {
+    CheckCircleIcon, AlertTriangleIcon, BlockedIcon,
+    TrendingUpIcon, ChartBarIcon, UsersIcon, LightningIcon,
+} from '../common/Icons';
 
-/**
- * Analytics grid section with all chart cards
- */
 const AnalyticsSection = ({ stats }) => {
     return (
         <section>
             <SectionHeader title="Analytics" subtitle="Critical path optimization" />
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
 
-                {/* 1. Critical Path Health Score */}
-                <ChartCard title="Critical Path Health" subtitle="Overall critical task status">
+                                <ChartCard title="Critical Path Health" subtitle="Overall critical task status">
                     <div className="flex items-start justify-between mb-4">
                         <div>
                             <div className="text-4xl font-bold text-slate-900 mb-1">
@@ -27,12 +28,10 @@ const AnalyticsSection = ({ stats }) => {
                             stats.criticalHealthScore >= 80 ? 'bg-green-100' :
                             stats.criticalHealthScore >= 60 ? 'bg-yellow-100' : 'bg-red-100'
                         }`}>
-                            <svg className={`w-7 h-7 ${
+                            <CheckCircleIcon className={`w-7 h-7 ${
                                 stats.criticalHealthScore >= 80 ? 'text-green-600' :
                                 stats.criticalHealthScore >= 60 ? 'text-yellow-600' : 'text-red-600'
-                            }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                            }`} />
                         </div>
                     </div>
                     <div className="space-y-2 pt-4 border-t border-slate-100">
@@ -51,29 +50,21 @@ const AnalyticsSection = ({ stats }) => {
                     </div>
                 </ChartCard>
 
-                {/* 2. Critical Path Timeline */}
-                <CriticalPathTimelineCard stats={stats} />
+                                <CriticalPathTimelineCard stats={stats} />
 
-                {/* 3. Project Progress */}
-                <ProjectProgressCard stats={stats} />
+                                <ProjectProgressCard stats={stats} />
 
-                {/* 4. Overdue Critical Tasks */}
-                <OverdueCriticalCard stats={stats} />
+                                <OverdueCriticalCard stats={stats} />
 
-                {/* 5. Blocked Tasks */}
-                <BlockedTasksCard stats={stats} />
+                                <BlockedTasksCard stats={stats} />
 
-                {/* 6. Team Workload on Critical Path */}
-                <CriticalWorkloadCard stats={stats} />
+                                <CriticalWorkloadCard stats={stats} />
 
-                {/* 7. Float/Slack at Risk */}
-                <NearCriticalCard stats={stats} />
+                                <NearCriticalCard stats={stats} />
 
-                {/* 8. Cross-Project Dependencies */}
-                <CrossProjectDepsCard stats={stats} />
+                                <CrossProjectDepsCard stats={stats} />
 
-                {/* 9. Upcoming Critical Deadlines */}
-                <UpcomingDeadlinesCard stats={stats} />
+                                <UpcomingDeadlinesCard stats={stats} />
             </div>
         </section>
     );
@@ -174,12 +165,12 @@ const OverdueCriticalCard = ({ stats }) => (
                             </span>
                         </div>
                         {project.overdueTasks.length > 0 && (
-                            <a
-                                href={`/projects?selectedIssue=${project.overdueTasks[0].taskKey}`}
+                            <Link
+                                to={`/projects?selectedIssue=${project.overdueTasks[0].taskKey}`}
                                 className="block text-xs text-slate-500 hover:text-slate-900 truncate transition-colors"
                             >
                                 {project.overdueTasks[0].taskKey} - {project.overdueTasks[0].summary}
-                            </a>
+                            </Link>
                         )}
                     </div>
                 ))
@@ -190,7 +181,15 @@ const OverdueCriticalCard = ({ stats }) => (
     </ChartCard>
 );
 
-const BlockedTasksCard = ({ stats }) => (
+const BlockedTasksCard = ({ stats }) => {
+    const hasBlocked = stats.blockedTasks.length > 0;
+    const blockedIconWrapCls = 'w-14 h-14 rounded-xl'
+        + ' flex items-center justify-center shrink-0 '
+        + (hasBlocked ? 'bg-red-100' : 'bg-slate-100');
+    const blockedIconCls = 'w-7 h-7 '
+        + (hasBlocked ? 'text-red-600' : 'text-slate-400');
+
+    return (
     <ChartCard title="Blocked Tasks" subtitle="Waiting on dependencies">
         <div className="flex items-start justify-between mb-4">
             <div>
@@ -201,17 +200,15 @@ const BlockedTasksCard = ({ stats }) => (
                     {stats.blockedCriticalTasks.length} are critical
                 </div>
             </div>
-            <div className={`w-14 h-14 ${stats.blockedTasks.length > 0 ? 'bg-red-100' : 'bg-slate-100'} rounded-xl flex items-center justify-center shrink-0`}>
-                <svg className={`w-7 h-7 ${stats.blockedTasks.length > 0 ? 'text-red-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                </svg>
+            <div className={blockedIconWrapCls}>
+                <BlockedIcon className={blockedIconCls} />
             </div>
         </div>
         {stats.blockedTasks.length > 0 && (
             <div className="pt-4 border-t border-slate-100">
                 <div className="space-y-2">
                     {stats.blockedTasks.slice(0, 4).map(task => (
-                        <a key={task.id} href={`/projects?selectedIssue=${task.taskKey}`} className="block">
+                        <Link key={task.id} to={`/projects?selectedIssue=${task.taskKey}`} className="block">
                             <div className="flex items-center gap-2">
                                 <div className="text-xs text-slate-900 font-medium truncate">
                                     {task.taskKey}
@@ -223,13 +220,14 @@ const BlockedTasksCard = ({ stats }) => (
                             <div className="text-xs text-slate-500 truncate">
                                 {task.summary}
                             </div>
-                        </a>
+                        </Link>
                     ))}
                 </div>
             </div>
         )}
     </ChartCard>
-);
+    );
+};
 
 const CriticalWorkloadCard = ({ stats }) => (
     <ChartCard title="Critical Path Workload" subtitle="Team resources on critical tasks">
@@ -278,23 +276,21 @@ const NearCriticalCard = ({ stats }) => (
                 </div>
             </div>
             <div className={`w-14 h-14 ${stats.nearCriticalTasks.length > 0 ? 'bg-amber-100' : 'bg-slate-100'} rounded-xl flex items-center justify-center shrink-0`}>
-                <svg className={`w-7 h-7 ${stats.nearCriticalTasks.length > 0 ? 'text-amber-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+                <AlertTriangleIcon className={`w-7 h-7 ${stats.nearCriticalTasks.length > 0 ? 'text-amber-600' : 'text-slate-400'}`} />
             </div>
         </div>
         {stats.nearCriticalTasks.length > 0 && (
             <div className="pt-4 border-t border-slate-100">
                 <div className="space-y-2">
                     {stats.nearCriticalTasks.slice(0, 4).map(task => (
-                        <a key={task.id} href={`/projects?selectedIssue=${task.taskKey}`} className="block text-xs">
+                        <Link key={task.id} to={`/projects?selectedIssue=${task.taskKey}`} className="block text-xs">
                             <div className="text-slate-900 font-medium truncate">
                                 {task.taskKey}
                             </div>
                             <div className="text-slate-500 truncate">
                                 {task.summary}
                             </div>
-                        </a>
+                        </Link>
                     ))}
                 </div>
             </div>
@@ -335,9 +331,9 @@ const UpcomingDeadlinesCard = ({ stats }) => (
         <div className="h-56 overflow-y-auto pr-2 space-y-2">
             {stats.upcomingCriticalDeadlines?.length > 0 ? (
                 stats.upcomingCriticalDeadlines.map(task => (
-                    <a
+                    <Link
                         key={task.id}
-                        href={`/projects?selectedIssue=${task.taskKey}`}
+                        to={`/projects?selectedIssue=${task.taskKey}`}
                         className="block p-3 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100"
                     >
                         <div className="flex items-start justify-between gap-3">
@@ -360,7 +356,7 @@ const UpcomingDeadlinesCard = ({ stats }) => (
                                 {formatShortDate(task.dueDate)}
                             </span>
                         </div>
-                    </a>
+                    </Link>
                 ))
             ) : (
                 <EmptyState icon="check" message="No upcoming critical deadlines" fullHeight />
@@ -369,21 +365,21 @@ const UpcomingDeadlinesCard = ({ stats }) => (
     </ChartCard>
 );
 
+const iconMap = {
+    trend: TrendingUpIcon,
+    chart: ChartBarIcon,
+    check: CheckCircleIcon,
+    users: UsersIcon,
+    lightning: LightningIcon,
+};
+
 const EmptyState = ({ icon, message, fullHeight = false }) => {
-    const icons = {
-        trend: "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6",
-        chart: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
-        check: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-        users: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
-        lightning: "M13 10V3L4 14h7v7l9-11h-7z",
-    };
+    const IconComponent = iconMap[icon];
 
     return (
         <div className={`${fullHeight ? 'h-full min-h-[180px]' : 'py-8'} flex flex-col items-center justify-center text-slate-400`}>
             <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={icons[icon]} />
-                </svg>
+                <IconComponent className="w-7 h-7" />
             </div>
             <p className="text-xs text-slate-500">{message}</p>
         </div>

@@ -1,10 +1,9 @@
 package com.backend.entities;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -23,13 +22,10 @@ public class Comment {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @CreationTimestamp
-    @Temporal(TemporalType.TIMESTAMP)
     @Column(nullable = false, updatable = false)
-    private Date timestamp;
+    private Instant timestamp;
 
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date editedAt;
+    private Instant editedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "task_id", nullable = false)
@@ -54,7 +50,9 @@ public class Comment {
     @Column(name = "attachment_url")
     private Set<String> attachments = new HashSet<>();
 
-    public Comment() {}
+    public Comment() {
+        this.timestamp = Instant.now();
+    }
 
     public Comment(Task task, User author, Comment parentComment, String content, List<String> attachments) {
         this.task = task;
@@ -62,82 +60,35 @@ public class Comment {
         this.parentComment = parentComment;
         this.content = content;
         this.attachments = attachments != null ? new HashSet<>(attachments) : new HashSet<>();
+        this.timestamp = Instant.now();
     }
 
-    // Getters and Setters
-    public Integer getId() {
-        return id;
-    }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
 
-    public void setId(Integer id) {
-        this.id = id;
-    }
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
 
-    public String getContent() {
-        return content;
-    }
+    public Instant getTimestamp() { return timestamp; }
 
-    public void setContent(String content) {
-        this.content = content;
-    }
+    public Instant getEditedAt() { return editedAt; }
+    public void setEditedAt(Instant editedAt) { this.editedAt = editedAt; }
 
-    public Date getTimestamp() {
-        return timestamp;
-    }
+    public Task getTask() { return task; }
+    public void setTask(Task task) { this.task = task; }
 
-    public Date getEditedAt() {
-        return editedAt;
-    }
+    public User getAuthor() { return author; }
+    public void setAuthor(User author) { this.author = author; }
 
-    public void setEditedAt(Date editedAt) {
-        this.editedAt = editedAt;
-    }
+    public Comment getParentComment() { return parentComment; }
+    public void setParentComment(Comment parentComment) { this.parentComment = parentComment; }
 
-    public Task getTask() {
-        return task;
-    }
+    public List<Comment> getReplies() { return replies; }
+    public void setReplies(List<Comment> replies) { this.replies = replies; }
 
-    public void setTask(Task task) {
-        this.task = task;
-    }
+    public Set<CommentReaction> getReactions() { return reactions; }
+    public void setReactions(Set<CommentReaction> reactions) { this.reactions = reactions; }
 
-    public User getAuthor() {
-        return author;
-    }
-
-    public void setAuthor(User author) {
-        this.author = author;
-    }
-
-    public Comment getParentComment() {
-        return parentComment;
-    }
-
-    public void setParentComment(Comment parentComment) {
-        this.parentComment = parentComment;
-    }
-
-    public List<Comment> getReplies() {
-        return replies;
-    }
-
-    public void setReplies(List<Comment> replies) {
-        this.replies = replies;
-    }
-
-    public Set<CommentReaction> getReactions() {
-        return reactions;
-    }
-
-    public void setReactions(Set<CommentReaction> reactions) {
-        this.reactions = reactions;
-    }
-
-    public Set<String> getAttachments() {
-        return attachments;
-    }
-
-    public void setAttachments(Set<String> attachments) {
-        this.attachments = attachments;
-    }
+    public Set<String> getAttachments() { return attachments; }
+    public void setAttachments(Set<String> attachments) { this.attachments = attachments; }
 }

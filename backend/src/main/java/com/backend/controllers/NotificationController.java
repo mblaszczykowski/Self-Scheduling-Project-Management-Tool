@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("api/notifications")
+@RequestMapping("/api/notifications")
 public class NotificationController {
     private final NotificationService notificationService;
     private final TokenService tokenService;
@@ -73,7 +73,7 @@ public class NotificationController {
         return new NotificationDTO(
                 notification.getId(),
                 notification.getMessage(),
-                notification.getTimestamp() != null ? notification.getTimestamp().toInstant() : null,
+                notification.getTimestamp(),
                 notification.getIsRead(),
                 notification.getType(),
                 notification.getLink()

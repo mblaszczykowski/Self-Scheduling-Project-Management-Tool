@@ -1,36 +1,36 @@
 package com.backend.services;
 
-import com.backend.daos.ProjectDAO;
-import com.backend.daos.TaskDAO;
-import com.backend.daos.UserDAO;
 import com.backend.dtos.TaskDTO;
 import com.backend.entities.*;
 import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
+import com.backend.repositories.ProjectRepository;
+import com.backend.repositories.TaskRepository;
+import com.backend.repositories.UserRepository;
 import com.backend.util.ValidationUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class TaskService {
 
-    private final TaskDAO taskDAO;
-    private final ProjectDAO projectDAO;
+    private final TaskRepository taskRepository;
+    private final ProjectRepository projectRepository;
     private final FileStorageService fileStorageService;
-    private final UserDAO userDAO;
+    private final UserRepository userRepository;
     private final NotificationService notificationService;
 
-    public TaskService(TaskDAO taskDAO, ProjectDAO projectDAO, FileStorageService fileStorageService,
-                       UserDAO userDAO, NotificationService notificationService) {
-        this.taskDAO = taskDAO;
-        this.projectDAO = projectDAO;
+    public TaskService(TaskRepository taskRepository, ProjectRepository projectRepository,
+                       FileStorageService fileStorageService, UserRepository userRepository,
+                       NotificationService notificationService) {
+        this.taskRepository = taskRepository;
+        this.projectRepository = projectRepository;
         this.fileStorageService = fileStorageService;
-        this.userDAO = userDAO;
+        this.userRepository = userRepository;
         this.notificationService = notificationService;
     }
 
@@ -42,7 +42,7 @@ public class TaskService {
                 ? fileStorageService.storeFiles(files)
                 : new ArrayList<String>();
 
-        var project = projectDAO.getProjectByKeyWithLock(projectKey)
+        var project = projectRepository.findByProjectKeyWithLock(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         if (!project.hasAccess(userId)) {
@@ -62,7 +62,7 @@ public class TaskService {
         task.setAttachments(attachmentUrls);
 
         if (taskDTO.assignee() != null && !taskDTO.assignee().isEmpty()) {
-            var assignee = userDAO.getUserByEmail(taskDTO.assignee())
+            var assignee = userRepository.findByEmail(taskDTO.assignee())
                     .orElseThrow(() -> new ValidationException("Assignee not found"));
             task.setAssignee(assignee);
         }
@@ -71,13 +71,13 @@ public class TaskService {
             task.setLabels(String.join(",", taskDTO.labels()));
         }
 
-        persistProjectWithIncrementedTaskCounter(project);
+        projectRepository.save(project);
 
         if (taskDTO.dependencyKeys() != null && !taskDTO.dependencyKeys().isEmpty()) {
             task.setDependencies(resolveDependenciesBatch(taskDTO.dependencyKeys()));
         }
 
-        var savedTask = taskDAO.save(task);
+        var savedTask = taskRepository.save(task);
 
         if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
             var message = "You have been assigned to task: " + task.getSummary();
@@ -94,14 +94,14 @@ public class TaskService {
                               Integer userId, List<MultipartFile> files) {
         validateTaskDTO(taskDTO);
 
-        var project = projectDAO.getProjectByKey(projectKey)
+        var project = projectRepository.findByProjectKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         if (!project.hasAccess(userId)) {
             throw new ResourceNotFoundException("Project not found");
         }
 
-        var task = taskDAO.getTaskByTaskKey(taskKey)
+        var task = taskRepository.findByTaskKey(taskKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
 
         if (!task.getProject().getId().equals(project.getId())) {
@@ -117,7 +117,7 @@ public class TaskService {
         task.setPriority(Objects.requireNonNullElse(taskDTO.priority(), TaskPriority.MEDIUM));
 
         if (taskDTO.assignee() != null && !taskDTO.assignee().isEmpty()) {
-            var assignee = userDAO.getUserByEmail(taskDTO.assignee())
+            var assignee = userRepository.findByEmail(taskDTO.assignee())
                     .orElseThrow(() -> new ValidationException("Assignee not found"));
             task.setAssignee(assignee);
         } else {
@@ -139,7 +139,7 @@ public class TaskService {
 
         updateTaskDependencies(task, taskDTO.dependencyKeys());
 
-        var updatedTask = taskDAO.save(task);
+        var updatedTask = taskRepository.save(task);
 
         if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
             var message = "Task '" + task.getSummary() + "' has been updated";
@@ -151,20 +151,9 @@ public class TaskService {
         return convertToDTO(updatedTask);
     }
 
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getTasksAssignedToUser(Integer userId) {
-        var tasks = taskDAO.getTasksAssignedToUser(userId);
-        return tasks.stream()
-                .map(this::convertToDTO)
-                .toList();
-    }
-
     public void validateTaskDTO(TaskDTO taskDTO) {
         if (ValidationUtil.isNullOrEmpty(taskDTO.summary())) {
             throw new ValidationException("Summary is required");
-        }
-        if (taskDTO.status() == null) {
-            throw new ValidationException("Status is required");
         }
         if (taskDTO.summary().length() > ValidationUtil.MAX_SUMMARY_LENGTH) {
             throw new ValidationException("Summary exceeds maximum length of " + ValidationUtil.MAX_SUMMARY_LENGTH + " characters");
@@ -185,7 +174,7 @@ public class TaskService {
     }
 
     public TaskDTO convertToDTO(Task task) {
-        var dependencyIds = extractDependencyIds(task);
+        var dependencyKeys = extractDependencyKeys(task);
         var labels = parseLabels(task.getLabels());
         var assigneeEmail = task.getAssignee() != null ? task.getAssignee().getEmail() : null;
         var attachments = task.getAttachments() != null
@@ -204,7 +193,7 @@ public class TaskService {
                 task.getDueDate(),
                 assigneeEmail,
                 labels,
-                dependencyIds,
+                dependencyKeys,
                 null,
                 attachments,
                 task.getCreated(),
@@ -214,12 +203,12 @@ public class TaskService {
         );
     }
 
-    private List<String> extractDependencyIds(Task task) {
+    private List<String> extractDependencyKeys(Task task) {
         if (task.getDependencies() == null || task.getDependencies().isEmpty()) {
             return null;
         }
         return task.getDependencies().stream()
-                .map(t -> String.valueOf(t.getId()))
+                .map(Task::getTaskKey)
                 .toList();
     }
 
@@ -228,10 +217,6 @@ public class TaskService {
             return null;
         }
         return Arrays.asList(labelsString.split(","));
-    }
-
-    private void persistProjectWithIncrementedTaskCounter(Project project) {
-        projectDAO.save(project);
     }
 
     private void updateTaskDependencies(Task task, List<String> dependencyKeys) {
@@ -249,31 +234,23 @@ public class TaskService {
             return new ArrayList<>();
         }
 
-        var numericIds = new ArrayList<Integer>();
-        var taskKeyRefs = new ArrayList<String>();
-        separateIdsFromKeys(dependencyRefs, numericIds, taskKeyRefs);
-
-        var dependencies = new ArrayList<Task>();
-        if (!numericIds.isEmpty()) {
-            dependencies.addAll(taskDAO.getTasksByIdsWithDetails(numericIds));
-        }
-        if (!taskKeyRefs.isEmpty()) {
-            dependencies.addAll(taskDAO.getTasksByTaskKeys(taskKeyRefs));
-        }
-        return dependencies;
-    }
-
-    private void separateIdsFromKeys(List<String> refs, List<Integer> numericIds, List<String> taskKeys) {
-        for (String ref : refs) {
-            if (ref == null) continue;
+        var tasksByProjectKey = new HashMap<String, List<Integer>>();
+        for (var ref : dependencyRefs) {
+            if (ref == null || !ref.contains("-")) continue;
+            var lastDash = ref.lastIndexOf('-');
+            var projectKey = ref.substring(0, lastDash);
             try {
-                numericIds.add(Integer.parseInt(ref));
-            } catch (NumberFormatException e) {
-                if (ref.contains("-")) {
-                    taskKeys.add(ref);
-                }
+                var taskNumber = Integer.parseInt(ref.substring(lastDash + 1));
+                tasksByProjectKey.computeIfAbsent(projectKey, k -> new ArrayList<>()).add(taskNumber);
+            } catch (NumberFormatException ignored) {
             }
         }
+
+        var dependencies = new ArrayList<Task>();
+        for (var entry : tasksByProjectKey.entrySet()) {
+            dependencies.addAll(taskRepository.findByProjectKeyAndTaskNumbers(entry.getKey(), entry.getValue()));
+        }
+        return dependencies;
     }
 
     private void validateNoCycles(Task task, List<Task> newDependencies) {
@@ -297,14 +274,14 @@ public class TaskService {
 
     @Transactional
     public void deleteTask(String projectKey, String taskKey, Integer userId) {
-        var project = projectDAO.getProjectByKey(projectKey)
+        var project = projectRepository.findByProjectKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         if (!project.isOwner(userId)) {
             throw new AuthorizationException("Only project owner can delete tasks");
         }
 
-        var task = taskDAO.getTaskByTaskKey(taskKey)
+        var task = taskRepository.findByTaskKey(taskKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
 
         if (!task.getProject().getId().equals(project.getId())) {
@@ -312,7 +289,7 @@ public class TaskService {
         }
 
         deleteTaskAttachmentsSilently(task);
-        taskDAO.deleteTask(task);
+        taskRepository.delete(task);
     }
 
     private void deleteTaskAttachmentsSilently(Task task) {

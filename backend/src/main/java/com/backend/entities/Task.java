@@ -75,6 +75,9 @@ public class Task {
     )
     private List<Task> dependencies = new ArrayList<>();
 
+    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Comment> comments = new ArrayList<>();
+
     @ElementCollection
     @CollectionTable(name = "task_attachments", joinColumns = @JoinColumn(name = "task_id"))
     @Column(name = "attachment_url")
@@ -107,7 +110,6 @@ public class Task {
         return project.getProjectKey() + "-" + taskNumber;
     }
 
-    // Getters and Setters
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
 
@@ -152,6 +154,9 @@ public class Task {
 
     public Integer getProgress() { return progress; }
     public void setProgress(Integer progress) { this.progress = progress; }
+
+    public List<Comment> getComments() { return comments; }
+    public void setComments(List<Comment> comments) { this.comments = comments; }
 
     public TaskPriority getPriority() { return priority; }
     public void setPriority(TaskPriority priority) { this.priority = priority; }

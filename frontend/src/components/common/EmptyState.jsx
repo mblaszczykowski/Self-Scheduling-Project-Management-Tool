@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { HiOutlineClipboardList, HiOutlineCalendar, HiOutlineCollection, HiOutlineSearch } from 'react-icons/hi';
+import { useAnimateIn } from '../../hooks/useAnimateIn';
 
 const iconMap = {
     table: HiOutlineClipboardList,
@@ -36,12 +37,7 @@ const EmptyState = ({
     actionLabel,
     className = '',
 }) => {
-    const [isVisible, setIsVisible] = useState(false);
-
-    useEffect(() => {
-        const timer = requestAnimationFrame(() => setIsVisible(true));
-        return () => cancelAnimationFrame(timer);
-    }, []);
+    const [isVisible] = useAnimateIn();
 
     const Icon = CustomIcon || iconMap[variant] || iconMap.list;
     const displayTitle = title || defaultMessages[variant]?.title || defaultMessages.list.title;

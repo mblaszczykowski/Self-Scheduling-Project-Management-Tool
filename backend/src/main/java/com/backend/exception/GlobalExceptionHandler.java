@@ -62,9 +62,6 @@ public class GlobalExceptionHandler {
                 "An unexpected error occurred");
     }
 
-    /**
-     * Builds a standardized error response with consistent format.
-     */
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String code, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", status.value());

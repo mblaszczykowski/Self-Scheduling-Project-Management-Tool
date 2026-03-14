@@ -1,41 +1,40 @@
 import React, { useContext, useEffect, useRef, useState, useCallback } from 'react';
-import { DataContext } from '../../context/DataContext';
 import { Form, Formik } from 'formik';
 import * as Yup from 'yup';
-import { toast, Slide } from 'react-toastify';
 import { HiOutlinePlus, HiOutlineX, HiOutlineTrash, HiOutlineCheck } from 'react-icons/hi';
-import { formatDateTime, formatDate } from '../../util/helpers';
-import { useClickOutside } from '../../hooks/useClickOutside';
+import { DataContext } from '../../context/DataContext';
 import TaskForm from './TaskForm';
 import ProjectForm from './ProjectForm';
 import ConfirmDialog from './ConfirmDialog';
-
-const showToast = (message, type = 'error') => {
-    toast[type](message, {
-        position: 'top-center',
-        autoClose: 2500,
-        transition: Slide,
-    });
-};
+import { useClickOutside } from '../../hooks/useClickOutside';
+import { formatDateTime, formatDate, MS_PER_DAY, toDateString } from '../../util/helpers';
+import { showToast } from '../../util/toast';
 
 const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
-    const { projects, createTask, updateTask, deleteTask, createProject, updateProject, deleteProject, user } = useContext(DataContext);
+    const {
+        projects,
+        createTask,
+        updateTask,
+        deleteTask,
+        createProject,
+        updateProject,
+        deleteProject,
+        user
+    } = useContext(DataContext);
 
     const [dependencies, setDependencies] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
     const modalRef = useRef(null);
     const formikRef = useRef(null);
-    const [newAttachments, setNewAttachments] = useState([]);
-    const [existingAttachments, setExistingAttachments] = useState([]);
-    const [emailLoading, setEmailLoading] = useState(false);
-    const [emailError, setEmailError] = useState('');
-    const [isVisible, setIsVisible] = useState(false);
-    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-    const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
-    const [isDirty, setIsDirty] = useState(false);
+    const [attachments, setAttachments] = useState({ existing: [], new: [] });
+    const [emailState, setEmailState] = useState({ loading: false, error: '' });
+    const [uiState, setUiState] = useState({
+        isVisible: false, deleteConfirmOpen: false,
+        closeConfirmOpen: false, isDirty: false,
+    });
 
     useEffect(() => {
-        requestAnimationFrame(() => setIsVisible(true));
+        requestAnimationFrame(() => setUiState(prev => ({ ...prev, isVisible: true })));
     }, []);
 
     useEffect(() => {
@@ -43,18 +42,17 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
     }, [user]);
 
     const handleCloseAttempt = useCallback(() => {
-        const formDirty = formikRef.current?.dirty || isDirty;
+        const formDirty = formikRef.current?.dirty || uiState.isDirty;
         if (formDirty && modalMode !== 'view') {
-            setCloseConfirmOpen(true);
+            setUiState(prev => ({ ...prev, closeConfirmOpen: true }));
         } else {
-            setIsVisible(false);
+            setUiState(prev => ({ ...prev, isVisible: false }));
             setTimeout(onClose, 200);
         }
-    }, [onClose, isDirty, modalMode]);
+    }, [onClose, uiState.isDirty, modalMode]);
 
     const handleForceClose = useCallback(() => {
-        setCloseConfirmOpen(false);
-        setIsVisible(false);
+        setUiState(prev => ({ ...prev, closeConfirmOpen: false, isVisible: false }));
         setTimeout(onClose, 200);
     }, [onClose]);
 
@@ -68,16 +66,18 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
     });
 
     useEffect(() => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = toDateString(new Date());
 
         if (modalType === 'task') {
             if (modalMode === 'edit' && task) {
-                const deps = task.dependencyKeys?.map(d => parseInt(d, 10)) || [];
+                const deps = task.dependencyKeys || [];
                 setDependencies(deps);
 
                 let duration = 1;
                 if (task.startDate && task.dueDate) {
-                    const diff = Math.floor((new Date(task.dueDate) - new Date(task.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+                    const startMs = new Date(task.startDate);
+                    const dueMs = new Date(task.dueDate);
+                    const diff = Math.floor((dueMs - startMs) / MS_PER_DAY) + 1;
                     duration = Math.max(diff, 1);
                 }
 
@@ -99,7 +99,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                     members: [],
                     newUserEmail: '',
                 });
-                setExistingAttachments(task.attachments || []);
+                setAttachments({ existing: task.attachments || [], new: [] });
             } else {
                 setDependencies([]);
                 setInitialValues(prev => ({
@@ -108,10 +108,11 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                     summary: '', description: '', status: 'TODO',
                     startDate: today, dueDate: today, assignee: '',
                     duration: 1, progress: 0, priority: 'MEDIUM', labels: '',
-                    created: new Date().toLocaleString(), updated: new Date().toLocaleString(),
+                    created: new Date().toLocaleString(),
+                    updated: new Date().toLocaleString(),
                     reporter: user?.email || '',
                 }));
-                setExistingAttachments([]);
+                setAttachments({ existing: [], new: [] });
             }
         } else if (modalType === 'project') {
             if (modalMode === 'edit' && project) {
@@ -126,7 +127,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                     duration: 1, progress: 0, priority: 'MEDIUM', labels: '',
                     created: '', updated: '', reporter: user?.email || '',
                 });
-                setExistingAttachments(project.attachments || []);
+                setAttachments({ existing: project.attachments || [], new: [] });
             } else {
                 setDependencies([]);
                 setInitialValues({
@@ -136,22 +137,26 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                     duration: 1, progress: 0, priority: 'MEDIUM', labels: '',
                     created: '', updated: '', reporter: user?.email || '',
                 });
-                setExistingAttachments([]);
+                setAttachments({ existing: [], new: [] });
             }
         }
-        setNewAttachments([]);
-    }, [modalType, modalMode, project?.projectKey, task?.id, user?.email]);
+    }, [modalType, modalMode, project, task, user]);
 
     const taskValidationSchema = Yup.object().shape({
         projectKey: Yup.string().required('Project is required.'),
         summary: Yup.string().required('Task summary is required.'),
         startDate: Yup.date().required('Start date is required.'),
-        dueDate: Yup.date().required('Due date is required.').min(Yup.ref('startDate'), 'Due date cannot be before start date.'),
+        dueDate: Yup.date()
+            .required('Due date is required.')
+            .min(Yup.ref('startDate'), 'Due date cannot be before start date.'),
     });
 
     const projectValidationSchema = Yup.object().shape(
         modalMode === 'create'
-            ? { projectKey: Yup.string().max(4, 'Max 4 characters.').required('Project key is required.'), summary: Yup.string().required('Project name is required.') }
+            ? {
+                projectKey: Yup.string().max(4, 'Max 4 characters.').required('Project key is required.'),
+                summary: Yup.string().required('Project name is required.')
+            }
             : { summary: Yup.string().required('Project name is required.') }
     );
 
@@ -161,37 +166,47 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
         try {
             if (modalType === 'task') {
                 const taskDTO = {
-                    summary: values.summary, description: values.description, status: values.status,
-                    startDate: values.startDate, dueDate: values.dueDate, assignee: values.assignee,
+                    summary: values.summary,
+                    description: values.description,
+                    status: values.status,
+                    startDate: values.startDate,
+                    dueDate: values.dueDate,
+                    assignee: values.assignee,
                     labels: values.labels.trim() ? values.labels.split(/\s+/) : [],
-                    dependencyKeys: dependencies.map(String), progress: values.progress,
-                    priority: values.priority, attachments: existingAttachments,
+                    dependencyKeys: dependencies.map(String),
+                    progress: values.progress,
+                    priority: values.priority,
+                    attachments: attachments.existing,
                 };
                 const projectKey = project?.projectKey || task?.projectKey || values.projectKey;
                 if (modalMode === 'create') {
-                    await createTask(projectKey, taskDTO, newAttachments);
+                    await createTask(projectKey, taskDTO, attachments.new);
                     showToast('Task created successfully', 'success');
                 } else {
-                    await updateTask(projectKey, task.taskKey, taskDTO, newAttachments);
+                    await updateTask(projectKey, task.taskKey, taskDTO, attachments.new);
                     showToast('Task updated successfully', 'success');
                 }
             } else {
                 const projectDTO = {
-                    projectKey: values.projectKey.toUpperCase(), summary: values.summary,
-                    description: values.description, members: values.members.map(u => ({ email: u.email })),
-                    dependencies, attachments: existingAttachments,
+                    projectKey: values.projectKey.toUpperCase(),
+                    summary: values.summary,
+                    description: values.description,
+                    members: values.members.map(u => ({ email: u.email })),
+                    dependencies,
+                    attachments: attachments.existing,
                 };
                 if (modalMode === 'create') {
-                    await createProject(projectDTO, newAttachments);
+                    await createProject(projectDTO, attachments.new);
                     showToast('Project created successfully', 'success');
                 } else {
-                    await updateProject(project.projectKey, projectDTO, newAttachments);
+                    await updateProject(project.projectKey, projectDTO, attachments.new);
                     showToast('Project updated successfully', 'success');
                 }
             }
             handleForceClose();
-        } catch (error) {
-            const message = error.response?.data?.message || error.message || 'Failed to save. Please try again.';
+        } catch (err) {
+            const message = err.response?.data?.message
+                || err.message || 'Failed to save. Please try again.';
             showToast(message, 'error');
         } finally {
             setSubmitting(false);
@@ -199,7 +214,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
     };
 
     const handleDeleteConfirm = async () => {
-        setDeleteConfirmOpen(false);
+        setUiState(prev => ({ ...prev, deleteConfirmOpen: false }));
         try {
             if (modalType === 'task' && modalMode === 'edit') {
                 await deleteTask(project?.projectKey || task?.projectKey, task.taskKey);
@@ -210,44 +225,45 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
             }
             handleForceClose();
         } catch (err) {
-            const message = err.response?.data?.message || err.message || 'Failed to delete. Please try again.';
+            const message = err.response?.data?.message
+                || err.message || 'Failed to delete. Please try again.';
             showToast(message, 'error');
         }
     };
 
     const handleAddAttachments = (files) => {
-        setNewAttachments(prev => [...prev, ...files]);
-        setIsDirty(true);
+        setAttachments(prev => ({ ...prev, new: [...prev.new, ...files] }));
+        setUiState(prev => ({ ...prev, isDirty: true }));
     };
 
     const handleRemoveAttachment = (attachment) => {
         if (attachment instanceof File) {
-            setNewAttachments(prev => prev.filter(f => f !== attachment));
+            setAttachments(prev => ({ ...prev, new: prev.new.filter(f => f !== attachment) }));
         } else {
-            setExistingAttachments(prev => prev.filter(a => a !== attachment));
+            setAttachments(prev => ({
+                ...prev, existing: prev.existing.filter(a => a !== attachment),
+            }));
         }
-        setIsDirty(true);
+        setUiState(prev => ({ ...prev, isDirty: true }));
     };
 
     const handleAddMember = (email, values, setFieldValue) => {
         if (!email) return;
         const normalizedEmail = email.toLowerCase().trim();
 
-        // Basic email format check
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-            setEmailError('Invalid email format');
+            setEmailState(prev => ({ ...prev, error: 'Invalid email format' }));
             return;
         }
 
         if (values.members.some(u => u.email === normalizedEmail)) {
-            setEmailError('Already added');
+            setEmailState(prev => ({ ...prev, error: 'Already added' }));
             return;
         }
 
-        setEmailError('');
+        setEmailState(prev => ({ ...prev, error: '' }));
         setFieldValue('members', [...values.members, { email: normalizedEmail }]);
         setFieldValue('newUserEmail', '');
-        // Backend validates if user exists when project is saved
     };
 
     const modalTitle = modalType === 'task'
@@ -255,76 +271,166 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
         : (modalMode === 'create' ? 'Create Project' : 'Edit Project');
 
     const deleteMessage = modalType === 'task'
-        ? `Are you sure you want to delete "${task?.summary || 'this task'}"? This action cannot be undone.`
-        : `Are you sure you want to delete "${project?.summary || 'this project'}"? All tasks in this project will also be deleted.`;
+        ? `Are you sure you want to delete "${task?.summary || 'this task'}"? This cannot be undone.`
+        : `Are you sure you want to delete "${project?.summary || 'this project'}"? All tasks will be deleted.`;
+
+    const overlayClasses =
+        'fixed inset-0 bg-black/50 z-[60] transition-opacity duration-300 '
+        + (uiState.isVisible ? 'opacity-100' : 'opacity-0');
+
+    const modalClasses =
+        'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[1400px]'
+        + ' max-h-[90vh] bg-white shadow-2xl rounded-xl z-[70] flex flex-col'
+        + ' transition-all duration-300 '
+        + (uiState.isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0');
+
+    const badgeClasses =
+        'px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide '
+        + (modalMode === 'create' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700');
+
+    const submitButtonClasses =
+        'flex-1 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800'
+        + ' transition-all font-semibold text-sm disabled:opacity-50'
+        + ' flex items-center justify-center gap-2';
 
     return (
         <>
-            <div className={`fixed inset-0 bg-black/50 z-[60] transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`} onClick={handleCloseAttempt} aria-hidden="true" />
+            <div
+                className={overlayClasses}
+                onClick={handleCloseAttempt}
+                aria-hidden="true"
+            />
 
-            <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="modal-title"
-                className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[1400px] max-h-[90vh] bg-white shadow-2xl rounded-xl z-[70] flex flex-col transition-all duration-300 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
-                {/* Header */}
+            <div
+                ref={modalRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-title"
+                className={modalClasses}
+            >
                 <div className="flex-shrink-0 bg-white border-b border-slate-200 rounded-t-xl">
                     <div className="h-1 bg-slate-900 rounded-t-xl" />
                     <div className="px-6 py-4">
                         <div className="flex justify-between items-start">
                             <div className="flex items-center gap-3">
                                 {modalType === 'task' && modalMode === 'edit' && task && (
-                                    <span className="px-2.5 py-1 bg-slate-900 text-white rounded-md text-xs font-bold">{task.taskKey}</span>
+                                    <span className="px-2.5 py-1 bg-slate-900 text-white rounded-md text-xs font-bold">
+                                        {task.taskKey}
+                                    </span>
                                 )}
                                 {modalType === 'project' && modalMode === 'edit' && project && (
-                                    <span className="px-2.5 py-1 bg-slate-900 text-white rounded-md text-xs font-bold">{project.projectKey}</span>
+                                    <span className="px-2.5 py-1 bg-slate-900 text-white rounded-md text-xs font-bold">
+                                        {project.projectKey}
+                                    </span>
                                 )}
                                 <div>
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${modalMode === 'create' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                                    <span className={badgeClasses}>
                                         {modalMode === 'create' ? 'New' : 'Edit'}
                                     </span>
-                                    <h2 id="modal-title" className="text-lg font-bold text-slate-900 mt-1">{modalTitle}</h2>
+                                    <h2 id="modal-title" className="text-lg font-bold text-slate-900 mt-1">
+                                        {modalTitle}
+                                    </h2>
                                 </div>
                             </div>
-                            <button onClick={handleCloseAttempt} aria-label="Close dialog" className="p-2 hover:bg-slate-100 rounded-lg transition-colors group">
+                            <button
+                                onClick={handleCloseAttempt}
+                                aria-label="Close dialog"
+                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors group"
+                            >
                                 <HiOutlineX className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
                             </button>
                         </div>
                     </div>
                 </div>
 
-                {/* Content */}
                 <div className="flex-1 overflow-y-auto">
-                    <Formik innerRef={formikRef} enableReinitialize initialValues={initialValues} validationSchema={validationSchema} onSubmit={handleSubmit}>
+                    <Formik
+                        innerRef={formikRef}
+                        enableReinitialize
+                        initialValues={initialValues}
+                        validationSchema={validationSchema}
+                        onSubmit={handleSubmit}
+                    >
                         {({ setFieldValue, values, handleChange }) => (
                             <Form className="flex h-full">
                                 {modalType === 'task' ? (
-                                    <TaskForm values={values} setFieldValue={setFieldValue} handleChange={handleChange} modalMode={modalMode}
-                                        task={task} project={project} projects={projects} currentUser={currentUser}
-                                        dependencies={dependencies} setDependencies={setDependencies}
-                                        existingAttachments={existingAttachments} newAttachments={newAttachments}
-                                        onAddAttachments={handleAddAttachments} onRemoveAttachment={handleRemoveAttachment} />
+                                    <TaskForm
+                                        values={values}
+                                        setFieldValue={setFieldValue}
+                                        handleChange={handleChange}
+                                        modalMode={modalMode}
+                                        task={task}
+                                        project={project}
+                                        projects={projects}
+                                        currentUser={currentUser}
+                                        dependencies={dependencies}
+                                        setDependencies={setDependencies}
+                                        existingAttachments={attachments.existing}
+                                        newAttachments={attachments.new}
+                                        onAddAttachments={handleAddAttachments}
+                                        onRemoveAttachment={handleRemoveAttachment}
+                                    />
                                 ) : (
-                                    <ProjectForm values={values} setFieldValue={setFieldValue} modalMode={modalMode}
-                                        project={project} projects={projects} currentUser={currentUser}
-                                        dependencies={dependencies} setDependencies={setDependencies}
-                                        existingAttachments={existingAttachments} newAttachments={newAttachments}
-                                        onAddAttachments={handleAddAttachments} onRemoveAttachment={handleRemoveAttachment}
-                                        onAddMember={handleAddMember} emailLoading={emailLoading} emailError={emailError} />
+                                    <ProjectForm
+                                        values={values}
+                                        setFieldValue={setFieldValue}
+                                        modalMode={modalMode}
+                                        project={project}
+                                        projects={projects}
+                                        currentUser={currentUser}
+                                        dependencies={dependencies}
+                                        setDependencies={setDependencies}
+                                        existingAttachments={attachments.existing}
+                                        newAttachments={attachments.new}
+                                        onAddAttachments={handleAddAttachments}
+                                        onRemoveAttachment={handleRemoveAttachment}
+                                        onAddMember={handleAddMember}
+                                        emailLoading={emailState.loading}
+                                        emailError={emailState.error}
+                                    />
                                 )}
                             </Form>
                         )}
                     </Formik>
                 </div>
 
-                {/* Footer */}
                 <div className="flex-shrink-0 bg-white border-t border-slate-200 px-6 py-4 rounded-b-xl">
                     <div className="flex items-center gap-3">
-                        <button type="button" onClick={() => formikRef.current?.submitForm()} disabled={formikRef.current?.isSubmitting}
-                            className="flex-1 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
-                            {modalMode === 'create' ? <HiOutlinePlus className="w-4 h-4" /> : <HiOutlineCheck className="w-4 h-4" />}
+                        <button
+                            type="button"
+                            onClick={() => formikRef.current?.submitForm()}
+                            disabled={formikRef.current?.isSubmitting}
+                            className={submitButtonClasses}
+                        >
+                            {modalMode === 'create' ? (
+                                <HiOutlinePlus className="w-4 h-4" />
+                            ) : (
+                                <HiOutlineCheck className="w-4 h-4" />
+                            )}
                             <span>{modalMode === 'create' ? 'Create' : 'Save Changes'}</span>
                         </button>
-                        <button type="button" onClick={handleCloseAttempt} className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium">Cancel</button>
+                        <button
+                            type="button"
+                            onClick={handleCloseAttempt}
+                            className={
+                                'px-4 py-2.5 text-slate-600 hover:bg-slate-100'
+                                + ' rounded-lg transition-colors text-sm font-medium'
+                            }
+                        >
+                            Cancel
+                        </button>
                         {modalMode === 'edit' && (
-                            <button type="button" onClick={() => setDeleteConfirmOpen(true)} className="px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setUiState(prev => ({
+                                    ...prev, deleteConfirmOpen: true,
+                                }))}
+                                className={
+                                    'px-4 py-2.5 text-red-600 hover:bg-red-50'
+                                    + ' rounded-lg transition-colors text-sm font-medium'
+                                    + ' flex items-center gap-2'
+                                }
+                            >
                                 <HiOutlineTrash className="w-4 h-4" />Delete
                             </button>
                         )}
@@ -332,13 +438,27 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                 </div>
             </div>
 
-            <ConfirmDialog isOpen={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} onConfirm={handleDeleteConfirm}
-                title={`Delete ${modalType === 'task' ? 'Task' : 'Project'}?`} message={deleteMessage}
-                confirmText="Delete" cancelText="Cancel" variant="danger" />
+            <ConfirmDialog
+                isOpen={uiState.deleteConfirmOpen}
+                onClose={() => setUiState(prev => ({ ...prev, deleteConfirmOpen: false }))}
+                onConfirm={handleDeleteConfirm}
+                title={`Delete ${modalType === 'task' ? 'Task' : 'Project'}?`}
+                message={deleteMessage}
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="danger"
+            />
 
-            <ConfirmDialog isOpen={closeConfirmOpen} onClose={() => setCloseConfirmOpen(false)} onConfirm={handleForceClose}
-                title="Unsaved Changes" message="You have unsaved changes. Are you sure you want to close without saving?"
-                confirmText="Discard" cancelText="Keep Editing" variant="warning" />
+            <ConfirmDialog
+                isOpen={uiState.closeConfirmOpen}
+                onClose={() => setUiState(prev => ({ ...prev, closeConfirmOpen: false }))}
+                onConfirm={handleForceClose}
+                title="Unsaved Changes"
+                message="You have unsaved changes. Are you sure you want to close without saving?"
+                confirmText="Discard"
+                cancelText="Keep Editing"
+                variant="warning"
+            />
         </>
     );
 };

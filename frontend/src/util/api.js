@@ -1,25 +1,19 @@
 import axios from 'axios';
 import config from '../config';
 
-// Single axios instance with proper configuration
 const api = axios.create({
     baseURL: config.API_BASE_URL,
     withCredentials: true,
-    timeout: 30000, // 30 second timeout to prevent indefinite waits
+    timeout: 30000,
 });
 
-/**
- * Get CSRF token from cookie.
- * The server sets XSRF-TOKEN cookie on GET requests.
- * Uses proper cookie parsing with URL decoding for reliability.
- */
 const getCsrfToken = () => {
     if (!document.cookie) return null;
 
     const cookies = document.cookie.split('; ').reduce((acc, cookie) => {
         const [key, ...valueParts] = cookie.split('=');
         if (key && valueParts.length > 0) {
-            acc[key] = valueParts.join('='); // Handle values containing '='
+            acc[key] = valueParts.join('=');
         }
         return acc;
     }, {});
@@ -30,18 +24,13 @@ const getCsrfToken = () => {
     try {
         return decodeURIComponent(token);
     } catch {
-        return token; // Return raw value if decoding fails
+        return token;
     }
 };
 
-/**
- * Request interceptor to add CSRF token to state-changing requests.
- * This implements the Double-Submit Cookie pattern.
- */
 api.interceptors.request.use((config) => {
     const method = config.method?.toUpperCase();
 
-    // Add CSRF token for non-safe methods (POST, PUT, DELETE, PATCH)
     if (method && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
         const csrfToken = getCsrfToken();
         if (csrfToken) {
@@ -52,7 +41,6 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
-// Token refresh logic
 let isRefreshing = false;
 let failedQueue = [];
 let refreshPromise = null;
@@ -69,12 +57,10 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        // Only handle 401 errors
         if (error.response?.status !== 401) {
             return Promise.reject(error);
         }
 
-        // Don't retry if already retried or should skip refresh
         const skipRefreshUrls = ['/api/auth/login', '/api/auth/refresh'];
         if (originalRequest._retry || skipRefreshUrls.includes(originalRequest.url) || originalRequest._skipRefresh) {
             return Promise.reject(error);
@@ -82,7 +68,6 @@ api.interceptors.response.use(
 
         originalRequest._retry = true;
 
-        // If already refreshing, wait for the current refresh to complete
         if (isRefreshing) {
             return new Promise((resolve, reject) => {
                 failedQueue.push({ resolve, reject });
@@ -93,7 +78,6 @@ api.interceptors.response.use(
         isRefreshing = true;
 
         try {
-            // Store refresh promise so all waiting requests use the same one
             refreshPromise = api.post('/api/auth/refresh');
             await refreshPromise;
 
@@ -102,10 +86,8 @@ api.interceptors.response.use(
         } catch (refreshError) {
             processQueue(refreshError);
 
-            // Clear any stale auth state and redirect
             const publicPaths = ['/login', '/register', '/'];
             if (!publicPaths.includes(window.location.pathname)) {
-                // Store message to show on login page
                 sessionStorage.setItem('session_expired', 'Your session has expired. Please sign in again.');
                 window.location.href = '/login';
             }
@@ -117,7 +99,6 @@ api.interceptors.response.use(
     }
 );
 
-// Helper for multipart form data requests
 const createFormData = (data, attachments = [], dataKey = 'data') => {
     const formData = new FormData();
     formData.append(dataKey, JSON.stringify(data));
@@ -125,7 +106,6 @@ const createFormData = (data, attachments = [], dataKey = 'data') => {
     return formData;
 };
 
-// ============ USER API ============
 export const getUser = () => api.get('/api/users').then(res => res.data);
 
 export const checkUserAuth = () =>
@@ -134,15 +114,11 @@ export const checkUserAuth = () =>
 export const getUserByEmail = (email) =>
     api.get(`/api/users/${email}`).then(res => res.data);
 
-export const checkUserExists = (email) =>
-    api.get('/api/users/exists', { params: { email } }).then(res => res.data.exists);
-
 export const updateUser = (formData) =>
     api.put('/api/users', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     }).then(res => res.data);
 
-// ============ PROJECT API ============
 export const getProjects = () => api.get('/api/projects').then(res => res.data);
 
 export const getProject = (projectKey) =>
@@ -161,7 +137,6 @@ export const updateProject = (projectKey, projectDTO, attachments = []) =>
 export const deleteProject = (projectKey) =>
     api.delete(`/api/projects/${projectKey}`).then(res => res.data);
 
-// ============ TASK API ============
 export const createTask = (projectKey, taskDTO, attachments = []) =>
     api.post(`/api/projects/${projectKey}/tasks`, createFormData(taskDTO, attachments, 'taskDTO'), {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -175,9 +150,6 @@ export const updateTask = (projectKey, taskKey, taskDTO, attachments = []) =>
 export const deleteTask = (projectKey, taskKey) =>
     api.delete(`/api/projects/${projectKey}/tasks/${taskKey}`).then(res => res.data);
 
-export const getUserTasks = () => api.get('/api/tasks/assigned').then(res => res.data);
-
-// ============ COMMENT API ============
 export const getComments = (taskId) =>
     api.get(`/api/tasks/${taskId}/comments`).then(res => res.data);
 
@@ -208,14 +180,12 @@ export const reactToComment = (taskId, commentId, reactionType) =>
         params: { type: reactionType }
     }).then(res => res.data);
 
-// ============ NOTIFICATION API ============
 export const getNotifications = () =>
     api.get('/api/notifications').then(res => res.data);
 
 export const markNotificationsAsRead = (notificationIds) =>
     api.post('/api/notifications/mark-as-read', notificationIds).then(res => res.data);
 
-// ============ AUTH API ============
 export const login = (email, password) =>
     api.post('/api/auth/login', { email, password }).then(res => res.data);
 
@@ -224,18 +194,11 @@ export const logout = () => api.post('/api/auth/logout');
 export const register = (userData) =>
     api.post('/api/users', userData).then(res => res.data);
 
-/**
- * Initialize CSRF token by making a GET request.
- * Call this on app initialization to ensure CSRF token is set.
- */
 export const initCsrfToken = async () => {
     try {
-        // Any GET request will set the CSRF token cookie
         await api.get('/api/users/exists', { params: { email: '' }, _skipRefresh: true });
     } catch (e) {
-        // Ignore errors - this is just to get the CSRF cookie
     }
 };
 
-// Export the axios instance for edge cases
 export default api;

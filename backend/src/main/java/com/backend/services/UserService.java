@@ -1,11 +1,11 @@
 package com.backend.services;
 
-import com.backend.daos.UserDAO;
 import com.backend.dtos.UserDTO;
 import com.backend.entities.User;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.repositories.ProjectRepository;
+import com.backend.repositories.UserRepository;
 import com.backend.requests.UserRegistrationRequest;
 import com.backend.util.FileValidationConstants;
 import com.backend.util.ValidationUtil;
@@ -19,27 +19,30 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
 
-    private final UserDAO userDAO;
+    private final UserRepository userRepository;
     private final TokenService tokenService;
     private final FileStorageService fileStorageService;
     private final ProjectRepository projectRepository;
     private final BCryptPasswordEncoder passwordEncoder;
 
     @Autowired
-    public UserService(UserDAO userDAO,
+    public UserService(UserRepository userRepository,
                        TokenService tokenService,
                        FileStorageService fileStorageService,
-                       ProjectRepository projectRepository) {
-        this.userDAO = userDAO;
+                       ProjectRepository projectRepository,
+                       BCryptPasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
         this.tokenService = tokenService;
         this.fileStorageService = fileStorageService;
         this.projectRepository = projectRepository;
-        this.passwordEncoder = new BCryptPasswordEncoder(12);
+        this.passwordEncoder = passwordEncoder;
     }
 
     public boolean shareProjectWith(Integer userId1, Integer userId2) {
@@ -47,16 +50,29 @@ public class UserService {
     }
 
     public boolean existsUserByEmail(String email) {
-        return userDAO.existsUserWithEmail(email);
+        return userRepository.existsByEmail(email);
     }
 
     public User findUserByEmailOrNull(String email) {
-        return userDAO.getUserByEmail(email).orElse(null);
+        return userRepository.findByEmail(email).orElse(null);
     }
 
     public User getRequiredUserByEmail(String email) {
-        return userDAO.getUserByEmail(email)
+        return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    public User getRequiredUserById(Integer id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    public Map<String, User> findByEmailsAsMap(Collection<String> emails) {
+        if (emails == null || emails.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findByEmailIn(emails).stream()
+                .collect(Collectors.toMap(User::getEmail, user -> user));
     }
 
     @Transactional
@@ -75,13 +91,13 @@ public class UserService {
                 hashedPassword
         );
 
-        userDAO.save(user);
+        userRepository.save(user);
 
         var tokens = tokenService.createAuthTokens(user.getId());
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, tokens.getAccessCookie().toString())
-                .header(HttpHeaders.SET_COOKIE, tokens.getRefreshCookie().toString())
+                .header(HttpHeaders.SET_COOKIE, tokens.accessCookie().toString())
+                .header(HttpHeaders.SET_COOKIE, tokens.refreshCookie().toString())
                 .body(Map.of(
                         "message", "Registration successful",
                         "userId", user.getId(),
@@ -112,7 +128,7 @@ public class UserService {
                               String newPassword,
                               MultipartFile profilePicture) {
 
-        var user = userDAO.getUserById(userId)
+        var user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (!ValidationUtil.isNullOrEmpty(firstname)) {
@@ -132,7 +148,7 @@ public class UserService {
 
             var normalizedEmail = email.toLowerCase().trim();
             if (!normalizedEmail.equals(user.getEmail()) &&
-                    userDAO.existsUserWithEmail(normalizedEmail)) {
+                    userRepository.existsByEmail(normalizedEmail)) {
                 throw new ValidationException("Email already in use");
             }
             user.setEmail(normalizedEmail);
@@ -154,7 +170,7 @@ public class UserService {
             replaceProfilePicture(user, profilePicture);
         }
 
-        userDAO.save(user);
+        userRepository.save(user);
 
         return new UserDTO(
                 user.getId(),
@@ -166,7 +182,7 @@ public class UserService {
     }
 
     private User getUserById(Integer id) {
-        return userDAO.getUserById(id)
+        return userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
@@ -182,7 +198,7 @@ public class UserService {
             throw new ValidationException("Invalid email format");
         }
 
-        if (userDAO.existsUserWithEmail(request.email().toLowerCase().trim())) {
+        if (userRepository.existsByEmail(request.email().toLowerCase().trim())) {
             throw new ValidationException("Email already registered");
         }
     }
