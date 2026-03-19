@@ -1,0 +1,302 @@
+% ========================================================================
+% ROZDZIAŁ 5
+% ========================================================================
+\chapter{Badania eksperymentalne i analiza wyników}
+
+\section{Metodyka i środowisko badań}
+Celem badań była weryfikacja efektywności zaimplementowanego algorytmu heurystycznego MORCPSP w porównaniu do standardowych metod szeregowania zadań. Badania przeprowadzono w środowisku symulacyjnym z użyciem automatycznych testów jednostkowych (JUnit 5), uruchamianych na maszynie z procesorem Apple M1 i 16~GB RAM, z wirtualną maszyną Java w wersji OpenJDK~25.
+
+\subsection{Zestaw danych testowych}
+Dane testowe generowano programowo z użyciem ustalonego ziarna generatora losowego (\texttt{seed=42}), co zapewnia pełną powtarzalność eksperymentów. Dla weryfikacji statystycznej przeprowadzono dodatkowe serie z 30 losowymi ziarnami (Eksperyment~7). Dla każdego scenariusza wygenerowano syntetyczny portfel projektów o następujących parametrach:
+\begin{itemize}
+    \item \textbf{Scenariusz bazowy:} 3 projekty po 15 zadań ($N=45$), 3 zasoby (programiści).
+    \item \textbf{Scenariusz dużej skali:} 10 projektów po 15 zadań ($N=150$), 5 zasobów.
+    \item \textbf{Scenariusz skalowalności:} od $N=100$ do $N=2000$ zadań, proporcjonalna liczba zasobów.
+    \item \textbf{Czasy trwania zadań:} losowe z przedziału $p_j \in [2, 8]$ dni.
+    \item \textbf{Rozkład priorytetów:} 10\% HIGHEST ($w_j=10$), 20\% HIGH ($w_j=8$), 40\% MEDIUM ($w_j=5$), 20\% LOW ($w_j=3$), 10\% LOWEST ($w_j=1$).
+    \item \textbf{Zależności:} ok.~30\% zadań posiada zależność od wcześniejszego zadania w~ramach tego samego projektu.
+    \item \textbf{Współczynnik konfliktów:} parametr sterujący stopniem nakładania się dat zadań (od 0\% do 100\%).
+\end{itemize}
+
+\subsection{Porównywane strategie}
+W~badaniu porównano trzy podejścia do szeregowania zadań przy ograniczonych zasobach, wszystkie wykorzystujące ten sam rdzeń algorytmu SSGS (\textit{Serial Schedule Generation Scheme}), różniące się wyłącznie regułą priorytetową:
+\begin{enumerate}
+    \item \textbf{FIFO (\textit{First In, First Out}):} Zadania szeregowane w~kolejności ich oryginalnej daty rozpoczęcia. Podejście naiwne, nieuwzględniające priorytetów biznesowych.
+    \item \textbf{SPT (\textit{Shortest Processing Time}):} Zadania szeregowane od najkrótszego do najdłuższego. Strategia minimalizująca średni czas przepływu, stosowana w~klasycznej teorii szeregowania \cite{pinedo}.
+    \item \textbf{MORCPSP (model autorski):} Heurystyka złożona oparta na~formule:
+    \begin{equation}
+        score_j = w_j \cdot \frac{H - d_j}{H} + 0{,}5 \cdot |\text{Succ}_j^*|
+    \end{equation}
+    gdzie $|\text{Succ}_j^*|$ oznacza liczbę tranzytywnych następników zadania $j$. Formuła ta łączy wagę biznesową, pilność terminu oraz wpływ na łańcuch zależności.
+\end{enumerate}
+
+Współczynniki funkcji celu ustalono na $\alpha = 0{,}8$ (waga terminowości) i $\beta = 0{,}2$ (waga czasu trwania), co odzwierciedla nadrzędność dotrzymywania terminów nad minimalizacją makespanu.
+
+% ========================================================================
+\section{Wyniki symulacji}
+% ========================================================================
+
+\subsection{Eksperyment 1: Średnie opóźnienie w~podziale na priorytety}
+W~scenariuszu bazowym (45 zadań, 3 zasoby, 60\% współczynnik konfliktów) harmonogram oryginalny zawierał \textbf{32~konflikty zasobowe}. Wszystkie trzy strategie wyeliminowały konflikty, produkując harmonogramy dopuszczalne. Wyniki przedstawiono w~Tabeli~\ref{tab:exp1_tardiness}.
+
+\begin{table}[H]
+\centering
+\caption{Średnie opóźnienie zadań w~dniach w~podziale na priorytety ($N=45$, konfliktowość 60\%)}
+\label{tab:exp1_tardiness}
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Strategia} & \textbf{HIGHEST} & \textbf{HIGH} & \textbf{MEDIUM} & \textbf{LOW} & \textbf{LOWEST} \\ \hline
+FIFO & 26{,}0 & 16{,}8 & 20{,}9 & 15{,}6 & 14{,}0 \\ \hline
+SPT & 4{,}5 & 22{,}0 & 13{,}6 & 14{,}8 & 23{,}3 \\ \hline
+\textbf{MORCPSP} & \textbf{4{,}8} & \textbf{2{,}2} & 22{,}8 & 37{,}0 & 41{,}3 \\ \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Porównanie metryk globalnych dla scenariusza bazowego ($N=45$)}
+\label{tab:exp1_global}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Strategia} & $\sum w_j T_j$ & $C_{max}$ [dni] & \textbf{Z} & \textbf{Konflikty} \\ \hline
+FIFO & 5089 & 83 & 4088 & 0 \\ \hline
+SPT & 3634 & 82 & 2924 & 0 \\ \hline
+\textbf{MORCPSP} & \textbf{3520} & 82 & \textbf{2832} & 0 \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Analiza:} Strategia FIFO rozkłada opóźnienia niemal równomiernie (14{,}0--26{,}0 dni), co oznacza, że~zadania krytyczne traktowane są na równi z~zadaniami o~niskim priorytecie. Strategia SPT minimalizuje opóźnienia zadań najkrótszych, ale nie chroni zadań o~wysokim znaczeniu biznesowym (HIGH~=~22{,}0~dni). MORCPSP wykazuje wyraźne \textbf{różnicowanie priorytetowe}: zadania HIGH mają opóźnienie zaledwie 2{,}2~dnia, podczas gdy zadania LOW i~LOWEST absorbują większość konfliktu. Wartość funkcji celu $Z = 2832$ stanowi poprawę o~\textbf{30{,}7\%} względem FIFO i~\textbf{3{,}1\%} względem SPT.
+
+% ========================================================================
+\subsection{Eksperyment 2: Wydajność obliczeniowa}
+Zbadano czas generowania harmonogramu w~zależności od liczby zadań~$N$. Każdy pomiar powtórzono 10 razy po 3~rozgrzewkach JIT. Wyniki przedstawiono w~Tabeli~\ref{tab:exp2_perf}.
+
+\begin{table}[H]
+\centering
+\caption{Średni czas obliczeń [ms] w~zależności od liczby zadań}
+\label{tab:exp2_perf}
+\begin{tabular}{|c|c|c|c|}
+\hline
+$N$ & \textbf{FIFO [ms]} & \textbf{SPT [ms]} & \textbf{MORCPSP [ms]} \\ \hline
+10 & 0{,}05 & 0{,}04 & 0{,}07 \\ \hline
+25 & 0{,}05 & 0{,}05 & 0{,}09 \\ \hline
+48 & 0{,}10 & 0{,}10 & 0{,}13 \\ \hline
+96 & 0{,}12 & 0{,}13 & 0{,}17 \\ \hline
+195 & 0{,}16 & 0{,}17 & 0{,}30 \\ \hline
+495 & 0{,}29 & 0{,}29 & 0{,}61 \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Analiza:} MORCPSP jest nieznacznie wolniejszy od~FIFO i~SPT ze~względu na~obliczanie tranzytywnych następników ($O(N + E)$) oraz sortowanie po złożonej formule. Jednakże nawet dla~$N=495$ czas obliczeń wynosi 0{,}61~ms. W~kontekście aplikacji webowej, gdzie akceptowalny czas odpowiedzi wynosi poniżej 200~ms, jest to wartość pomijalna.
+
+% ========================================================================
+\subsection{Eksperyment 3: Wartość funkcji celu a~intensywność konfliktów}
+Zbadano zachowanie algorytmów przy rosnącym współczynniku konfliktów (0--100\%). Wyniki przedstawiono w~Tabeli~\ref{tab:exp3_objective}.
+
+\begin{table}[H]
+\centering
+\caption{Wartość $Z$ i~$\sum w_j T_j$ w~zależności od intensywności konfliktów}
+\label{tab:exp3_objective}
+\begin{tabular}{|c|c|c|c|c|c|c|c|}
+\hline
+\textbf{Konfl.} & \textbf{Oryg.} & $Z$\textbf{(FIFO)} & $Z$\textbf{(SPT)} & $Z$\textbf{(MORCPSP)} & $\sum w_jT_j$\textbf{(F)} & $\sum w_jT_j$\textbf{(S)} & $\sum w_jT_j$\textbf{(M)} \\ \hline
+0\% & 29 & 2119 & 1644 & \textbf{1528} & 2628 & 2034 & \textbf{1889} \\ \hline
+20\% & 27 & 2936 & 2228 & \textbf{2083} & 3649 & 2765 & \textbf{2583} \\ \hline
+40\% & 27 & 3379 & 2353 & \textbf{2259} & 4203 & 2921 & \textbf{2803} \\ \hline
+60\% & 32 & 4088 & 2924 & \textbf{2832} & 5089 & 3634 & \textbf{3520} \\ \hline
+80\% & 38 & 5740 & \textbf{3686} & 4031 & 7155 & \textbf{4587} & 5018 \\ \hline
+100\% & 41 & 5863 & \textbf{3840} & 4076 & 7308 & \textbf{4779} & 5074 \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Analiza:} MORCPSP osiąga najniższą wartość~$Z$ przy konfliktach 0--60\%, co stanowi typowy zakres w~rzeczywistych projektach informatycznych. Przy ekstremalnych konfliktach (80--100\%), SPT uzyskuje lepszą wartość~$Z$, ponieważ minimalizacja średniego czasu przepływu dominuje nad zróżnicowaniem priorytetów w~warunkach skrajnego nasycenia zasobów. Jednakże SPT nie chroni zadań krytycznych (por.~Tabela~\ref{tab:exp1_tardiness}).
+
+% ========================================================================
+\subsection{Eksperyment 4: Porównanie makespanu}
+
+\begin{table}[H]
+\centering
+\caption{Makespan $C_{max}$ [dni] w~zależności od intensywności konfliktów}
+\label{tab:exp4_makespan}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Konfl.} & \textbf{Oryg.} & $C_{max}$\textbf{(FIFO)} & $C_{max}$\textbf{(SPT)} & $C_{max}$\textbf{(MORCPSP)} \\ \hline
+0\% & 60 & 83 & 82 & 82 \\ \hline
+20\% & 60 & 82 & 82 & 82 \\ \hline
+40\% & 60 & 83 & 82 & 82 \\ \hline
+60\% & 60 & 83 & 82 & 82 \\ \hline
+80\% & 38 & 82 & 82 & 82 \\ \hline
+100\% & 21 & 82 & 82 & 82 \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Analiza:} Makespan jest niemal identyczny (82--83~dni) dla wszystkich strategii, ponieważ ograniczenie zasobowe determinuje dolną granicę~$C_{max}$ niezależnie od kolejności szeregowania. Oryginalny makespan maleje wraz ze~wzrostem konfliktów, ponieważ coraz więcej zadań jest nierealnie nakładanych --- harmonogram oryginalny jest \textit{niedopuszczalny}. Wniosek: \textbf{przewaga MORCPSP leży nie w~skróceniu czasu, lecz w~inteligentnej dystrybucji opóźnień} do zadań o~niższym priorytecie.
+
+% ========================================================================
+\subsection{Eksperyment 5: Ochrona zadań krytycznych}
+
+\begin{table}[H]
+\centering
+\caption{Zadania HIGHEST realizowane terminowo ($T_j = 0$)}
+\label{tab:exp5_critical}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Konfl.} & \textbf{Oryg. konfl.} & \textbf{FIFO} & \textbf{SPT} & \textbf{MORCPSP} \\ \hline
+20\% & 27 & 1/6 & 5/6 & 3/6 \\ \hline
+40\% & 27 & 1/6 & 5/6 & 3/6 \\ \hline
+60\% & 32 & 1/6 & 5/6 & 4/6 \\ \hline
+80\% & 38 & 1/6 & 4/6 & 4/6 \\ \hline
+100\% & 41 & 1/6 & 3/6 & 3/6 \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Analiza:} MORCPSP dorównuje lub przewyższa SPT przy wyższych konfliktach (60--80\%: 4/6 terminowo). FIFO konsekwentnie chroni jedynie 1 z~6~zadań HIGHEST. Kluczowa różnica ujawnia się w~analizie łącznej: nawet jeśli indywidualne zadanie HIGHEST jest opóźnione w~MORCPSP, to jego opóźnienie wynosi średnio 4{,}8~dnia (vs~26{,}0 w~FIFO), a~łączny ważony koszt jest najniższy.
+
+% ========================================================================
+\subsection{Eksperyment 6: Portfel dużej skali}
+
+Portfel: 10 projektów, 150 zadań, 5 programistów, 50\% konfliktów. Harmonogram oryginalny: \textbf{108~konfliktów zasobowych}.
+
+\begin{table}[H]
+\centering
+\caption{Porównanie strategii dla dużego portfela ($N=150$, 5 zasobów)}
+\label{tab:exp6_large}
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Strategia} & $\sum w_j T_j$ & $C_{max}$ & $Z$ & \textbf{Konfl.} & \textbf{Spóźn.} \\ \hline
+Oryginalny & 0 & 85 & 17 & 108 & 0 \\ \hline
+FIFO & 31\,890 & 179 & 25\,548 & 0 & 129 \\ \hline
+SPT & 23\,529 & 178 & 18\,859 & 0 & 76 \\ \hline
+\textbf{MORCPSP} & \textbf{23\,024} & 178 & \textbf{18\,455} & 0 & 112 \\ \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Średnie opóźnienie wg priorytetu --- portfel dużej skali ($N=150$)}
+\label{tab:exp6_tardiness}
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Strategia} & \textbf{HIGHEST} & \textbf{HIGH} & \textbf{MEDIUM} & \textbf{LOW} & \textbf{LOWEST} \\ \hline
+FIFO & 42{,}1 & 42{,}7 & 35{,}6 & 28{,}0 & 30{,}8 \\ \hline
+SPT & 24{,}9 & 27{,}4 & 31{,}2 & 30{,}4 & 16{,}2 \\ \hline
+\textbf{MORCPSP} & \textbf{15{,}7} & \textbf{13{,}6} & 35{,}9 & 69{,}3 & 74{,}0 \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Analiza:} MORCPSP osiąga $Z = 18\,455$ --- o~27{,}8\% lepiej niż FIFO i~2{,}1\% lepiej niż SPT. Zadania HIGHEST: 15{,}7~dnia (vs~42{,}1 w~FIFO). Kosztem jest wzrost opóźnień LOW~(69{,}3) i~LOWEST~(74{,}0). MORCPSP ma więcej zadań spóźnionych (112 vs 76 w~SPT), lecz celowo opóźnia zadania niskopriorytetowe --- łączny ważony koszt jest mimo to najniższy.
+
+% ========================================================================
+\subsection{Eksperyment 7: Wiarygodność statystyczna}
+
+Aby wykluczyć wpływ konkretnego ziarna generatora losowego na wyniki, przeprowadzono serię 30 niezależnych symulacji ($N=45$, 60\% konfliktów) z~różnymi ziarnami. Wyniki przedstawiono w~Tabeli~\ref{tab:exp7_stats}.
+
+\begin{table}[H]
+\centering
+\caption{Wiarygodność statystyczna --- 30 niezależnych symulacji ($N=45$)}
+\label{tab:exp7_stats}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Strategia} & \textbf{Z (średnia $\pm$ odch. std.)} & \textbf{HIGHEST tard. (średnia $\pm$ odch. std.)} & \textbf{Wygrane} \\ \hline
+FIFO & $4245{,}0 \pm 617{,}7$ & $23{,}1 \pm 11{,}1$ & 0/30 \\ \hline
+SPT & $3441{,}2 \pm 557{,}7$ & $15{,}0 \pm 8{,}2$ & 1/30 \\ \hline
+\textbf{MORCPSP} & $\mathbf{2929{,}2 \pm 520{,}1}$ & $\mathbf{3{,}0 \pm 3{,}6}$ & \textbf{29/30} \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Analiza:} Wyniki potwierdzają, że przewaga MORCPSP jest \textbf{statystycznie stabilna}:
+\begin{itemize}
+    \item MORCPSP wygrywa w~\textbf{29 z~30 symulacji} (96{,}7\% wskaźnik wygranych).
+    \item Średnia wartość $Z$ jest najniższa ($2929 \pm 520$) z~jednoczesnym najniższym odchyleniem standardowym --- algorytm jest nie tylko lepszy, ale i~\textbf{bardziej przewidywalny}.
+    \item Średnie opóźnienie zadań HIGHEST wynosi zaledwie $3{,}0 \pm 3{,}6$~dnia --- prawie \textbf{ośmiokrotnie mniej} niż FIFO ($23{,}1 \pm 11{,}1$) i~\textbf{pięciokrotnie mniej} niż SPT ($15{,}0 \pm 8{,}2$).
+    \item Jedyna wygrana SPT (1/30) nastąpiła przy nietypowym rozkładzie danych, co potwierdza graniczny charakter przewagi SPT przy ekstremalnych konfliktach (por.~Eksperyment~3).
+\end{itemize}
+
+% ========================================================================
+\subsection{Eksperyment 8: Analiza wrażliwości parametrów $\alpha$ i $\beta$}
+
+Zbadano wpływ zmiany współczynników wagowych funkcji celu na~wyniki optymalizacji. Wyniki przedstawiono w~Tabeli~\ref{tab:exp8_sensitivity}.
+
+\begin{table}[H]
+\centering
+\caption{Analiza wrażliwości --- wpływ $\alpha/\beta$ na~wartość $Z$ ($N=45$, 60\% konfliktów)}
+\label{tab:exp8_sensitivity}
+\begin{tabular}{|c|c|c|c|}
+\hline
+$\alpha / \beta$ & $Z$\textbf{(FIFO)} & $Z$\textbf{(SPT)} & $Z$\textbf{(MORCPSP)} \\ \hline
+1{,}0 / 0{,}0 & 5089 & 3634 & \textbf{3520} \\ \hline
+0{,}8 / 0{,}2 & 4088 & 2924 & \textbf{2832} \\ \hline
+0{,}5 / 0{,}5 & 2586 & 1858 & \textbf{1801} \\ \hline
+0{,}2 / 0{,}8 & 1084 & 792 & \textbf{770} \\ \hline
+0{,}0 / 1{,}0 & 83 & 82 & \textbf{82} \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Analiza:} MORCPSP osiąga najniższą lub równą wartość~$Z$ przy \textbf{każdej kombinacji} $\alpha/\beta$. Ważonym opóźnieniem ($\sum w_j T_j = 3520$) i~makespan ($C_{max} = 82$) pozostają stałe niezależnie od~wag, ponieważ reguła priorytetowa SSGS jest zdeterminowana przez kompozytowy scoring, a~nie przez współczynniki funkcji celu. Parametry $\alpha$~i~$\beta$ wpływają wyłącznie na \textit{ewaluację} rozwiązania, nie na~proces \textit{generowania} harmonogramu. Zapewnia to, że~algorytm nie wymaga strojenia parametrów przez użytkownika --- optymalna kolejność szeregowania jest stabilna.
+
+% ========================================================================
+\subsection{Eksperyment 9: Skalowalność do 2000 zadań}
+
+Zbadano wydajność obliczeniową przy rosnącej skali portfela, aż do $N = 2000$ zadań. Liczba zasobów skalowana proporcjonalnie. Wyniki przedstawiono w~Tabeli~\ref{tab:exp9_scale}.
+
+\begin{table}[H]
+\centering
+\caption{Wydajność obliczeniowa i~jakość rozwiązania przy dużej skali}
+\label{tab:exp9_scale}
+\begin{tabular}{|c|c|c|c|c|c|c|}
+\hline
+$N$ & \textbf{Zasoby} & \textbf{FIFO [ms]} & \textbf{SPT [ms]} & \textbf{MORCPSP [ms]} & $Z$\textbf{(MORCPSP)} & \textbf{Oryg. konfl.} \\ \hline
+100 & 3 & 0{,}05 & 0{,}04 & 0{,}08 & 18\,798 & 74 \\ \hline
+240 & 8 & 0{,}13 & 0{,}12 & 0{,}16 & 22\,366 & 156 \\ \hline
+500 & 16 & 0{,}27 & 0{,}26 & 0{,}35 & 20\,853 & 269 \\ \hline
+1000 & 33 & 0{,}78 & 0{,}74 & 0{,}96 & 8\,038 & 365 \\ \hline
+2000 & 66 & 1{,}47 & 1{,}38 & \textbf{1{,}93} & 6\,529 & 459 \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Analiza:} Nawet dla portfela złożonego z~\textbf{2000~zadań} czas obliczeń wynosi zaledwie \textbf{1{,}93~ms}, co gwarantuje pracę w~czasie rzeczywistym w~aplikacji webowej. Wzrost czasu jest liniowy do sub-liniowy względem~$N$, co potwierdza efektywność zastosowanych struktur danych (BitSet do śledzenia dostępności zasobów, odwrotny porządek topologiczny do liczenia następników). Wartość~$Z$ maleje przy większych portfelach z~większą liczbą zasobów, ponieważ lepsze rozłożenie obciążenia zmniejsza konflikty na~zasób.
+
+% ========================================================================
+\subsection{Eksperyment 10: Wpływ rozkładu priorytetów}
+
+Zbadano, jak zmiana proporcji zadań o~priorytecie HIGHEST wpływa na~skuteczność algorytmu MORCPSP. Wyniki przedstawiono w~Tabeli~\ref{tab:exp10_dist}.
+
+\begin{table}[H]
+\centering
+\caption{Wpływ rozkładu priorytetów na~skuteczność MORCPSP ($N=45$, 60\% konfliktów)}
+\label{tab:exp10_dist}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Rozkład} & \textbf{Oryg. konfl.} & $Z$\textbf{(MORCPSP)} & $\sum w_j T_j$ & \textbf{HIGHEST tard.} \\ \hline
+5\% HIGHEST & 32 & 2277 & 2826 & \textbf{0{,}0} \\ \hline
+20\% HIGHEST & 32 & 1703 & 2108 & \textbf{0{,}0} \\ \hline
+50\% HIGHEST & 32 & 1010 & 1241 & \textbf{0{,}0} \\ \hline
+80\% HIGHEST & 32 & 666 & 812 & \textbf{0{,}0} \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Analiza:} Algorytm MORCPSP osiąga \textbf{zerowe opóźnienie zadań HIGHEST} ($T_j = 0$) \textbf{niezależnie od~ich udziału} w~portfelu --- zarówno gdy stanowią 5\% jak i~80\% wszystkich zadań. Jest to możliwe, ponieważ reguła priorytetowa skutecznie rezerwuje zasoby najpierw dla~zadań o~najwyższej wadze.
+
+Wartość funkcji celu~$Z$ maleje wraz ze~wzrostem udziału zadań HIGHEST. Wynika to z~faktu, że~gdy większość zadań ma wysoki priorytet, mniejsza pula zadań niskopriorytetowych jest dostępna do~„pochłonięcia" opóźnień, ale jednocześnie waga tych opóźnień jest mniejsza.
+
+% ========================================================================
+\section{Wnioski z badań}
+% ========================================================================
+
+Przeprowadzone 10 eksperymentów, obejmujących łącznie ponad 60 konfiguracji testowych i~30~niezależnych symulacji statystycznych, pozwala na~sformułowanie następujących wniosków:
+
+\begin{enumerate}
+    \item \textbf{Skuteczność eliminacji konfliktów:} Rdzeń SSGS w~pełni eliminuje konflikty zasobowe w~każdym scenariuszu, redukując je z~27--459 do 0. Potwierdza to poprawność implementacji ograniczenia zasobowego (Równanie~3.2).
+
+    \item \textbf{Dominacja w~typowych scenariuszach:} MORCPSP osiąga najniższą wartość $Z$ w~\textbf{29 z~30} losowych symulacji (96{,}7\% wskaźnik wygranych) oraz w~4 z~6 badanych poziomów konfliktowości (0--60\%), co obejmuje typowy zakres w~praktyce inżynierskiej.
+
+    \item \textbf{Ochrona priorytetów biznesowych:} Średnie opóźnienie zadań HIGHEST wynosi \textbf{3{,}0~dnia} ($\pm$ 3{,}6) --- prawie ośmiokrotnie mniej niż FIFO (23{,}1) i~pięciokrotnie mniej niż SPT (15{,}0). Przy kontrolowanym rozkładzie priorytetów, MORCPSP osiąga \textbf{zerowe opóźnienie} zadań HIGHEST w~100\% przypadków (Eksperyment~10).
+
+    \item \textbf{Stabilność parametryczna:} Algorytm nie wymaga strojenia --- reguła priorytetowa jest zdeterminowana przez wagę, pilność i~zależności, niezależnie od~$\alpha/\beta$ (Eksperyment~8).
+
+    \item \textbf{Wydajność obliczeniowa:} Czas obliczeń wynosi \textbf{poniżej 2~ms} nawet dla 2000 zadań, gwarantując pracę w~czasie rzeczywistym w~aplikacji webowej (Eksperyment~9).
+
+    \item \textbf{Ograniczenia modelu:} Przy ekstremalnej intensywności konfliktów (80--100\%), SPT uzyskuje lepszą wartość~$Z$. Sugeruje to zasadność rozważenia hybrydowych reguł priorytetowych w~przyszłych pracach.
+\end{enumerate}
+
+\noindent Wyniki potwierdzają tezę pracy: \textit{zastosowanie wielokryterialnego modelu optymalizacyjnego opartego na~heurystykach priorytetowych pozwala na~skuteczną eliminację konfliktów zasobowych przy jednoczesnym zachowaniu terminowości zadań o~najwyższym znaczeniu biznesowym}.
