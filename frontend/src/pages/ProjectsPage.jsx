@@ -8,13 +8,16 @@ import FilterBar from '../components/projects/FilterBar';
 import TaskListView from '../components/projects/TaskListView';
 import TimelineView from '../components/projects/TimelineView';
 import { TaskTooltip, FilterTooltip } from '../components/projects/TimelineTooltip';
+import OptimizationMetrics from '../components/projects/OptimizationMetrics';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import { useTaskFiltering } from '../hooks/useTaskFiltering';
 import { useTimelineResize } from '../hooks/useTimelineResize';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { useModal } from '../hooks/useModal';
-import { isOverdue, isUpcomingDeadline, calculateDuration, MS_PER_DAY, toDateString } from '../util/helpers';
+import { isOverdue, isUpcomingDeadline, calculateDuration, MS_PER_DAY, toDateString, getErrorMessage } from '../util/helpers';
 import { computeProjectDateRange, computeProjectProgress } from '../util/projectUtils';
+import { simulateOptimization, applyOptimization } from '../util/api';
+import { showToast } from '../util/toast';
 import { TIMELINE_CONSTANTS, getSidebarWidth } from '../config/timelineConstants';
 
 const { DAY_WIDTH, TIMELINE_END_PADDING } = TIMELINE_CONSTANTS;
@@ -22,7 +25,7 @@ const { DAY_WIDTH, TIMELINE_END_PADDING } = TIMELINE_CONSTANTS;
 const ProjectsPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { projects, updateTask, user, handleLogout: contextLogout } = useContext(DataContext);
+    const { projects, updateTask, refreshProjects, user, handleLogout: contextLogout } = useContext(DataContext);
 
     const {
         open: modalOpen, type: modalType, mode: modalMode,
@@ -53,6 +56,10 @@ const ProjectsPage = () => {
     });
     const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, content: null });
     const [filterTooltip, setFilterTooltip] = useState({ visible: false, x: 0, y: 0, text: '' });
+    const [optimization, setOptimization] = useState({
+        loading: false, applying: false, result: null, showGhostBars: false, error: null,
+        suggestionMap: null, // Map<taskKey, suggestion> for O(1) lookup in TimelineView
+    });
 
     useEffect(() => {
         const { openFilterDropdown, searchQuery, ...toSave } = filterState;
@@ -329,6 +336,72 @@ const ProjectsPage = () => {
         navigate('/login');
     }, [contextLogout, navigate]);
 
+    const handleOptimize = useCallback(async () => {
+        setOptimization(prev => ({ ...prev, loading: true, error: null }));
+        try {
+            const projectKeys = processedProjects.map(p => p.projectKey);
+            const result = await simulateOptimization({ projectKeys, alpha: 0.8, beta: 0.2 });
+
+            // Pre-build Map for O(1) ghost bar lookups in TimelineView
+            const suggestionMap = new Map();
+            if (result?.suggestions) {
+                for (const s of result.suggestions) {
+                    if (s.wasShifted) suggestionMap.set(s.taskKey, s);
+                }
+            }
+
+            const shiftedCount = suggestionMap.size;
+            if (shiftedCount === 0) {
+                showToast('Schedule is already optimal — no changes needed.', 'info');
+                setOptimization(prev => ({ ...prev, loading: false }));
+                return;
+            }
+
+            setOptimization({
+                loading: false, applying: false, result, showGhostBars: true,
+                error: null, suggestionMap,
+            });
+        } catch (err) {
+            const msg = getErrorMessage(err);
+            showToast(msg, 'error');
+            setOptimization(prev => ({ ...prev, loading: false, error: msg }));
+        }
+    }, [processedProjects]);
+
+    const handleAcceptOptimization = useCallback(async () => {
+        if (!optimization.result?.suggestions) return;
+        setOptimization(prev => ({ ...prev, applying: true }));
+        try {
+            await applyOptimization(optimization.result.suggestions);
+            setOptimization({
+                loading: false, applying: false, result: null, showGhostBars: false,
+                error: null, suggestionMap: null,
+            });
+            refreshProjects();
+            showToast('Schedule optimized successfully.', 'success');
+        } catch (err) {
+            const msg = getErrorMessage(err);
+            showToast(msg, 'error');
+            setOptimization(prev => ({ ...prev, applying: false, error: msg }));
+        }
+    }, [optimization.result, refreshProjects]);
+
+    const handleRejectOptimization = useCallback(() => {
+        setOptimization({
+            loading: false, applying: false, result: null, showGhostBars: false,
+            error: null, suggestionMap: null,
+        });
+    }, []);
+
+    // Clear optimization results when underlying data changes
+    useEffect(() => {
+        if (optimization.result) {
+            setOptimization(prev => ({
+                ...prev, result: null, showGhostBars: false, suggestionMap: null,
+            }));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projects]);
 
     const toggleExpand = (key) => setViewState(prev => ({
         ...prev,
@@ -357,6 +430,14 @@ const ProjectsPage = () => {
                 new Date(t.dueDate).getTime(),
             ])
         );
+
+        // Include ghost bar dates so they're always visible on the timeline
+        if (optimization.suggestionMap) {
+            for (const s of optimization.suggestionMap.values()) {
+                if (s.suggestedStartDate) allDates.push(new Date(s.suggestedStartDate).getTime());
+                if (s.suggestedDueDate) allDates.push(new Date(s.suggestedDueDate).getTime());
+            }
+        }
 
         let timelineStart, timelineEnd;
         if (allDates.length === 0) {
@@ -459,6 +540,18 @@ const ProjectsPage = () => {
                     </div>
                 </div>
 
+                {optimization.result && viewState.mode === 'timeline' && (
+                    <OptimizationMetrics
+                        originalMetrics={optimization.result.originalMetrics}
+                        optimizedMetrics={optimization.result.optimizedMetrics}
+                        suggestions={optimization.result.suggestions}
+                        suggestionsCount={optimization.suggestionMap?.size ?? 0}
+                        onAccept={handleAcceptOptimization}
+                        onReject={handleRejectOptimization}
+                        isApplying={optimization.applying}
+                    />
+                )}
+
                 {viewState.mode === 'list' ? (
                   <ErrorBoundary>
                     <TaskListView
@@ -507,6 +600,10 @@ const ProjectsPage = () => {
                         headerRef={headerRef}
                         timelineRef={timelineRef}
                         syncScroll={syncScroll}
+                        optimization={optimization}
+                        onOptimize={handleOptimize}
+                        onAcceptOptimization={handleAcceptOptimization}
+                        onRejectOptimization={handleRejectOptimization}
                     />
                   </ErrorBoundary>
                 )}

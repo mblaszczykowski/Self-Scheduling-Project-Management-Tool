@@ -36,6 +36,9 @@ class AuthServiceTest {
     private TokenService tokenService;
 
     @Mock
+    private com.backend.filter.RateLimitFilter rateLimitFilter;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -52,8 +55,8 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userService, tokenService, false, "Strict");
         passwordEncoder = new BCryptPasswordEncoder(12);
+        authService = new AuthService(userService, tokenService, rateLimitFilter, passwordEncoder, false, "Strict");
 
         testUser = new User();
         testUser.setId(TEST_USER_ID);
@@ -78,8 +81,8 @@ class AuthServiceTest {
             );
             when(tokenService.createAuthTokens(TEST_USER_ID)).thenReturn(mockTokens);
 
-            LoginRequest request = new LoginRequest(TEST_EMAIL, TEST_PASSWORD);
-            ResponseEntity<?> response = authService.authenticateUser(request);
+            LoginRequest loginReq = new LoginRequest(TEST_EMAIL, TEST_PASSWORD);
+            ResponseEntity<?> response = authService.authenticateUser(loginReq, request);
 
             assertEquals(HttpStatus.OK, response.getStatusCode());
             assertTrue(response.getHeaders().containsKey(HttpHeaders.SET_COOKIE));
@@ -96,8 +99,8 @@ class AuthServiceTest {
         void shouldReturnBadRequestForInvalidPassword() {
             when(userService.findUserByEmailOrNull(TEST_EMAIL)).thenReturn(testUser);
 
-            LoginRequest request = new LoginRequest(TEST_EMAIL, "WrongPassword123!");
-            ResponseEntity<?> response = authService.authenticateUser(request);
+            LoginRequest loginReq = new LoginRequest(TEST_EMAIL, "WrongPassword123!");
+            ResponseEntity<?> response = authService.authenticateUser(loginReq, request);
 
             assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
 
@@ -112,8 +115,8 @@ class AuthServiceTest {
         void shouldReturnBadRequestForNonExistentUser() {
             when(userService.findUserByEmailOrNull("nonexistent@example.com")).thenReturn(null);
 
-            LoginRequest request = new LoginRequest("nonexistent@example.com", TEST_PASSWORD);
-            ResponseEntity<?> response = authService.authenticateUser(request);
+            LoginRequest loginReq = new LoginRequest("nonexistent@example.com", TEST_PASSWORD);
+            ResponseEntity<?> response = authService.authenticateUser(loginReq, request);
 
             assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
 
@@ -126,50 +129,50 @@ class AuthServiceTest {
         @Test
         @DisplayName("should throw ValidationException for empty email")
         void shouldThrowForEmptyEmail() {
-            LoginRequest request = new LoginRequest("", TEST_PASSWORD);
+            LoginRequest loginReq = new LoginRequest("", TEST_PASSWORD);
 
             assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(request)
+                    authService.authenticateUser(loginReq, request)
             );
         }
 
         @Test
         @DisplayName("should throw ValidationException for null password")
         void shouldThrowForNullPassword() {
-            LoginRequest request = new LoginRequest(TEST_EMAIL, null);
+            LoginRequest loginReq = new LoginRequest(TEST_EMAIL, null);
 
             assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(request)
+                    authService.authenticateUser(loginReq, request)
             );
         }
 
         @Test
         @DisplayName("should throw ValidationException for invalid email format")
         void shouldThrowForInvalidEmailFormat() {
-            LoginRequest request = new LoginRequest("not-an-email", TEST_PASSWORD);
+            LoginRequest loginReq = new LoginRequest("not-an-email", TEST_PASSWORD);
 
             assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(request)
+                    authService.authenticateUser(loginReq, request)
             );
         }
 
         @Test
         @DisplayName("should throw ValidationException for whitespace-only email")
         void shouldThrowForWhitespaceEmail() {
-            LoginRequest request = new LoginRequest("   ", TEST_PASSWORD);
+            LoginRequest loginReq = new LoginRequest("   ", TEST_PASSWORD);
 
             assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(request)
+                    authService.authenticateUser(loginReq, request)
             );
         }
 
         @Test
         @DisplayName("should throw ValidationException for whitespace-only password")
         void shouldThrowForWhitespacePassword() {
-            LoginRequest request = new LoginRequest(TEST_EMAIL, "   ");
+            LoginRequest loginReq = new LoginRequest(TEST_EMAIL, "   ");
 
             assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(request)
+                    authService.authenticateUser(loginReq, request)
             );
         }
 
@@ -187,12 +190,12 @@ class AuthServiceTest {
             for (int i = 0; i < iterations; i++) {
                 // Time for existing user with wrong password
                 long startExisting = System.nanoTime();
-                authService.authenticateUser(new LoginRequest(TEST_EMAIL, "WrongPassword123!"));
+                authService.authenticateUser(new LoginRequest(TEST_EMAIL, "WrongPassword123!"), request);
                 existingUserTotalTime += System.nanoTime() - startExisting;
 
                 // Time for non-existing user
                 long startNonExisting = System.nanoTime();
-                authService.authenticateUser(new LoginRequest("nonexistent@example.com", "WrongPassword123!"));
+                authService.authenticateUser(new LoginRequest("nonexistent@example.com", "WrongPassword123!"), request);
                 nonExistingUserTotalTime += System.nanoTime() - startNonExisting;
             }
 

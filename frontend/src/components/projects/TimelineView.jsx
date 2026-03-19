@@ -42,6 +42,10 @@ const TimelineView = ({
     headerRef,
     timelineRef,
     syncScroll,
+    optimization,
+    onOptimize,
+    onAcceptOptimization,
+    onRejectOptimization,
 }) => {
     const monthElements = useMemo(() => {
         const months = [];
@@ -360,6 +364,78 @@ const TimelineView = ({
                                                     }}
                                                 />
                                             </div>
+                                            {optimization?.showGhostBars && (() => {
+                                                const suggestion = optimization.suggestionMap?.get(task.taskKey);
+                                                if (!suggestion) return null;
+                                                const ghostPos = calculateTaskPosition(
+                                                    suggestion.suggestedStartDate,
+                                                    suggestion.suggestedDueDate,
+                                                    timelineStart
+                                                );
+                                                const origCenter = taskPosition.marginLeft + taskPosition.width / 2;
+                                                const ghostCenter = ghostPos.marginLeft + ghostPos.width / 2;
+                                                const arrowStartX = taskPosition.marginLeft + taskPosition.width;
+                                                const arrowEndX = ghostPos.marginLeft;
+                                                const goesRight = ghostCenter > origCenter;
+                                                return (
+                                                    <>
+                                                        {/* Connecting flow arrow from original to ghost */}
+                                                        {Math.abs(arrowEndX - arrowStartX) > 8 && (
+                                                            <svg
+                                                                className="absolute pointer-events-none"
+                                                                style={{
+                                                                    left: 0, top: 0, width: '100%', height: '100%',
+                                                                    zIndex: 1, overflow: 'visible',
+                                                                }}
+                                                            >
+                                                                <line
+                                                                    x1={goesRight ? arrowStartX + 2 : taskPosition.marginLeft - 2}
+                                                                    y1="50%"
+                                                                    x2={goesRight ? arrowEndX - 2 : arrowEndX + ghostPos.width + 2}
+                                                                    y2="50%"
+                                                                    stroke="rgba(129,140,248,0.35)"
+                                                                    strokeWidth="1"
+                                                                    strokeDasharray="3 2"
+                                                                />
+                                                                <polygon
+                                                                    points={goesRight
+                                                                        ? `${arrowEndX - 2},${0} ${arrowEndX + 2},${0} ${arrowEndX},${0}`
+                                                                        : `${arrowEndX + ghostPos.width + 2},${0} ${arrowEndX + ghostPos.width - 2},${0} ${arrowEndX + ghostPos.width},${0}`
+                                                                    }
+                                                                    fill="rgba(129,140,248,0.4)"
+                                                                    style={{ transform: 'translateY(calc(50% - 0px))' }}
+                                                                />
+                                                            </svg>
+                                                        )}
+                                                        {/* Ghost bar with animated shimmer */}
+                                                        <div
+                                                            className="absolute h-3 rounded-full z-[2]"
+                                                            style={{
+                                                                marginLeft: `${ghostPos.marginLeft}px`,
+                                                                width: `${ghostPos.width}px`,
+                                                                background: 'linear-gradient(90deg, rgba(129,140,248,0.15), rgba(129,140,248,0.3), rgba(129,140,248,0.15))',
+                                                                backgroundSize: '200% 100%',
+                                                                animation: 'optGhostShimmer 2.5s ease-in-out infinite',
+                                                                border: '1.5px dashed rgba(129,140,248,0.6)',
+                                                                boxShadow: '0 0 8px rgba(129,140,248,0.12)',
+                                                            }}
+                                                            onMouseEnter={(e) => onTooltipShow(e, {
+                                                                type: 'task',
+                                                                title: `${task.summary}`,
+                                                                subtitle: `${task.taskKey} \u2022 optimized`,
+                                                                status: 'Suggested schedule',
+                                                                dates: `${formatShortDate(suggestion.suggestedStartDate)} \u2192 ${
+                                                                    formatShortDate(suggestion.suggestedDueDate)
+                                                                }`,
+                                                                assignee: task.assignee || 'Unassigned',
+                                                                progress: task.progress,
+                                                            })}
+                                                            onMouseMove={onTooltipMove}
+                                                            onMouseLeave={onTooltipHide}
+                                                        />
+                                                    </>
+                                                );
+                                            })()}
                                             {enrichedTask?.isDelayed && (
                                                 <div
                                                     className="absolute flex items-center gap-1"
@@ -504,6 +580,14 @@ const TimelineView = ({
 
     return (
         <>
+            {optimization?.showGhostBars && (
+                <style>{`
+                    @keyframes optGhostShimmer {
+                        0%, 100% { background-position: 200% 0; }
+                        50% { background-position: -200% 0; }
+                    }
+                `}</style>
+            )}
             <div
                 className="flex mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white"
                 ref={headerRef}
@@ -525,9 +609,46 @@ const TimelineView = ({
                         />
                     </button>
                     {!sidebarCollapsed && (
-                        <span className="text-xs text-slate-500 pr-3">
-                            {processedProjects.length} projects
-                        </span>
+                        <div className="flex items-center gap-2.5 pr-3">
+                            <span className="text-xs text-slate-500">
+                                {processedProjects.length} projects
+                            </span>
+                            {!optimization?.result && (
+                                <button
+                                    onClick={onOptimize}
+                                    disabled={optimization?.loading}
+                                    className="group relative text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 disabled:opacity-60 flex items-center gap-1.5 text-white overflow-hidden"
+                                    title="Optimize schedule across all projects (RCPSP solver)"
+                                    style={{
+                                        background: optimization?.loading
+                                            ? 'linear-gradient(135deg, #4338ca, #6366f1)'
+                                            : 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                                        boxShadow: optimization?.loading
+                                            ? '0 0 12px rgba(99,102,241,0.3)'
+                                            : '0 1px 3px rgba(79,70,229,0.3)',
+                                    }}
+                                >
+                                    {optimization?.loading ? (
+                                        <>
+                                            <svg className="animate-spin h-3 w-3 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                            </svg>
+                                            <span>Solving...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" className="flex-shrink-0 transition-transform group-hover:rotate-90 duration-300">
+                                                <path d="M5.5 1v9M1 5.5h9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity="0.5"/>
+                                                <circle cx="5.5" cy="5.5" r="3" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                                                <circle cx="5.5" cy="5.5" r="1" fill="currentColor"/>
+                                            </svg>
+                                            <span>Optimize</span>
+                                        </>
+                                    )}
+                                </button>
+                            )}
+                        </div>
                     )}
                 </div>
                 <div className="flex-1 flex relative bg-white">{monthElements}</div>

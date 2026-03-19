@@ -201,4 +201,10 @@ export const initCsrfToken = async () => {
     }
 };
 
+export const simulateOptimization = (requestDTO) =>
+    api.post('/api/optimization/simulate', requestDTO).then(res => res.data);
+
+export const applyOptimization = (suggestions) =>
+    api.post('/api/optimization/apply', suggestions).then(res => res.data);
+
 export default api;

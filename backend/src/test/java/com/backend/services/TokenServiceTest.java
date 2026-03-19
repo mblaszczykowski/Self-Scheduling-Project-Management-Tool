@@ -419,10 +419,10 @@ class TokenServiceTest {
         void shouldCreateBothCookies() {
             TokenService.AuthTokens tokens = tokenService.createAuthTokens(TEST_USER_ID);
 
-            assertNotNull(tokens.getAccessCookie());
-            assertNotNull(tokens.getRefreshCookie());
-            assertEquals("accessToken", tokens.getAccessCookie().getName());
-            assertEquals("refreshToken", tokens.getRefreshCookie().getName());
+            assertNotNull(tokens.accessCookie());
+            assertNotNull(tokens.refreshCookie());
+            assertEquals("accessToken", tokens.accessCookie().getName());
+            assertEquals("refreshToken", tokens.refreshCookie().getName());
         }
 
         @Test
@@ -430,8 +430,8 @@ class TokenServiceTest {
         void shouldSetHttpOnlyFlag() {
             TokenService.AuthTokens tokens = tokenService.createAuthTokens(TEST_USER_ID);
 
-            assertTrue(tokens.getAccessCookie().isHttpOnly());
-            assertTrue(tokens.getRefreshCookie().isHttpOnly());
+            assertTrue(tokens.accessCookie().isHttpOnly());
+            assertTrue(tokens.refreshCookie().isHttpOnly());
         }
 
         @Test
@@ -439,8 +439,8 @@ class TokenServiceTest {
         void shouldSetSameSiteAttribute() {
             TokenService.AuthTokens tokens = tokenService.createAuthTokens(TEST_USER_ID);
 
-            assertTrue(tokens.getAccessCookie().toString().contains("SameSite=Strict"));
-            assertTrue(tokens.getRefreshCookie().toString().contains("SameSite=Strict"));
+            assertTrue(tokens.accessCookie().toString().contains("SameSite=Strict"));
+            assertTrue(tokens.refreshCookie().toString().contains("SameSite=Strict"));
         }
     }
 
