@@ -50,9 +50,9 @@ function LoginForm({ onToggleForm }) {
             onSubmit={handleSubmit}
         >
             {({ errors, touched, isSubmitting }) => (
-                <Form className="space-y-5">
+                <Form className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                             Email
                         </label>
                         <Field
@@ -65,7 +65,7 @@ function LoginForm({ onToggleForm }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                             Password
                         </label>
                         <div className="relative">
@@ -83,12 +83,7 @@ function LoginForm({ onToggleForm }) {
                     <button
                         type="submit"
                         disabled={isSubmitting}
-                        className={
-                            'w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600'
-                            + ' hover:from-blue-700 hover:to-indigo-700 text-white font-medium'
-                            + ' rounded-xl transition-all duration-200 shadow-lg'
-                            + ' shadow-blue-500/25 hover:shadow-blue-500/40 disabled:opacity-50'
-                        }
+                        className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-[10px] transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50"
                     >
                         {isSubmitting ? 'Signing in...' : 'Sign in'}
                     </button>

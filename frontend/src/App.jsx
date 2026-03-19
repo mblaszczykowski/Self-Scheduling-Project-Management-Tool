@@ -1,14 +1,15 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useContext, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AuthPage from './pages/AuthPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import DashboardPage from './pages/DashboardPage';
 import { DataContext, DataProvider } from './context/DataContext';
 import { checkUserAuth } from './util/api';
 import PageTransition from './components/common/PageTransition';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import ProjectsPage from './pages/ProjectsPage';
+
+const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
+const ProjectsPage = React.lazy(() => import('./pages/ProjectsPage'));
 
 const LoadingSpinner = () => (
     <div className="flex justify-center items-center h-screen bg-slate-50">
@@ -91,7 +92,9 @@ function AppRoutes() {
                     element={
                         <ProtectedRoute>
                             <PageTransition>
-                                <DashboardPage />
+                                <Suspense fallback={<LoadingSpinner />}>
+                                    <DashboardPage />
+                                </Suspense>
                             </PageTransition>
                         </ProtectedRoute>
                     }
@@ -101,7 +104,9 @@ function AppRoutes() {
                     element={
                         <ProtectedRoute>
                             <PageTransition>
-                                <ProjectsPage />
+                                <Suspense fallback={<LoadingSpinner />}>
+                                    <ProjectsPage />
+                                </Suspense>
                             </PageTransition>
                         </ProtectedRoute>
                     }

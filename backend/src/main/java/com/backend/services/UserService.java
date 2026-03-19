@@ -199,7 +199,7 @@ public class UserService {
         }
 
         if (userRepository.existsByEmail(request.email().toLowerCase().trim())) {
-            throw new ValidationException("Email already registered");
+            throw new ValidationException("Registration failed. Please check your details.");
         }
     }
 
@@ -212,11 +212,16 @@ public class UserService {
     }
 
     private void replaceProfilePicture(User user, MultipartFile profilePicture) {
-        if (user.getProfilePicture() != null) {
-            fileStorageService.deleteFile(user.getProfilePicture());
-        }
+        var oldPicture = user.getProfilePicture();
         var profilePicturePath = fileStorageService.storeFile(profilePicture);
         user.setProfilePicture(profilePicturePath);
+        if (oldPicture != null) {
+            try {
+                fileStorageService.deleteFile(oldPicture);
+            } catch (Exception e) {
+                // Old file cleanup is best-effort; new file is already set
+            }
+        }
     }
 
     private void validateImageMagicBytes(MultipartFile file) {

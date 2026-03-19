@@ -6,6 +6,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -13,14 +14,18 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final ObjectMapper objectMapper;
+    private final Set<String> trustedProxies;
 
     private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final int MAX_REGISTER_ATTEMPTS = 3;
@@ -29,8 +34,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final ConcurrentHashMap<String, RateLimitEntry> loginAttempts = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RateLimitEntry> registerAttempts = new ConcurrentHashMap<>();
 
-    public RateLimitFilter(ObjectMapper objectMapper) {
+    public RateLimitFilter(ObjectMapper objectMapper,
+                          @Value("${app.trusted-proxies:}") String trustedProxiesConfig) {
         this.objectMapper = objectMapper;
+        this.trustedProxies = (trustedProxiesConfig == null || trustedProxiesConfig.isBlank())
+                ? Set.of()
+                : Arrays.stream(trustedProxiesConfig.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toSet());
     }
 
     @Override
@@ -62,15 +74,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
+        String remoteAddr = request.getRemoteAddr();
+
+        if (!trustedProxies.isEmpty() && trustedProxies.contains(remoteAddr)) {
+            String xForwardedFor = request.getHeader("X-Forwarded-For");
+            if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+                return xForwardedFor.split(",")[0].trim();
+            }
+            String xRealIp = request.getHeader("X-Real-IP");
+            if (xRealIp != null && !xRealIp.isEmpty()) {
+                return xRealIp.trim();
+            }
         }
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isEmpty()) {
-            return xRealIp;
-        }
-        return request.getRemoteAddr();
+
+        return remoteAddr;
     }
 
     private boolean isRateLimited(String clientIp, ConcurrentHashMap<String, RateLimitEntry> attempts, int maxAttempts) {

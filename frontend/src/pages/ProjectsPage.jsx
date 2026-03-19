@@ -8,6 +8,7 @@ import FilterBar from '../components/projects/FilterBar';
 import TaskListView from '../components/projects/TaskListView';
 import TimelineView from '../components/projects/TimelineView';
 import { TaskTooltip, FilterTooltip } from '../components/projects/TimelineTooltip';
+import ErrorBoundary from '../components/common/ErrorBoundary';
 import { useTaskFiltering } from '../hooks/useTaskFiltering';
 import { useTimelineResize } from '../hooks/useTimelineResize';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -29,16 +30,43 @@ const ProjectsPage = () => {
         openModal: baseOpenModal, closeModal: baseCloseModal,
     } = useModal();
 
-    const [filterState, setFilterState] = useState({
-        filters: {}, searchInput: '', searchQuery: '',
-        assignedToMe: false, openFilterDropdown: null,
+    const [filterState, setFilterState] = useState(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('flowlink_filters'));
+            if (saved) return { ...saved, openFilterDropdown: null, searchQuery: saved.searchInput || '' };
+        } catch {}
+        return { filters: {}, searchInput: '', searchQuery: '', assignedToMe: false, openFilterDropdown: null };
     });
-    const [sortState, setSortState] = useState({ field: 'id', order: 'asc' });
-    const [viewState, setViewState] = useState({
-        mode: 'timeline', sidebarCollapsed: false, expandedProjects: {},
+    const [sortState, setSortState] = useState(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('flowlink_sort'));
+            if (saved) return saved;
+        } catch {}
+        return { field: 'id', order: 'asc' };
+    });
+    const [viewState, setViewState] = useState(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('flowlink_view'));
+            if (saved) return { ...saved, expandedProjects: saved.expandedProjects || {} };
+        } catch {}
+        return { mode: 'timeline', sidebarCollapsed: false, expandedProjects: {} };
     });
     const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, content: null });
     const [filterTooltip, setFilterTooltip] = useState({ visible: false, x: 0, y: 0, text: '' });
+
+    useEffect(() => {
+        const { openFilterDropdown, searchQuery, ...toSave } = filterState;
+        localStorage.setItem('flowlink_filters', JSON.stringify(toSave));
+    }, [filterState]);
+
+    useEffect(() => {
+        localStorage.setItem('flowlink_sort', JSON.stringify(sortState));
+    }, [sortState]);
+
+    useEffect(() => {
+        const { expandedProjects, ...toSave } = viewState;
+        localStorage.setItem('flowlink_view', JSON.stringify(toSave));
+    }, [viewState]);
 
     const sidebarWidth = getSidebarWidth(viewState.sidebarCollapsed);
 
@@ -126,11 +154,21 @@ const ProjectsPage = () => {
             }
         }
 
+        const previousStartDate = task.startDate;
+        const previousDueDate = task.dueDate;
+
         updateTask(projectKey, task.taskKey, {
             summary: task.summary, description: task.description, status: task.status,
             startDate: newStartDate, dueDate: newDueDate, assignee: task.assignee,
             labels: task.labels, dependencyKeys: task.dependencies || [],
-        }).catch(err => console.error('Error updating task:', err));
+        }).catch(err => {
+            console.error('Error updating task:', err);
+            updateTask(projectKey, task.taskKey, {
+                summary: task.summary, description: task.description, status: task.status,
+                startDate: previousStartDate, dueDate: previousDueDate, assignee: task.assignee,
+                labels: task.labels, dependencyKeys: task.dependencies || [],
+            }).catch(() => {});
+        });
     }, [processedProjects, updateTask]);
 
     const { startResize, shouldPreventClick } = useTimelineResize({
@@ -422,6 +460,7 @@ const ProjectsPage = () => {
                 </div>
 
                 {viewState.mode === 'list' ? (
+                  <ErrorBoundary>
                     <TaskListView
                         filteredTasks={filteredTasks}
                         processedProjects={processedProjects}
@@ -432,7 +471,9 @@ const ProjectsPage = () => {
                         onSort={handleSort}
                         onTaskClick={(project, task) => openModal('task', 'edit', project, task)}
                     />
+                  </ErrorBoundary>
                 ) : (
+                  <ErrorBoundary>
                     <TimelineView
                         processedProjects={processedProjects}
                         allTasks={allTasks}
@@ -467,6 +508,7 @@ const ProjectsPage = () => {
                         timelineRef={timelineRef}
                         syncScroll={syncScroll}
                     />
+                  </ErrorBoundary>
                 )}
 
                 <TaskTooltip tooltip={tooltip} />

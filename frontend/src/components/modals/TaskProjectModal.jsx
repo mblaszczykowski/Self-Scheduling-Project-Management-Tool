@@ -352,7 +352,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                         onSubmit={handleSubmit}
                     >
                         {({ setFieldValue, values, handleChange }) => (
-                            <Form className="flex h-full">
+                            <Form className="flex flex-col md:flex-row h-full">
                                 {modalType === 'task' ? (
                                     <TaskForm
                                         values={values}
@@ -402,12 +402,21 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                             disabled={formikRef.current?.isSubmitting}
                             className={submitButtonClasses}
                         >
-                            {modalMode === 'create' ? (
-                                <HiOutlinePlus className="w-4 h-4" />
+                            {formikRef.current?.isSubmitting ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span>{modalMode === 'create' ? 'Creating...' : 'Saving...'}</span>
+                                </>
                             ) : (
-                                <HiOutlineCheck className="w-4 h-4" />
+                                <>
+                                    {modalMode === 'create' ? (
+                                        <HiOutlinePlus className="w-4 h-4" />
+                                    ) : (
+                                        <HiOutlineCheck className="w-4 h-4" />
+                                    )}
+                                    <span>{modalMode === 'create' ? 'Create' : 'Save Changes'}</span>
+                                </>
                             )}
-                            <span>{modalMode === 'create' ? 'Create' : 'Save Changes'}</span>
                         </button>
                         <button
                             type="button"

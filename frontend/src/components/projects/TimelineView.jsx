@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
     formatShortDate,
     STATUS_CONFIG,
@@ -43,7 +43,7 @@ const TimelineView = ({
     timelineRef,
     syncScroll,
 }) => {
-    const renderMonths = () => {
+    const monthElements = useMemo(() => {
         const months = [];
         let year = timelineStart.getFullYear(), month = timelineStart.getMonth();
         const endYear = timelineEnd.getFullYear(), endMonth = timelineEnd.getMonth();
@@ -95,7 +95,7 @@ const TimelineView = ({
             if (month > 11) { month = 0; year++; }
         }
         return months;
-    };
+    }, [timelineStart, timelineEnd]);
 
     const renderProjectRow = (project, projectIndex) => {
         const projectFilteredTasks = project.tasks.filter(
@@ -530,7 +530,7 @@ const TimelineView = ({
                         </span>
                     )}
                 </div>
-                <div className="flex-1 flex relative bg-white">{renderMonths()}</div>
+                <div className="flex-1 flex relative bg-white">{monthElements}</div>
             </div>
             <div className="space-y-2 overflow-auto flex-grow" ref={timelineRef} onScroll={syncScroll}>
                 {visibleProjects.map((project) =>
@@ -541,4 +541,4 @@ const TimelineView = ({
     );
 };
 
-export default TimelineView;
+export default React.memo(TimelineView);

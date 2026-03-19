@@ -14,6 +14,8 @@ import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
 import com.backend.util.CriticalPathMethodHelper;
 import com.backend.util.ValidationUtil;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -98,6 +100,12 @@ public class ProjectService {
         }
 
         return convertToDTOWithCPM(project);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProjectDTO> getAllProjectsPaginated(Integer userId, Pageable pageable) {
+        var projects = projectRepository.findAllAccessibleByUserPaged(userId, pageable);
+        return projects.map(this::convertToDTOWithCPM);
     }
 
     @Transactional(readOnly = true)
@@ -242,7 +250,9 @@ public class ProjectService {
         for (String attachment : attachments) {
             try {
                 fileStorageService.deleteFile(attachment);
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(ProjectService.class)
+                        .warn("Failed to delete attachment: {}", attachment, e);
             }
         }
     }

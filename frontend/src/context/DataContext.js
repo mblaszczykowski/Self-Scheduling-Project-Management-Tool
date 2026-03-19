@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 import {
     createComment as apiCreateComment,
     createProject as apiCreateProject,
@@ -227,7 +227,7 @@ export const DataProvider = ({ children, initialUser }) => {
         }
     }, [projects, updateProject]);
 
-    const value = {
+    const value = useMemo(() => ({
         user,
         projects,
         notifications,
@@ -251,7 +251,16 @@ export const DataProvider = ({ children, initialUser }) => {
         reactToComment,
         addUserToProject,
         handleLogout,
-    };
+    }), [
+        user, projects, notifications, loading, error,
+        clearError, setUser, setNotifications,
+        refreshProjects, refreshNotifications,
+        createTask, updateTask, deleteTask,
+        createProject, updateProject, deleteProject,
+        getComments, createComment, updateComment,
+        deleteComment, reactToComment,
+        addUserToProject, handleLogout,
+    ]);
 
     return (
         <DataContext.Provider value={value}>

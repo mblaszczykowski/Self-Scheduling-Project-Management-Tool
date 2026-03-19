@@ -6,6 +6,7 @@ import com.backend.services.TokenService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,10 +30,17 @@ public class ProjectController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ProjectDTO>> getAllProjects(HttpServletRequest request) {
+    public ResponseEntity<?> getAllProjects(
+            HttpServletRequest request,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false, defaultValue = "20") Integer size
+    ) {
         var userId = tokenService.getUserIdFromRequest(request);
-        var projects = projectService.getAllProjects(userId);
-        return ResponseEntity.ok(projects);
+        if (page != null) {
+            var pageable = PageRequest.of(page, Math.min(size, 100));
+            return ResponseEntity.ok(projectService.getAllProjectsPaginated(userId, pageable));
+        }
+        return ResponseEntity.ok(projectService.getAllProjects(userId));
     }
 
     @GetMapping("/{projectKey}")

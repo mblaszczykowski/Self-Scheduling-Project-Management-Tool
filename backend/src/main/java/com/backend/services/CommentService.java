@@ -150,6 +150,14 @@ public class CommentService {
         return convertToDTO(refreshedComment);
     }
 
+    public void verifyCommentBelongsToTask(Integer commentId, Integer taskId) {
+        var comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+        if (!comment.getTask().getId().equals(taskId)) {
+            throw new ValidationException("Comment does not belong to the specified task");
+        }
+    }
+
     private void validateCommentContent(String content) {
         if (content == null || content.trim().isEmpty()) {
             throw new ValidationException("Comment content cannot be empty");

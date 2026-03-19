@@ -368,4 +368,4 @@ const FilterBar = ({
     );
 };
 
-export default FilterBar;
+export default React.memo(FilterBar);

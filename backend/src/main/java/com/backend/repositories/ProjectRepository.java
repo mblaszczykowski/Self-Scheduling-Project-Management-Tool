@@ -7,6 +7,9 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +25,13 @@ public interface ProjectRepository extends JpaRepository<Project, Integer> {
             "WHERE p.owner.id = :userId OR p.id IN " +
             "(SELECT p2.id FROM Project p2 JOIN p2.members m2 WHERE m2.id = :userId)")
     List<Project> findAllAccessibleByUser(@Param("userId") Integer userId);
+
+    @Query("SELECT DISTINCT p FROM Project p " +
+            "LEFT JOIN FETCH p.owner " +
+            "LEFT JOIN FETCH p.members " +
+            "WHERE p.owner.id = :userId OR p.id IN " +
+            "(SELECT p2.id FROM Project p2 JOIN p2.members m2 WHERE m2.id = :userId)")
+    Page<Project> findAllAccessibleByUserPaged(@Param("userId") Integer userId, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Project p WHERE p.projectKey = :projectKey")

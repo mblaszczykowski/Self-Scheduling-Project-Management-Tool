@@ -16,6 +16,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Map;
@@ -62,7 +64,9 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
         var cookieToken = getCsrfTokenFromCookie(request);
         String headerToken = request.getHeader(CSRF_HEADER_NAME);
 
-        if (cookieToken == null || headerToken == null || !cookieToken.equals(headerToken)) {
+        if (cookieToken == null || headerToken == null || !MessageDigest.isEqual(
+                cookieToken.getBytes(StandardCharsets.UTF_8),
+                headerToken.getBytes(StandardCharsets.UTF_8))) {
             sendCsrfErrorResponse(response);
             return;
         }

@@ -1,15 +1,4 @@
-start with all security,performance, architecture, data integrity, fix bugs for backend and frontend
-leave the infrastructure stuff
-
-then do this:
-Quick Wins
-
-1. Persist filter/view state to localStorage — currently resets on page reload
-2. Add loading states to submit buttons (TaskForm, ProjectForm, AccountModal)
-3. Password strength indicator on RegisterForm
-4. Character counts on text inputs with max lengths
-5. Fix mobile overflow — TaskForm sidebar is fixed w-[400px], breaks on mobile
-6. Fix aria-controls mismatch — Header mobile menu button references non-existent ID  
+to do 
 
 Major UX Features Missing
 

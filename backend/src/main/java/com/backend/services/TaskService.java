@@ -297,7 +297,9 @@ public class TaskService {
         for (String attachment : task.getAttachments()) {
             try {
                 fileStorageService.deleteFile(attachment);
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(TaskService.class)
+                        .warn("Failed to delete task attachment: {}", attachment, e);
             }
         }
     }

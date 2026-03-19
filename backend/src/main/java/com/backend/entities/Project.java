@@ -8,6 +8,9 @@ import java.util.List;
 @Table(name = "projects",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_project_key", columnNames = "project_key")
+        },
+        indexes = {
+                @Index(name = "idx_project_owner", columnList = "owner_id")
         }
 )
 @NamedEntityGraph(

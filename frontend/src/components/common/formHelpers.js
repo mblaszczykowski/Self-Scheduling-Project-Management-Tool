@@ -21,8 +21,8 @@ export const inputDisabledClass = "bg-slate-50 text-slate-500 cursor-not-allowed
 
 export const selectClass = "w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-1 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-all cursor-pointer appearance-none hover:border-slate-300";
 
-export const authInputClass = (hasError) => `w-full px-4 py-3 rounded-xl border ${
+export const authInputClass = (hasError) => `w-full px-3.5 py-2.5 rounded-[10px] border ${
     hasError
         ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
         : 'border-slate-200 focus:ring-slate-900 focus:border-slate-900'
-} bg-slate-50 text-slate-900 text-sm transition-colors focus:ring-1 focus:outline-none`;
+} bg-white text-slate-900 text-sm transition-all focus:ring-1 focus:outline-none hover:border-slate-300`;

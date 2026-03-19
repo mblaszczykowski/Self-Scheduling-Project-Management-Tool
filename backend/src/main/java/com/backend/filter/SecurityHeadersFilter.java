@@ -28,12 +28,14 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
                 "default-src 'self'; " +
                 "script-src 'self'; " +
                 "style-src 'self' 'unsafe-inline'; " +
-                "img-src 'self' data: blob: https:; " +
+                "img-src 'self' data: blob:; " +
                 "font-src 'self' data:; " +
                 "connect-src 'self'; " +
                 "frame-ancestors 'none';");
 
         response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+
+        response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
 
         response.setHeader("Permissions-Policy",
                 "geolocation=(), microphone=(), camera=(), payment=()");

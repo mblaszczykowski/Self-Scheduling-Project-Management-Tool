@@ -45,14 +45,20 @@ const TaskForm = ({
                         type="text"
                         id="summary"
                         name="summary"
+                        maxLength={200}
                         placeholder="What needs to be done?"
                         className={`${inputClass} text-base font-medium`}
                     />
-                    <ErrorMessage
-                        name="summary"
-                        component="div"
-                        className="text-red-500 text-xs mt-1.5 font-medium"
-                    />
+                    <div className="flex justify-between mt-1.5">
+                        <ErrorMessage
+                            name="summary"
+                            component="div"
+                            className="text-red-500 text-xs font-medium"
+                        />
+                        <span className={`text-xs ${values.summary?.length > 180 ? 'text-amber-600' : 'text-slate-400'}`}>
+                            {values.summary?.length || 0}/200
+                        </span>
+                    </div>
                 </div>
 
                 <div className="mb-6">
@@ -83,7 +89,7 @@ const TaskForm = ({
                 )}
             </div>
 
-            <div className="w-[400px] px-6 py-5 overflow-y-auto bg-slate-50/50">
+            <div className="w-full md:w-[400px] shrink-0 px-6 py-5 overflow-y-auto bg-slate-50/50">
                 <div className="space-y-5">
                     <div>
                         <InputLabel htmlFor="projectKey" required>Project</InputLabel>

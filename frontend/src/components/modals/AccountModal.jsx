@@ -77,13 +77,16 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
         }
     };
 
+    const profilePreviewRef = React.useRef(profilePreview);
+    profilePreviewRef.current = profilePreview;
+
     React.useEffect(() => {
         return () => {
-            if (profilePreview && profilePreview.startsWith('blob:')) {
-                URL.revokeObjectURL(profilePreview);
+            if (profilePreviewRef.current && profilePreviewRef.current.startsWith('blob:')) {
+                URL.revokeObjectURL(profilePreviewRef.current);
             }
         };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <Modal
