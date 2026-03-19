@@ -41,3 +41,14 @@ trzeba testy napisac i manualne porobic potestowac dokladnie czy ten algorytm op
 niech przygotuje sql ktory uzupelni mi baze fajnymi danymi do przetestowania optimize, 
 niech ten sql tworzy dla mojego uzytkownika ***REMOVED-EMAIL*** nowy projekt ktory bedzie dobry jako przyklad do optymalizacji
 chce moc wiele razy tego sql wykonac na bazie postgres i optymalizowac i potem usuwac sobie recznie te projekty
+
+
+
+
+
+
+are we now completely sure the algorithm and optimization works good?
+maybe prepare more project sqls to add and i will provide you screenshots so you can verify some real world usages
+
+
+a potem te analizy rozdzial badania i porownania

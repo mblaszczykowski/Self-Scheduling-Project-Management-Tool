@@ -106,6 +106,69 @@ public class ScheduleOptimizer {
     }
 
     /**
+     * FIFO baseline: schedule tasks in order of their original start date (first-come-first-served).
+     * Same SSGS core with resource constraints, but no intelligent prioritization.
+     */
+    public ScheduleResult optimizeFIFO(List<TaskDTO> tasks, LocalDate horizonStart, double alpha, double beta) {
+        return optimizeWithStrategy(tasks, horizonStart, alpha, beta, SchedulingStrategy.FIFO);
+    }
+
+    /**
+     * SPT baseline: schedule tasks by shortest processing time first.
+     * Minimizes average flow time but ignores business priorities.
+     */
+    public ScheduleResult optimizeSPT(List<TaskDTO> tasks, LocalDate horizonStart, double alpha, double beta) {
+        return optimizeWithStrategy(tasks, horizonStart, alpha, beta, SchedulingStrategy.SPT);
+    }
+
+    private enum SchedulingStrategy { MORCPSP, FIFO, SPT }
+
+    private ScheduleResult optimizeWithStrategy(List<TaskDTO> tasks, LocalDate horizonStart,
+                                                 double alpha, double beta, SchedulingStrategy strategy) {
+        if (tasks == null || tasks.isEmpty()) return emptyResult();
+
+        var taskMap = buildTaskMap(tasks, horizonStart);
+        if (taskMap.isEmpty()) return emptyResult();
+
+        buildSuccessorLinks(taskMap);
+
+        var activeTasks = taskMap.values().stream()
+                .filter(t -> !t.isCompleted)
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        if (activeTasks.isEmpty()) return emptyResult();
+
+        // Apply strategy-specific ordering
+        switch (strategy) {
+            case FIFO -> activeTasks.sort(Comparator.comparingInt(t -> t.originalStartOffset));
+            case SPT -> activeTasks.sort(Comparator.comparingInt(t -> t.duration));
+            case MORCPSP -> {
+                int horizonLength = computeHorizonLength(taskMap);
+                var successorCounts = computeAllTransitiveSuccessorCounts(taskMap);
+                buildPriorityList(activeTasks, successorCounts, horizonLength);
+            }
+        }
+
+        // Same SSGS core for all strategies
+        var resourceSchedule = new HashMap<String, BitSet>();
+        for (var task : activeTasks) {
+            int earliestPrecedence = computeEarliestPrecedenceStart(task, taskMap);
+            int start = Math.max(0, earliestPrecedence);
+
+            if (task.assignee != null && !task.assignee.isBlank()) {
+                start = findEarliestResourceSlot(task.assignee, task.duration, start, resourceSchedule);
+                var bits = resourceSchedule.computeIfAbsent(task.assignee, k -> new BitSet());
+                bits.set(start, start + task.duration);
+            }
+
+            task.scheduledStart = start;
+            task.scheduledEnd = start + task.duration;
+        }
+
+        return buildResult(activeTasks, horizonStart, alpha, beta);
+    }
+
+    /**
      * Evaluate the objective function for the current (original) schedule.
      * Used to compute "before optimization" metrics, including counting
      * how many resource conflicts exist in the current arrangement.
