@@ -34,7 +34,7 @@ public class TaskService {
         this.notificationService = notificationService;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public TaskDTO createTask(String projectKey, TaskDTO taskDTO, Integer userId, List<MultipartFile> files) {
         validateTaskDTO(taskDTO);
 
@@ -74,7 +74,7 @@ public class TaskService {
         projectRepository.save(project);
 
         if (taskDTO.dependencyKeys() != null && !taskDTO.dependencyKeys().isEmpty()) {
-            task.setDependencies(resolveDependenciesBatch(taskDTO.dependencyKeys()));
+            task.setDependencies(resolveDependenciesBatch(taskDTO.dependencyKeys(), userId));
         }
 
         var savedTask = taskRepository.save(task);
@@ -89,7 +89,7 @@ public class TaskService {
         return convertToDTO(savedTask);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public TaskDTO updateTask(String projectKey, String taskKey, TaskDTO taskDTO,
                               Integer userId, List<MultipartFile> files) {
         validateTaskDTO(taskDTO);
@@ -137,7 +137,7 @@ public class TaskService {
             task.getAttachments().addAll(newAttachments);
         }
 
-        updateTaskDependencies(task, taskDTO.dependencyKeys());
+        updateTaskDependencies(task, taskDTO.dependencyKeys(), userId);
 
         var updatedTask = taskRepository.save(task);
 
@@ -219,9 +219,9 @@ public class TaskService {
         return Arrays.asList(labelsString.split(","));
     }
 
-    private void updateTaskDependencies(Task task, List<String> dependencyKeys) {
+    private void updateTaskDependencies(Task task, List<String> dependencyKeys, Integer userId) {
         if (dependencyKeys != null) {
-            var dependencies = resolveDependenciesBatch(dependencyKeys);
+            var dependencies = resolveDependenciesBatch(dependencyKeys, userId);
             validateNoCycles(task, dependencies);
             task.setDependencies(dependencies);
         } else {
@@ -230,6 +230,10 @@ public class TaskService {
     }
 
     private List<Task> resolveDependenciesBatch(List<String> dependencyRefs) {
+        return resolveDependenciesBatch(dependencyRefs, null);
+    }
+
+    private List<Task> resolveDependenciesBatch(List<String> dependencyRefs, Integer userId) {
         if (dependencyRefs == null || dependencyRefs.isEmpty()) {
             return new ArrayList<>();
         }
@@ -250,6 +254,16 @@ public class TaskService {
         for (var entry : tasksByProjectKey.entrySet()) {
             dependencies.addAll(taskRepository.findByProjectKeyAndTaskNumbers(entry.getKey(), entry.getValue()));
         }
+
+        if (userId != null) {
+            for (var dep : dependencies) {
+                if (!dep.getProject().hasAccess(userId)) {
+                    throw new AuthorizationException(
+                            "Cannot create dependency to task in inaccessible project: " + dep.getTaskKey());
+                }
+            }
+        }
+
         return dependencies;
     }
 
@@ -272,7 +286,7 @@ public class TaskService {
         }
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deleteTask(String projectKey, String taskKey, Integer userId) {
         var project = projectRepository.findByProjectKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));

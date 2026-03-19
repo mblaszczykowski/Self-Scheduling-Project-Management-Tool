@@ -90,23 +90,41 @@ export const DataProvider = ({ children, initialUser }) => {
         if (!user) return;
 
         let intervalId = null;
+        let consecutiveFailures = 0;
+
+        const pollWithErrorHandling = async () => {
+            try {
+                await refreshNotifications();
+                consecutiveFailures = 0;
+            } catch {
+                consecutiveFailures++;
+                if (consecutiveFailures >= 5) {
+                    stopPolling();
+                    const backoffMs = Math.min(NOTIFICATION_POLL_MS * Math.pow(2, consecutiveFailures - 5), 300000);
+                    intervalId = setTimeout(() => {
+                        intervalId = null;
+                        startPolling();
+                    }, backoffMs);
+                }
+            }
+        };
 
         const startPolling = () => {
             if (intervalId) return;
-            intervalId = setInterval(() => {
-                refreshNotifications();
-            }, NOTIFICATION_POLL_MS);
+            intervalId = setInterval(pollWithErrorHandling, NOTIFICATION_POLL_MS);
         };
 
         const stopPolling = () => {
             if (intervalId) {
                 clearInterval(intervalId);
+                clearTimeout(intervalId);
                 intervalId = null;
             }
         };
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
+                consecutiveFailures = 0;
                 refreshNotifications();
                 startPolling();
             } else {

@@ -37,15 +37,13 @@ export default function Comments({ taskId, currentUserId }) {
     }, [taskId, getComments]);
 
     useEffect(() => {
-        const abortController = new AbortController();
-        let cancelled = false;
+        let isMounted = true;
         const load = async () => {
-            if (!cancelled) await fetchComments();
+            if (isMounted) await fetchComments();
         };
         load();
         return () => {
-            cancelled = true;
-            abortController.abort();
+            isMounted = false;
         };
     }, [fetchComments]);
 

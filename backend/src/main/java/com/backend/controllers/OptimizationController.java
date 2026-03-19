@@ -7,6 +7,7 @@ import com.backend.services.OptimizationService;
 import com.backend.services.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +18,12 @@ public class OptimizationController {
 
     private final OptimizationService optimizationService;
     private final TokenService tokenService;
+
+    @Value("${optimization.default-alpha:0.8}")
+    private double defaultAlpha;
+
+    @Value("${optimization.default-beta:0.2}")
+    private double defaultBeta;
 
     public OptimizationController(OptimizationService optimizationService, TokenService tokenService) {
         this.optimizationService = optimizationService;
@@ -30,8 +37,8 @@ public class OptimizationController {
     ) {
         var userId = tokenService.getUserIdFromRequest(request);
 
-        double alpha = requestDTO.alpha() != null ? requestDTO.alpha() : 0.8;
-        double beta = requestDTO.beta() != null ? requestDTO.beta() : 0.2;
+        double alpha = requestDTO.alpha() != null ? requestDTO.alpha() : defaultAlpha;
+        double beta = requestDTO.beta() != null ? requestDTO.beta() : defaultBeta;
 
         var result = optimizationService.optimizeSchedule(
                 requestDTO.projectKeys(),

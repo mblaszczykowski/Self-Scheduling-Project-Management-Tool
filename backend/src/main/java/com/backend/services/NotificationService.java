@@ -21,7 +21,7 @@ public class NotificationService {
         this.notificationRepository = notificationRepository;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void createNotification(User recipient, String message, NotificationType type, String link) {
         var notification = new Notification();
         notification.setUser(recipient);
@@ -42,7 +42,7 @@ public class NotificationService {
         return notificationRepository.findByUserIdOrderByTimestampDesc(userId, pageable);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void markNotificationsAsRead(List<Integer> notificationIds, Integer userId) {
         var notifications = notificationRepository.findAllById(notificationIds);
         verifyOwnershipOfAllNotifications(notifications, userId);

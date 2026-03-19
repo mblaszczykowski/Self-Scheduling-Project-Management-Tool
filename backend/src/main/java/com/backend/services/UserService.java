@@ -75,7 +75,7 @@ public class UserService {
                 .collect(Collectors.toMap(User::getEmail, user -> user));
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ResponseEntity<?> registerUser(UserRegistrationRequest request) {
         validateRegistrationRequest(request);
         ValidationUtil.validatePassword(request.password());
@@ -119,7 +119,7 @@ public class UserService {
                 .body(userDTO);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public UserDTO updateUser(Integer userId,
                               String firstname,
                               String lastname,

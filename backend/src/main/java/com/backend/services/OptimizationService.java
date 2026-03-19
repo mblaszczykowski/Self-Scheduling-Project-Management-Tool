@@ -116,7 +116,7 @@ public class OptimizationService {
                 optimizedResult.tasksShifted());
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void applyOptimization(List<TaskScheduleSuggestionDTO> suggestions, Integer userId) {
         if (suggestions == null || suggestions.isEmpty()) return;
 

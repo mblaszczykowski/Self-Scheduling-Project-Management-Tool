@@ -42,8 +42,11 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
     }, [user]);
 
     const handleCloseAttempt = useCallback(() => {
-        const formDirty = formikRef.current?.dirty || uiState.isDirty;
-        if (formDirty && modalMode !== 'view') {
+        // Only show "unsaved changes" if user actually touched a field
+        const formTouched = formikRef.current?.touched && Object.keys(formikRef.current.touched).length > 0;
+        const formDirty = formikRef.current?.dirty && formTouched;
+        const isDirty = (formDirty || uiState.isDirty) && modalMode !== 'view';
+        if (isDirty) {
             setUiState(prev => ({ ...prev, closeConfirmOpen: true }));
         } else {
             setUiState(prev => ({ ...prev, isVisible: false }));

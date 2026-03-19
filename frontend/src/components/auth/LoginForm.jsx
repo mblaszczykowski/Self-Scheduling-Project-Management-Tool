@@ -21,10 +21,10 @@ function LoginForm({ onToggleForm }) {
     const { setUser } = useContext(DataContext);
 
     useEffect(() => {
-        const expiredMessage = sessionStorage.getItem('session_expired');
-        if (expiredMessage) {
-            sessionStorage.removeItem('session_expired');
-            showToast(expiredMessage, 'info');
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('expired') === 'true') {
+            showToast('Your session has expired. Please sign in again.', 'info');
+            window.history.replaceState({}, '', '/login');
         }
     }, []);
 

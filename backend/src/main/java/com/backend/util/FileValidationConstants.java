@@ -25,14 +25,22 @@ public final class FileValidationConstants {
     public static final byte[] GIF_MAGIC = new byte[]{0x47, 0x49, 0x46};
     public static final byte[] WEBP_RIFF_MAGIC = new byte[]{0x52, 0x49, 0x46, 0x46}; // RIFF header
     public static final byte[] PDF_MAGIC = new byte[]{0x25, 0x50, 0x44, 0x46}; // %PDF
+    public static final byte[] ZIP_MAGIC = new byte[]{0x50, 0x4B, 0x03, 0x04}; // PK (docx, xlsx, pptx)
+    public static final byte[] OLE2_MAGIC = new byte[]{(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0}; // OLE2 (doc, xls, ppt)
 
-    public static final Map<String, byte[]> MAGIC_BYTES_BY_EXTENSION = Map.of(
-            "jpg", JPEG_MAGIC,
-            "jpeg", JPEG_MAGIC,
-            "png", PNG_MAGIC,
-            "gif", GIF_MAGIC,
-            "webp", WEBP_RIFF_MAGIC,
-            "pdf", PDF_MAGIC
+    public static final Map<String, byte[]> MAGIC_BYTES_BY_EXTENSION = Map.ofEntries(
+            Map.entry("jpg", JPEG_MAGIC),
+            Map.entry("jpeg", JPEG_MAGIC),
+            Map.entry("png", PNG_MAGIC),
+            Map.entry("gif", GIF_MAGIC),
+            Map.entry("webp", WEBP_RIFF_MAGIC),
+            Map.entry("pdf", PDF_MAGIC),
+            Map.entry("docx", ZIP_MAGIC),
+            Map.entry("xlsx", ZIP_MAGIC),
+            Map.entry("pptx", ZIP_MAGIC),
+            Map.entry("doc", OLE2_MAGIC),
+            Map.entry("xls", OLE2_MAGIC),
+            Map.entry("ppt", OLE2_MAGIC)
     );
 
     public static boolean startsWithMagicBytes(byte[] fileBytes, byte[] magicBytes) {

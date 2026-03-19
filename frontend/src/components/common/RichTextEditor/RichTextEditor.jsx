@@ -52,7 +52,7 @@ const RichTextEditor = ({
         }),
         Image.configure({
             inline: true,
-            allowBase64: true,
+            allowBase64: false,
             HTMLAttributes: {
                 class: 'rounded-xl max-w-full h-auto shadow-lg my-4',
             },

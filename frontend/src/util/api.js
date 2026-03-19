@@ -88,8 +88,7 @@ api.interceptors.response.use(
 
             const publicPaths = ['/login', '/register', '/'];
             if (!publicPaths.includes(window.location.pathname)) {
-                sessionStorage.setItem('session_expired', 'Your session has expired. Please sign in again.');
-                window.location.href = '/login';
+                window.location.href = '/login?expired=true';
             }
             return Promise.reject(refreshError);
         } finally {

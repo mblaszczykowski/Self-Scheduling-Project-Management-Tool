@@ -60,7 +60,7 @@ public class CommentService {
                 .toList();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public CommentDTO addComment(Integer taskId, Integer userId, String content,
                                  List<MultipartFile> files, Integer parentCommentId) {
         validateCommentContent(content);
@@ -83,7 +83,7 @@ public class CommentService {
                     .orElseThrow(() -> new ResourceNotFoundException("Parent comment not found"));
         }
 
-        var sanitizedContent = Jsoup.clean(content, Safelist.none());
+        var sanitizedContent = Jsoup.clean(content, Safelist.basicWithImages());
 
         var comment = new Comment(task, user, parentComment, sanitizedContent, attachmentUrls);
         var savedComment = commentRepository.save(comment);
@@ -92,7 +92,7 @@ public class CommentService {
         return convertToDTO(savedComment);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public CommentDTO updateComment(Integer commentId, Integer userId, String content,
                                     List<MultipartFile> files) {
         validateCommentContent(content);
@@ -103,7 +103,7 @@ public class CommentService {
         verifyProjectAccess(comment.getTask().getProject(), userId);
         verifyCommentOwnership(comment, userId);
 
-        var sanitizedContent = Jsoup.clean(content, Safelist.none());
+        var sanitizedContent = Jsoup.clean(content, Safelist.basicWithImages());
         comment.setContent(sanitizedContent);
         comment.setEditedAt(Instant.now());
 
@@ -117,7 +117,7 @@ public class CommentService {
         return convertToDTO(updatedComment);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deleteComment(Integer commentId, Integer userId) {
         var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
@@ -128,7 +128,7 @@ public class CommentService {
         commentRepository.delete(comment);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public CommentDTO reactToComment(Integer commentId, Integer userId, ReactionType reactionType) {
         var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));

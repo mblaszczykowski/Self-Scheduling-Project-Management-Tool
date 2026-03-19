@@ -3,6 +3,7 @@ package com.backend.repositories;
 import com.backend.entities.Task;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -66,4 +67,8 @@ public interface TaskRepository extends JpaRepository<Task, Integer> {
     @EntityGraph(value = "Task.withDetails", type = EntityGraph.EntityGraphType.FETCH)
     @Query("SELECT t FROM Task t WHERE t.project.id IN :projectIds ORDER BY t.taskNumber")
     List<Task> findByProjectIdsWithDetails(@Param("projectIds") List<Integer> projectIds);
+
+    @Modifying
+    @Query(value = "DELETE FROM task_dependencies WHERE dependency_id IN :taskIds", nativeQuery = true)
+    void removeIncomingDependencies(@Param("taskIds") List<Integer> taskIds);
 }

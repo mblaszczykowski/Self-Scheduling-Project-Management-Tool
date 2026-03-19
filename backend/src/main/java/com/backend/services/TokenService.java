@@ -55,7 +55,7 @@ public class TokenService {
                 .compact();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public String generateRefreshToken(Integer userId) {
         refreshTokenRepository.deleteByUserId(userId);
 
@@ -125,7 +125,7 @@ public class TokenService {
         }
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Integer validateRefreshToken(String token) {
         var refreshToken = refreshTokenRepository.findByToken(token)
                 .orElse(null);
@@ -165,12 +165,12 @@ public class TokenService {
         return userId;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void revokeRefreshToken(Integer userId) {
         refreshTokenRepository.deleteByUserId(userId);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void cleanupExpiredTokens() {
         refreshTokenRepository.deleteByExpiryDateBefore(Instant.now());
     }

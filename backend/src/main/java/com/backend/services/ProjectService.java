@@ -51,7 +51,7 @@ public class ProjectService {
         this.cpmHelper = new CriticalPathMethodHelper();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ProjectDTO createProject(ProjectDTO projectDTO, Integer userId, List<MultipartFile> attachments) {
         validateProjectDTO(projectDTO);
 
@@ -125,7 +125,7 @@ public class ProjectService {
                 .toList();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ProjectDTO updateProject(String projectKey, ProjectDTO projectDTO, Integer userId, List<MultipartFile> attachments) {
         validateProjectDTO(projectDTO);
 
@@ -165,13 +165,29 @@ public class ProjectService {
         return convertToDTO(updatedProject);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deleteProject(String projectKey, Integer userId) {
         var project = projectRepository.findByProjectKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         if (!project.isOwner(userId)) {
             throw new AuthorizationException("Only project owner can delete the project");
+        }
+
+        // Clear task dependencies before deletion — ManyToMany self-reference
+        // on task_dependencies table blocks cascade delete via FK constraints.
+        // Must clear both sides: this task's deps AND other tasks depending on this task.
+        var tasks = project.getTasks();
+        if (tasks != null && !tasks.isEmpty()) {
+            var taskIds = tasks.stream().map(t -> t.getId()).toList();
+            // Clear outgoing dependencies (this task depends on X)
+            for (var task : tasks) {
+                task.getDependencies().clear();
+            }
+            // Clear incoming dependencies (X depends on this task) via native query
+            taskRepository.removeIncomingDependencies(taskIds);
+            taskRepository.saveAll(tasks);
+            taskRepository.flush();
         }
 
         deleteAllProjectAttachmentsSilently(project);

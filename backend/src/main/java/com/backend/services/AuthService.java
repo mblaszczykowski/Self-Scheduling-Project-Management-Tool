@@ -17,7 +17,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class AuthService {
@@ -28,6 +31,7 @@ public class AuthService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final boolean secureCookie;
     private final String sameSite;
+    private final Set<String> trustedProxies;
 
     @Autowired
     public AuthService(UserService userService,
@@ -35,18 +39,25 @@ public class AuthService {
                        RateLimitFilter rateLimitFilter,
                        BCryptPasswordEncoder passwordEncoder,
                        @Value("${app.cookie.secure:true}") boolean secureCookie,
-                       @Value("${app.cookie.same-site:Strict}") String sameSite) {
+                       @Value("${app.cookie.same-site:Strict}") String sameSite,
+                       @Value("${app.trusted-proxies:}") String trustedProxiesConfig) {
         this.userService = userService;
         this.tokenService = tokenService;
         this.rateLimitFilter = rateLimitFilter;
         this.passwordEncoder = passwordEncoder;
         this.secureCookie = secureCookie;
         this.sameSite = sameSite;
+        this.trustedProxies = (trustedProxiesConfig == null || trustedProxiesConfig.isBlank())
+                ? Set.of()
+                : Arrays.stream(trustedProxiesConfig.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toSet());
     }
 
     private static final String TIMING_ATTACK_PREVENTION_HASH = "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYIWWwK6W6Wy";
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ResponseEntity<?> authenticateUser(LoginRequest loginRequest, HttpServletRequest httpRequest) {
         validateLoginRequest(loginRequest);
 
@@ -76,18 +87,10 @@ public class AuthService {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        var xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        var xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isEmpty()) {
-            return xRealIp;
-        }
-        return request.getRemoteAddr();
+        return com.backend.util.IpUtil.getClientIp(request, trustedProxies);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ResponseEntity<?> refreshAccessToken(HttpServletRequest request) {
         String refreshToken = null;
         if (request.getCookies() != null) {
@@ -119,7 +122,7 @@ public class AuthService {
         return ResponseEntity.ok().headers(headers).body(Map.of("message", "Token refreshed successfully"));
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void logoutUser(HttpServletRequest request, HttpServletResponse response) {
         var userId = (Integer) request.getAttribute("userId");
 

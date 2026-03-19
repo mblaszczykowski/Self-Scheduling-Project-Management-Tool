@@ -56,7 +56,7 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder(12);
-        authService = new AuthService(userService, tokenService, rateLimitFilter, passwordEncoder, false, "Strict");
+        authService = new AuthService(userService, tokenService, rateLimitFilter, passwordEncoder, false, "Strict", "");
 
         testUser = new User();
         testUser.setId(TEST_USER_ID);
