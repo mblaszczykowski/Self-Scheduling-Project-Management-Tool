@@ -24,21 +24,27 @@ export const ProjectsProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
     const [projects, setProjects] = useState([]);
     const [projectsLoading, setProjectsLoading] = useState(true);
+    const [projectsError, setProjectsError] = useState(null);
 
     useEffect(() => {
         if (!user) {
             setProjects([]);
             setProjectsLoading(false);
+            setProjectsError(null);
             return;
         }
 
         let cancelled = false;
         const fetchProjects = async () => {
             try {
+                setProjectsError(null);
                 const data = await getProjects();
                 if (!cancelled) setProjects(data);
             } catch (err) {
-                if (!cancelled) console.error('Error fetching projects:', err);
+                if (!cancelled) {
+                    console.error('Error fetching projects:', err);
+                    setProjectsError(getErrorMessage(err, 'Failed to load projects'));
+                }
             } finally {
                 if (!cancelled) setProjectsLoading(false);
             }
@@ -130,6 +136,7 @@ export const ProjectsProvider = ({ children }) => {
     const value = useMemo(() => ({
         projects,
         projectsLoading,
+        projectsError,
         refreshProjects,
         createTask,
         updateTask,
@@ -144,7 +151,7 @@ export const ProjectsProvider = ({ children }) => {
         reactToComment,
         addUserToProject,
     }), [
-        projects, projectsLoading,
+        projects, projectsLoading, projectsError,
         refreshProjects,
         createTask, updateTask, deleteTask,
         createProject, updateProject, deleteProject,

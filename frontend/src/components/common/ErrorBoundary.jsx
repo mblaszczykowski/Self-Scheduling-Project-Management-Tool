@@ -46,7 +46,7 @@ class ErrorBoundary extends React.Component {
             if (level === 'section') {
                 return (
                     <div className="flex items-center justify-center py-12 px-4">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-sm text-center">
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 max-w-sm text-center">
                             <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
                                 <AlertTriangleIcon className="w-5 h-5 text-red-600" />
                             </div>
@@ -78,8 +78,8 @@ class ErrorBoundary extends React.Component {
             }
 
             return (
-                <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                    <div className="bg-white p-8 rounded-xl shadow-lg max-w-md text-center">
+                <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+                    <div className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-lg max-w-md text-center">
                         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
                             <AlertTriangleIcon className="w-8 h-8 text-red-600" />
                         </div>

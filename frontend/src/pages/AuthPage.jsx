@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import RegisterForm from '../components/auth/RegisterForm';
 import LoginForm from '../components/auth/LoginForm';
 import { useNavigate } from 'react-router-dom';
@@ -138,7 +138,7 @@ const GanttChart = () => {
                 </div>
 
                 {/* Today line */}
-                <div className="today-line absolute top-0 bottom-0 w-px z-10 pointer-events-none" style={{ left: `calc(${SIDEBAR_W}px + ${TODAY_PCT}% * (100% - ${SIDEBAR_W}px) / 100)`, background: 'linear-gradient(to bottom, #ef4444, #ef444430)' }}>
+                <div className="today-line absolute top-0 bottom-0 w-px z-10 pointer-events-none" style={{ left: `calc(${SIDEBAR_W}px + (100% - ${SIDEBAR_W}px) * ${TODAY_PCT} / 100)`, background: 'linear-gradient(to bottom, #ef4444, #ef444430)' }}>
                     <div className="absolute -top-0 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[6px] font-bold px-1 py-px rounded-b tracking-wide">TODAY</div>
                 </div>
 
@@ -329,7 +329,10 @@ export default function AuthPage({ show }) {
     const [showForm, setShowForm] = useState(show);
     const navigate = useNavigate();
 
-    const handleResetForm = () => navigate('/reset-password');
+    useEffect(() => {
+        setShowForm(show);
+    }, [show]);
+
     const handleToggleForm = () => setShowForm(prev => prev === 'login' ? 'register' : 'login');
 
     return (
@@ -421,7 +424,7 @@ export default function AuthPage({ show }) {
                             </div>
 
                             {showForm === 'login' ? (
-                                <LoginForm onToggleForm={handleToggleForm} onResetForm={handleResetForm} />
+                                <LoginForm onToggleForm={handleToggleForm} />
                             ) : (
                                 <RegisterForm onToggleForm={handleToggleForm} />
                             )}

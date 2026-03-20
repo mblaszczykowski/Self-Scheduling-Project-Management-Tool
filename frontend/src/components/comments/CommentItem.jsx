@@ -31,25 +31,27 @@ const CommentItem = React.memo(({
         lastname: comment.authorName?.split(' ')[1],
     };
 
+    const actionBtnClass = 'text-[11px] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors';
+
     return (
         <div
             className={
-                `${level > 0 ? 'ml-6 mt-2' : 'mt-2'}`
-                + ` transition-all duration-200`
+                `${level > 0 ? 'ml-5 mt-2' : 'mt-2'}`
+                + ` transition-all duration-150`
                 + ` ${isVisible ? 'opacity-100' : 'opacity-0'}`
             }
         >
-            <div className="flex gap-2.5">
+            <div className="flex gap-2">
                 <Avatar
                     user={authorParts}
                     profilePicture={comment.authorProfilePicture}
-                    size="sm"
-                    className="flex-shrink-0"
+                    size="xs"
+                    className="flex-shrink-0 mt-0.5"
                 />
 
                 <div className="flex-1 min-w-0">
                     {editingComment?.id === comment.id ? (
-                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                        <div className="bg-slate-50 dark:bg-slate-800/30 rounded-md p-2.5 border border-slate-200 dark:border-slate-700">
                             <CommentForm
                                 onSubmit={(values, actions, attachments) =>
                                     onHandleUpdateComment(comment, values, actions, attachments)
@@ -64,13 +66,13 @@ const CommentItem = React.memo(({
                         </div>
                     ) : (
                         <>
-                            <div className="bg-slate-50 rounded-lg px-3 py-2">
-                                <div className="flex items-center gap-2 mb-0.5">
-                                    <span className="font-medium text-slate-900 text-sm">
+                            <div className="group">
+                                <div className="flex items-baseline gap-1.5 mb-0.5">
+                                    <span className="font-medium text-slate-800 dark:text-slate-200 text-[13px]">
                                         {comment.authorName}
                                     </span>
                                     <span
-                                        className="text-[11px] text-slate-400"
+                                        className="text-[11px] text-slate-400 dark:text-slate-500"
                                         title={new Date(comment.timestamp).toLocaleString()}
                                     >
                                         {formatDistanceToNow(
@@ -79,17 +81,15 @@ const CommentItem = React.memo(({
                                         )}
                                     </span>
                                     {comment.editedAt && (
-                                        <span className="text-[10px] text-slate-400">
-                                            (edited)
-                                        </span>
+                                        <span className="text-[10px] text-slate-300 dark:text-slate-600">edited</span>
                                     )}
                                 </div>
-                                <div className="text-sm text-slate-700 whitespace-pre-wrap">
+                                <div className="text-[13px] text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
                                     {comment.content}
                                 </div>
 
                                 {comment.attachments?.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
                                         {comment.attachments.map((a, idx) =>
                                             renderAttachmentPreview(a, true, idx, comment.id)
                                         )}
@@ -97,16 +97,16 @@ const CommentItem = React.memo(({
                                 )}
                             </div>
 
-                            <div className="flex items-center gap-3 mt-1 ml-1">
+                            <div className="flex items-center gap-2.5 mt-1">
                                 <button
                                     onClick={() =>
                                         onHandleReactToComment(comment.id, 'LIKE')
                                     }
                                     className={
-                                        'flex items-center gap-1 text-xs transition-colors '
+                                        'flex items-center gap-0.5 text-[11px] transition-colors '
                                         + (comment.likedByCurrentUser
-                                            ? 'text-slate-900 font-medium'
-                                            : 'text-slate-500 hover:text-slate-700')
+                                            ? 'text-slate-800 dark:text-slate-200 font-medium'
+                                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')
                                     }
                                     disabled={
                                         comment.likedByCurrentUser
@@ -121,10 +121,10 @@ const CommentItem = React.memo(({
                                         onHandleReactToComment(comment.id, 'DISLIKE')
                                     }
                                     className={
-                                        'flex items-center gap-1 text-xs transition-colors '
+                                        'flex items-center gap-0.5 text-[11px] transition-colors '
                                         + (comment.dislikedByCurrentUser
                                             ? 'text-red-500 font-medium'
-                                            : 'text-slate-500 hover:text-slate-700')
+                                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')
                                     }
                                     disabled={
                                         comment.likedByCurrentUser
@@ -134,34 +134,27 @@ const CommentItem = React.memo(({
                                     <ThumbsDownIcon filled={comment.dislikedByCurrentUser} />
                                     {comment.dislikeCount > 0 && comment.dislikeCount}
                                 </button>
-                                {level < MAX_REPLY_DEPTH && (
+                                {level < MAX_REPLY_DEPTH ? (
                                     <button
                                         onClick={() => onSetReplyingCommentId(comment.id)}
-                                        className={
-                                            'text-xs text-slate-500 hover:text-slate-700'
-                                            + ' font-medium transition-colors'
-                                        }
+                                        className={actionBtnClass}
                                     >
                                         Reply
                                     </button>
+                                ) : (
+                                    <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">max depth</span>
                                 )}
                                 {isOwner && (
                                     <>
                                         <button
                                             onClick={() => onSetEditingComment(comment)}
-                                            className={
-                                                'text-xs text-slate-500'
-                                                + ' hover:text-slate-700 transition-colors'
-                                            }
+                                            className={actionBtnClass}
                                         >
                                             Edit
                                         </button>
                                         <button
                                             onClick={() => onHandleDeleteComment(comment.id)}
-                                            className={
-                                                'text-xs text-slate-500'
-                                                + ' hover:text-red-500 transition-colors'
-                                            }
+                                            className={actionBtnClass + ' hover:!text-red-500'}
                                         >
                                             Delete
                                         </button>

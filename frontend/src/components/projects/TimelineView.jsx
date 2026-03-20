@@ -32,6 +32,7 @@ const TimelineView = ({
     syncScroll,
     optimization,
     onOptimize,
+    onScrollToToday,
     onAcceptOptimization,
     onRejectOptimization,
 }) => {
@@ -63,7 +64,7 @@ const TimelineView = ({
             ? 'Try adjusting your filters to see more results.'
             : 'Create your first project to see it on the timeline.';
         return (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-grow flex flex-col">
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-grow flex flex-col">
                 <EmptyState
                     variant={hasActiveFilters ? 'search' : 'timeline'}
                     title={emptyTitle}
@@ -92,6 +93,7 @@ const TimelineView = ({
                 processedProjects={processedProjects}
                 optimization={optimization}
                 onOptimize={onOptimize}
+                onScrollToToday={onScrollToToday}
                 onSidebarToggle={onSidebarToggle}
                 headerRef={headerRef}
                 syncScroll={syncScroll}

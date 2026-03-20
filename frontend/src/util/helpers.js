@@ -76,18 +76,18 @@ export const getFileInfo = (attachment) => {
 };
 
 export const getStatusConfig = () => ({
-    'BACKLOG': { label: 'Backlog', color: 'bg-slate-50 text-slate-600', dot: 'bg-slate-400' },
-    'TODO': { label: 'To Do', color: 'bg-blue-50 text-blue-600', dot: 'bg-blue-500' },
-    'IN_PROGRESS': { label: 'In Progress', color: 'bg-amber-50 text-amber-600', dot: 'bg-amber-500' },
-    'IN_TEST': { label: 'In Test', color: 'bg-purple-50 text-purple-600', dot: 'bg-purple-500' },
-    'TO_TEST': { label: 'To Test', color: 'bg-indigo-50 text-indigo-600', dot: 'bg-indigo-500' },
-    'TO_REVIEW': { label: 'To Review', color: 'bg-cyan-50 text-cyan-600', dot: 'bg-cyan-500' },
-    'READY_TO_MERGE': { label: 'Ready to Merge', color: 'bg-teal-50 text-teal-600', dot: 'bg-teal-500' },
-    'READY_TO_DEPLOY': { label: 'Ready to Deploy', color: 'bg-emerald-50 text-emerald-600', dot: 'bg-emerald-500' },
-    'DONE': { label: 'Done', color: 'bg-green-50 text-green-600', dot: 'bg-green-500' },
-    'RELEASED': { label: 'Released', color: 'bg-green-50 text-green-700', dot: 'bg-green-600' },
-    'WITHDRAWN': { label: 'Withdrawn', color: 'bg-red-50 text-red-600', dot: 'bg-red-500' },
-    'GATHERING_INTEREST': { label: 'Gathering Interest', color: 'bg-orange-50 text-orange-600', dot: 'bg-orange-500' },
+    'BACKLOG': { label: 'Backlog', color: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400', dot: 'bg-slate-400' },
+    'TODO': { label: 'To Do', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800', dot: 'bg-blue-500' },
+    'IN_PROGRESS': { label: 'In Progress', color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-800', dot: 'bg-amber-500' },
+    'IN_TEST': { label: 'In Test', color: 'bg-purple-50 text-purple-700 ring-1 ring-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:ring-purple-800', dot: 'bg-purple-500' },
+    'TO_TEST': { label: 'To Test', color: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:ring-indigo-800', dot: 'bg-indigo-500' },
+    'TO_REVIEW': { label: 'To Review', color: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200 dark:bg-cyan-950 dark:text-cyan-300 dark:ring-cyan-800', dot: 'bg-cyan-500' },
+    'READY_TO_MERGE': { label: 'Ready to Merge', color: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300', dot: 'bg-teal-500' },
+    'READY_TO_DEPLOY': { label: 'Ready to Deploy', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300', dot: 'bg-emerald-500' },
+    'DONE': { label: 'Done', color: 'bg-green-100 text-green-800 font-medium dark:bg-green-950 dark:text-green-300', dot: 'bg-green-500' },
+    'RELEASED': { label: 'Released', color: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400', dot: 'bg-green-600' },
+    'WITHDRAWN': { label: 'Withdrawn', color: 'bg-red-50 text-red-600 line-through dark:bg-red-950 dark:text-red-400', dot: 'bg-red-500' },
+    'GATHERING_INTEREST': { label: 'Gathering Interest', color: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:ring-orange-800', dot: 'bg-orange-500' },
 });
 
 export const getPriorityConfig = () => ({
@@ -107,12 +107,24 @@ export const getAvatarColor = (user) => {
         'from-purple-600 to-purple-700',
         'from-emerald-600 to-emerald-700',
         'from-teal-600 to-teal-700',
-        'from-cyan-600 to-cyan-700'
+        'from-cyan-600 to-cyan-700',
+        'from-rose-600 to-rose-700',
+        'from-amber-600 to-amber-700',
+        'from-lime-600 to-lime-700',
+        'from-fuchsia-600 to-fuchsia-700',
+        'from-sky-600 to-sky-700',
+        'from-orange-600 to-orange-700',
+        'from-pink-600 to-pink-700',
+        'from-red-600 to-red-700',
     ];
 
     const identifier = typeof user === 'string' ? user : (user?.email || user?.firstname || '');
-    const index = identifier ? identifier.charCodeAt(0) % colors.length : 0;
-    return colors[index];
+    let hash = 0;
+    for (let i = 0; i < identifier.length; i++) {
+        hash = ((hash << 5) - hash) + identifier.charCodeAt(i);
+        hash |= 0;
+    }
+    return colors[Math.abs(hash) % colors.length];
 };
 
 export const getAvatarInitials = (user) => {

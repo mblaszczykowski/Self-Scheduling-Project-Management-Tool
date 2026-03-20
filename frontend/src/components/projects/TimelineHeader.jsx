@@ -12,6 +12,7 @@ const TimelineHeader = ({
     processedProjects,
     optimization,
     onOptimize,
+    onScrollToToday,
     onSidebarToggle,
     headerRef,
     syncScroll,
@@ -32,11 +33,11 @@ const TimelineHeader = ({
                 const day = new Date(currentYear, currentMonth, i + 1);
                 const isToday = today.toDateString() === day.toDateString();
                 const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-                const weekendClass = isWeekend ? 'bg-slate-50' : '';
+                const weekendClass = isWeekend ? 'bg-slate-50 dark:bg-slate-800/50' : '';
                 const todayClass = isToday
                     ? 'bg-slate-900 text-white font-semibold'
                     : 'text-slate-500';
-                const dayClassName = `text-xs p-1 border-l border-slate-200 flex items-center justify-center ${
+                const dayClassName = `text-xs p-1 border-l border-slate-200 dark:border-slate-700 flex items-center justify-center ${
                     weekendClass
                 } ${todayClass}`;
                 return (
@@ -50,11 +51,11 @@ const TimelineHeader = ({
                 );
             });
 
-            const monthHeaderClass = 'text-xs font-semibold text-slate-700 border-b border-slate-200 p-2 bg-white';
+            const monthHeaderClass = 'text-xs font-semibold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 p-2 bg-white dark:bg-slate-800';
             months.push(
                 <div
                     key={`${year}-${month}`}
-                    className="flex flex-col text-center border-r border-slate-200"
+                    className="flex flex-col text-center border-r border-slate-200 dark:border-slate-700"
                     style={{ width: `${daysInMonth * DAY_WIDTH}px` }}
                 >
                     <div className={monthHeaderClass}>
@@ -70,11 +71,11 @@ const TimelineHeader = ({
         return months;
     }, [timelineStart, timelineEnd]);
 
-    const headerSidebarClass = 'sticky left-0 z-10 flex items-center justify-between bg-white border-r border-slate-200 transition-all duration-200';
+    const headerSidebarClass = 'sticky left-0 z-10 flex items-center justify-between bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transition-all duration-200';
 
     return (
         <div
-            className="flex mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white"
+            className="flex mb-3 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
             ref={headerRef}
             onScroll={syncScroll}
         >
@@ -95,9 +96,18 @@ const TimelineHeader = ({
                 </button>
                 {!sidebarCollapsed && (
                     <div className="flex items-center gap-2.5 pr-3">
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
                             {processedProjects.length} projects
                         </span>
+                        {onScrollToToday && (
+                            <button
+                                onClick={onScrollToToday}
+                                className="text-[10px] px-2 py-1 rounded-md font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                title="Scroll to today"
+                            >
+                                Today
+                            </button>
+                        )}
                         {!optimization?.result && (
                             <button
                                 onClick={onOptimize}
@@ -136,7 +146,7 @@ const TimelineHeader = ({
                     </div>
                 )}
             </div>
-            <div className="flex-1 flex relative bg-white">{monthElements}</div>
+            <div className="flex-1 flex relative bg-white dark:bg-slate-800">{monthElements}</div>
         </div>
     );
 };

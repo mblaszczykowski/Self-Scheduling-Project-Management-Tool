@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -46,7 +48,7 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -56,6 +58,19 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Dark mode body */
+.dark body,
+.dark {
+  color-scheme: dark;
+}
+
+/* Smooth theme transition */
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition: background-color 200ms, border-color 200ms, color 200ms !important;
 }
 
 /* Custom Toast Notifications - match app design */
@@ -133,4 +148,54 @@ code {
 
 .Toastify__close-button:hover {
   opacity: 1 !important;
+}
+
+/* Dark mode toast overrides */
+.dark .Toastify__toast {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+.dark .Toastify__toast-body {
+  color: #e2e8f0 !important;
+}
+
+.dark .Toastify__toast--success {
+  background: #052e16 !important;
+  border-color: #14532d !important;
+}
+
+.dark .Toastify__toast--error {
+  background: #450a0a !important;
+  border-color: #7f1d1d !important;
+}
+
+.dark .Toastify__toast--info {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+.dark .Toastify__toast--warning {
+  background: #451a03 !important;
+  border-color: #78350f !important;
+}
+
+.dark .Toastify__close-button {
+  color: #94a3b8 !important;
+}
+
+.dark .Toastify__progress-bar {
+  background: #e2e8f0 !important;
+}
+
+.dark .Toastify__toast--success .Toastify__progress-bar {
+  background: #22c55e !important;
+}
+
+.dark .Toastify__toast--error .Toastify__progress-bar {
+  background: #ef4444 !important;
+}
+
+.dark .Toastify__toast--warning .Toastify__progress-bar {
+  background: #f59e0b !important;
 }

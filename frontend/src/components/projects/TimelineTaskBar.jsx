@@ -111,7 +111,7 @@ const TimelineTaskBar = ({
         timelineStart
     );
 
-    const taskRowClass = `sticky left-0 z-10 bg-slate-50 border-x border-b border-slate-200 hover:bg-slate-100 cursor-pointer transition-all duration-200 ${
+    const taskRowClass = `sticky left-0 z-10 bg-slate-50 dark:bg-slate-800/50 border-x border-b border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-all duration-200 ${
         isLastTask ? 'rounded-b-lg' : ''
     }`;
 
@@ -156,7 +156,7 @@ const TimelineTaskBar = ({
                     </div>
                 ) : (
                     <div className="p-2 pl-5">
-                        <p className="text-sm text-slate-700 truncate mb-1">
+                        <p className="text-sm text-slate-700 dark:text-slate-200 truncate mb-1">
                             {task.summary}
                         </p>
                         <div className="flex items-center gap-2">

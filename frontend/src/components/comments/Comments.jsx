@@ -1,6 +1,5 @@
 import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { ProjectsContext } from '../../context/ProjectsContext';
-import { HiOutlineChatAlt2 } from 'react-icons/hi';
 import { getFileInfo } from '../../util/helpers';
 import PreviewModal from '../common/PreviewModal';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
@@ -142,41 +141,19 @@ export default function Comments({ taskId, currentUserId }) {
         <div>
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-slate-900">
+                    <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         Comments
-                    </h3>
-                    <span
-                        className={
-                            'text-[11px] font-medium text-slate-500'
-                            + ' bg-slate-100 px-1.5 py-0.5 rounded'
-                        }
-                    >
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
                         {comments.length}
                     </span>
                 </div>
                 {!showCommentForm && (
                     <button
                         onClick={() => setShowCommentForm(true)}
-                        className={
-                            'inline-flex items-center gap-1.5 px-3 py-1.5'
-                            + ' bg-slate-900 text-white rounded-lg hover:bg-slate-800'
-                            + ' transition-colors text-xs font-medium'
-                        }
+                        className="text-[12px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                     >
-                        <svg
-                            className="w-3 h-3"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 4v16m8-8H4"
-                            />
-                        </svg>
-                        Add
+                        + Add
                     </button>
                 )}
             </div>
@@ -217,9 +194,8 @@ export default function Comments({ taskId, currentUserId }) {
                     ))}
                 </div>
             ) : (
-                <div className="text-center py-6 bg-slate-50 rounded-lg">
-                    <HiOutlineChatAlt2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="text-xs text-slate-500">No comments yet</p>
+                <div className="py-6 text-center">
+                    <p className="text-[12px] text-slate-300 dark:text-slate-600">No comments yet</p>
                 </div>
             )}
 
@@ -234,8 +210,8 @@ export default function Comments({ taskId, currentUserId }) {
                 isOpen={deleteConfirmId !== null}
                 onClose={() => setDeleteConfirmId(null)}
                 onConfirm={confirmDeleteComment}
-                title="Delete Comment?"
-                message="Are you sure you want to delete this comment? This action cannot be undone."
+                title="Delete comment?"
+                message="Are you sure? This action cannot be undone."
                 confirmText="Delete"
                 cancelText="Cancel"
                 variant="danger"

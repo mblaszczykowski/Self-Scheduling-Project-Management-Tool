@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { AuthContext, AuthProvider } from './context/AuthContext';
 import { ProjectsProvider } from './context/ProjectsContext';
 import { NotificationsProvider } from './context/NotificationsContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { checkUserAuth } from './util/api';
 import PageTransition from './components/common/PageTransition';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -14,10 +15,13 @@ const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = React.lazy(() => import('./pages/ProjectsPage'));
 
 const LoadingSpinner = () => (
-    <div className="flex justify-center items-center h-screen bg-slate-50">
+    <div className="flex justify-center items-center h-screen bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
-            <p className="mt-4 text-slate-500">Loading</p>
+            <div className="w-10 h-10 bg-slate-900 dark:bg-white rounded-xl flex items-center justify-center mx-auto mb-4">
+                <div className="w-5 h-5 bg-white dark:bg-slate-900 rounded-[4px]" />
+            </div>
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-white mx-auto" />
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading</p>
         </div>
     </div>
 );
@@ -46,9 +50,9 @@ function AppRoutes() {
     if (loading) return <LoadingSpinner />;
 
     return (
-        <div className="App min-h-screen">
+        <div className="App min-h-screen bg-slate-50 dark:bg-slate-900">
             <ToastContainer
-                position="top-center"
+                position="top-right"
                 autoClose={2500}
                 hideProgressBar={false}
                 newestOnTop
@@ -57,6 +61,7 @@ function AppRoutes() {
                 draggable={false}
                 pauseOnHover
                 theme="light"
+                style={{ marginTop: '4rem' }}
             />
             <Routes>
                 <Route
@@ -147,15 +152,17 @@ function App() {
     if (!authChecked) return <LoadingSpinner />;
 
     return (
-        <ErrorBoundary>
-            <AuthProvider initialUser={initialUser}>
-                <ProjectsProvider>
-                    <NotificationsProvider>
-                        <AppRoutes />
-                    </NotificationsProvider>
-                </ProjectsProvider>
-            </AuthProvider>
-        </ErrorBoundary>
+        <ThemeProvider>
+            <ErrorBoundary>
+                <AuthProvider initialUser={initialUser}>
+                    <ProjectsProvider>
+                        <NotificationsProvider>
+                            <AppRoutes />
+                        </NotificationsProvider>
+                    </ProjectsProvider>
+                </AuthProvider>
+            </ErrorBoundary>
+        </ThemeProvider>
     );
 }
 

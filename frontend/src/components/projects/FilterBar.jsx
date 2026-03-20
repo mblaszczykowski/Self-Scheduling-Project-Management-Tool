@@ -322,13 +322,15 @@ const FilterBar = ({
                             <input
                                 type="text"
                                 placeholder="Search tasks..."
+                                data-search-input
                                 value={searchInput}
                                 onChange={e => onSearchInputChange(e.target.value)}
                                 className={
-                                    'px-2 py-1.5 bg-white border border-slate-200'
-                                    + ' rounded text-sm text-slate-700'
+                                    'px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'
+                                    + ' rounded text-sm text-slate-700 dark:text-slate-200'
+                                    + ' placeholder-slate-400 dark:placeholder-slate-500'
                                     + ' focus:outline-none focus:ring-1'
-                                    + ' focus:ring-slate-900 w-40'
+                                    + ' focus:ring-slate-900 dark:focus:ring-slate-400 w-40'
                                 }
                                 autoFocus
                             />
@@ -356,11 +358,13 @@ const FilterBar = ({
                         onMouseEnter={(e) => handleButtonMouseEnter(e, 'Clear all filters')}
                         onMouseLeave={onFilterTooltipHide}
                         className={
-                            'p-2 text-slate-400 hover:text-slate-600'
-                            + ' hover:bg-slate-100 rounded-lg transition-colors'
+                            'flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium'
+                            + ' text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950'
+                            + ' hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors'
                         }
                     >
                         <CloseIcon />
+                        <span className="hidden sm:inline">Clear filters</span>
                     </button>
                 )}
             </div>

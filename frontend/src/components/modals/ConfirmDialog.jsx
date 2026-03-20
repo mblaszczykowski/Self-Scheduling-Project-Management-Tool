@@ -15,14 +15,14 @@ const ConfirmDialog = ({
 
     const variantStyles = {
         danger: {
-            iconBg: 'bg-red-100',
-            iconColor: 'text-red-600',
-            confirmBg: 'bg-red-600 hover:bg-red-700'
+            iconBg: 'bg-red-50 dark:bg-red-950/40',
+            iconColor: 'text-red-500 dark:text-red-400',
+            confirmBg: 'bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400'
         },
         warning: {
-            iconBg: 'bg-amber-100',
-            iconColor: 'text-amber-600',
-            confirmBg: 'bg-amber-600 hover:bg-amber-700'
+            iconBg: 'bg-amber-50 dark:bg-amber-950/40',
+            iconColor: 'text-amber-500 dark:text-amber-400',
+            confirmBg: 'bg-amber-600 hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-400'
         }
     };
 
@@ -30,39 +30,41 @@ const ConfirmDialog = ({
 
     return (
         <div
-            className="fixed inset-0 bg-black/50 z-[80] flex items-center justify-center"
+            className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-[80] flex items-center justify-center"
             onClick={onClose}
         >
             <div
-                className="bg-white rounded-xl shadow-xl max-w-sm w-full mx-4 overflow-hidden"
+                className="bg-white dark:bg-[#1a1a2e] border border-slate-200 dark:border-slate-700/60 rounded-lg shadow-[0_16px_48px_-12px_rgba(0,0,0,0.25)] max-w-sm w-full mx-4 overflow-hidden"
                 onClick={e => e.stopPropagation()}
                 role="alertdialog"
                 aria-modal="true"
                 aria-labelledby="confirm-dialog-title"
                 aria-describedby="confirm-dialog-description"
             >
-                <div className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className={`w-10 h-10 rounded-full ${styles.iconBg} flex items-center justify-center`}>
-                            <HiOutlineExclamation className={`w-5 h-5 ${styles.iconColor}`} />
+                <div className="px-5 py-4">
+                    <div className="flex items-start gap-3 mb-3">
+                        <div className={`w-8 h-8 rounded-md ${styles.iconBg} flex items-center justify-center shrink-0 mt-0.5`}>
+                            <HiOutlineExclamation className={`w-4 h-4 ${styles.iconColor}`} />
                         </div>
-                        <h3 id="confirm-dialog-title" className="text-lg font-semibold text-slate-900">
-                            {title}
-                        </h3>
+                        <div>
+                            <h3 id="confirm-dialog-title" className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                {title}
+                            </h3>
+                            <p id="confirm-dialog-description" className="text-[13px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                {message}
+                            </p>
+                        </div>
                     </div>
-                    <p id="confirm-dialog-description" className="text-sm text-slate-600 mb-6">
-                        {message}
-                    </p>
-                    <div className="flex gap-3">
+                    <div className="flex justify-end gap-2 mt-4">
                         <button
                             onClick={onClose}
-                            className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                            className="px-3 py-1.5 text-[13px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
                         >
                             {cancelText}
                         </button>
                         <button
                             onClick={onConfirm}
-                            className={`flex-1 px-4 py-2.5 text-sm font-medium text-white rounded-lg transition-colors ${styles.confirmBg}`}
+                            className={`px-3 py-1.5 text-[13px] font-semibold text-white rounded transition-colors ${styles.confirmBg}`}
                         >
                             {confirmText}
                         </button>

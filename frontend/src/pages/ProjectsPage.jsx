@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useRef, useState, useCallback } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ProjectsContext } from '../context/ProjectsContext';
@@ -21,6 +21,8 @@ import { useEnrichedProjects } from '../hooks/useEnrichedProjects';
 import { useUrlSyncedFilters } from '../hooks/useUrlSyncedFilters';
 import { useScheduleOptimization } from '../hooks/useScheduleOptimization';
 import { toDateString, MS_PER_DAY } from '../util/helpers';
+import { showToast } from '../util/toast';
+import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 import { getSidebarWidth, TIMELINE_CONSTANTS } from '../config/timelineConstants';
 
 const { DAY_WIDTH, TIMELINE_END_PADDING } = TIMELINE_CONSTANTS;
@@ -71,6 +73,27 @@ const ProjectsPage = () => {
     const { optimization, handleOptimize, handleAcceptOptimization, handleRejectOptimization } =
         useScheduleOptimization({ processedProjects, projects, refreshProjects });
 
+    useKeyboardShortcuts([
+        { key: 'n', handler: () => openModal('task', 'create') },
+        { key: 'p', handler: () => openModal('project', 'create') },
+        { key: '/', handler: () => document.querySelector('[data-search-input]')?.focus() },
+        { key: '1', handler: () => setViewState(prev => ({ ...prev, mode: 'timeline' })) },
+        { key: '2', handler: () => setViewState(prev => ({ ...prev, mode: 'list' })) },
+        { key: 'Escape', handler: () => { if (modalOpen) closeModal(); } },
+    ]);
+
+    // Auto-switch to list on mobile
+    useEffect(() => {
+        const checkMobile = () => {
+            if (window.innerWidth < 640 && viewState.mode === 'timeline') {
+                setViewState(prev => ({ ...prev, mode: 'list' }));
+            }
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, [viewState.mode, setViewState]);
+
     // --- Local UI state ---
 
     const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, content: null });
@@ -117,11 +140,14 @@ const ProjectsPage = () => {
             labels: task.labels, dependencyKeys: task.dependencies || [],
         }).catch(err => {
             console.error('Error updating task:', err);
+            showToast('Failed to update task dates. Reverting changes.', 'error');
             updateTask(projectKey, task.taskKey, {
                 summary: task.summary, description: task.description, status: task.status,
                 startDate: previousStartDate, dueDate: previousDueDate, assignee: task.assignee,
                 labels: task.labels, dependencyKeys: task.dependencies || [],
-            }).catch(() => {});
+            }).catch(() => {
+                showToast('Failed to revert changes. Please refresh the page.', 'error');
+            });
         });
     }, [processedProjects, updateTask]);
 
@@ -202,6 +228,14 @@ const ProjectsPage = () => {
 
     const { timelineStart, timelineEnd, timelineWidth } = timelineBounds;
 
+    const scrollToToday = useCallback(() => {
+        if (!timelineRef.current) return;
+        const today = new Date();
+        const daysFromStart = Math.round((today - timelineStart) / MS_PER_DAY);
+        const scrollLeft = Math.max(0, daysFromStart * DAY_WIDTH - timelineRef.current.clientWidth / 2);
+        timelineRef.current.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+    }, [timelineStart]);
+
     // --- Event handlers ---
 
     const toggleExpand = (key) => setViewState(prev => ({
@@ -229,7 +263,7 @@ const ProjectsPage = () => {
     // --- Render ---
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
             <Header
                 onLogout={handleLogout}
                 onCreateProject={() => openModal('project', 'create')}
@@ -237,7 +271,7 @@ const ProjectsPage = () => {
             />
 
             <div className="flex-grow flex flex-col px-4 lg:px-6 py-6">
-                <div className="mb-4 flex items-center gap-4">
+                <div className="mb-4 flex items-center gap-4 animate-[fadeInSlide_0.3s_ease-out_both]">
                     <FilterBar
                         projects={projects}
                         allTasks={allTasks}
@@ -263,21 +297,22 @@ const ProjectsPage = () => {
                         filterRef={filterRef}
                     />
 
-                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shrink-0">
+                    <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shrink-0">
                         {['timeline', 'list'].map(mode => (
                             <button
                                 key={mode}
                                 onClick={() => setViewState(prev => ({ ...prev, mode }))}
                                 className={
-                                    'py-2 px-4 text-sm font-medium rounded-lg transition-colors '
+                                    'py-2 px-3 sm:px-4 text-sm font-medium rounded-lg transition-colors '
+                                    + (mode === 'timeline' ? 'hidden sm:flex ' : '')
                                     + (viewState.mode === mode
-                                        ? 'bg-slate-900 text-white'
-                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50')
+                                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700')
                                 }
                             >
                                 <span className="flex items-center gap-2">
                                     {mode === 'timeline' ? <ChartBarIcon /> : <ListIcon />}
-                                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                                    <span className="hidden sm:inline">{mode.charAt(0).toUpperCase() + mode.slice(1)}</span>
                                 </span>
                             </button>
                         ))}
@@ -347,6 +382,7 @@ const ProjectsPage = () => {
                         syncScroll={syncScroll}
                         optimization={optimization}
                         onOptimize={handleOptimize}
+                        onScrollToToday={scrollToToday}
                         onAcceptOptimization={handleAcceptOptimization}
                         onRejectOptimization={handleRejectOptimization}
                     />

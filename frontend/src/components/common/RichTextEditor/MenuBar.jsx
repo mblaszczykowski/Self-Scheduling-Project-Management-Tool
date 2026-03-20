@@ -38,7 +38,7 @@ const MenuBar = ({ editor }) => {
     };
 
     return (
-        <div className="flex flex-wrap items-center gap-1 p-3 border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white">
+        <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-slate-100 dark:border-slate-700/40 bg-slate-50/50 dark:bg-slate-800/30">
             {TOOLBAR_GROUPS.map((group, gi) => (
                 <React.Fragment key={group.id}>
                     {gi > 0 && <MenuDivider />}
@@ -50,7 +50,7 @@ const MenuBar = ({ editor }) => {
                                 isActive={isActive(item)}
                                 title={item.title}
                             >
-                                {item.icon ? <item.icon className="w-3.5 h-3.5" /> : <span className="text-sm font-bold">{item.label}</span>}
+                                {item.icon ? <item.icon className="w-3 h-3" /> : <span className="text-[11px] font-semibold">{item.label}</span>}
                             </MenuButton>
                         ))}
                     </div>
@@ -67,7 +67,7 @@ const MenuBar = ({ editor }) => {
                         isActive={item.activeKey ? editor.isActive(item.activeKey) : false}
                         title={item.title}
                     >
-                        <item.icon className="w-3.5 h-3.5" />
+                        <item.icon className="w-3 h-3" />
                     </MenuButton>
                 ))}
             </div>
@@ -82,7 +82,7 @@ const MenuBar = ({ editor }) => {
                         disabled={!editor.can()[item.canKey]()}
                         title={item.title}
                     >
-                        <item.icon className="w-3.5 h-3.5" />
+                        <item.icon className="w-3 h-3" />
                     </MenuButton>
                 ))}
             </div>
