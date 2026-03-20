@@ -1,6 +1,8 @@
 package com.backend.services;
 
+import com.backend.config.CookieProperties;
 import com.backend.entities.User;
+import com.backend.exception.AuthorizationException;
 import com.backend.exception.ValidationException;
 import com.backend.filter.RateLimitFilter;
 import com.backend.requests.LoginRequest;
@@ -10,17 +12,13 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class AuthService {
@@ -29,8 +27,7 @@ public class AuthService {
     private final TokenService tokenService;
     private final RateLimitFilter rateLimitFilter;
     private final BCryptPasswordEncoder passwordEncoder;
-    private final boolean secureCookie;
-    private final String sameSite;
+    private final CookieProperties cookieProperties;
     private final Set<String> trustedProxies;
 
     @Autowired
@@ -38,52 +35,43 @@ public class AuthService {
                        TokenService tokenService,
                        RateLimitFilter rateLimitFilter,
                        BCryptPasswordEncoder passwordEncoder,
-                       @Value("${app.cookie.secure:true}") boolean secureCookie,
-                       @Value("${app.cookie.same-site:Strict}") String sameSite,
+                       CookieProperties cookieProperties,
                        @Value("${app.trusted-proxies:}") String trustedProxiesConfig) {
         this.userService = userService;
         this.tokenService = tokenService;
         this.rateLimitFilter = rateLimitFilter;
         this.passwordEncoder = passwordEncoder;
-        this.secureCookie = secureCookie;
-        this.sameSite = sameSite;
-        this.trustedProxies = (trustedProxiesConfig == null || trustedProxiesConfig.isBlank())
-                ? Set.of()
-                : Arrays.stream(trustedProxiesConfig.split(","))
-                        .map(String::trim)
-                        .filter(s -> !s.isEmpty())
-                        .collect(Collectors.toSet());
+        this.cookieProperties = cookieProperties;
+        this.trustedProxies = com.backend.util.IpUtil.parseTrustedProxies(trustedProxiesConfig);
     }
 
     private static final String TIMING_ATTACK_PREVENTION_HASH = "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYIWWwK6W6Wy";
 
+    public record LoginResult(Map<String, Object> body, TokenService.AuthTokens tokens) {}
+
     @Transactional(rollbackFor = Exception.class)
-    public ResponseEntity<?> authenticateUser(LoginRequest loginRequest, HttpServletRequest httpRequest) {
+    public LoginResult authenticateUser(LoginRequest loginRequest, HttpServletRequest httpRequest) {
         validateLoginRequest(loginRequest);
 
         var user = userService.findUserByEmailOrNull(loginRequest.email());
         var credentialsValid = verifyCredentialsWithConstantTime(user, loginRequest.password());
 
         if (!credentialsValid) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid email or password"));
+            throw new ValidationException("Invalid email or password");
         }
 
         rateLimitFilter.resetLoginAttempts(getClientIp(httpRequest));
 
         var tokens = tokenService.createAuthTokens(user.getId());
 
-        var response = Map.of(
+        var body = Map.<String, Object>of(
                 "message", "Login successful",
                 "userId", user.getId(),
                 "email", user.getEmail(),
                 "name", user.getFullName()
         );
 
-        var headers = new HttpHeaders();
-        headers.add(HttpHeaders.SET_COOKIE, tokens.accessCookie().toString());
-        headers.add(HttpHeaders.SET_COOKIE, tokens.refreshCookie().toString());
-
-        return ResponseEntity.ok().headers(headers).body(response);
+        return new LoginResult(body, tokens);
     }
 
     private String getClientIp(HttpServletRequest request) {
@@ -91,7 +79,7 @@ public class AuthService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public ResponseEntity<?> refreshAccessToken(HttpServletRequest request) {
+    public TokenService.AuthTokens refreshAccessToken(HttpServletRequest request) {
         String refreshToken = null;
         if (request.getCookies() != null) {
             for (var cookie : request.getCookies()) {
@@ -103,23 +91,15 @@ public class AuthService {
         }
 
         if (refreshToken == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Refresh token not provided"));
+            throw new AuthorizationException("Refresh token not provided");
         }
 
         var userId = tokenService.validateRefreshToken(refreshToken);
         if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Invalid or expired refresh token"));
+            throw new AuthorizationException("Invalid or expired refresh token");
         }
 
-        var rotatedTokens = tokenService.createAuthTokens(userId);
-
-        var headers = new HttpHeaders();
-        headers.add(HttpHeaders.SET_COOKIE, rotatedTokens.accessCookie().toString());
-        headers.add(HttpHeaders.SET_COOKIE, rotatedTokens.refreshCookie().toString());
-
-        return ResponseEntity.ok().headers(headers).body(Map.of("message", "Token refreshed successfully"));
+        return tokenService.createAuthTokens(userId);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -132,18 +112,18 @@ public class AuthService {
 
         var deleteAccessCookie = ResponseCookie.from("accessToken", "")
                 .httpOnly(true)
-                .secure(secureCookie)
+                .secure(cookieProperties.isSecure())
                 .path("/")
                 .maxAge(0)
-                .sameSite(sameSite)
+                .sameSite(cookieProperties.getSameSite())
                 .build();
 
         var deleteRefreshCookie = ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
-                .secure(secureCookie)
+                .secure(cookieProperties.isSecure())
                 .path("/")
                 .maxAge(0)
-                .sameSite(sameSite)
+                .sameSite(cookieProperties.getSameSite())
                 .build();
 
         response.setHeader(HttpHeaders.SET_COOKIE, deleteAccessCookie.toString());

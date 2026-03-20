@@ -17,6 +17,8 @@ import java.util.stream.Collectors;
 @Service
 public class FileStorageService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FileStorageService.class);
+
     private final Path fileStorageLocation;
 
     public FileStorageService(@Value("${file.upload-dir}") String uploadDir) {
@@ -82,6 +84,17 @@ public class FileStorageService {
             }
         } catch (IOException ex) {
             throw new FileStorageException("Could not delete file");
+        }
+    }
+
+    public void deleteFilesSilently(Collection<String> filePaths) {
+        if (filePaths == null) return;
+        for (String path : filePaths) {
+            try {
+                deleteFile(path);
+            } catch (Exception e) {
+                log.warn("Failed to delete file: {}", path, e);
+            }
         }
     }
 

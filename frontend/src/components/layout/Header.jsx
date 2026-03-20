@@ -1,16 +1,19 @@
 import React, { useContext, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { HiOutlineMenu, HiOutlineX } from 'react-icons/hi';
-import { DataContext } from '../../context/DataContext';
+import { AuthContext } from '../../context/AuthContext';
+import { NotificationsContext } from '../../context/NotificationsContext';
 import AccountModal from '../modals/AccountModal';
 import NotificationDropdown from './NotificationDropdown';
 import CreateMenu from './CreateMenu';
-import UserMenu, { LogoutConfirmDialog } from './UserMenu';
+import UserMenu from './UserMenu';
+import ConfirmDialog from '../modals/ConfirmDialog';
 import MobileMenu from './MobileMenu';
 import { markNotificationsAsRead } from '../../util/api';
 
 export default function Header({ onLogout, onCreateProject, onCreateTask }) {
-    const { user, notifications, setNotifications, setUser } = useContext(DataContext);
+    const { user, setUser } = useContext(AuthContext);
+    const { notifications, setNotifications } = useContext(NotificationsContext);
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [accountModalOpen, setAccountModalOpen] = useState(false);
     const [createDropdownOpen, setCreateDropdownOpen] = useState(false);
@@ -120,10 +123,15 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                 <AccountModal user={user} onClose={() => setAccountModalOpen(false)} onUpdateUser={setUser} />
             )}
 
-            <LogoutConfirmDialog
+            <ConfirmDialog
                 isOpen={logoutConfirmOpen}
                 onClose={() => setLogoutConfirmOpen(false)}
                 onConfirm={handleLogoutConfirm}
+                title="Log out?"
+                message="Are you sure you want to log out? You'll need to sign in again to access your projects."
+                confirmText="Log out"
+                cancelText="Cancel"
+                variant="danger"
             />
         </header>
     );

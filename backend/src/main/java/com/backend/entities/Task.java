@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Entity
@@ -70,8 +71,10 @@ public class Task {
     @ManyToMany
     @JoinTable(
             name = "task_dependencies",
-            joinColumns = @JoinColumn(name = "task_id"),
-            inverseJoinColumns = @JoinColumn(name = "dependency_id")
+            joinColumns = @JoinColumn(name = "task_id",
+                    foreignKey = @ForeignKey(foreignKeyDefinition = "FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE")),
+            inverseJoinColumns = @JoinColumn(name = "dependency_id",
+                    foreignKey = @ForeignKey(foreignKeyDefinition = "FOREIGN KEY (dependency_id) REFERENCES tasks(id) ON DELETE CASCADE"))
     )
     private List<Task> dependencies = new ArrayList<>();
 
@@ -140,11 +143,33 @@ public class Task {
     public Project getProject() { return project; }
     public void setProject(Project project) { this.project = project; }
 
-    public List<Task> getDependencies() { return dependencies; }
-    public void setDependencies(List<Task> dependencies) { this.dependencies = dependencies; }
+    public List<Task> getDependencies() { return Collections.unmodifiableList(dependencies); }
 
-    public List<String> getAttachments() { return attachments; }
-    public void setAttachments(List<String> attachments) { this.attachments = attachments; }
+    public void replaceDependencies(List<Task> dependencies) {
+        this.dependencies.clear();
+        if (dependencies != null) {
+            this.dependencies.addAll(dependencies);
+        }
+    }
+
+    public void clearDependencies() {
+        this.dependencies.clear();
+    }
+
+    public List<String> getAttachments() { return Collections.unmodifiableList(attachments); }
+
+    public void replaceAttachments(List<String> attachments) {
+        this.attachments.clear();
+        if (attachments != null) {
+            this.attachments.addAll(attachments);
+        }
+    }
+
+    public void addAttachments(List<String> attachments) {
+        if (attachments != null) {
+            this.attachments.addAll(attachments);
+        }
+    }
 
     public Instant getCreated() { return created; }
     public void setCreated(Instant created) { this.created = created; }
@@ -155,8 +180,7 @@ public class Task {
     public Integer getProgress() { return progress; }
     public void setProgress(Integer progress) { this.progress = progress; }
 
-    public List<Comment> getComments() { return comments; }
-    public void setComments(List<Comment> comments) { this.comments = comments; }
+    public List<Comment> getComments() { return Collections.unmodifiableList(comments); }
 
     public TaskPriority getPriority() { return priority; }
     public void setPriority(TaskPriority priority) { this.priority = priority; }

@@ -67,9 +67,15 @@ public class ValidationUtil {
         }
     }
 
-    public static void validatePasswordMatch(String password, String confirmPassword) {
-        if (!password.equals(confirmPassword)) {
-            throw new ValidationException("Passwords do not match");
+    public static void validateSummaryAndDescription(String summary, String description) {
+        if (isNullOrEmpty(summary)) {
+            throw new ValidationException("Summary is required");
+        }
+        if (summary.length() > MAX_SUMMARY_LENGTH) {
+            throw new ValidationException("Summary exceeds maximum length of " + MAX_SUMMARY_LENGTH + " characters");
+        }
+        if (description != null && description.length() > MAX_DESCRIPTION_LENGTH) {
+            throw new ValidationException("Description exceeds maximum length of " + MAX_DESCRIPTION_LENGTH + " characters");
         }
     }
 

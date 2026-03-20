@@ -1,9 +1,7 @@
 import React from 'react';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 import { formatDistanceToNow } from 'date-fns';
-import {
-    getImageUrl, getAvatarColor, getAvatarInitials,
-} from '../../util/helpers';
+import Avatar from '../common/Avatar';
 import { ThumbsUpIcon, ThumbsDownIcon } from '../common/Icons';
 import CommentForm from './CommentForm';
 
@@ -15,15 +13,12 @@ const CommentItem = React.memo(({
     currentUserId,
     editingComment,
     replyingCommentId,
-    newAttachments,
     onSetEditingComment,
     onSetReplyingCommentId,
-    onSetNewAttachments,
     onHandleUpdateComment,
     onHandleAddComment,
     onHandleDeleteComment,
     onHandleReactToComment,
-    onAddAttachments,
     renderAttachmentPreview,
     openPreview,
 }) => {
@@ -45,41 +40,25 @@ const CommentItem = React.memo(({
             }
         >
             <div className="flex gap-2.5">
-                {comment.authorProfilePicture ? (
-                    <img
-                        src={getImageUrl(comment.authorProfilePicture)}
-                        alt=""
-                        className="h-7 w-7 rounded-full object-cover flex-shrink-0"
-                    />
-                ) : (
-                    <div
-                        className={
-                            'h-7 w-7 bg-gradient-to-br '
-                            + `${getAvatarColor(authorParts)} `
-                            + 'rounded-full flex items-center justify-center flex-shrink-0'
-                        }
-                    >
-                        <span className="text-[10px] font-semibold text-white">
-                            {getAvatarInitials(authorParts)}
-                        </span>
-                    </div>
-                )}
+                <Avatar
+                    user={authorParts}
+                    profilePicture={comment.authorProfilePicture}
+                    size="sm"
+                    className="flex-shrink-0"
+                />
 
                 <div className="flex-1 min-w-0">
                     {editingComment?.id === comment.id ? (
                         <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
                             <CommentForm
-                                onSubmit={(values, actions) =>
-                                    onHandleUpdateComment(comment, values, actions)
+                                onSubmit={(values, actions, attachments) =>
+                                    onHandleUpdateComment(comment, values, actions, attachments)
                                 }
                                 initialContent={comment.content}
                                 buttonText="Update"
                                 onCancel={() => {
                                     onSetEditingComment(null);
-                                    onSetNewAttachments([]);
                                 }}
-                                newAttachments={newAttachments}
-                                onAddAttachments={onAddAttachments}
                                 renderAttachmentPreview={renderAttachmentPreview}
                             />
                         </div>
@@ -195,16 +174,13 @@ const CommentItem = React.memo(({
                     {replyingCommentId === comment.id && (
                         <div className="mt-2">
                             <CommentForm
-                                onSubmit={(values, actions) =>
-                                    onHandleAddComment(values, actions, comment.id)
+                                onSubmit={(values, actions, attachments) =>
+                                    onHandleAddComment(values, actions, comment.id, attachments)
                                 }
                                 buttonText="Reply"
                                 onCancel={() => {
                                     onSetReplyingCommentId(null);
-                                    onSetNewAttachments([]);
                                 }}
-                                newAttachments={newAttachments}
-                                onAddAttachments={onAddAttachments}
                                 renderAttachmentPreview={renderAttachmentPreview}
                             />
                         </div>
@@ -218,15 +194,12 @@ const CommentItem = React.memo(({
                             currentUserId={currentUserId}
                             editingComment={editingComment}
                             replyingCommentId={replyingCommentId}
-                            newAttachments={newAttachments}
                             onSetEditingComment={onSetEditingComment}
                             onSetReplyingCommentId={onSetReplyingCommentId}
-                            onSetNewAttachments={onSetNewAttachments}
                             onHandleUpdateComment={onHandleUpdateComment}
                             onHandleAddComment={onHandleAddComment}
                             onHandleDeleteComment={onHandleDeleteComment}
                             onHandleReactToComment={onHandleReactToComment}
-                            onAddAttachments={onAddAttachments}
                             renderAttachmentPreview={renderAttachmentPreview}
                             openPreview={openPreview}
                         />

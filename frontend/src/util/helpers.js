@@ -153,12 +153,12 @@ export const generateBezierPath = (startX, startY, endX, endY) => {
     return `M ${startX} ${startY} C ${startX + offset} ${startY}, ${endX - offset} ${endY}, ${endX} ${endY}`;
 };
 
-export const getErrorMessage = (err) => {
+export const getErrorMessage = (err, defaultMessage = 'An unexpected error occurred') => {
     if (err.response?.data?.message) return err.response.data.message;
     if (err.response?.data?.error) return err.response.data.error;
     if (err.message === 'Network Error') return 'Unable to connect to server';
     if (err.code === 'ECONNABORTED') return 'Request timed out';
-    return err.message || 'An unexpected error occurred';
+    return err.message || defaultMessage;
 };
 
 export const daysBetween = (date1, date2) => {

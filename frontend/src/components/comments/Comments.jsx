@@ -1,11 +1,9 @@
 import React, { useContext, useEffect, useState, useCallback } from 'react';
-import { DataContext } from '../../context/DataContext';
-import {
-    HiOutlineDocument, HiOutlineDocumentText,
-    HiOutlineX, HiOutlineChatAlt2,
-} from 'react-icons/hi';
+import { ProjectsContext } from '../../context/ProjectsContext';
+import { HiOutlineChatAlt2 } from 'react-icons/hi';
 import { getFileInfo } from '../../util/helpers';
 import PreviewModal from '../common/PreviewModal';
+import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import ConfirmDialog from '../modals/ConfirmDialog';
 import CommentItem from './CommentItem';
 import CommentForm from './CommentForm';
@@ -14,12 +12,11 @@ export default function Comments({ taskId, currentUserId }) {
     const {
         getComments, createComment, updateComment,
         deleteComment, reactToComment,
-    } = useContext(DataContext);
+    } = useContext(ProjectsContext);
 
     const [comments, setComments] = useState([]);
     const [editingComment, setEditingComment] = useState(null);
     const [replyingCommentId, setReplyingCommentId] = useState(null);
-    const [newAttachments, setNewAttachments] = useState([]);
     const [showCommentForm, setShowCommentForm] = useState(false);
     const [preview, setPreview] = useState(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState(null);
@@ -48,16 +45,15 @@ export default function Comments({ taskId, currentUserId }) {
     }, [fetchComments]);
 
     const handleAddComment = async (
-        values, { resetForm, setSubmitting }, parentCommentId = null,
+        values, { resetForm, setSubmitting }, parentCommentId = null, attachments = [],
     ) => {
         try {
             await createComment(
                 taskId, { content: values.content },
-                newAttachments, parentCommentId,
+                attachments, parentCommentId,
             );
             await fetchComments();
             resetForm();
-            setNewAttachments([]);
             if (parentCommentId) setReplyingCommentId(null);
             setShowCommentForm(false);
         } catch (err) {
@@ -67,15 +63,14 @@ export default function Comments({ taskId, currentUserId }) {
         }
     };
 
-    const handleUpdateComment = async (comment, values, { setSubmitting }) => {
+    const handleUpdateComment = async (comment, values, { setSubmitting }, attachments = []) => {
         try {
             await updateComment(
                 taskId, comment.id,
-                { content: values.content }, newAttachments,
+                { content: values.content }, attachments,
             );
             await fetchComments();
             setEditingComment(null);
-            setNewAttachments([]);
         } catch (err) {
             console.error('Error updating comment:', err);
         } finally {
@@ -108,11 +103,6 @@ export default function Comments({ taskId, currentUserId }) {
         }
     };
 
-    const handleAddNewAttachments = (e) => {
-        const files = Array.from(e.target.files);
-        setNewAttachments(prev => [...prev, ...files]);
-    };
-
     const handleRemoveAttachment = (attachment, isExisting, commentId = null) => {
         if (isExisting && commentId) {
             setComments(prev =>
@@ -127,8 +117,6 @@ export default function Comments({ taskId, currentUserId }) {
                         : c
                 )
             );
-        } else {
-            setNewAttachments(prev => prev.filter(file => file !== attachment));
         }
     };
 
@@ -139,69 +127,16 @@ export default function Comments({ taskId, currentUserId }) {
 
     const renderAttachmentPreview = (
         attachment, isExisting, idx, commentId = null,
-    ) => {
-        const { url, fileName, fileType } = getFileInfo(attachment);
-
-        return (
-            <div
-                key={`${fileName}-${idx}`}
-                className="relative group cursor-pointer"
-                onClick={() => openPreview(attachment)}
-            >
-                {fileType === 'image' ? (
-                    <img
-                        src={url}
-                        alt={fileName}
-                        className={
-                            'h-10 w-10 object-cover rounded border'
-                            + ' border-slate-200 hover:border-slate-300 transition-colors'
-                        }
-                    />
-                ) : fileType === 'pdf' ? (
-                    <div
-                        className={
-                            'flex items-center gap-1.5 px-2 py-1 bg-white rounded'
-                            + ' border border-slate-200 hover:border-slate-300'
-                            + ' transition-colors'
-                        }
-                    >
-                        <HiOutlineDocumentText className="w-3 h-3 text-red-500" />
-                        <span className="text-[10px] text-slate-600 truncate max-w-[60px]">
-                            {fileName}
-                        </span>
-                    </div>
-                ) : (
-                    <div
-                        className={
-                            'flex items-center gap-1.5 px-2 py-1 bg-white rounded'
-                            + ' border border-slate-200 hover:border-slate-300'
-                            + ' transition-colors'
-                        }
-                    >
-                        <HiOutlineDocument className="w-3 h-3 text-slate-400" />
-                        <span className="text-[10px] text-slate-600 truncate max-w-[60px]">
-                            {fileName}
-                        </span>
-                    </div>
-                )}
-                <button
-                    type="button"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveAttachment(attachment, isExisting, commentId);
-                    }}
-                    className={
-                        'absolute -top-1 -right-1 w-4 h-4 bg-slate-700 text-white'
-                        + ' rounded-full flex items-center justify-center opacity-0'
-                        + ' group-hover:opacity-100 transition-opacity'
-                    }
-                    title="Remove"
-                >
-                    <HiOutlineX className="w-2.5 h-2.5" />
-                </button>
-            </div>
-        );
-    };
+    ) => (
+        <AttachmentThumbnail
+            key={`${getFileInfo(attachment).fileName}-${idx}`}
+            attachment={attachment}
+            variant="compact"
+            idx={idx}
+            onClick={openPreview}
+            onRemove={(att) => handleRemoveAttachment(att, isExisting, commentId)}
+        />
+    );
 
     return (
         <div>
@@ -249,16 +184,13 @@ export default function Comments({ taskId, currentUserId }) {
             {showCommentForm && (
                 <div className="mb-3">
                     <CommentForm
-                        onSubmit={(values, actions) =>
-                            handleAddComment(values, actions, null)
+                        onSubmit={(values, actions, attachments) =>
+                            handleAddComment(values, actions, null, attachments)
                         }
                         buttonText="Post"
                         onCancel={() => {
                             setShowCommentForm(false);
-                            setNewAttachments([]);
                         }}
-                        newAttachments={newAttachments}
-                        onAddAttachments={handleAddNewAttachments}
                         renderAttachmentPreview={renderAttachmentPreview}
                     />
                 </div>
@@ -273,15 +205,12 @@ export default function Comments({ taskId, currentUserId }) {
                             currentUserId={currentUserId}
                             editingComment={editingComment}
                             replyingCommentId={replyingCommentId}
-                            newAttachments={newAttachments}
                             onSetEditingComment={setEditingComment}
                             onSetReplyingCommentId={setReplyingCommentId}
-                            onSetNewAttachments={setNewAttachments}
                             onHandleUpdateComment={handleUpdateComment}
                             onHandleAddComment={handleAddComment}
                             onHandleDeleteComment={handleDeleteComment}
                             onHandleReactToComment={handleReactToComment}
-                            onAddAttachments={handleAddNewAttachments}
                             renderAttachmentPreview={renderAttachmentPreview}
                             openPreview={openPreview}
                         />

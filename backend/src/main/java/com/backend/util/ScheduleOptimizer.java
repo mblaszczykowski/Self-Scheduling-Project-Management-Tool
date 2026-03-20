@@ -492,7 +492,7 @@ public class ScheduleOptimizer {
      * Paper specifies: HIGHEST=10, MEDIUM=5, LOW=1.
      * Full mapping: LOWEST=1, LOW=3, MEDIUM=5, HIGH=8, HIGHEST=10
      */
-    private int mapPriorityToWeight(com.backend.entities.TaskPriority priority) {
+    public static int mapPriorityToWeight(com.backend.entities.TaskPriority priority) {
         return switch (priority) {
             case LOWEST -> 1;
             case LOW -> 3;

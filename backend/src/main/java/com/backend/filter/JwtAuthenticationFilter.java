@@ -2,19 +2,17 @@ package com.backend.filter;
 
 import com.backend.config.PublicEndpoints;
 import com.backend.services.TokenService;
+import com.backend.util.FilterResponseUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Component
@@ -70,16 +68,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private void sendErrorResponse(HttpServletResponse response,
                                    HttpStatus status,
                                    String message) throws IOException {
-        response.setStatus(status.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-
-        var error = new LinkedHashMap<String, Object>();
-        error.put("status", status.value());
-        error.put("error", status.getReasonPhrase());
-        error.put("code", "AUTH_ERROR");
-        error.put("message", message);
-        error.put("timestamp", Instant.now().toString());
-
-        objectMapper.writeValue(response.getWriter(), error);
+        FilterResponseUtil.sendJsonError(response, status, message, objectMapper,
+                Map.of("code", "AUTH_ERROR"));
     }
 }

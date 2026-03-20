@@ -22,14 +22,15 @@ public class OptimizationService {
     private final ProjectRepository projectRepository;
     private final TaskRepository taskRepository;
     private final TaskService taskService;
-    private final CriticalPathMethodHelper cpmHelper = new CriticalPathMethodHelper();
+    private final CriticalPathMethodHelper cpmHelper;
     private final ScheduleOptimizer optimizer = new ScheduleOptimizer();
 
     public OptimizationService(ProjectRepository projectRepository, TaskRepository taskRepository,
-                               TaskService taskService) {
+                               TaskService taskService, CriticalPathMethodHelper cpmHelper) {
         this.projectRepository = projectRepository;
         this.taskRepository = taskRepository;
         this.taskService = taskService;
+        this.cpmHelper = cpmHelper;
     }
 
     @Transactional(readOnly = true)
@@ -42,15 +43,14 @@ public class OptimizationService {
             throw new ValidationException("Alpha and beta must be between 0 and 1");
         }
 
-        // Fetch and authorize projects
-        var projects = projectKeys.stream()
-                .map(key -> projectRepository.findByProjectKey(key)
-                        .orElseThrow(() -> new ResourceNotFoundException("Project not found: " + key)))
-                .toList();
-
+        // Fetch and authorize projects (batch)
+        var projects = projectRepository.findByProjectKeyIn(projectKeys);
+        if (projects.size() != projectKeys.size()) {
+            throw new ResourceNotFoundException("One or more projects not found");
+        }
         for (var project : projects) {
             if (!project.hasAccess(userId)) {
-                throw new AuthorizationException("No access to project: " + project.getProjectKey());
+                throw new ResourceNotFoundException("Project not found");
             }
         }
 
@@ -80,14 +80,33 @@ public class OptimizationService {
                     .orElse(LocalDate.now());
         }
 
-        // Run evaluation on current schedule and optimization
+        // Run evaluation on current schedule
         var originalResult = optimizer.evaluateOriginal(taskDTOs, horizonStart, alpha, beta);
-        var optimizedResult = optimizer.optimize(taskDTOs, horizonStart, alpha, beta);
 
-        // Build suggestions
+        // Run optimizer iteratively until convergence — the SSGS heuristic may not
+        // find the global optimum in a single pass because the priority ordering
+        // depends on slack/due dates which change after rescheduling.
+        var currentDTOs = taskDTOs;
+        ScheduleOptimizer.ScheduleResult optimizedResult = null;
+        for (int iteration = 0; iteration < 10; iteration++) {
+            var result = optimizer.optimize(currentDTOs, horizonStart, alpha, beta);
+            if (optimizedResult != null && result.tasksShifted() == 0) {
+                break; // converged — no more improvements
+            }
+            optimizedResult = result;
+            if (result.tasksShifted() == 0) break;
+
+            // Feed optimized dates back as input for next iteration
+            currentDTOs = applyResultToDTOs(currentDTOs, result);
+        }
+        if (optimizedResult == null) {
+            optimizedResult = optimizer.optimize(taskDTOs, horizonStart, alpha, beta);
+        }
+
+        // Build suggestions comparing original dates vs final optimized positions
         var suggestions = buildSuggestions(taskDTOs, optimizedResult, criticalSet);
 
-        // Count late tasks from results
+        // Count late tasks from results (both use original taskDTOs for consistent comparison)
         int originalTasksLate = countLateTasks(taskDTOs, originalResult);
         int optimizedTasksLate = countLateTasks(taskDTOs, optimizedResult);
         int totalActiveTasks = optimizedResult.tasks().size();
@@ -127,20 +146,40 @@ public class OptimizationService {
 
         if (shiftedSuggestions.isEmpty()) return;
 
-        // Batch fetch all tasks we need to update
-        for (var suggestion : shiftedSuggestions) {
-            var task = taskRepository.findByTaskKey(suggestion.taskKey())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Task not found: " + suggestion.taskKey()));
-
-            if (!task.getProject().hasAccess(userId)) {
-                throw new AuthorizationException("No access to task: " + suggestion.taskKey());
-            }
-
-            task.setStartDate(suggestion.suggestedStartDate());
-            task.setDueDate(suggestion.suggestedDueDate());
-            taskRepository.save(task);
+        // Collect all task keys and batch-fetch
+        var tasksByProjectKey = new HashMap<String, List<Integer>>();
+        for (var s : shiftedSuggestions) {
+            var key = s.taskKey();
+            if (key == null || !key.contains("-")) continue;
+            var lastDash = key.lastIndexOf('-');
+            var projectKey = key.substring(0, lastDash);
+            try {
+                var taskNumber = Integer.parseInt(key.substring(lastDash + 1));
+                tasksByProjectKey.computeIfAbsent(projectKey, k -> new ArrayList<>()).add(taskNumber);
+            } catch (NumberFormatException ignored) {}
         }
+
+        var allTasks = new ArrayList<Task>();
+        for (var entry : tasksByProjectKey.entrySet()) {
+            allTasks.addAll(taskRepository.findByProjectKeyAndTaskNumbers(entry.getKey(), entry.getValue()));
+        }
+        var taskMap = allTasks.stream().collect(Collectors.toMap(Task::getTaskKey, t -> t));
+
+        // Now iterate suggestions using the map
+        var tasksToSave = new ArrayList<Task>();
+        for (var s : shiftedSuggestions) {
+            var task = taskMap.get(s.taskKey());
+            if (task == null) {
+                throw new ResourceNotFoundException("Task not found: " + s.taskKey());
+            }
+            if (!task.getProject().hasAccess(userId)) {
+                throw new AuthorizationException("No access to task: " + s.taskKey());
+            }
+            task.setStartDate(s.suggestedStartDate());
+            task.setDueDate(s.suggestedDueDate());
+            tasksToSave.add(task);
+        }
+        taskRepository.saveAll(tasksToSave);
     }
 
     private int countLateTasks(List<TaskDTO> taskDTOs, ScheduleOptimizer.ScheduleResult result) {
@@ -166,7 +205,7 @@ public class OptimizationService {
             boolean wasShifted = !scheduled.suggestedStart().equals(dto.startDate())
                     || !scheduled.suggestedDue().equals(dto.dueDate());
 
-            int priorityWeight = dto.priority() != null ? mapPriorityToWeight(dto.priority()) : 5;
+            int priorityWeight = dto.priority() != null ? ScheduleOptimizer.mapPriorityToWeight(dto.priority()) : 5;
 
             suggestions.add(new TaskScheduleSuggestionDTO(
                     dto.taskKey(),
@@ -187,13 +226,22 @@ public class OptimizationService {
         return suggestions;
     }
 
-    private int mapPriorityToWeight(com.backend.entities.TaskPriority priority) {
-        return switch (priority) {
-            case LOWEST -> 1;
-            case LOW -> 3;
-            case MEDIUM -> 5;
-            case HIGH -> 8;
-            case HIGHEST -> 10;
-        };
+    /**
+     * Creates new TaskDTOs with optimized start/due dates from a ScheduleResult,
+     * used to feed back into the optimizer for iterative convergence.
+     */
+    private List<TaskDTO> applyResultToDTOs(List<TaskDTO> originals, ScheduleOptimizer.ScheduleResult result) {
+        return originals.stream().map(dto -> {
+            var scheduled = result.tasks().get(dto.taskKey());
+            if (scheduled == null) return dto;
+            return new TaskDTO(
+                    dto.id(), dto.taskNumber(), dto.taskKey(), dto.projectKey(),
+                    dto.summary(), dto.description(), dto.status(),
+                    scheduled.suggestedStart(), scheduled.suggestedDue(),
+                    dto.assignee(), dto.labels(), dto.dependencyKeys(), dto.isCritical(),
+                    dto.attachments(), dto.created(), dto.updated(), dto.progress(), dto.priority()
+            );
+        }).toList();
     }
+
 }

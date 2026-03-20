@@ -1,4 +1,7 @@
 export { useDashboardStats } from './useDashboardStats';
+export { useTaskCounts } from './useTaskCounts';
+export { useCriticalPathStats } from './useCriticalPathStats';
+export { useBlockedTaskStats } from './useBlockedTaskStats';
 export { useTaskFiltering } from './useTaskFiltering';
 export { useTimelineResize } from './useTimelineResize';
 export { useClickOutside } from './useClickOutside';

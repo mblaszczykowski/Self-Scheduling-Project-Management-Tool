@@ -9,7 +9,7 @@ import AttachmentUploader from './AttachmentUploader';
 import {
     SectionHeader, InputLabel, inputClass, selectClass,
 } from '../common/formHelpers';
-import { getAvatarColor, getAvatarInitials } from '../../util/helpers';
+import Avatar from '../common/Avatar';
 
 const ProjectForm = ({
     values,
@@ -115,10 +115,6 @@ const ProjectForm = ({
                                 {values.members.map((m, i) => {
                                     const isMemberOwner =
                                         project?.owner?.id === m.id;
-                                    const avatarClass =
-                                        'w-7 h-7 rounded-lg bg-gradient-to-br '
-                                        + `${getAvatarColor(m)} flex items-center`
-                                        + ' justify-center text-[10px] font-bold text-white';
                                     return (
                                         <div
                                             key={m.id || m.email || i}
@@ -129,9 +125,7 @@ const ProjectForm = ({
                                             }
                                         >
                                             <div className="flex items-center gap-2.5">
-                                                <div className={avatarClass}>
-                                                    {getAvatarInitials(m)}
-                                                </div>
+                                                <Avatar user={m} size="sm" className="rounded-lg" />
                                                 <div className="min-w-0">
                                                     <div className="text-xs font-medium text-slate-800 truncate">
                                                         {m.firstname

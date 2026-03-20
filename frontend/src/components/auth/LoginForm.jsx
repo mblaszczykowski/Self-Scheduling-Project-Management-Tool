@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import EyeButton from '../common/EyeButton';
 import { login, getUser } from '../../util/api';
 import { showToast } from '../../util/toast';
-import { DataContext } from '../../context/DataContext';
+import { getErrorMessage } from '../../util/helpers';
+import { AuthContext } from '../../context/AuthContext';
 import { authInputClass } from '../common/formHelpers';
 
 const validationSchema = Yup.object().shape({
@@ -18,7 +19,7 @@ const validationSchema = Yup.object().shape({
 function LoginForm({ onToggleForm }) {
     const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
-    const { setUser } = useContext(DataContext);
+    const { setUser } = useContext(AuthContext);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -35,8 +36,7 @@ function LoginForm({ onToggleForm }) {
             setUser(fetchedUser);
             navigate('/dashboard');
         } catch (err) {
-            const errorMessage = err.response?.data?.message || 'Login failed. Check your credentials.';
-            showToast(errorMessage);
+            showToast(getErrorMessage(err, 'Login failed. Check your credentials.'));
             console.error('Login error:', err.response || err.message);
         } finally {
             setSubmitting(false);

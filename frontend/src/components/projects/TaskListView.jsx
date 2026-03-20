@@ -7,6 +7,7 @@ const TaskListView = ({
     filteredTasks,
     processedProjects,
     taskKeyToTaskMap,
+    projectKeyToProject,
     sortField,
     sortOrder,
     hasActiveFilters,
@@ -114,7 +115,9 @@ const TaskListView = ({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {filteredTasks.map((task, index) => {
-                            const project = processedProjects.find(p => p.projectKey === task.projectKey);
+                            const project = projectKeyToProject
+                                ? projectKeyToProject.get(task.projectKey)
+                                : processedProjects.find(p => p.projectKey === task.projectKey);
                             const rowClassName = `hover:bg-blue-50/50 cursor-pointer transition-colors group ${
                                 index % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
                             }`;

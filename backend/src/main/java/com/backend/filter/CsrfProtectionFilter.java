@@ -1,16 +1,16 @@
 package com.backend.filter;
 
+import com.backend.config.CookieProperties;
 import com.backend.config.PublicEndpoints;
+import com.backend.util.FilterResponseUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -20,7 +20,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.Map;
 
 @Component
 public class CsrfProtectionFilter extends OncePerRequestFilter {
@@ -31,15 +30,12 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
     private static final SecureRandom secureRandom = new SecureRandom();
 
     private final ObjectMapper objectMapper;
-    private final boolean secureCookie;
-    private final String sameSite;
+    private final CookieProperties cookieProperties;
 
     public CsrfProtectionFilter(ObjectMapper objectMapper,
-                                @Value("${app.cookie.secure:false}") boolean secureCookie,
-                                @Value("${app.cookie.same-site:Lax}") String sameSite) {
+                                CookieProperties cookieProperties) {
         this.objectMapper = objectMapper;
-        this.secureCookie = secureCookie;
-        this.sameSite = sameSite;
+        this.cookieProperties = cookieProperties;
     }
 
     @Override
@@ -88,9 +84,9 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
             var cookie = ResponseCookie.from(CSRF_COOKIE_NAME, newToken)
                     .path("/")
                     .httpOnly(false)
-                    .secure(secureCookie)
+                    .secure(cookieProperties.isSecure())
                     .maxAge(3600)
-                    .sameSite(sameSite)
+                    .sameSite(cookieProperties.getSameSite())
                     .build();
             response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         }
@@ -115,16 +111,7 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
     }
 
     private void sendCsrfErrorResponse(HttpServletResponse response) throws IOException {
-        response.setStatus(HttpStatus.FORBIDDEN.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-
-        Map<String, Object> error = Map.of(
-                "status", HttpStatus.FORBIDDEN.value(),
-                "error", "Forbidden",
-                "message", "CSRF token validation failed. Please refresh the page and try again.",
-                "timestamp", System.currentTimeMillis()
-        );
-
-        objectMapper.writeValue(response.getWriter(), error);
+        FilterResponseUtil.sendJsonError(response, HttpStatus.FORBIDDEN,
+                "CSRF token validation failed. Please refresh the page and try again.", objectMapper);
     }
 }

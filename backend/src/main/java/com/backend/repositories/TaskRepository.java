@@ -3,7 +3,6 @@ package com.backend.repositories;
 import com.backend.entities.Task;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -16,6 +15,7 @@ public interface TaskRepository extends JpaRepository<Task, Integer> {
     @Query("SELECT t FROM Task t WHERE t.project.id = :projectId ORDER BY t.taskNumber")
     List<Task> findByProjectIdWithDetails(@Param("projectId") Integer projectId);
 
+    @EntityGraph("Task.withDetails")
     @Query("SELECT t FROM Task t WHERE t.project.projectKey = :projectKey AND t.taskNumber = :taskNumber")
     Optional<Task> findByProjectKeyAndTaskNumber(
             @Param("projectKey") String projectKey,
@@ -43,20 +43,6 @@ public interface TaskRepository extends JpaRepository<Task, Integer> {
         }
     }
 
-    default Optional<Task> findByTaskKeyWithDetails(String taskKey) {
-        if (taskKey == null || !taskKey.contains("-")) {
-            return Optional.empty();
-        }
-        var lastDash = taskKey.lastIndexOf('-');
-        var projectKey = taskKey.substring(0, lastDash);
-        try {
-            var taskNumber = Integer.parseInt(taskKey.substring(lastDash + 1));
-            return findByProjectKeyAndTaskNumberWithDetails(projectKey, taskNumber);
-        } catch (NumberFormatException e) {
-            return Optional.empty();
-        }
-    }
-
     @EntityGraph(attributePaths = "project")
     @Query("SELECT t FROM Task t WHERE t.project.projectKey = :projectKey AND t.taskNumber IN :taskNumbers")
     List<Task> findByProjectKeyAndTaskNumbers(
@@ -68,7 +54,4 @@ public interface TaskRepository extends JpaRepository<Task, Integer> {
     @Query("SELECT t FROM Task t WHERE t.project.id IN :projectIds ORDER BY t.taskNumber")
     List<Task> findByProjectIdsWithDetails(@Param("projectIds") List<Integer> projectIds);
 
-    @Modifying
-    @Query(value = "DELETE FROM task_dependencies WHERE dependency_id IN :taskIds", nativeQuery = true)
-    void removeIncomingDependencies(@Param("taskIds") List<Integer> taskIds);
 }

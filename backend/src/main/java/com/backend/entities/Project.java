@@ -2,6 +2,8 @@ package com.backend.entities;
 
 import jakarta.persistence.*;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 @Entity
@@ -60,25 +62,14 @@ public class Project {
     @ManyToMany
     @JoinTable(
             name = "project_dependencies",
-            joinColumns = @JoinColumn(name = "project_id"),
-            inverseJoinColumns = @JoinColumn(name = "dependency_id")
+            joinColumns = @JoinColumn(name = "project_id",
+                    foreignKey = @ForeignKey(foreignKeyDefinition = "FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE")),
+            inverseJoinColumns = @JoinColumn(name = "dependency_id",
+                    foreignKey = @ForeignKey(foreignKeyDefinition = "FOREIGN KEY (dependency_id) REFERENCES projects(id) ON DELETE CASCADE"))
     )
     private List<Project> dependencies = new ArrayList<>();
 
     public Project() {}
-
-    public Project(Integer id, String projectKey, String summary, String description,
-                   User owner, List<Task> tasks, List<String> attachments, List<Project> dependencies) {
-        this.id = id;
-        this.projectKey = projectKey;
-        this.summary = summary;
-        this.description = description;
-        this.owner = owner;
-        this.tasks = tasks;
-        this.attachments = attachments;
-        this.dependencies = dependencies;
-        this.nextTaskNumber = 1;
-    }
 
     public boolean isOwner(Integer userId) {
         return owner != null && owner.getId().equals(userId);
@@ -116,15 +107,42 @@ public class Project {
     public User getOwner() { return owner; }
     public void setOwner(User owner) { this.owner = owner; }
 
-    public List<Task> getTasks() { return tasks; }
-    public void setTasks(List<Task> tasks) { this.tasks = tasks; }
+    public List<Task> getTasks() { return Collections.unmodifiableList(tasks); }
 
-    public List<String> getAttachments() { return attachments; }
-    public void setAttachments(List<String> attachments) { this.attachments = attachments; }
+    public List<String> getAttachments() { return Collections.unmodifiableList(attachments); }
 
-    public List<User> getMembers() { return members; }
-    public void setMembers(List<User> members) { this.members = members; }
+    public void replaceAttachments(List<String> attachments) {
+        this.attachments.clear();
+        if (attachments != null) {
+            this.attachments.addAll(attachments);
+        }
+    }
 
-    public List<Project> getDependencies() { return dependencies; }
-    public void setDependencies(List<Project> dependencies) { this.dependencies = dependencies; }
+    public void addAttachments(Collection<String> attachments) {
+        if (attachments != null) {
+            this.attachments.addAll(attachments);
+        }
+    }
+
+    public List<User> getMembers() { return Collections.unmodifiableList(members); }
+
+    public void replaceMembers(Collection<? extends User> members) {
+        this.members.clear();
+        if (members != null) {
+            this.members.addAll(members);
+        }
+    }
+
+    public List<Project> getDependencies() { return Collections.unmodifiableList(dependencies); }
+
+    public void replaceDependencies(List<Project> dependencies) {
+        this.dependencies.clear();
+        if (dependencies != null) {
+            this.dependencies.addAll(dependencies);
+        }
+    }
+
+    public void clearDependencies() {
+        this.dependencies.clear();
+    }
 }

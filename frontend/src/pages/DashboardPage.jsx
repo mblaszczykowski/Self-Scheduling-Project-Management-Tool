@@ -1,11 +1,13 @@
 import React, { useContext, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLogout } from '../hooks/useLogout';
 import {
     ArcElement, BarElement, CategoryScale, Chart as ChartJS, Legend,
     LinearScale, LineElement, PointElement, TimeScale, Title, Tooltip,
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import { DataContext } from '../context/DataContext';
+import { AuthContext } from '../context/AuthContext';
+import { ProjectsContext } from '../context/ProjectsContext';
 import Header from '../components/layout/Header';
 import TaskProjectModal from '../components/modals/TaskProjectModal';
 import { DashboardSkeleton } from '../components/common/Skeleton';
@@ -16,6 +18,7 @@ import ProjectCard from '../components/dashboard/ProjectCard';
 import AnalyticsSection from '../components/dashboard/AnalyticsSection';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 import { useModal } from '../hooks/useModal';
+import ErrorBoundary from '../components/common/ErrorBoundary';
 import { computeProjectDateRange } from '../util/projectUtils';
 
 ChartJS.register(
@@ -25,7 +28,9 @@ ChartJS.register(
 
 const DashboardPage = () => {
     const navigate = useNavigate();
-    const { user, projects, loading, refreshProjects, handleLogout: contextLogout } = useContext(DataContext);
+    const { user } = useContext(AuthContext);
+    const { projects, projectsLoading, refreshProjects } = useContext(ProjectsContext);
+    const handleLogout = useLogout();
 
     const {
         open: modalOpen, type: modalType, mode: modalMode,
@@ -46,15 +51,10 @@ const DashboardPage = () => {
         });
     }, [projects]);
 
-    const closeModal = useCallback(() => {
+    const closeModal = useCallback((didSave = false) => {
         baseCloseModal();
-        refreshProjects();
+        if (didSave) refreshProjects();
     }, [baseCloseModal, refreshProjects]);
-
-    const handleLogout = useCallback(async () => {
-        await contextLogout();
-        navigate('/login');
-    }, [contextLogout, navigate]);
 
     const getProjectCompletion = (projectKey) => {
         return stats.projectCompletion.find(p => p.projectKey === projectKey)?.completionPercentage || 0;
@@ -68,11 +68,13 @@ const DashboardPage = () => {
                 onCreateTask={() => openModal('task', 'create')}
             />
 
-            {loading && <DashboardSkeleton />}
+            {projectsLoading && <DashboardSkeleton />}
 
-            {!loading && (
+            {!projectsLoading && (
                 <>
-                    <DashboardHero user={user} stats={stats} />
+                    <ErrorBoundary level="section" resetKey="dashboard-hero">
+                        <DashboardHero user={user} stats={stats} />
+                    </ErrorBoundary>
 
                     <div className="px-8 lg:px-12 py-8">
                         <div className="max-w-[1400px] mx-auto space-y-10">
@@ -99,7 +101,9 @@ const DashboardPage = () => {
                                 )}
                             </section>
 
-                            <AnalyticsSection stats={stats} />
+                            <ErrorBoundary level="section" resetKey="analytics">
+                                <AnalyticsSection stats={stats} />
+                            </ErrorBoundary>
                         </div>
                     </div>
                 </>

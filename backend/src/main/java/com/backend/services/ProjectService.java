@@ -40,7 +40,8 @@ public class ProjectService {
             TaskService taskService,
             TaskRepository taskRepository,
             NotificationService notificationService,
-            FileStorageService fileStorageService
+            FileStorageService fileStorageService,
+            CriticalPathMethodHelper cpmHelper
     ) {
         this.projectRepository = projectRepository;
         this.userService = userService;
@@ -48,7 +49,25 @@ public class ProjectService {
         this.taskRepository = taskRepository;
         this.notificationService = notificationService;
         this.fileStorageService = fileStorageService;
-        this.cpmHelper = new CriticalPathMethodHelper();
+        this.cpmHelper = cpmHelper;
+    }
+
+    public Project getAccessibleProject(String projectKey, Integer userId) {
+        var project = projectRepository.findByProjectKeyWithOwnerAndMembers(projectKey)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        if (!project.hasAccess(userId)) {
+            throw new ResourceNotFoundException("Project not found");
+        }
+        return project;
+    }
+
+    public Project getAccessibleProjectWithLock(String projectKey, Integer userId) {
+        var project = projectRepository.findByProjectKeyWithLock(projectKey)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        if (!project.hasAccess(userId)) {
+            throw new ResourceNotFoundException("Project not found");
+        }
+        return project;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -71,10 +90,10 @@ public class ProjectService {
         project.setDescription(projectDTO.description());
         project.setOwner(owner);
         project.setNextTaskNumber(1);
-        project.setAttachments(attachmentUrls);
+        project.replaceAttachments(attachmentUrls);
 
         var members = resolveMembersFromEmails(projectDTO.members(), owner);
-        project.setMembers(new ArrayList<>(members));
+        project.replaceMembers(members);
 
         if (projectDTO.dependencies() != null && !projectDTO.dependencies().isEmpty()) {
             var dependencies = projectDTO.dependencies().stream()
@@ -82,7 +101,7 @@ public class ProjectService {
                             .orElseThrow(() -> new ValidationException("Dependency project not found: " + depKey)))
                     .collect(Collectors.toList());
             validateNoProjectCycles(project, dependencies);
-            project.setDependencies(dependencies);
+            project.replaceDependencies(dependencies);
         }
 
         var savedProject = projectRepository.save(project);
@@ -92,20 +111,24 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public ProjectDTO getProjectByKey(String projectKey, Integer userId) {
-        var project = projectRepository.findByProjectKey(projectKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-
-        if (!project.hasAccess(userId)) {
-            throw new ResourceNotFoundException("Project not found");
-        }
-
+        var project = getAccessibleProject(projectKey, userId);
         return convertToDTOWithCPM(project);
     }
 
     @Transactional(readOnly = true)
     public Page<ProjectDTO> getAllProjectsPaginated(Integer userId, Pageable pageable) {
         var projects = projectRepository.findAllAccessibleByUserPaged(userId, pageable);
-        return projects.map(this::convertToDTOWithCPM);
+
+        // Batch fetch all tasks for projects in this page
+        var projectIds = projects.getContent().stream().map(Project::getId).toList();
+        var allTasks = taskRepository.findByProjectIdsWithDetails(projectIds);
+        var tasksByProjectId = allTasks.stream()
+                .collect(Collectors.groupingBy(t -> t.getProject().getId()));
+
+        return projects.map(project -> {
+            var tasks = tasksByProjectId.getOrDefault(project.getId(), List.of());
+            return convertToDTOWithCPM(project, tasks);
+        });
     }
 
     @Transactional(readOnly = true)
@@ -141,11 +164,7 @@ public class ProjectService {
 
         if (attachments != null && !attachments.isEmpty()) {
             var newAttachments = fileStorageService.storeFiles(attachments);
-            if (project.getAttachments() != null) {
-                project.getAttachments().addAll(newAttachments);
-            } else {
-                project.setAttachments(newAttachments);
-            }
+            project.addAttachments(newAttachments);
         }
 
         if (projectDTO.members() != null) {
@@ -158,7 +177,7 @@ public class ProjectService {
                             .orElseThrow(() -> new ValidationException("Dependency project not found: " + depKey)))
                     .collect(Collectors.toList());
             validateNoProjectCycles(project, dependencies);
-            project.setDependencies(dependencies);
+            project.replaceDependencies(dependencies);
         }
 
         var updatedProject = projectRepository.save(project);
@@ -172,22 +191,6 @@ public class ProjectService {
 
         if (!project.isOwner(userId)) {
             throw new AuthorizationException("Only project owner can delete the project");
-        }
-
-        // Clear task dependencies before deletion — ManyToMany self-reference
-        // on task_dependencies table blocks cascade delete via FK constraints.
-        // Must clear both sides: this task's deps AND other tasks depending on this task.
-        var tasks = project.getTasks();
-        if (tasks != null && !tasks.isEmpty()) {
-            var taskIds = tasks.stream().map(t -> t.getId()).toList();
-            // Clear outgoing dependencies (this task depends on X)
-            for (var task : tasks) {
-                task.getDependencies().clear();
-            }
-            // Clear incoming dependencies (X depends on this task) via native query
-            taskRepository.removeIncomingDependencies(taskIds);
-            taskRepository.saveAll(tasks);
-            taskRepository.flush();
         }
 
         deleteAllProjectAttachmentsSilently(project);
@@ -226,7 +229,7 @@ public class ProjectService {
 
         var owner = project.getOwner();
         var updatedMembers = resolveMembersFromEmails(memberDTOs, owner);
-        project.setMembers(new ArrayList<>(updatedMembers));
+        project.replaceMembers(updatedMembers);
 
         for (var member : updatedMembers) {
             var isNewMember = !existingMemberIds.contains(member.getId());
@@ -262,20 +265,11 @@ public class ProjectService {
     }
 
     private void deleteAttachmentsSilently(Collection<String> attachments) {
-        if (attachments == null) return;
-        for (String attachment : attachments) {
-            try {
-                fileStorageService.deleteFile(attachment);
-            } catch (Exception e) {
-                org.slf4j.LoggerFactory.getLogger(ProjectService.class)
-                        .warn("Failed to delete attachment: {}", attachment, e);
-            }
-        }
+        fileStorageService.deleteFilesSilently(attachments);
     }
 
     private void validateProjectDTO(ProjectDTO projectDTO) {
-        if (ValidationUtil.isNullOrEmpty(projectDTO.projectKey()) ||
-                ValidationUtil.isNullOrEmpty(projectDTO.summary())) {
+        if (ValidationUtil.isNullOrEmpty(projectDTO.projectKey())) {
             throw new ValidationException("Project key and summary are required");
         }
 
@@ -288,13 +282,7 @@ public class ProjectService {
                     "Project key must start with a letter and contain only uppercase letters and numbers");
         }
 
-        if (projectDTO.summary().length() > ValidationUtil.MAX_SUMMARY_LENGTH) {
-            throw new ValidationException("Summary exceeds maximum length of " + ValidationUtil.MAX_SUMMARY_LENGTH + " characters");
-        }
-
-        if (projectDTO.description() != null && projectDTO.description().length() > ValidationUtil.MAX_DESCRIPTION_LENGTH) {
-            throw new ValidationException("Description exceeds maximum length of " + ValidationUtil.MAX_DESCRIPTION_LENGTH + " characters");
-        }
+        ValidationUtil.validateSummaryAndDescription(projectDTO.summary(), projectDTO.description());
     }
 
     private void validateNoProjectCycles(Project project, List<Project> newDependencies) {
@@ -389,12 +377,6 @@ public class ProjectService {
     }
 
     private UserDTO convertUserToDTO(User user) {
-        return new UserDTO(
-                user.getId(),
-                user.getFirstname(),
-                user.getLastname(),
-                user.getEmail(),
-                user.getProfilePicture()
-        );
+        return userService.convertToDTO(user);
     }
 }

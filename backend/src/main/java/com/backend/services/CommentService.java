@@ -56,7 +56,7 @@ public class CommentService {
         var repliesByParentId = batchLoadReplies(topLevelComments);
         return topLevelComments.stream()
                 .sorted(Comparator.comparing(Comment::getTimestamp))
-                .map(c -> convertToDTOWithReplies(c, repliesByParentId))
+                .map(c -> convertToDTOWithReplies(c, repliesByParentId, userId))
                 .toList();
     }
 
@@ -89,7 +89,7 @@ public class CommentService {
         var savedComment = commentRepository.save(comment);
         initializeLazyCollections(savedComment);
         notifyParentCommentAuthorIfDifferentUser(parentComment, userId, task);
-        return convertToDTO(savedComment);
+        return convertToDTO(savedComment, userId);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -109,12 +109,12 @@ public class CommentService {
 
         if (files != null && !files.isEmpty()) {
             var newAttachments = fileStorageService.storeFiles(files);
-            comment.getAttachments().addAll(newAttachments);
+            comment.addAttachments(newAttachments);
         }
 
         var updatedComment = commentRepository.save(comment);
         initializeLazyCollections(updatedComment);
-        return convertToDTO(updatedComment);
+        return convertToDTO(updatedComment, userId);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -144,10 +144,8 @@ public class CommentService {
             notifyCommentAuthorOfReaction(comment);
         }
 
-        var refreshedComment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
-        initializeLazyCollections(refreshedComment);
-        return convertToDTO(refreshedComment);
+        initializeLazyCollections(comment);
+        return convertToDTO(comment, userId);
     }
 
     public void verifyCommentBelongsToTask(Integer commentId, Integer taskId) {
@@ -169,7 +167,7 @@ public class CommentService {
 
     private void verifyProjectAccess(Project project, Integer userId) {
         if (!project.hasAccess(userId)) {
-            throw new AuthorizationException("Access denied to this project");
+            throw new ResourceNotFoundException("Project not found");
         }
     }
 
@@ -249,34 +247,39 @@ public class CommentService {
                 NotificationType.COMMENT_REACTION, link);
     }
 
-    private CommentDTO convertToDTOWithReplies(Comment comment, Map<Integer, List<Comment>> repliesMap) {
+    private CommentDTO convertToDTOWithReplies(Comment comment, Map<Integer, List<Comment>> repliesMap, Integer currentUserId) {
         var replies = repliesMap.getOrDefault(comment.getId(), Collections.emptyList())
                 .stream()
                 .sorted(Comparator.comparing(Comment::getTimestamp))
-                .map(c -> convertToDTOWithReplies(c, repliesMap))
+                .map(c -> convertToDTOWithReplies(c, repliesMap, currentUserId))
                 .toList();
 
-        return buildCommentDTO(comment, replies);
+        return buildCommentDTO(comment, replies, currentUserId);
     }
 
-    private CommentDTO convertToDTO(Comment comment) {
-        return buildCommentDTO(comment, Collections.emptyList());
+    private CommentDTO convertToDTO(Comment comment, Integer currentUserId) {
+        return buildCommentDTO(comment, Collections.emptyList(), currentUserId);
     }
 
-    private CommentDTO buildCommentDTO(Comment comment, List<CommentDTO> replies) {
+    private CommentDTO buildCommentDTO(Comment comment, List<CommentDTO> replies, Integer currentUserId) {
         var reactions = Optional.ofNullable(comment.getReactions()).orElse(Collections.emptySet());
 
-        var likedByUsernames = reactions.stream()
-                .filter(r -> r.getType() == ReactionType.LIKE)
-                .map(r -> r.getUser() != null ? r.getUser().getFullName() : null)
-                .filter(Objects::nonNull)
-                .toList();
-
-        var dislikedByUsernames = reactions.stream()
-                .filter(r -> r.getType() == ReactionType.DISLIKE)
-                .map(r -> r.getUser() != null ? r.getUser().getFullName() : null)
-                .filter(Objects::nonNull)
-                .toList();
+        var likedByUsernames = new ArrayList<String>();
+        var dislikedByUsernames = new ArrayList<String>();
+        boolean likedByCurrentUser = false;
+        boolean dislikedByCurrentUser = false;
+        for (var r : reactions) {
+            var name = r.getUser() != null ? r.getUser().getFullName() : null;
+            boolean isCurrentUser = r.getUser() != null && r.getUser().getId().equals(currentUserId);
+            if (name == null) continue;
+            if (r.getType() == ReactionType.LIKE) {
+                likedByUsernames.add(name);
+                if (isCurrentUser) likedByCurrentUser = true;
+            } else if (r.getType() == ReactionType.DISLIKE) {
+                dislikedByUsernames.add(name);
+                if (isCurrentUser) dislikedByCurrentUser = true;
+            }
+        }
 
         var author = comment.getAuthor();
         var task = comment.getTask();
@@ -298,6 +301,8 @@ public class CommentService {
                 dislikedByUsernames.size(),
                 likedByUsernames,
                 dislikedByUsernames,
+                likedByCurrentUser,
+                dislikedByCurrentUser,
                 replies
         );
     }

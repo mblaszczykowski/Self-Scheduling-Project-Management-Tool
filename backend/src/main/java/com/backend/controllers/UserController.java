@@ -1,12 +1,12 @@
 package com.backend.controllers;
 
 import com.backend.dtos.UserDTO;
-import com.backend.entities.User;
 import com.backend.requests.UserRegistrationRequest;
 import com.backend.services.TokenService;
 import com.backend.services.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,9 +27,9 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getCurrentUser(HttpServletRequest request) {
+    public ResponseEntity<UserDTO> getCurrentUser(HttpServletRequest request) {
         int userId = tokenService.getUserIdFromRequest(request);
-        return userService.getUserDetails(userId);
+        return ResponseEntity.ok(userService.getUserDetails(userId));
     }
 
     @GetMapping("/{email}")
@@ -38,28 +38,20 @@ public class UserController {
             @PathVariable("email") String email
     ) {
         Integer requestingUserId = tokenService.getUserIdFromRequest(request);
-        User user = userService.getRequiredUserByEmail(email);
-
-        boolean canAccessProfile = user.getId().equals(requestingUserId) ||
-                userService.shareProjectWith(requestingUserId, user.getId());
-
-        if (!canAccessProfile) {
-            throw new com.backend.exception.ResourceNotFoundException("User not found");
-        }
-
-        UserDTO userDTO = new UserDTO(
-                user.getId(),
-                user.getFirstname(),
-                user.getLastname(),
-                user.getEmail(),
-                user.getProfilePicture()
-        );
-        return ResponseEntity.ok(userDTO);
+        return ResponseEntity.ok(userService.getUserByEmailForRequester(email, requestingUserId));
     }
 
     @PostMapping
     public ResponseEntity<?> registerUser(@RequestBody UserRegistrationRequest request) {
-        return userService.registerUser(request);
+        var result = userService.registerUser(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, result.tokens().accessCookie().toString())
+                .header(HttpHeaders.SET_COOKIE, result.tokens().refreshCookie().toString())
+                .body(Map.of(
+                        "message", "Registration successful",
+                        "userId", result.userId(),
+                        "email", result.email()
+                ));
     }
 
     @GetMapping("/exists")

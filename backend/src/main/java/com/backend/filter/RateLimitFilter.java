@@ -1,6 +1,7 @@
 package com.backend.filter;
 
 import com.backend.config.PublicEndpoints;
+import com.backend.util.FilterResponseUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -8,18 +9,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
@@ -39,12 +36,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                           @Value("${rate-limit.max-register-attempts:3}") int maxRegisterAttempts,
                           @Value("${rate-limit.window-ms:900000}") long windowMs) {
         this.objectMapper = objectMapper;
-        this.trustedProxies = (trustedProxiesConfig == null || trustedProxiesConfig.isBlank())
-                ? Set.of()
-                : Arrays.stream(trustedProxiesConfig.split(","))
-                        .map(String::trim)
-                        .filter(s -> !s.isEmpty())
-                        .collect(Collectors.toSet());
+        this.trustedProxies = com.backend.util.IpUtil.parseTrustedProxies(trustedProxiesConfig);
         this.maxLoginAttempts = maxLoginAttempts;
         this.maxRegisterAttempts = maxRegisterAttempts;
         this.windowMs = windowMs;
@@ -128,18 +120,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private void sendRateLimitResponse(HttpServletResponse response, String message) throws IOException {
-        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setHeader("Retry-After", String.valueOf(windowMs / 1000));
-
-        Map<String, Object> error = Map.of(
-                "status", HttpStatus.TOO_MANY_REQUESTS.value(),
-                "error", "Too Many Requests",
-                "message", message,
-                "timestamp", System.currentTimeMillis()
-        );
-
-        objectMapper.writeValue(response.getWriter(), error);
+        FilterResponseUtil.sendJsonError(response, HttpStatus.TOO_MANY_REQUESTS, message, objectMapper);
     }
 
     private static class RateLimitEntry {

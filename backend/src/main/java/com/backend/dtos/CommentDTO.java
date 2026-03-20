@@ -17,5 +17,7 @@ public record CommentDTO(
         Integer dislikeCount,
         List<String> likedByUsernames,
         List<String> dislikedByUsernames,
+        boolean likedByCurrentUser,
+        boolean dislikedByCurrentUser,
         List<CommentDTO> replies
 ) {}

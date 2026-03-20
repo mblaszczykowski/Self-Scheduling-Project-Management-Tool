@@ -13,11 +13,15 @@ export default function NotificationDropdown({
     const dropdownRef = useRef(null);
     useClickOutside(dropdownRef, onClose);
 
-    const { unreadNotifications, readNotifications, unreadCount } = useMemo(() => ({
-        unreadNotifications: notifications.filter(n => !n.isRead),
-        readNotifications: notifications.filter(n => n.isRead),
-        unreadCount: notifications.filter(n => !n.isRead).length,
-    }), [notifications]);
+    const { unreadNotifications, readNotifications } = useMemo(() => {
+        const unread = [];
+        const read = [];
+        for (const n of notifications) {
+            (n.isRead ? read : unread).push(n);
+        }
+        return { unreadNotifications: unread, readNotifications: read };
+    }, [notifications]);
+    const unreadCount = unreadNotifications.length;
 
     const handleClick = async () => {
         if (isOpen) {

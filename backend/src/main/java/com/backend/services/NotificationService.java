@@ -1,5 +1,6 @@
 package com.backend.services;
 
+import com.backend.dtos.NotificationDTO;
 import com.backend.entities.Notification;
 import com.backend.entities.NotificationType;
 import com.backend.entities.User;
@@ -56,6 +57,17 @@ public class NotificationService {
                 throw new AuthorizationException("Access denied to notification");
             }
         }
+    }
+
+    public NotificationDTO convertToDTO(Notification notification) {
+        return new NotificationDTO(
+                notification.getId(),
+                notification.getMessage(),
+                notification.getTimestamp(),
+                notification.getIsRead(),
+                notification.getType(),
+                notification.getLink()
+        );
     }
 
     private void markAllAsRead(List<Notification> notifications) {

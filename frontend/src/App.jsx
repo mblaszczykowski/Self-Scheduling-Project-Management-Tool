@@ -3,7 +3,9 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import AuthPage from './pages/AuthPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { DataContext, DataProvider } from './context/DataContext';
+import { AuthContext, AuthProvider } from './context/AuthContext';
+import { ProjectsProvider } from './context/ProjectsContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 import { checkUserAuth } from './util/api';
 import PageTransition from './components/common/PageTransition';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -21,7 +23,7 @@ const LoadingSpinner = () => (
 );
 
 const ProtectedRoute = ({ children }) => {
-    const { user, loading } = useContext(DataContext);
+    const { user, loading } = useContext(AuthContext);
 
     if (loading) return <LoadingSpinner />;
     if (!user) return <Navigate to="/login" replace />;
@@ -30,7 +32,7 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const PublicRoute = ({ children, redirectTo = '/dashboard' }) => {
-    const { user, loading } = useContext(DataContext);
+    const { user, loading } = useContext(AuthContext);
 
     if (loading) return <LoadingSpinner />;
     if (user) return <Navigate to={redirectTo} replace />;
@@ -39,7 +41,7 @@ const PublicRoute = ({ children, redirectTo = '/dashboard' }) => {
 };
 
 function AppRoutes() {
-    const { loading } = useContext(DataContext);
+    const { loading } = useContext(AuthContext);
 
     if (loading) return <LoadingSpinner />;
 
@@ -146,9 +148,13 @@ function App() {
 
     return (
         <ErrorBoundary>
-            <DataProvider initialUser={initialUser}>
-                <AppRoutes />
-            </DataProvider>
+            <AuthProvider initialUser={initialUser}>
+                <ProjectsProvider>
+                    <NotificationsProvider>
+                        <AppRoutes />
+                    </NotificationsProvider>
+                </ProjectsProvider>
+            </AuthProvider>
         </ErrorBoundary>
     );
 }

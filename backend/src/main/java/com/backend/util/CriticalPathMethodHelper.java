@@ -1,12 +1,14 @@
 package com.backend.util;
 
 import com.backend.dtos.TaskDTO;
+import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Component
 public class CriticalPathMethodHelper {
 
     public List<TaskDTO> calculateTaskDTOsWithCPM(List<TaskDTO> tasks) {

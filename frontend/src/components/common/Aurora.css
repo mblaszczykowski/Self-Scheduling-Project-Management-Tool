@@ -118,8 +118,19 @@
     pointer-events: none;
 }
 
+/* ── Optimization ghost bars ── */
+@keyframes optGhostShimmer {
+    0%, 100% { background-position: 200% 0; }
+    50% { background-position: -200% 0; }
+}
+.opt-ghost {
+    background: linear-gradient(90deg, rgba(99,102,241,0.12), rgba(99,102,241,0.35), rgba(99,102,241,0.12));
+    background-size: 200% 100%;
+    animation: optGhostShimmer 2.5s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .gantt-bar, .bar-fill, .anim-in { animation: none !important; opacity: 1 !important; transform: none !important; }
     .bar-fill { width: var(--prog) !important; }
-    .dep-line, .today-line { animation: none; }
+    .dep-line, .today-line, .opt-ghost { animation: none; }
 }

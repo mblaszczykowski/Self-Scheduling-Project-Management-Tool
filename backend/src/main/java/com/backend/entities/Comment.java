@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -83,12 +85,22 @@ public class Comment {
     public Comment getParentComment() { return parentComment; }
     public void setParentComment(Comment parentComment) { this.parentComment = parentComment; }
 
-    public List<Comment> getReplies() { return replies; }
-    public void setReplies(List<Comment> replies) { this.replies = replies; }
+    public List<Comment> getReplies() { return Collections.unmodifiableList(replies); }
 
-    public Set<CommentReaction> getReactions() { return reactions; }
-    public void setReactions(Set<CommentReaction> reactions) { this.reactions = reactions; }
+    public Set<CommentReaction> getReactions() { return Collections.unmodifiableSet(reactions); }
 
-    public Set<String> getAttachments() { return attachments; }
-    public void setAttachments(Set<String> attachments) { this.attachments = attachments; }
+    public Set<String> getAttachments() { return Collections.unmodifiableSet(attachments); }
+
+    public void addAttachments(Collection<String> attachments) {
+        if (attachments != null) {
+            this.attachments.addAll(attachments);
+        }
+    }
+
+    public void replaceAttachments(Set<String> attachments) {
+        this.attachments.clear();
+        if (attachments != null) {
+            this.attachments.addAll(attachments);
+        }
+    }
 }

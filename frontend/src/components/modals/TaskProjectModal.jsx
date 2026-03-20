@@ -1,16 +1,19 @@
 import React, { useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { Form, Formik } from 'formik';
-import * as Yup from 'yup';
 import { HiOutlinePlus, HiOutlineX, HiOutlineTrash, HiOutlineCheck } from 'react-icons/hi';
-import { DataContext } from '../../context/DataContext';
+import { AuthContext } from '../../context/AuthContext';
+import { ProjectsContext } from '../../context/ProjectsContext';
 import TaskForm from './TaskForm';
 import ProjectForm from './ProjectForm';
 import ConfirmDialog from './ConfirmDialog';
 import { useClickOutside } from '../../hooks/useClickOutside';
-import { formatDateTime, formatDate, MS_PER_DAY, toDateString } from '../../util/helpers';
+import useAttachments from '../../hooks/useAttachments';
+import useModalFormInit from '../../hooks/useModalFormInit';
+import { getErrorMessage } from '../../util/helpers';
 import { showToast } from '../../util/toast';
 
 const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
+    const { user } = useContext(AuthContext);
     const {
         projects,
         createTask,
@@ -19,14 +22,15 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
         createProject,
         updateProject,
         deleteProject,
-        user
-    } = useContext(DataContext);
+    } = useContext(ProjectsContext);
 
-    const [dependencies, setDependencies] = useState([]);
-    const [currentUser, setCurrentUser] = useState(null);
+    const { attachments, setAttachments, handleAddAttachments, handleRemoveAttachment } = useAttachments();
+    const { initialValues, validationSchema, dependencies, setDependencies } = useModalFormInit({
+        modalType, modalMode, project, task, user, setAttachments,
+    });
+
     const modalRef = useRef(null);
     const formikRef = useRef(null);
-    const [attachments, setAttachments] = useState({ existing: [], new: [] });
     const [emailState, setEmailState] = useState({ loading: false, error: '' });
     const [uiState, setUiState] = useState({
         isVisible: false, deleteConfirmOpen: false,
@@ -36,10 +40,6 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
     useEffect(() => {
         requestAnimationFrame(() => setUiState(prev => ({ ...prev, isVisible: true })));
     }, []);
-
-    useEffect(() => {
-        if (user) setCurrentUser(user);
-    }, [user]);
 
     const handleCloseAttempt = useCallback(() => {
         // Only show "unsaved changes" if user actually touched a field
@@ -54,116 +54,12 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
         }
     }, [onClose, uiState.isDirty, modalMode]);
 
-    const handleForceClose = useCallback(() => {
+    const handleForceClose = useCallback((didSave = false) => {
         setUiState(prev => ({ ...prev, closeConfirmOpen: false, isVisible: false }));
-        setTimeout(onClose, 200);
+        setTimeout(() => onClose(didSave), 200);
     }, [onClose]);
 
     useClickOutside(modalRef, handleCloseAttempt);
-
-    const [initialValues, setInitialValues] = useState({
-        projectKey: '', summary: '', description: '', status: 'TODO',
-        startDate: '', dueDate: '', assignee: '', duration: 1, progress: 0,
-        priority: 'MEDIUM', labels: '', created: '', updated: '',
-        reporter: '', members: [], newUserEmail: '',
-    });
-
-    useEffect(() => {
-        const today = toDateString(new Date());
-
-        if (modalType === 'task') {
-            if (modalMode === 'edit' && task) {
-                const deps = task.dependencyKeys || [];
-                setDependencies(deps);
-
-                let duration = 1;
-                if (task.startDate && task.dueDate) {
-                    const startMs = new Date(task.startDate);
-                    const dueMs = new Date(task.dueDate);
-                    const diff = Math.floor((dueMs - startMs) / MS_PER_DAY) + 1;
-                    duration = Math.max(diff, 1);
-                }
-
-                setInitialValues({
-                    projectKey: task.projectKey || '',
-                    summary: task.summary || '',
-                    description: task.description || '',
-                    status: task.status || 'TODO',
-                    startDate: formatDate(task.startDate),
-                    dueDate: formatDate(task.dueDate),
-                    assignee: task.assignee || '',
-                    duration,
-                    progress: task.progress || 0,
-                    priority: task.priority || 'MEDIUM',
-                    labels: task.labels?.join(' ') || '',
-                    created: formatDateTime(task.created),
-                    updated: formatDateTime(task.updated),
-                    reporter: user?.email || '',
-                    members: [],
-                    newUserEmail: '',
-                });
-                setAttachments({ existing: task.attachments || [], new: [] });
-            } else {
-                setDependencies([]);
-                setInitialValues(prev => ({
-                    ...prev,
-                    projectKey: project?.projectKey || '',
-                    summary: '', description: '', status: 'TODO',
-                    startDate: today, dueDate: today, assignee: '',
-                    duration: 1, progress: 0, priority: 'MEDIUM', labels: '',
-                    created: new Date().toLocaleString(),
-                    updated: new Date().toLocaleString(),
-                    reporter: user?.email || '',
-                }));
-                setAttachments({ existing: [], new: [] });
-            }
-        } else if (modalType === 'project') {
-            if (modalMode === 'edit' && project) {
-                setDependencies(project.dependencies || []);
-                setInitialValues({
-                    projectKey: project.projectKey || '',
-                    summary: project.summary || '',
-                    description: project.description || '',
-                    members: project.members || [],
-                    newUserEmail: '',
-                    status: 'TODO', startDate: '', dueDate: '', assignee: '',
-                    duration: 1, progress: 0, priority: 'MEDIUM', labels: '',
-                    created: '', updated: '', reporter: user?.email || '',
-                });
-                setAttachments({ existing: project.attachments || [], new: [] });
-            } else {
-                setDependencies([]);
-                setInitialValues({
-                    projectKey: '', summary: '', description: '',
-                    members: user ? [user] : [], newUserEmail: '',
-                    status: 'TODO', startDate: '', dueDate: '', assignee: '',
-                    duration: 1, progress: 0, priority: 'MEDIUM', labels: '',
-                    created: '', updated: '', reporter: user?.email || '',
-                });
-                setAttachments({ existing: [], new: [] });
-            }
-        }
-    }, [modalType, modalMode, project, task, user]);
-
-    const taskValidationSchema = Yup.object().shape({
-        projectKey: Yup.string().required('Project is required.'),
-        summary: Yup.string().required('Task summary is required.'),
-        startDate: Yup.date().required('Start date is required.'),
-        dueDate: Yup.date()
-            .required('Due date is required.')
-            .min(Yup.ref('startDate'), 'Due date cannot be before start date.'),
-    });
-
-    const projectValidationSchema = Yup.object().shape(
-        modalMode === 'create'
-            ? {
-                projectKey: Yup.string().max(4, 'Max 4 characters.').required('Project key is required.'),
-                summary: Yup.string().required('Project name is required.')
-            }
-            : { summary: Yup.string().required('Project name is required.') }
-    );
-
-    const validationSchema = modalType === 'task' ? taskValidationSchema : projectValidationSchema;
 
     const handleSubmit = async (values, { setSubmitting }) => {
         try {
@@ -206,11 +102,9 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                     showToast('Project updated successfully', 'success');
                 }
             }
-            handleForceClose();
+            handleForceClose(true);
         } catch (err) {
-            const message = err.response?.data?.message
-                || err.message || 'Failed to save. Please try again.';
-            showToast(message, 'error');
+            showToast(getErrorMessage(err, 'Failed to save. Please try again.'), 'error');
         } finally {
             setSubmitting(false);
         }
@@ -226,29 +120,21 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                 await deleteProject(project.projectKey);
                 showToast('Project deleted successfully', 'success');
             }
-            handleForceClose();
+            handleForceClose(true);
         } catch (err) {
-            const message = err.response?.data?.message
-                || err.message || 'Failed to delete. Please try again.';
-            showToast(message, 'error');
+            showToast(getErrorMessage(err, 'Failed to delete. Please try again.'), 'error');
         }
     };
 
-    const handleAddAttachments = (files) => {
-        setAttachments(prev => ({ ...prev, new: [...prev.new, ...files] }));
+    const onAddAttachments = useCallback((files) => {
+        handleAddAttachments(files);
         setUiState(prev => ({ ...prev, isDirty: true }));
-    };
+    }, [handleAddAttachments]);
 
-    const handleRemoveAttachment = (attachment) => {
-        if (attachment instanceof File) {
-            setAttachments(prev => ({ ...prev, new: prev.new.filter(f => f !== attachment) }));
-        } else {
-            setAttachments(prev => ({
-                ...prev, existing: prev.existing.filter(a => a !== attachment),
-            }));
-        }
+    const onRemoveAttachment = useCallback((attachment) => {
+        handleRemoveAttachment(attachment);
         setUiState(prev => ({ ...prev, isDirty: true }));
-    };
+    }, [handleRemoveAttachment]);
 
     const handleAddMember = (email, values, setFieldValue) => {
         if (!email) return;
@@ -365,13 +251,13 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                                         task={task}
                                         project={project}
                                         projects={projects}
-                                        currentUser={currentUser}
+                                        currentUser={user}
                                         dependencies={dependencies}
                                         setDependencies={setDependencies}
                                         existingAttachments={attachments.existing}
                                         newAttachments={attachments.new}
-                                        onAddAttachments={handleAddAttachments}
-                                        onRemoveAttachment={handleRemoveAttachment}
+                                        onAddAttachments={onAddAttachments}
+                                        onRemoveAttachment={onRemoveAttachment}
                                     />
                                 ) : (
                                     <ProjectForm
@@ -380,13 +266,13 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                                         modalMode={modalMode}
                                         project={project}
                                         projects={projects}
-                                        currentUser={currentUser}
+                                        currentUser={user}
                                         dependencies={dependencies}
                                         setDependencies={setDependencies}
                                         existingAttachments={attachments.existing}
                                         newAttachments={attachments.new}
-                                        onAddAttachments={handleAddAttachments}
-                                        onRemoveAttachment={handleRemoveAttachment}
+                                        onAddAttachments={onAddAttachments}
+                                        onRemoveAttachment={onRemoveAttachment}
                                         onAddMember={handleAddMember}
                                         emailLoading={emailState.loading}
                                         emailError={emailState.error}

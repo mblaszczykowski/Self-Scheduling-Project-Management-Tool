@@ -4,15 +4,17 @@ import Modal from 'react-modal';
 import { ErrorMessage, Field, Form, Formik } from 'formik';
 import * as Yup from 'yup';
 import { updateUser } from '../../util/api';
-import { getImageUrl, getAvatarColor, getAvatarInitials } from '../../util/helpers';
+import { getImageUrl } from '../../util/helpers';
+import Avatar from '../common/Avatar';
 import { CloseIcon } from '../common/Icons';
+import { inputClass } from '../common/formHelpers';
 
 const validationSchema = Yup.object().shape({
     firstname: Yup.string().required('First name is required'),
     lastname: Yup.string().required('Last name is required'),
     email: Yup.string().email('Invalid email').required('Email is required'),
     currentPassword: Yup.string(),
-    newPassword: Yup.string().min(6, 'Password must be at least 6 characters'),
+    newPassword: Yup.string().min(8, 'Password must be at least 8 characters'),
     confirmNewPassword: Yup.string().oneOf([Yup.ref('newPassword'), null], 'Passwords must match'),
 });
 
@@ -126,26 +128,12 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                     {({ isSubmitting, setFieldValue }) => (
                         <Form className="space-y-5">
                             <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                                {profilePreview ? (
-                                    <img
-                                        src={profilePreview}
-                                        alt="Profile Preview"
-                                        className="h-20 w-20 rounded-full object-cover ring-4 ring-white shadow-lg"
-                                    />
-                                ) : (
-                                    <div
-                                        className={
-                                            'h-20 w-20 bg-gradient-to-br '
-                                            + `${getAvatarColor(user)} `
-                                            + 'rounded-full flex items-center justify-center'
-                                            + ' ring-4 ring-white shadow-lg'
-                                        }
-                                    >
-                                        <span className="text-2xl font-bold text-white">
-                                            {getAvatarInitials(user)}
-                                        </span>
-                                    </div>
-                                )}
+                                <Avatar
+                                    user={user}
+                                    profilePicture={profilePreview}
+                                    size="lg"
+                                    className="ring-4 ring-white shadow-lg"
+                                />
                                 <div className="flex-1">
                                     <label className="block">
                                         <span
@@ -174,12 +162,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                         type="text"
                                         id="firstname"
                                         name="firstname"
-                                        className={
-                                            'w-full px-3 py-2.5 bg-white border border-slate-200'
-                                            + ' rounded-lg text-sm text-slate-700 focus:ring-1'
-                                            + ' focus:ring-slate-900 focus:border-slate-900'
-                                            + ' focus:outline-none transition-colors'
-                                        }
+                                        className={inputClass}
                                     />
                                     <ErrorMessage name="firstname" component="div" className="text-red-500 text-xs mt-1" />
                                 </div>
@@ -191,12 +174,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                         type="text"
                                         id="lastname"
                                         name="lastname"
-                                        className={
-                                            'w-full px-3 py-2.5 bg-white border border-slate-200'
-                                            + ' rounded-lg text-sm text-slate-700 focus:ring-1'
-                                            + ' focus:ring-slate-900 focus:border-slate-900'
-                                            + ' focus:outline-none transition-colors'
-                                        }
+                                        className={inputClass}
                                     />
                                     <ErrorMessage name="lastname" component="div" className="text-red-500 text-xs mt-1" />
                                 </div>
@@ -210,7 +188,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                     type="email"
                                     id="email"
                                     name="email"
-                                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-900 focus:border-slate-900 focus:outline-none transition-colors"
+                                    className={inputClass}
                                 />
                                 <ErrorMessage name="email" component="div" className="text-red-500 text-xs mt-1" />
                             </div>
@@ -226,12 +204,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                             type="password"
                                             id="currentPassword"
                                             name="currentPassword"
-                                            className={
-                                            'w-full px-3 py-2.5 bg-white border border-slate-200'
-                                            + ' rounded-lg text-sm text-slate-700 focus:ring-1'
-                                            + ' focus:ring-slate-900 focus:border-slate-900'
-                                            + ' focus:outline-none transition-colors'
-                                        }
+                                            className={inputClass}
                                         />
                                         <ErrorMessage name="currentPassword" component="div" className="text-red-500 text-xs mt-1" />
                                     </div>
@@ -244,12 +217,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                                 type="password"
                                                 id="newPassword"
                                                 name="newPassword"
-                                                className={
-                                            'w-full px-3 py-2.5 bg-white border border-slate-200'
-                                            + ' rounded-lg text-sm text-slate-700 focus:ring-1'
-                                            + ' focus:ring-slate-900 focus:border-slate-900'
-                                            + ' focus:outline-none transition-colors'
-                                        }
+                                                className={inputClass}
                                             />
                                             <ErrorMessage name="newPassword" component="div" className="text-red-500 text-xs mt-1" />
                                         </div>
@@ -261,12 +229,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                                 type="password"
                                                 id="confirmNewPassword"
                                                 name="confirmNewPassword"
-                                                className={
-                                            'w-full px-3 py-2.5 bg-white border border-slate-200'
-                                            + ' rounded-lg text-sm text-slate-700 focus:ring-1'
-                                            + ' focus:ring-slate-900 focus:border-slate-900'
-                                            + ' focus:outline-none transition-colors'
-                                        }
+                                                className={inputClass}
                                             />
                                             <ErrorMessage name="confirmNewPassword" component="div" className="text-red-500 text-xs mt-1" />
                                         </div>

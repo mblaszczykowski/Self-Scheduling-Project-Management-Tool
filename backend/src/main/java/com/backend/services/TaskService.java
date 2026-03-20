@@ -59,7 +59,7 @@ public class TaskService {
         task.setProgress(Objects.requireNonNullElse(taskDTO.progress(), 0));
         task.setProject(project);
         task.setTaskNumber(project.allocateNextTaskNumber());
-        task.setAttachments(attachmentUrls);
+        task.replaceAttachments(attachmentUrls);
 
         if (taskDTO.assignee() != null && !taskDTO.assignee().isEmpty()) {
             var assignee = userRepository.findByEmail(taskDTO.assignee())
@@ -74,7 +74,7 @@ public class TaskService {
         projectRepository.save(project);
 
         if (taskDTO.dependencyKeys() != null && !taskDTO.dependencyKeys().isEmpty()) {
-            task.setDependencies(resolveDependenciesBatch(taskDTO.dependencyKeys(), userId));
+            task.replaceDependencies(resolveDependenciesBatch(taskDTO.dependencyKeys(), userId));
         }
 
         var savedTask = taskRepository.save(task);
@@ -128,13 +128,13 @@ public class TaskService {
             task.setLabels(String.join(",", taskDTO.labels()));
         }
 
-        task.setAttachments(taskDTO.attachments() != null
+        task.replaceAttachments(taskDTO.attachments() != null
                 ? new ArrayList<>(taskDTO.attachments())
                 : new ArrayList<>());
 
         if (files != null && !files.isEmpty()) {
             var newAttachments = fileStorageService.storeFiles(files);
-            task.getAttachments().addAll(newAttachments);
+            task.addAttachments(newAttachments);
         }
 
         updateTaskDependencies(task, taskDTO.dependencyKeys(), userId);
@@ -152,15 +152,7 @@ public class TaskService {
     }
 
     public void validateTaskDTO(TaskDTO taskDTO) {
-        if (ValidationUtil.isNullOrEmpty(taskDTO.summary())) {
-            throw new ValidationException("Summary is required");
-        }
-        if (taskDTO.summary().length() > ValidationUtil.MAX_SUMMARY_LENGTH) {
-            throw new ValidationException("Summary exceeds maximum length of " + ValidationUtil.MAX_SUMMARY_LENGTH + " characters");
-        }
-        if (taskDTO.description() != null && taskDTO.description().length() > ValidationUtil.MAX_DESCRIPTION_LENGTH) {
-            throw new ValidationException("Description exceeds maximum length of " + ValidationUtil.MAX_DESCRIPTION_LENGTH + " characters");
-        }
+        ValidationUtil.validateSummaryAndDescription(taskDTO.summary(), taskDTO.description());
         if (taskDTO.progress() != null && (taskDTO.progress() < 0 || taskDTO.progress() > 100)) {
             throw new ValidationException("Progress must be between 0 and 100");
         }
@@ -223,14 +215,10 @@ public class TaskService {
         if (dependencyKeys != null) {
             var dependencies = resolveDependenciesBatch(dependencyKeys, userId);
             validateNoCycles(task, dependencies);
-            task.setDependencies(dependencies);
+            task.replaceDependencies(dependencies);
         } else {
-            task.setDependencies(new ArrayList<>());
+            task.clearDependencies();
         }
-    }
-
-    private List<Task> resolveDependenciesBatch(List<String> dependencyRefs) {
-        return resolveDependenciesBatch(dependencyRefs, null);
     }
 
     private List<Task> resolveDependenciesBatch(List<String> dependencyRefs, Integer userId) {
@@ -307,14 +295,6 @@ public class TaskService {
     }
 
     private void deleteTaskAttachmentsSilently(Task task) {
-        if (task.getAttachments() == null) return;
-        for (String attachment : task.getAttachments()) {
-            try {
-                fileStorageService.deleteFile(attachment);
-            } catch (Exception e) {
-                org.slf4j.LoggerFactory.getLogger(TaskService.class)
-                        .warn("Failed to delete task attachment: {}", attachment, e);
-            }
-        }
+        fileStorageService.deleteFilesSilently(task.getAttachments());
     }
 }

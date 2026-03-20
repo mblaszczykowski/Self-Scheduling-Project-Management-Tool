@@ -1,5 +1,6 @@
 package com.backend.services;
 
+import com.backend.config.CookieProperties;
 import com.backend.entities.RefreshToken;
 import com.backend.exception.AuthorizationException;
 import com.backend.repositories.RefreshTokenRepository;
@@ -7,7 +8,6 @@ import io.jsonwebtoken.*;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,22 +25,19 @@ public class TokenService {
     private final Duration accessTokenExpiration;
     private final Duration refreshTokenExpiration;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final boolean secureCookie;
-    private final String sameSite;
+    private final CookieProperties cookieProperties;
 
     @Autowired
     public TokenService(SecretKey jwtSecretKey,
                         Duration accessTokenExpiration,
                         Duration refreshTokenExpiration,
                         RefreshTokenRepository refreshTokenRepository,
-                        @Value("${app.cookie.secure:true}") boolean secureCookie,
-                        @Value("${app.cookie.same-site:Strict}") String sameSite) {
+                        CookieProperties cookieProperties) {
         this.jwtSecretKey = jwtSecretKey;
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
         this.refreshTokenRepository = refreshTokenRepository;
-        this.secureCookie = secureCookie;
-        this.sameSite = sameSite;
+        this.cookieProperties = cookieProperties;
     }
 
     public String generateAccessToken(Integer userId) {
@@ -78,29 +75,21 @@ public class TokenService {
 
         var accessCookie = ResponseCookie.from("accessToken", accessToken)
                 .httpOnly(true)
-                .secure(secureCookie)
+                .secure(cookieProperties.isSecure())
                 .path("/")
                 .maxAge(accessTokenExpiration)
-                .sameSite(sameSite)
+                .sameSite(cookieProperties.getSameSite())
                 .build();
 
         var refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .secure(secureCookie)
+                .secure(cookieProperties.isSecure())
                 .path("/")
                 .maxAge(refreshTokenExpiration)
-                .sameSite(sameSite)
+                .sameSite(cookieProperties.getSameSite())
                 .build();
 
         return new AuthTokens(accessCookie, refreshCookie);
-    }
-
-    public Duration getAccessTokenExpiration() {
-        return accessTokenExpiration;
-    }
-
-    public boolean isSecureCookie() {
-        return secureCookie;
     }
 
     public Integer validateTokenAndGetUserId(String token) {

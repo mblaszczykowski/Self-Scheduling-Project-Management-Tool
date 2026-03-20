@@ -52,3 +52,22 @@ maybe prepare more project sqls to add and i will provide you screenshots so you
 
 
 a potem te analizy rozdzial badania i porownania
+
+
+
+
+
+
+review this application from an architectural perspective. should we do some bigger refactors, if yes, where?
+i want this app to be very well written on pro level.
+
+
+
+trzeba bedzie albo dodac nowy rozdzial prezentujacy aplikacje albo do badan i eksperymentow dodac 
+zobrazowanie w aplikacji tych wszystkich eksperymentow
+ze screenami opisami lacznie z tworzeniem projektu itp
+caly proces przedstawic do badan i przedstawic aplikacje a poki co jest sam tekst i dane i tabelki
+
+
+po wiekszych zmianach w architekturze trzeba bedzie aktualizowac chapter 4 implementacja z nowa struktura, zrobic to po tym
+architectural refactoringu ktory teraz robie

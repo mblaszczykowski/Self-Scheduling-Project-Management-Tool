@@ -1,13 +1,9 @@
 package com.backend.controllers;
 
-import com.backend.dtos.NotificationDTO;
-import com.backend.entities.Notification;
 import com.backend.services.NotificationService;
 import com.backend.services.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,7 +37,7 @@ public class NotificationController {
         var notificationPage = notificationService.getAllNotificationsPaged(userId, pageable);
 
         var notificationDTOs = notificationPage.getContent().stream()
-                .map(this::convertToDTO)
+                .map(notificationService::convertToDTO)
                 .toList();
 
         var isDefaultFirstPage = page == 0 && clampedSize == DEFAULT_PAGE_SIZE && !notificationPage.hasNext();
@@ -69,14 +65,4 @@ public class NotificationController {
         return ResponseEntity.ok().build();
     }
 
-    private NotificationDTO convertToDTO(Notification notification) {
-        return new NotificationDTO(
-                notification.getId(),
-                notification.getMessage(),
-                notification.getTimestamp(),
-                notification.getIsRead(),
-                notification.getType(),
-                notification.getLink()
-        );
-    }
 }

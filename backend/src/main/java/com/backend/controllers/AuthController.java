@@ -5,6 +5,7 @@ import com.backend.services.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,12 +24,20 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest, HttpServletRequest httpRequest) {
-        return authService.authenticateUser(loginRequest, httpRequest);
+        var result = authService.authenticateUser(loginRequest, httpRequest);
+        var headers = new HttpHeaders();
+        headers.add(HttpHeaders.SET_COOKIE, result.tokens().accessCookie().toString());
+        headers.add(HttpHeaders.SET_COOKIE, result.tokens().refreshCookie().toString());
+        return ResponseEntity.ok().headers(headers).body(result.body());
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshToken(HttpServletRequest request) {
-        return authService.refreshAccessToken(request);
+        var tokens = authService.refreshAccessToken(request);
+        var headers = new HttpHeaders();
+        headers.add(HttpHeaders.SET_COOKIE, tokens.accessCookie().toString());
+        headers.add(HttpHeaders.SET_COOKIE, tokens.refreshCookie().toString());
+        return ResponseEntity.ok().headers(headers).body(Map.of("message", "Token refreshed successfully"));
     }
 
     @PostMapping("/logout")

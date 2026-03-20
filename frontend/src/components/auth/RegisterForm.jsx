@@ -4,8 +4,9 @@ import { ErrorMessage, Field, Form, Formik } from 'formik';
 import * as Yup from 'yup';
 import EyeButton from '../common/EyeButton';
 import { register, checkUserAuth } from '../../util/api';
-import { DataContext } from '../../context/DataContext';
+import { AuthContext } from '../../context/AuthContext';
 import { showToast } from '../../util/toast';
+import { getErrorMessage } from '../../util/helpers';
 import { authInputClass } from '../common/formHelpers';
 
 const validationSchema = Yup.object().shape({
@@ -61,7 +62,7 @@ const PasswordRequirements = ({ password }) => {
 
 function RegisterForm({ onToggleForm }) {
     const [showPassword, setShowPassword] = useState(false);
-    const { setUser } = useContext(DataContext);
+    const { setUser } = useContext(AuthContext);
     const navigate = useNavigate();
 
     const handleSubmit = async (values, { setSubmitting }) => {
@@ -71,8 +72,7 @@ function RegisterForm({ onToggleForm }) {
             setUser(userData);
             navigate('/dashboard');
         } catch (err) {
-            const errorMessage = err.response?.data?.message || 'Registration failed.';
-            showToast(errorMessage);
+            showToast(getErrorMessage(err, 'Registration failed.'));
             console.error('Register error:', err.response || err.message);
         } finally {
             setSubmitting(false);

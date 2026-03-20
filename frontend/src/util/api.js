@@ -42,15 +42,7 @@ api.interceptors.request.use((config) => {
 });
 
 let isRefreshing = false;
-let failedQueue = [];
 let refreshPromise = null;
-
-const processQueue = (error) => {
-    failedQueue.forEach(prom => {
-        error ? prom.reject(error) : prom.resolve();
-    });
-    failedQueue = [];
-};
 
 api.interceptors.response.use(
     (response) => response,
@@ -69,23 +61,16 @@ api.interceptors.response.use(
         originalRequest._retry = true;
 
         if (isRefreshing) {
-            return new Promise((resolve, reject) => {
-                failedQueue.push({ resolve, reject });
-            }).then(() => api(originalRequest))
-              .catch(err => Promise.reject(err));
+            return refreshPromise.then(() => api(originalRequest));
         }
 
         isRefreshing = true;
+        refreshPromise = api.post('/api/auth/refresh');
 
         try {
-            refreshPromise = api.post('/api/auth/refresh');
             await refreshPromise;
-
-            processQueue(null);
             return api(originalRequest);
         } catch (refreshError) {
-            processQueue(refreshError);
-
             const publicPaths = ['/login', '/register', '/'];
             if (!publicPaths.includes(window.location.pathname)) {
                 window.location.href = '/login?expired=true';
@@ -107,8 +92,7 @@ const createFormData = (data, attachments = [], dataKey = 'data') => {
 
 export const getUser = () => api.get('/api/users').then(res => res.data);
 
-export const checkUserAuth = () =>
-    api.get('/api/users').then(res => res.data);
+export const checkUserAuth = getUser;
 
 export const getUserByEmail = (email) =>
     api.get(`/api/users/${email}`).then(res => res.data);

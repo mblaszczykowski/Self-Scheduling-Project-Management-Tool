@@ -28,8 +28,6 @@ public interface CommentRepository extends JpaRepository<Comment, Integer> {
             "ORDER BY c.timestamp")
     List<Comment> findRepliesByParentIdsWithDetails(@Param("parentIds") List<Integer> parentIds);
 
-    List<Comment> findByTaskIdAndParentCommentIsNull(Integer taskId);
-
     @Query("SELECT c FROM Comment c " +
             "LEFT JOIN FETCH c.author " +
             "LEFT JOIN FETCH c.task t " +

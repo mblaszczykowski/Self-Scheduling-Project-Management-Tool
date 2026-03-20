@@ -1,27 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { formatShortDate, getImageUrl, getAvatarColor, getAvatarInitials } from '../../util/helpers';
-
-const AvatarImage = ({ member }) => {
-    const [hasError, setHasError] = useState(false);
-
-    if (hasError || !member.profilePicture) {
-        return (
-            <div className={`w-7 h-7 bg-gradient-to-br ${getAvatarColor(member)} rounded-full flex items-center justify-center border-2 border-white`}>
-                <span className="text-xs font-medium text-white">{getAvatarInitials(member)}</span>
-            </div>
-        );
-    }
-
-    return (
-        <img
-            src={getImageUrl(member.profilePicture)}
-            alt={member.firstname}
-            className="w-7 h-7 rounded-full border-2 border-white object-cover"
-            onError={() => setHasError(true)}
-        />
-    );
-};
+import { formatShortDate } from '../../util/helpers';
+import Avatar from '../common/Avatar';
 
 const ProjectCard = ({
     project,
@@ -80,7 +60,7 @@ const ProjectCard = ({
                 <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                     <div className="flex -space-x-2">
                         {project.members?.slice(0, 4).map(member => (
-                            <AvatarImage key={member.id} member={member} />
+                            <Avatar key={member.id} user={member} size="md" className="border-2 border-white" />
                         ))}
                         {project.members?.length > 4 && (
                             <span className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium text-slate-700 border-2 border-white">

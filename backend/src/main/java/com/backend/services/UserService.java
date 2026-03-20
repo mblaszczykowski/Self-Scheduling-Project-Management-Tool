@@ -10,9 +10,6 @@ import com.backend.requests.UserRegistrationRequest;
 import com.backend.util.FileValidationConstants;
 import com.backend.util.ValidationUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,6 +64,20 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
+    public UserDTO convertToDTO(User user) {
+        return new UserDTO(user.getId(), user.getFirstname(), user.getLastname(), user.getEmail(), user.getProfilePicture());
+    }
+
+    public UserDTO getUserByEmailForRequester(String email, Integer requesterId) {
+        var user = getRequiredUserByEmail(email);
+        boolean canAccessProfile = user.getId().equals(requesterId) ||
+                shareProjectWith(requesterId, user.getId());
+        if (!canAccessProfile) {
+            throw new ResourceNotFoundException("User not found");
+        }
+        return convertToDTO(user);
+    }
+
     public Map<String, User> findByEmailsAsMap(Collection<String> emails) {
         if (emails == null || emails.isEmpty()) {
             return Map.of();
@@ -75,8 +86,10 @@ public class UserService {
                 .collect(Collectors.toMap(User::getEmail, user -> user));
     }
 
+    public record RegistrationResult(UserDTO user, TokenService.AuthTokens tokens, Integer userId, String email) {}
+
     @Transactional(rollbackFor = Exception.class)
-    public ResponseEntity<?> registerUser(UserRegistrationRequest request) {
+    public RegistrationResult registerUser(UserRegistrationRequest request) {
         validateRegistrationRequest(request);
         ValidationUtil.validatePassword(request.password());
         ValidationUtil.validateName(request.firstname(), "First name");
@@ -95,28 +108,12 @@ public class UserService {
 
         var tokens = tokenService.createAuthTokens(user.getId());
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, tokens.accessCookie().toString())
-                .header(HttpHeaders.SET_COOKIE, tokens.refreshCookie().toString())
-                .body(Map.of(
-                        "message", "Registration successful",
-                        "userId", user.getId(),
-                        "email", user.getEmail()
-                ));
+        return new RegistrationResult(convertToDTO(user), tokens, user.getId(), user.getEmail());
     }
 
-    public ResponseEntity<?> getUserDetails(Integer userId) {
-        var user = getUserById(userId);
-        var userDTO = new UserDTO(
-                user.getId(),
-                user.getFirstname(),
-                user.getLastname(),
-                user.getEmail(),
-                user.getProfilePicture()
-        );
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(userDTO);
+    public UserDTO getUserDetails(Integer userId) {
+        var user = getRequiredUserById(userId);
+        return convertToDTO(user);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -172,18 +169,7 @@ public class UserService {
 
         userRepository.save(user);
 
-        return new UserDTO(
-                user.getId(),
-                user.getFirstname(),
-                user.getLastname(),
-                user.getEmail(),
-                user.getProfilePicture()
-        );
-    }
-
-    private User getUserById(Integer id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        return convertToDTO(user);
     }
 
     private void validateRegistrationRequest(UserRegistrationRequest request) {

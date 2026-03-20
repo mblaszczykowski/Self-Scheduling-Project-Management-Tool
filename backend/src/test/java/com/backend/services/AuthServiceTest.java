@@ -1,6 +1,7 @@
 package com.backend.services;
 
 import com.backend.entities.User;
+import com.backend.exception.AuthorizationException;
 import com.backend.exception.ValidationException;
 import com.backend.requests.LoginRequest;
 import jakarta.servlet.http.Cookie;
@@ -14,16 +15,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,7 +54,10 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder(12);
-        authService = new AuthService(userService, tokenService, rateLimitFilter, passwordEncoder, false, "Strict", "");
+        var cookieProperties = new com.backend.config.CookieProperties();
+        cookieProperties.setSecure(false);
+        cookieProperties.setSameSite("Strict");
+        authService = new AuthService(userService, tokenService, rateLimitFilter, passwordEncoder, cookieProperties, "");
 
         testUser = new User();
         testUser.setId(TEST_USER_ID);
@@ -82,48 +83,36 @@ class AuthServiceTest {
             when(tokenService.createAuthTokens(TEST_USER_ID)).thenReturn(mockTokens);
 
             LoginRequest loginReq = new LoginRequest(TEST_EMAIL, TEST_PASSWORD);
-            ResponseEntity<?> response = authService.authenticateUser(loginReq, request);
+            var result = authService.authenticateUser(loginReq, request);
 
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertTrue(response.getHeaders().containsKey(HttpHeaders.SET_COOKIE));
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> body = (Map<String, Object>) response.getBody();
-            assertNotNull(body);
-            assertEquals("Login successful", body.get("message"));
-            assertEquals(TEST_USER_ID, body.get("userId"));
+            assertNotNull(result);
+            assertNotNull(result.tokens());
+            assertEquals("Login successful", result.body().get("message"));
+            assertEquals(TEST_USER_ID, result.body().get("userId"));
         }
 
         @Test
-        @DisplayName("should return bad request for invalid password")
-        void shouldReturnBadRequestForInvalidPassword() {
+        @DisplayName("should throw ValidationException for invalid password")
+        void shouldThrowForInvalidPassword() {
             when(userService.findUserByEmailOrNull(TEST_EMAIL)).thenReturn(testUser);
 
             LoginRequest loginReq = new LoginRequest(TEST_EMAIL, "WrongPassword123!");
-            ResponseEntity<?> response = authService.authenticateUser(loginReq, request);
 
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> body = (Map<String, Object>) response.getBody();
-            assertNotNull(body);
-            assertEquals("Invalid email or password", body.get("error"));
+            var ex = assertThrows(ValidationException.class, () ->
+                    authService.authenticateUser(loginReq, request));
+            assertEquals("Invalid email or password", ex.getMessage());
         }
 
         @Test
-        @DisplayName("should return bad request for non-existent user without revealing user existence")
-        void shouldReturnBadRequestForNonExistentUser() {
+        @DisplayName("should throw ValidationException for non-existent user without revealing user existence")
+        void shouldThrowForNonExistentUser() {
             when(userService.findUserByEmailOrNull("nonexistent@example.com")).thenReturn(null);
 
             LoginRequest loginReq = new LoginRequest("nonexistent@example.com", TEST_PASSWORD);
-            ResponseEntity<?> response = authService.authenticateUser(loginReq, request);
 
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> body = (Map<String, Object>) response.getBody();
-            assertNotNull(body);
-            assertEquals("Invalid email or password", body.get("error"));
+            var ex = assertThrows(ValidationException.class, () ->
+                    authService.authenticateUser(loginReq, request));
+            assertEquals("Invalid email or password", ex.getMessage());
         }
 
         @Test
@@ -190,12 +179,14 @@ class AuthServiceTest {
             for (int i = 0; i < iterations; i++) {
                 // Time for existing user with wrong password
                 long startExisting = System.nanoTime();
-                authService.authenticateUser(new LoginRequest(TEST_EMAIL, "WrongPassword123!"), request);
+                assertThrows(ValidationException.class, () ->
+                        authService.authenticateUser(new LoginRequest(TEST_EMAIL, "WrongPassword123!"), request));
                 existingUserTotalTime += System.nanoTime() - startExisting;
 
                 // Time for non-existing user
                 long startNonExisting = System.nanoTime();
-                authService.authenticateUser(new LoginRequest("nonexistent@example.com", "WrongPassword123!"), request);
+                assertThrows(ValidationException.class, () ->
+                        authService.authenticateUser(new LoginRequest("nonexistent@example.com", "WrongPassword123!"), request));
                 nonExistingUserTotalTime += System.nanoTime() - startNonExisting;
             }
 
@@ -225,56 +216,46 @@ class AuthServiceTest {
             );
             when(tokenService.createAuthTokens(TEST_USER_ID)).thenReturn(mockTokens);
 
-            ResponseEntity<?> response = authService.refreshAccessToken(request);
+            var tokens = authService.refreshAccessToken(request);
 
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertTrue(response.getHeaders().containsKey(HttpHeaders.SET_COOKIE));
+            assertNotNull(tokens);
+            assertNotNull(tokens.accessCookie());
+            assertNotNull(tokens.refreshCookie());
         }
 
         @Test
-        @DisplayName("should return 401 when refresh token cookie is missing")
-        void shouldReturn401WhenCookieMissing() {
+        @DisplayName("should throw when refresh token cookie is missing")
+        void shouldThrowWhenCookieMissing() {
             when(request.getCookies()).thenReturn(null);
 
-            ResponseEntity<?> response = authService.refreshAccessToken(request);
-
-            assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> body = (Map<String, Object>) response.getBody();
-            assertNotNull(body);
-            assertEquals("Refresh token not provided", body.get("error"));
+            var ex = assertThrows(AuthorizationException.class, () ->
+                    authService.refreshAccessToken(request));
+            assertEquals("Refresh token not provided", ex.getMessage());
         }
 
         @Test
-        @DisplayName("should return 401 when refresh token is invalid")
-        void shouldReturn401WhenTokenInvalid() {
+        @DisplayName("should throw when refresh token is invalid")
+        void shouldThrowWhenTokenInvalid() {
             Cookie refreshCookie = new Cookie("refreshToken", "invalid-token");
             when(request.getCookies()).thenReturn(new Cookie[]{refreshCookie});
             when(tokenService.validateRefreshToken("invalid-token")).thenReturn(null);
 
-            ResponseEntity<?> response = authService.refreshAccessToken(request);
-
-            assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> body = (Map<String, Object>) response.getBody();
-            assertNotNull(body);
-            assertEquals("Invalid or expired refresh token", body.get("error"));
+            var ex = assertThrows(AuthorizationException.class, () ->
+                    authService.refreshAccessToken(request));
+            assertEquals("Invalid or expired refresh token", ex.getMessage());
         }
 
         @Test
-        @DisplayName("should return 401 when no refreshToken cookie among multiple cookies")
-        void shouldReturn401WhenNoRefreshTokenCookie() {
+        @DisplayName("should throw when no refreshToken cookie among multiple cookies")
+        void shouldThrowWhenNoRefreshTokenCookie() {
             Cookie[] cookies = {
                     new Cookie("accessToken", "some-access-token"),
                     new Cookie("otherCookie", "other-value")
             };
             when(request.getCookies()).thenReturn(cookies);
 
-            ResponseEntity<?> response = authService.refreshAccessToken(request);
-
-            assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+            assertThrows(AuthorizationException.class, () ->
+                    authService.refreshAccessToken(request));
         }
 
         @Test
@@ -294,9 +275,9 @@ class AuthServiceTest {
             );
             when(tokenService.createAuthTokens(TEST_USER_ID)).thenReturn(mockTokens);
 
-            ResponseEntity<?> response = authService.refreshAccessToken(request);
+            var tokens = authService.refreshAccessToken(request);
 
-            assertEquals(HttpStatus.OK, response.getStatusCode());
+            assertNotNull(tokens);
         }
     }
 
