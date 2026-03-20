@@ -382,11 +382,11 @@ const TaskForm = ({
                                     const dotColor = dt ? (DEP_DOT_COLOR[dt.status] || 'bg-slate-400') : 'bg-slate-400';
                                     return (
                                         <div key={key}
-                                            className="group/dep flex items-center gap-2 py-[5px] px-2 -mx-2 rounded-md hover:bg-white dark:hover:bg-slate-800/40 transition-colors"
+                                            className="group/dep flex items-center gap-2 py-1.5 px-2.5 -mx-2.5 rounded-lg hover:bg-white dark:hover:bg-slate-800/50 transition-all duration-150 hover:shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
                                         >
-                                            <span className={`w-[6px] h-[6px] rounded-full shrink-0 ${dotColor}`} />
-                                            <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 font-mono">{key}</span>
-                                            <span className="text-[11px] text-slate-500 dark:text-slate-400 flex-1 truncate">{dt?.summary || ''}</span>
+                                            <span className={`w-[7px] h-[7px] rounded-full shrink-0 ring-1 ring-current/20 ${dotColor}`} />
+                                            <span className="text-[12px] font-bold text-indigo-600 dark:text-indigo-400 font-mono">{key}</span>
+                                            <span className="text-[12px] text-slate-500 dark:text-slate-400 flex-1 truncate">{dt?.summary || ''}</span>
                                             <button type="button"
                                                 onClick={() => setDependencies(prev => prev.filter(k => k !== key))}
                                                 className="text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-all opacity-0 group-hover/dep:opacity-100 scale-90 group-hover/dep:scale-100"
