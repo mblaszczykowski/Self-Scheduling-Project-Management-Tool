@@ -139,7 +139,7 @@ const DueBadge = ({ date }) => {
     else if (diff === 0)  { text = 'due today';  cls = 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/50'; }
     else if (diff <= 3)   { text = `in ${diff}d`; cls = 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/50'; }
     else return null;
-    return <span className={`ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${cls} animate-pulse`}>{text}</span>;
+    return <span className={`ml-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${cls} animate-pulse`}>{text}</span>;
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -403,7 +403,7 @@ const TaskForm = ({
 
                 {/* ── Meta ── */}
                 {modalMode === 'edit' && (
-                    <div className="px-1 pt-1 flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500">
+                    <div className="px-1 pt-2 flex items-center justify-between text-[11px] font-medium text-slate-400 dark:text-slate-500">
                         <span>Created {values.created || '—'}</span>
                         <span className="w-px h-3 bg-slate-200 dark:bg-slate-700/40" />
                         <span>Updated {values.updated || '—'}</span>
