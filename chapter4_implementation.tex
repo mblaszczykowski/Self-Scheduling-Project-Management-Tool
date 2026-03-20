@@ -1,0 +1,1047 @@
+% ========================================================================
+% ROZDZIAŁ 4 — ROZBUDOWANA WERSJA (~30 stron)
+% ========================================================================
+\chapter{Projekt i implementacja systemu}
+
+% ========================================================================
+\section{Architektura rozwiązania}
+% ========================================================================
+
+System FlowLink został zaprojektowany w~architekturze trójwarstwowej (\textit{Three-Tier Architecture}), z~wyraźnym oddzieleniem warstwy prezentacji, logiki biznesowej i~trwałości danych (Rysunek~\ref{fig:architecture}). Komunikacja między warstwami odbywa się za~pośrednictwem bezstanowego interfejsu REST API z~wykorzystaniem formatu JSON.
+
+\begin{itemize}
+    \item \textbf{Warstwa serwera (Backend):} Spring Boot 3.2.4, Java 21, PostgreSQL --- realizuje logikę biznesową, uwierzytelnianie, walidację danych oraz dostęp do~bazy.
+    \item \textbf{Warstwa klienta (Frontend):} React 18.3, TailwindCSS 3.4, React Router 6.26 --- aplikacja typu SPA (\textit{Single Page Application}) renderowana w~przeglądarce użytkownika.
+    \item \textbf{Warstwa danych:} PostgreSQL z~pulą połączeń HikariCP (min~5, max~20), Hibernate 6.4 jako ORM z~grafami encji (\textit{Entity Graphs}) eliminującymi problem N+1~zapytań.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.2cm and 2cm,
+    box/.style={draw, rounded corners=4pt, minimum width=3.2cm, minimum height=1cm,
+                font=\small, align=center, thick},
+    layer/.style={draw, dashed, rounded corners=8pt, inner sep=12pt,
+                  fill=#1, fill opacity=0.08},
+    arrow/.style={-{Stealth[length=6pt]}, thick},
+    doublearrow/.style={{Stealth[length=6pt]}-{Stealth[length=6pt]}, thick},
+    label/.style={font=\footnotesize\bfseries, text=#1}
+]
+\node[box, fill=blue!8] (react) {React 18.3\\SPA};
+\node[box, fill=blue!8, right=1.5cm of react] (tailwind) {TailwindCSS\\UI Components};
+\node[box, fill=blue!8, right=1.5cm of tailwind] (axios) {Axios\\HTTP Client};
+\begin{scope}[on background layer]
+    \node[layer=blue, fit=(react)(tailwind)(axios), label={[label=blue!70]above:Warstwa klienta (Frontend --- port 3000)}] (frontend) {};
+\end{scope}
+\node[box, fill=orange!12, below=2cm of tailwind] (rest) {REST API\\JSON / FormData};
+\node[box, fill=green!8, below=2cm of rest, xshift=-3.5cm] (controllers) {Controllers\\Routing};
+\node[box, fill=green!8, right=1cm of controllers] (services) {Services\\Logika biznesowa};
+\node[box, fill=green!8, right=1cm of services] (optimizer) {ScheduleOptimizer\\SSGS / MORCPSP};
+\node[box, fill=green!8, right=1cm of optimizer] (repos) {Repositories\\JPA / Hibernate};
+\begin{scope}[on background layer]
+    \node[layer=green, fit=(controllers)(services)(optimizer)(repos),
+          label={[label=green!60!black]above:Warstwa serwera (Spring Boot 3.2.4 --- port 8080)}] (backend) {};
+\end{scope}
+\node[box, fill=red!8, below=2cm of services, xshift=0.5cm, minimum width=4cm] (db) {PostgreSQL\\Baza danych};
+\node[box, fill=red!8, right=2cm of db] (hikari) {HikariCP\\Pula połączeń};
+\begin{scope}[on background layer]
+    \node[layer=red, fit=(db)(hikari), label={[label=red!60!black]above:Warstwa danych}] (database) {};
+\end{scope}
+\draw[doublearrow, blue!60] (axios) -- node[right, font=\scriptsize, text=gray] {HTTP/CORS\\JWT Cookies} (rest);
+\draw[arrow, orange!60] (rest) -- (controllers);
+\draw[arrow, green!60] (controllers) -- (services);
+\draw[arrow, green!60] (services) -- (optimizer);
+\draw[arrow, green!60] (services) -- (repos);
+\draw[arrow, green!60] (repos) -- (hikari);
+\draw[arrow, red!60] (hikari) -- (db);
+\end{tikzpicture}
+\caption{Architektura trójwarstwowa systemu FlowLink}
+\label{fig:architecture}
+\end{figure}
+
+\noindent Zestawienie zastosowanych technologii i~bibliotek przedstawiono w~Tabeli~\ref{tab:tech_stack}.
+
+\begin{table}[H]
+\centering
+\caption{Stos technologiczny systemu FlowLink}
+\label{tab:tech_stack}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Warstwa} & \textbf{Technologia} & \textbf{Wersja} & \textbf{Zastosowanie} \\ \hline
+Backend & Spring Boot & 3.2.4 & Framework REST API \\ \hline
+Backend & Java & 21 & Język implementacji \\ \hline
+Backend & Hibernate/JPA & 6.4.4 & Mapowanie obiektowo-relacyjne \\ \hline
+Backend & HikariCP & 5.0.1 & Pula połączeń bazodanowych \\ \hline
+Backend & jjwt & 0.11.5 & Generowanie i~walidacja JWT \\ \hline
+Backend & BCrypt & 6.2.1 & Hashowanie haseł (siła 12) \\ \hline
+Backend & jsoup & 1.17.2 & Sanityzacja HTML (komentarze) \\ \hline
+Baza danych & PostgreSQL & --- & Trwałe przechowywanie danych \\ \hline
+Frontend & React & 18.3.1 & Framework interfejsu użytkownika \\ \hline
+Frontend & TailwindCSS & 3.4.10 & Style CSS (tryb JIT) \\ \hline
+Frontend & Axios & 1.7.7 & Klient HTTP z~interceptorami \\ \hline
+Frontend & React Router & 6.26.2 & Routing po~stronie klienta \\ \hline
+Frontend & Formik + Yup & 2.4.6 / 1.6.1 & Zarządzanie formularzami \\ \hline
+Frontend & Tiptap & 3.18.0 & Edytor tekstu sformatowanego \\ \hline
+Frontend & react-toastify & 10.0.6 & Powiadomienia toast \\ \hline
+Frontend & Chart.js & 4.4.6 & Wizualizacje wykresów \\ \hline
+Frontend & date-fns & 4.1.0 & Operacje na~datach \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Struktura pakietów backendu}
+
+Warstwa serwerowa zorganizowana jest zgodnie z~wzorcem warstwowym (\textit{Layered Architecture}). Poniżej przedstawiono strukturę pakietów wraz z~ich odpowiedzialnościami:
+
+\begin{verbatim}
+com.backend/
+├── config/         Konfiguracja: JWT, CORS, pula połączeń, ciasteczka
+├── controllers/    Punkty końcowe REST API (7 kontrolerów)
+├── services/       Logika biznesowa (9 serwisów)
+├── repositories/   Warstwa dostępu do danych (7 repozytoriów JPA)
+├── entities/       Modele JPA z relacjami i ograniczeniami (7 encji)
+├── dtos/           Rekordy Java 17+ (9 obiektów DTO)
+├── filter/         Filtry HTTP: JWT, CSRF, rate limiting, nagłówki
+├── util/           Klasy narzędziowe: ScheduleOptimizer, CPM, walidacja
+├── exception/      Wyjątki domenowe + GlobalExceptionHandler
+└── requests/       Obiekty żądań (LoginRequest)
+\end{verbatim}
+
+% ========================================================================
+\section{Model danych}
+% ========================================================================
+
+Schemat bazy danych obejmuje 7~encji głównych, 4~tabele pośredniczące (\textit{join tables}) dla~relacji wiele-do-wielu oraz 3~tabele kolekcji elementów (\textit{ElementCollection}) dla~załączników. Diagram związków encji przedstawiono na~Rysunku~\ref{fig:er_diagram}.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm and 3cm,
+    entity/.style={draw, thick, rounded corners=3pt, minimum width=3cm,
+                   minimum height=0.8cm, font=\small\bfseries, fill=#1},
+    attr/.style={font=\tiny, text=gray!70!black, align=left},
+    rel/.style={-{Stealth[length=5pt]}, thick, #1},
+    manyrel/.style={{Diamond[length=5pt]}-{Stealth[length=5pt]}, thick, #1}
+]
+\node[entity=blue!10] (user) {User};
+\node[entity=green!10, right=4cm of user] (project) {Project};
+\node[entity=orange!10, below=3cm of project] (task) {Task};
+\node[entity=purple!10, below=2.5cm of user] (comment) {Comment};
+\node[entity=red!10, left=1cm of comment, yshift=-1.5cm] (notification) {Notification};
+\node[entity=yellow!15, right=4cm of task] (refreshtoken) {RefreshToken};
+\node[attr, below=0.15cm of user] {id, email, firstname\\lastname, password};
+\node[attr, below=0.15cm of project] {id, projectKey, summary\\nextTaskNumber};
+\node[attr, below=0.15cm of task] {id, taskNumber, summary\\status, startDate, dueDate\\priority, progress, assignee\_id};
+\node[attr, below=0.15cm of comment] {id, content, author\_id\\task\_id, parentComment\_id};
+\draw[rel=blue!60] (user) -- node[above, font=\tiny] {owner (1:N)} (project);
+\draw[manyrel=blue!40, dashed] (user) -- node[below, font=\tiny, sloped] {members (M:N)} (project);
+\draw[rel=green!60] (project) -- node[right, font=\tiny] {tasks (1:N)} (task);
+\draw[rel=blue!60, bend right=20] (user.south) to node[left, font=\tiny] {assignee} (task.west);
+\draw[rel=orange!60] (task) -- node[below, font=\tiny, sloped] {comments (1:N)} (comment);
+\draw[rel=blue!60] (user) -- node[left, font=\tiny] {author} (comment);
+\draw[rel=blue!60, bend right=25] (user.south west) to node[left, font=\tiny] {recipient (1:N)} (notification);
+\draw[manyrel=orange!60, looseness=4] (task.south east) to[out=-30, in=30]
+    node[right, font=\tiny] {dependencies\\(M:N)} (task.north east);
+\draw[rel=purple!40, looseness=5, dashed] (comment.south) to[out=-150, in=150]
+    node[left, font=\tiny] {parentComment} (comment.north);
+\end{tikzpicture}
+\caption{Uproszczony diagram związków encji (ERD) systemu FlowLink}
+\label{fig:er_diagram}
+\end{figure}
+
+\subsection{Encja Task}
+
+Centralna encja systemu, odwzorowująca zadanie projektowe:
+
+\begin{table}[H]
+\centering
+\caption{Struktura encji Task}
+\label{tab:task_entity}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Pole} & \textbf{Typ} & \textbf{Ograniczenia} & \textbf{Opis} \\ \hline
+id & Integer & PK, AUTO\_INCREMENT & Identyfikator \\ \hline
+taskNumber & Integer & UNIQUE(project\_id, task\_number) & Nr w~projekcie \\ \hline
+summary & VARCHAR & NOT NULL, max 255 & Tytuł zadania \\ \hline
+description & TEXT & max 4000 & Szczegółowy opis \\ \hline
+status & TaskStatus & NOT NULL, default BACKLOG & Stan zadania \\ \hline
+startDate & LocalDate & nullable & Data rozpoczęcia \\ \hline
+dueDate & LocalDate & nullable & Termin wymagalności \\ \hline
+progress & Integer & 0--100, default 0 & Postęp [\%] \\ \hline
+priority & TaskPriority & default MEDIUM & Priorytet \\ \hline
+assignee\_id & FK $\rightarrow$ User & nullable, LAZY & Wykonawca \\ \hline
+project\_id & FK $\rightarrow$ Project & NOT NULL, LAZY & Projekt nadrzędny \\ \hline
+created & Instant & NOT NULL, immutable & Data utworzenia \\ \hline
+updated & Instant & NOT NULL, @PreUpdate & Ostatnia modyfikacja \\ \hline
+\end{tabular}
+\end{table}
+
+\noindent Relacja samoodnosząca \texttt{dependencies} (\texttt{@ManyToMany}) realizowana jest przez tabelę pośredniczącą \texttt{task\_dependencies}:
+
+\begin{verbatim}
+@ManyToMany
+@JoinTable(
+    name = "task_dependencies",
+    joinColumns = @JoinColumn(name = "task_id"),
+    inverseJoinColumns = @JoinColumn(name = "dependency_id")
+)
+private List<Task> dependencies;
+\end{verbatim}
+
+Enumeracja \texttt{TaskStatus} definiuje 12~stanów cyklu życia zadania: \texttt{BACKLOG}, \texttt{GATHERING\_INTEREST}, \texttt{TODO}, \texttt{WITHDRAWN}, \texttt{IN\_PROGRESS}, \texttt{TO\_REVIEW}, \texttt{TO\_TEST}, \texttt{IN\_TEST}, \texttt{READY\_TO\_MERGE}, \texttt{READY\_TO\_DEPLOY}, \texttt{RELEASED}, \texttt{DONE}.
+
+Enumeracja \texttt{TaskPriority} definiuje 5~poziomów z~wagami: \texttt{LOWEST}~(1), \texttt{LOW}~(2), \texttt{MEDIUM}~(3), \texttt{HIGH}~(4), \texttt{HIGHEST}~(5). Wagi te mapowane są~na~skalę $w_j \in [1,10]$ w~module optymalizacyjnym (Tabela~\ref{tab:priority_weights}).
+
+\textbf{Indeksy bazodanowe:} Dla~optymalizacji zapytań zdefiniowano indeksy na~kolumnach: \texttt{project\_id}, \texttt{assignee\_id}, \texttt{status}, \texttt{due\_date}, \texttt{priority}.
+
+\subsection{Encja Project}
+
+Reprezentuje projekt zarządzany w~systemie:
+
+\begin{itemize}
+    \item \texttt{projectKey} (VARCHAR, UNIQUE, immutable) --- krótki identyfikator (np. ``PROJ'').
+    \item \texttt{owner} (\texttt{@ManyToOne} $\rightarrow$ User) --- właściciel projektu.
+    \item \texttt{members} (\texttt{@ManyToMany} $\rightarrow$ User, tabela \texttt{project\_members}) --- członkowie zespołu.
+    \item \texttt{tasks} (\texttt{@OneToMany}, cascade ALL, orphanRemoval) --- lista zadań.
+    \item \texttt{nextTaskNumber} --- atomowy licznik do~alokacji numerów zadań.
+\end{itemize}
+
+Metody autoryzacyjne na~poziomie encji:
+
+\begin{verbatim}
+public boolean isOwner(Integer userId)   // czy jest właścicielem
+public boolean isMember(Integer userId)  // czy jest członkiem
+public boolean hasAccess(Integer userId) // owner || member
+\end{verbatim}
+
+\subsection{Encja User}
+
+Przechowuje dane użytkownika systemu: \texttt{email} (UNIQUE), \texttt{password} (hash BCrypt z~siłą~12), \texttt{firstname}, \texttt{lastname}, \texttt{profilePicture}. Hasło nigdy nie jest eksponowane w~DTO --- \texttt{UserDTO} zawiera wyłącznie: \texttt{id}, \texttt{firstname}, \texttt{lastname}, \texttt{email}, \texttt{profilePicture}.
+
+\subsection{Optymalizacja zapytań --- Named Entity Graphs}
+
+Aby wyeliminować problem N+1~zapytań przy pobieraniu zadań z~zależnościami, zdefiniowano graf encji:
+
+\begin{verbatim}
+@NamedEntityGraph(
+    name = "Task.withDetails",
+    attributeNodes = {
+        @NamedAttributeNode("assignee"),
+        @NamedAttributeNode("project"),
+        @NamedAttributeNode(value = "dependencies",
+                            subgraph = "dependency-project")
+    },
+    subgraphs = @NamedSubgraph(
+        name = "dependency-project",
+        attributeNodes = @NamedAttributeNode("project"))
+)
+\end{verbatim}
+
+Użycie w~repozytorium:
+
+\begin{verbatim}
+@EntityGraph(value = "Task.withDetails",
+             type = EntityGraph.EntityGraphType.FETCH)
+@Query("SELECT t FROM Task t WHERE t.project.id IN :projectIds")
+List<Task> findByProjectIdsWithDetails(List<Integer> projectIds);
+\end{verbatim}
+
+Dzięki temu jedno zapytanie SQL z~\texttt{LEFT JOIN FETCH} pobiera zadanie wraz z~wykonawcą, projektem i~zależnościami, zamiast generować $N \times M$ zapytań.
+
+\subsection{Pozostałe encje}
+
+\textbf{Comment} --- komentarz do~zadania z~obsługą wątków (\textit{threading}). Relacja samoodnosząca \texttt{parentComment} umożliwia zagnieżdżanie odpowiedzi do~4~poziomów głębokości. Zawiera kolekcję reakcji (\texttt{CommentReaction}: LIKE/DISLIKE) z~ograniczeniem UNIQUE na~parę (comment\_id, user\_id).
+
+\textbf{Notification} --- powiadomienie kierowane do~użytkownika. Typy: \texttt{TASK\_ASSIGNED}, \texttt{TASK\_UPDATED}, \texttt{COMMENT\_REPLY}, \texttt{COMMENT\_REACTION}, \texttt{PROJECT\_INVITATION}. Pole \texttt{link} zawiera URL do~powiązanego zasobu (np. \texttt{/projects?selectedIssue=PROJ-42}).
+
+\textbf{RefreshToken} --- token odświeżania przechowywany w~bazie dla~obsługi unieważniania sesji. Zawiera: \texttt{token} (UNIQUE), \texttt{userId}, \texttt{expiryDate}. Wygasłe tokeny usuwane są~cyklicznie co~godzinę (Sekcja~\ref{sec:scheduled_tasks}).
+
+% ========================================================================
+\section{Warstwa serwisów}
+% ========================================================================
+
+\subsection{Serwis zadań (TaskService)}
+
+Centralny serwis logiki biznesowej dla~operacji na~zadaniach. Implementuje walidację, rozwiązywanie zależności i~detekcję cykli.
+
+\subsubsection{Walidacja danych wejściowych}
+
+Metoda \texttt{validateTaskDTO()} weryfikuje:
+
+\begin{itemize}
+    \item \texttt{summary}: nie null, nie pusty, max 255~znaków.
+    \item \texttt{description}: max 4000~znaków.
+    \item \texttt{progress}: wartość w~zakresie [0, 100].
+    \item \texttt{labels}: żadna etykieta nie zawiera przecinka (przechowywane jako tekst rozdzielony przecinkami).
+\end{itemize}
+
+W~przypadku naruszenia walidacji rzucany jest wyjątek \texttt{ValidationException}, który \texttt{GlobalExceptionHandler} mapuje na~odpowiedź HTTP 400 z~kodem \texttt{VALIDATION\_ERROR}.
+
+\subsubsection{Tworzenie zadania}
+
+Przepływ metody \texttt{createTask(projectKey, taskDTO, userId, files)}:
+
+\begin{enumerate}
+    \item Walidacja DTO.
+    \item Przechowywanie załączników przez \texttt{FileStorageService.storeFiles()}.
+    \item Pobranie projektu z~blokadą pesymistyczną (\texttt{PESSIMISTIC\_WRITE}) --- zapobiega wyścigowi przy alokacji numeru zadania.
+    \item Weryfikacja dostępu: \texttt{project.hasAccess(userId)}.
+    \item Atomowa alokacja numeru: \texttt{project.allocateNextTaskNumber()}.
+    \item Domyślne wartości: status = \texttt{BACKLOG}, priorytet = \texttt{MEDIUM}, progress = 0.
+    \item Rozwiązywanie zależności: \texttt{resolveDependenciesBatch()}.
+    \item Walidacja braku cykli: \texttt{validateNoCycles()}.
+    \item Zapis i~powiadomienie wykonawcy (jeśli różny od~twórcy).
+\end{enumerate}
+
+\subsubsection{Detekcja cykli w~grafie zależności}
+
+Algorytm \texttt{validateNoCycles()} wykorzystuje przeszukiwanie wszerz (BFS):
+
+\begin{verbatim}
+private void validateNoCycles(Task task, List<Task> dependencies) {
+    Queue<Task> queue = new LinkedList<>(dependencies);
+    Set<Integer> visited = new HashSet<>();
+    while (!queue.isEmpty()) {
+        Task current = queue.poll();
+        if (current.getId().equals(task.getId()))
+            throw new ValidationException(
+                "Circular dependency detected");
+        if (visited.add(current.getId()))
+            queue.addAll(current.getDependencies());
+    }
+}
+\end{verbatim}
+
+Złożoność: $O(V + E)$ gdzie $V$ = zadania, $E$ = krawędzie zależności. Algorytm jest wywoływany przy każdym tworzeniu i~aktualizacji zadania z~zależnościami.
+
+\subsubsection{Hurtowe rozwiązywanie zależności}
+
+Metoda \texttt{resolveDependenciesBatch()} optymalizuje pobieranie zależności grupując je~po~kluczu projektu i~wykonując hurtowe zapytania zamiast N~indywidualnych:
+
+\begin{verbatim}
+// Grupowanie kluczy wg projektu
+Map<String, List<Integer>> byProject = dependencyKeys.stream()
+    .collect(groupingBy(key -> extractProjectKey(key),
+                        mapping(key -> extractNumber(key),
+                                toList())));
+
+// Jedno zapytanie per projekt zamiast N zapytań per klucz
+for (var entry : byProject.entrySet()) {
+    var tasks = taskRepository.findByProjectKeyAndTaskNumbers(
+        entry.getKey(), entry.getValue());
+    resolved.addAll(tasks);
+}
+\end{verbatim}
+
+\subsection{Serwis powiadomień (NotificationService)}
+
+Implementuje wzorzec \textit{fire-and-forget} --- powiadomienia tworzone są~synchronicznie, ale nie blokują głównej operacji:
+
+\begin{verbatim}
+public void createNotification(User recipient, String message,
+                                NotificationType type, String link) {
+    var notification = new Notification();
+    notification.setUser(recipient);
+    notification.setMessage(message);
+    notification.setType(type);
+    notification.setLink(link);
+    notification.setTimestamp(Instant.now());
+    notification.setRead(false);
+    notificationRepository.save(notification);
+}
+\end{verbatim}
+
+Powiadomienia generowane są~przy: przypisaniu zadania, aktualizacji zadania, odpowiedzi na~komentarz, reakcji na~komentarz, zaproszeniu do~projektu.
+
+Weryfikacja własności: \texttt{markNotificationsAsRead()} sprawdza, czy~wszystkie wskazane powiadomienia należą do~żądającego użytkownika, rzucając \texttt{AuthorizationException} w~przypadku niezgodności.
+
+\subsection{Serwis przechowywania plików (FileStorageService)}
+
+System umożliwia dodawanie załączników do~zadań, projektów i~komentarzy. Pliki przechowywane są~w~katalogu konfigurowanym przez \texttt{\$\{file.upload-dir\}} (domyślnie \texttt{uploads/}).
+
+\subsubsection{Walidacja bezpieczeństwa plików}
+
+Wielopoziomowa walidacja chroni przed złośliwymi plikami:
+
+\begin{enumerate}
+    \item \textbf{Sprawdzenie pustości:} Plik nie może być pusty (0~bajtów).
+    \item \textbf{Walidacja nazwy:} Nazwa nie null, nie pusta, bez znaków specjalnych.
+    \item \textbf{Rozszerzenie:} Porównanie z~białą listą dozwolonych rozszerzeń.
+    \item \textbf{Rozmiar:} Maksymalnie 5~MB per plik (konfigurowalny).
+    \item \textbf{Magic bytes:} Weryfikacja nagłówka binarnego pliku --- zapobiega przesłaniu pliku \texttt{.jpg} zawierającego w~rzeczywistości kod wykonywalny.
+    \item \textbf{Ochrona przed path traversal:} Odrzucenie nazw zawierających \texttt{/}, \texttt{\textbackslash}, \texttt{..}; walidacja \texttt{normalize()} i~\texttt{startsWith()}.
+\end{enumerate}
+
+Bezpieczna nazwa pliku generowana jest jako: \texttt{UUID.randomUUID() + "." + extension}, eliminując ryzyko kolizji i~wstrzyknięcia ścieżki.
+
+% ========================================================================
+\section{Mechanizm uwierzytelniania i autoryzacji}
+% ========================================================================
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=0.6cm,
+    actor/.style={draw, thick, rounded corners=3pt, minimum width=2.2cm,
+                  minimum height=0.7cm, font=\small\bfseries, fill=#1},
+    msg/.style={-{Stealth[length=5pt]}, thick, #1},
+    msglabel/.style={font=\scriptsize, fill=white, inner sep=1pt},
+    timeline/.style={thick, gray!40},
+    note/.style={draw, dashed, rounded corners=3pt, fill=yellow!5,
+                 font=\scriptsize, align=left, text width=3.5cm}
+]
+\node[actor=blue!10] (client) {Klient (React)};
+\node[actor=green!10, right=5cm of client] (server) {Serwer (Spring)};
+\node[actor=red!10, right=4cm of server] (db) {PostgreSQL};
+\draw[timeline] (client.south) -- ++(0,-11.5);
+\draw[timeline] (server.south) -- ++(0,-11.5);
+\draw[timeline] (db.south) -- ++(0,-11.5);
+\draw[msg=blue!60] ($(client.south)+(0,-0.8)$) -- node[msglabel, above] {1. POST /api/auth/login} ($(server.south)+(0,-0.8)$);
+\draw[msg=green!60] ($(server.south)+(0,-1.5)$) -- node[msglabel, above] {2. SELECT user WHERE email=?} ($(db.south)+(0,-1.5)$);
+\draw[msg=red!40, dashed] ($(db.south)+(0,-2.0)$) -- node[msglabel, above] {User entity} ($(server.south)+(0,-2.0)$);
+\node[note, anchor=west] at ($(server.south)+(0.3,-2.8)$) {3. BCrypt.matches(\\password, hash)\\Generuj JWT access (15min)\\+ refresh token (7 dni)};
+\draw[msg=green!60] ($(server.south)+(0,-4.0)$) -- node[msglabel, above] {4. Set-Cookie: accessToken, refreshToken} ($(client.south)+(0,-4.0)$);
+\node[msglabel, below] at ($(client.south)!0.5!(server.south)+(0,-4.0)$) {\textit{HttpOnly, Secure, SameSite=Lax}};
+\draw[msg=blue!60] ($(client.south)+(0,-5.5)$) -- node[msglabel, above] {5. GET /api/projects (Cookie: accessToken)} ($(server.south)+(0,-5.5)$);
+\node[note, anchor=west] at ($(server.south)+(0.3,-6.3)$) {6. JwtAuthenticationFilter:\\validateToken(accessToken)\\userId $\rightarrow$ request attribute};
+\draw[msg=orange!60, dashed] ($(server.south)+(0,-7.5)$) -- node[msglabel, above] {7. 401 Unauthorized (token expired)} ($(client.south)+(0,-7.5)$);
+\draw[msg=blue!60] ($(client.south)+(0,-8.3)$) -- node[msglabel, above] {8. POST /api/auth/refresh (Cookie: refreshToken)} ($(server.south)+(0,-8.3)$);
+\draw[msg=green!60] ($(server.south)+(0,-9.0)$) -- node[msglabel, above] {9. Set-Cookie: nowy accessToken} ($(client.south)+(0,-9.0)$);
+\draw[msg=blue!60] ($(client.south)+(0,-9.8)$) -- node[msglabel, above] {10. Ponowienie oryginalnego żądania} ($(server.south)+(0,-9.8)$);
+\draw[msg=green!60] ($(server.south)+(0,-10.5)$) -- node[msglabel, above] {11. 200 OK + dane} ($(client.south)+(0,-10.5)$);
+\node[note, anchor=east, text width=2.8cm] at ($(client.south)+(-0.3,-8.5)$) {Axios interceptor:\\kolejkuje żądania\\podczas odświeżania\\(1 refresh naraz)};
+\end{tikzpicture}
+\caption{Diagram sekwencji przepływu uwierzytelniania JWT z~automatycznym odświeżaniem tokena}
+\label{fig:jwt_sequence}
+\end{figure}
+
+System wykorzystuje uwierzytelnianie oparte na~tokenach JWT (\textit{JSON Web Token}) przechowywanych w~ciasteczkach \texttt{HttpOnly}, co~zapobiega atakom XSS (JavaScript nie ma dostępu do~wartości tokena).
+
+\subsection{Generowanie tokenów (JwtConfig)}
+
+Klucz podpisujący generowany jest z~algorytmu HMAC-SHA256 na~skrócie SHA-256 sekretu:
+
+\begin{verbatim}
+MessageDigest digest = MessageDigest.getInstance("SHA-256");
+byte[] keyBytes = digest.digest(
+    secretKey.getBytes(StandardCharsets.UTF_8));
+return new SecretKeySpec(keyBytes, "HmacSHA256");
+\end{verbatim}
+
+Parametry tokenów:
+\begin{itemize}
+    \item Token dostępowy: ważność 15~minut, \texttt{subject = userId}.
+    \item Token odświeżania: ważność 7~dni, przechowywany w~encji \texttt{RefreshToken} dla~obsługi unieważniania.
+    \item Ciasteczka: \texttt{HttpOnly=true}, \texttt{Secure=true} (w~produkcji), \texttt{SameSite=Lax}, \texttt{Path=/}.
+\end{itemize}
+
+\subsection{Filtr uwierzytelniający (JwtAuthenticationFilter)}
+
+Filtr \texttt{OncePerRequestFilter} przechwytuje każde żądanie HTTP:
+
+\begin{verbatim}
+protected void doFilterInternal(HttpServletRequest request, ...) {
+    String path = request.getRequestURI();
+    if (PublicEndpoints.isPublicForJwt(path, method))
+        { filterChain.doFilter(request, response); return; }
+
+    String token = tokenService.extractTokenFromRequest(request);
+    if (token == null)
+        { sendErrorResponse(response, "Missing token"); return; }
+
+    Integer userId = tokenService.validateTokenAndGetUserId(token);
+    if (userId == null)
+        { sendErrorResponse(response, "Invalid token"); return; }
+
+    request.setAttribute("userId", userId);
+    filterChain.doFilter(request, response);
+}
+\end{verbatim}
+
+Odpowiedzi błędne formatowane są~jako JSON:
+\begin{verbatim}
+{ "status": 401, "error": "Unauthorized",
+  "code": "AUTH_ERROR",
+  "message": "Missing authentication token",
+  "timestamp": "2026-03-20T10:30:00Z" }
+\end{verbatim}
+
+\subsection{Automatyczne odświeżanie tokena (Frontend)}
+
+Interceptor Axios implementuje mechanizm kolejkowania żądań podczas odświeżania tokena:
+
+\begin{verbatim}
+// Zapobiega wielokrotnemu odświeżaniu (thundering herd)
+let isRefreshing = false;
+let failedQueue = [];
+
+api.interceptors.response.use(null, async (error) => {
+    if (error.response?.status !== 401) return reject(error);
+    if (isRefreshing) {
+        // Kolejkuj żądanie — rozwiąż po odświeżeniu
+        return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+        }).then(() => api(originalRequest));
+    }
+    isRefreshing = true;
+    await api.post('/api/auth/refresh');
+    processQueue(null); // rozwiąż wszystkie oczekujące
+    isRefreshing = false;
+    return api(originalRequest); // ponów oryginalne żądanie
+});
+\end{verbatim}
+
+Mechanizm gwarantuje, że~nawet przy wielu równoczesnych żądaniach~401, odświeżanie tokena następuje \textbf{dokładnie raz}, a~wszystkie oczekujące żądania są~ponawiane z~nowym tokenem.
+
+\subsection{Endpointy publiczne vs chronione}
+
+\begin{table}[H]
+\centering
+\caption{Klasyfikacja endpointów wg wymaganej autoryzacji}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Endpoint} & \textbf{Metoda} & \textbf{Autoryzacja} \\ \hline
+/api/auth/login & POST & Publiczny \\ \hline
+/api/auth/refresh & POST & Publiczny \\ \hline
+/api/users & POST & Publiczny (rejestracja) \\ \hline
+/api/users/exists & GET & Publiczny \\ \hline
+/files/**, /uploads/** & GET & Publiczny (pliki statyczne) \\ \hline
+/api/projects/** & * & JWT wymagany \\ \hline
+/api/optimization/** & POST & JWT wymagany \\ \hline
+/api/notifications/** & * & JWT wymagany \\ \hline
+\end{tabular}
+\end{table}
+
+% ========================================================================
+\section{Obsługa błędów}
+% ========================================================================
+
+Centralna klasa \texttt{GlobalExceptionHandler} z~adnotacją \texttt{@RestControllerAdvice} przechwytuje wyjątki i~mapuje je~na~ustandaryzowane odpowiedzi HTTP:
+
+\begin{table}[H]
+\centering
+\caption{Mapowanie wyjątków na~kody HTTP}
+\label{tab:exception_mapping}
+\begin{tabular}{|l|c|l|}
+\hline
+\textbf{Wyjątek} & \textbf{HTTP} & \textbf{Kod błędu} \\ \hline
+ValidationException & 400 & VALIDATION\_ERROR \\ \hline
+ResourceNotFoundException & 404 & NOT\_FOUND \\ \hline
+AuthorizationException & 403 & FORBIDDEN \\ \hline
+FileStorageException & 400 & FILE\_ERROR \\ \hline
+JsonProcessingException & 400 & INVALID\_JSON \\ \hline
+TooManyAttemptsException & 429 & TOO\_MANY\_REQUESTS \\ \hline
+Exception (generyczny) & 500 & INTERNAL\_ERROR \\ \hline
+\end{tabular}
+\end{table}
+
+Każda odpowiedź błędna zawiera strukturę: \texttt{status}, \texttt{error}, \texttt{code}, \texttt{message}, \texttt{timestamp}. Wyjątki generyczne (500) są~logowane na~poziomie ERROR z~pełnym \textit{stack trace}, natomiast wyjątki biznesowe (400, 403, 404) --- na~poziomie WARN bez~\textit{stack trace}.
+
+% ========================================================================
+\section{Metoda Ścieżki Krytycznej (CriticalPathMethodHelper)}
+% ========================================================================
+
+Przed optymalizacją MORCPSP, system oblicza ścieżkę krytyczną metodą CPM, aby~oznaczyć zadania, których opóźnienie bezpośrednio wpływa na~termin zakończenia projektu.
+
+\subsection{Algorytm CPM}
+
+\textbf{Faza przejścia w~przód} (\textit{Forward Pass}):
+\begin{itemize}
+    \item Dla zadań bez poprzedników: $ES_j = 0$, $EF_j = p_j$.
+    \item Dla zadań z~poprzednikami: $ES_j = \max_{i \in Pred_j} EF_i$, $EF_j = ES_j + p_j$.
+    \item Realizacja: rekurencyjne DFS ze~zbiorem \texttt{visited}.
+\end{itemize}
+
+\textbf{Faza przejścia wstecz} (\textit{Backward Pass}):
+\begin{itemize}
+    \item Czas zakończenia projektu: $T_{proj} = \max_j EF_j$.
+    \item Dla zadań bez następników: $LF_j = T_{proj}$.
+    \item Dla zadań z~następnikami: $LF_j = \min_{k \in Succ_j} LS_k$.
+    \item $LS_j = LF_j - p_j$, luz (\textit{float}): $TF_j = LS_j - ES_j$.
+    \item \textbf{Zadanie krytyczne}: $TF_j = 0$ (brak zapasu czasowego).
+    \item Sortowanie topologiczne przez DFS zapewnia poprawną kolejność przetwarzania.
+\end{itemize}
+
+Wynik CPM (\texttt{isCritical = true/false}) jest przekazywany do~modułu optymalizacyjnego i~wyświetlany w~interfejsie użytkownika jako czerwone podświetlenie paska na~osi czasu oraz czerwona kropka przy identyfikatorze zadania.
+
+% ========================================================================
+\section{Moduł optymalizacyjny}
+% ========================================================================
+
+Centralny element pracy --- moduł automatycznej optymalizacji harmonogramu portfela projektów, składający się z~trzech komponentów (Rysunek~\ref{fig:optimization_components}).
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1cm and 1.5cm,
+    comp/.style={draw, thick, rounded corners=4pt, minimum width=3.5cm,
+                 minimum height=1.2cm, font=\small, align=center, fill=#1},
+    api/.style={draw, thick, minimum width=3cm, minimum height=0.6cm,
+                font=\scriptsize\ttfamily, fill=orange!8, rounded corners=2pt},
+    arrow/.style={-{Stealth[length=5pt]}, thick},
+    dashedarrow/.style={-{Stealth[length=5pt]}, thick, dashed, gray},
+    group/.style={draw, dashed, rounded corners=8pt, inner sep=10pt, fill=#1, fill opacity=0.05}
+]
+\node[comp=green!10] (controller) {OptimizationController\\{\scriptsize @RestController}};
+\node[comp=green!10, below=1.2cm of controller] (service) {OptimizationService\\{\scriptsize @Service, @Transactional}};
+\node[comp=blue!10, below left=1.2cm and 0.5cm of service] (optimizer) {ScheduleOptimizer\\{\scriptsize Stateless, SSGS}};
+\node[comp=blue!10, below right=1.2cm and 0.5cm of service] (cpm) {CriticalPathMethodHelper\\{\scriptsize Forward/Backward Pass}};
+\node[comp=gray!10, right=1.5cm of service] (taskrepo) {TaskRepository\\{\scriptsize Entity Graph: withDetails}};
+\node[comp=gray!10, above=0.5cm of taskrepo] (projectrepo) {ProjectRepository\\{\scriptsize findByProjectKey}};
+\node[api, above left=0.8cm and -0.5cm of controller] (simulate) {POST /simulate};
+\node[api, above right=0.8cm and -0.5cm of controller] (apply) {POST /apply};
+\node[comp=purple!10, above=2.5cm of controller, xshift=-3cm] (projpage) {ProjectsPage\\{\scriptsize handleOptimize()}};
+\node[comp=purple!10, above=2.5cm of controller, xshift=3cm] (metrics) {OptimizationMetrics\\{\scriptsize Panel wyników}};
+\node[comp=purple!10, below=0.3cm of metrics] (timeline) {TimelineView\\{\scriptsize Ghost Bars}};
+\begin{scope}[on background layer]
+    \node[group=green, fit=(controller)(service)(optimizer)(cpm)(taskrepo)(projectrepo),
+          label={[font=\footnotesize\bfseries, text=green!50!black]below:Backend (Java / Spring Boot)}] {};
+    \node[group=purple, fit=(projpage)(metrics)(timeline),
+          label={[font=\footnotesize\bfseries, text=purple!50!black]above:Frontend (React)}] {};
+\end{scope}
+\draw[arrow] (simulate) -- (controller);
+\draw[arrow] (apply) -- (controller);
+\draw[arrow] (controller) -- (service);
+\draw[arrow] (service) -- (optimizer);
+\draw[arrow] (service) -- (cpm);
+\draw[arrow] (service) -- (taskrepo);
+\draw[dashedarrow] (service) -- (projectrepo);
+\draw[arrow, purple!60] (projpage) -- node[left, font=\scriptsize] {API call} (simulate);
+\draw[arrow, purple!60, dashed] (projpage) -- (metrics);
+\draw[arrow, purple!60, dashed] (projpage) -- (timeline);
+\node[font=\tiny, text=gray, rotate=-90, anchor=north] at ($(controller)!0.5!(service)+(-1.8,0)$) {OptimizationResultDTO};
+\node[font=\tiny, text=gray] at ($(service)!0.5!(optimizer)+(0,0.3)$) {List<TaskDTO>};
+\node[font=\tiny, text=gray] at ($(service)!0.5!(cpm)+(0,0.3)$) {isCritical};
+\end{tikzpicture}
+\caption{Diagram komponentów modułu optymalizacyjnego i~jego integracja z~interfejsem użytkownika}
+\label{fig:optimization_components}
+\end{figure}
+
+\subsection{Algorytm SSGS (ScheduleOptimizer)}
+
+Klasa \texttt{ScheduleOptimizer} implementuje algorytm SSGS (\textit{Serial Schedule Generation Scheme}) --- standardową heurystykę konstrukcyjną dla~problemu RCPSP \cite{hartmann}. Jest klasą bezstanową, niezależną od~Spring Framework, co~umożliwia testowanie jednostkowe bez kontekstu aplikacji.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1cm,
+    startstop/.style={draw, rounded corners=8pt, minimum width=3.5cm, minimum height=0.8cm,
+                      fill=gray!15, font=\small, thick, align=center},
+    process/.style={draw, minimum width=4.5cm, minimum height=0.8cm,
+                    fill=blue!6, font=\small, thick, align=center},
+    decision/.style={draw, diamond, aspect=2.5, minimum width=2cm,
+                     fill=orange!8, font=\small, thick, align=center, inner sep=1pt},
+    io/.style={draw, trapezium, trapezium left angle=70, trapezium right angle=110,
+               minimum width=3.5cm, fill=green!6, font=\small, thick, align=center},
+    arrow/.style={-{Stealth[length=5pt]}, thick},
+    phase/.style={font=\scriptsize\bfseries, text=gray}
+]
+\node[startstop] (start) {Wejście: Lista TaskDTO,\\horyzont $T_0$, $\alpha$, $\beta$};
+\node[process, below=0.8cm of start] (build) {Budowa grafu zadań\\(predecessors, successors)};
+\node[phase, left=0.3cm of build, anchor=east] {Faza 1};
+\node[process, below=0.8cm of build] (topo) {Oblicz $|\text{Succ}_j^*|$\\(odwrotny porządek topologiczny)};
+\node[process, below=0.6cm of topo] (sort) {Sortuj wg $score_j = w_j \cdot \frac{H-d_j}{H} + 0{,}5 \cdot |\text{Succ}_j^*|$};
+\node[phase, left=0.3cm of topo, anchor=east] {Faza 2};
+\node[io, below=0.8cm of sort] (next) {Weź następne zadanie $j$\\z listy priorytetowej};
+\node[phase, left=0.3cm of next, anchor=east] {Faza 3};
+\node[process, below=0.8cm of next] (prec) {$ES_j = \max_{i \in Pred_j} C_i$};
+\node[decision, below=0.8cm of prec] (hasres) {Assignee\\$\neq$ null?};
+\node[process, right=2.5cm of hasres] (resource) {Szukaj wolnego slotu\\w BitSet[assignee]};
+\node[process, below=1.2cm of hasres] (place) {$S_j = \max(0, ES_j, \text{slot})$\\$C_j = S_j + p_j$\\Oznacz BitSet $[S_j, C_j)$};
+\node[decision, below=0.8cm of place] (more) {Pozostały\\zadania?};
+\node[process, below=1cm of more] (metrics) {Oblicz: $\sum w_j T_j$, $C_{max}$,\\$Z = \alpha \sum w_j T_j + \beta C_{max}$};
+\node[phase, left=0.3cm of metrics, anchor=east] {Faza 4};
+\node[startstop, below=0.8cm of metrics] (end) {Wynik: ScheduleResult\\(sugestie, metryki)};
+\draw[arrow] (start) -- (build);
+\draw[arrow] (build) -- (topo);
+\draw[arrow] (topo) -- (sort);
+\draw[arrow] (sort) -- (next);
+\draw[arrow] (next) -- (prec);
+\draw[arrow] (prec) -- (hasres);
+\draw[arrow] (hasres) -- node[above, font=\scriptsize] {Tak} (resource);
+\draw[arrow] (hasres) -- node[left, font=\scriptsize] {Nie} (place);
+\draw[arrow] (resource) |- (place);
+\draw[arrow] (place) -- (more);
+\draw[arrow] (more) -- node[left, font=\scriptsize] {Nie} (metrics);
+\draw[arrow] (more.east) -- ++(2,0) |- node[near start, above, font=\scriptsize] {Tak} (next.east);
+\draw[arrow] (metrics) -- (end);
+\end{tikzpicture}
+\caption{Schemat blokowy algorytmu SSGS zaimplementowanego w~klasie \texttt{ScheduleOptimizer}}
+\label{fig:ssgs_flowchart}
+\end{figure}
+
+\subsubsection{Struktura wewnętrzna}
+
+Algorytm operuje na~wewnętrznej reprezentacji:
+
+\begin{verbatim}
+private static class SchedulableTask {
+    String taskKey;           // identyfikator (np. "PROJ-42")
+    int duration;             // czas trwania (inkluzywny)
+    int originalStartOffset;  // offset od horyzontu [dni]
+    int dueDateOffset;        // termin wymagalności (ekskluzywny)
+    int priorityWeight;       // waga w_j ∈ [1,10]
+    String assignee;          // email wykonawcy (null = brak)
+    List<String> predecessors;
+    List<String> successors;
+    boolean isCompleted;      // DONE/RELEASED/WITHDRAWN
+    int scheduledStart;       // wynik optymalizacji
+    int scheduledEnd;         // scheduledStart + duration
+    double priorityScore;     // kompozytowy scoring
+}
+\end{verbatim}
+
+\subsubsection{Faza 1: Budowa grafu zadań}
+
+Dla każdego \texttt{TaskDTO} z~niepustymi datami tworzona jest instancja \texttt{SchedulableTask}. Czas trwania obliczany jest inkluzywnie:
+
+$$p_j = \text{ChronoUnit.DAYS.between}(startDate, dueDate) + 1$$
+
+Zadania o~statusie terminalnym (\texttt{DONE}, \texttt{RELEASED}, \texttt{WITHDRAWN}) zachowują oryginalne pozycje jako stałe ograniczenia kolejnościowe dla~następników, ale~nie są~uwzględniane w~zbiorze zmiennych decyzyjnych. Zbudowane zostają dwukierunkowe relacje \texttt{predecessors}$\leftrightarrow$\texttt{successors}.
+
+\subsubsection{Faza 2: Lista priorytetowa}
+
+Obliczenie tranzytywnych następników realizowane jest w~jednym przebiegu odwrotnego porządku topologicznego ($O(N + E)$), zamiast naiwnego $O(N^2)$:
+
+\begin{verbatim}
+// Sortowanie topologiczne (DFS post-order)
+for (var key : taskMap.keySet())
+    topoSortDFS(key, taskMap, visited, order);
+
+// Odwrotna kolejność: liście przetwarzane pierwsze
+for (var key : order) {
+    int count = 0;
+    for (var succKey : task.successors)
+        count += 1 + counts.getOrDefault(succKey, 0);
+    counts.put(key, count);
+}
+\end{verbatim}
+
+Kompozytowy scoring:
+\begin{equation}
+score_j = w_j \cdot \frac{H - d_j}{H} + 0{,}5 \cdot |\text{Succ}_j^*|
+\end{equation}
+
+Przy remisach: porównanie po~$d_j$ (rosnąco), następnie $w_j$ (malejąco).
+
+\subsubsection{Faza 3: Rdzeń SSGS}
+
+Dla każdego zadania w~kolejności priorytetowej:
+
+\begin{enumerate}
+    \item $ES_j = \max_{i \in Pred_j} C_i$ --- najwcześniejszy start z~ograniczeń kolejnościowych.
+    \item Jeśli \texttt{assignee $\neq$ null}: szukanie wolnego slotu w~\texttt{BitSet[assignee]}.
+    \item $S_j = \max(0, ES_j, \text{earliest\_free\_slot})$, $C_j = S_j + p_j$.
+    \item Oznaczenie zajętości: \texttt{bitSet.set($S_j$, $C_j$)}.
+\end{enumerate}
+
+\textbf{Struktura BitSet} zapewnia operacje $O(1)$ per dzień. Metoda \texttt{findEarliestResourceSlot()} wykorzystuje \texttt{nextSetBit()} do~zlokalizowania pierwszego zajętego dnia i~\texttt{nextClearBit()} do~przeskoczenia bloku zajętości:
+
+\begin{verbatim}
+int candidate = earliest;
+while (safety++ < MAX_HORIZON_DAYS) {
+    int nextBusy = bits.nextSetBit(candidate);
+    if (nextBusy < 0 || nextBusy >= candidate + duration)
+        return candidate; // znaleziono wolny slot
+    candidate = bits.nextClearBit(nextBusy); // skok za zajętość
+}
+\end{verbatim}
+
+\subsubsection{Faza 4: Obliczenie metryk}
+
+\begin{itemize}
+    \item Opóźnienie: $T_j = \max(0, C_j - d_j)$.
+    \item Ważone opóźnienie: $\sum_{j=1}^{N} w_j T_j$.
+    \item Makespan: $C_{max} = \max_j C_j$.
+    \item Funkcja celu: $Z = \alpha \sum w_j T_j + \beta C_{max}$.
+    \item Konflikty zasobowe: iteracja po~wszystkich zadaniach z~wtórną weryfikacją BitSet.
+\end{itemize}
+
+\subsubsection{Złożoność obliczeniowa}
+
+\begin{itemize}
+    \item \textbf{Czasowa:} $O(N^2 + N \cdot H)$, gdzie $N$ = zadania, $H$ = horyzont [dni].
+    \item \textbf{Pamięciowa:} $O(N + K \cdot H)$, gdzie $K$ = unikalni wykonawcy. Każdy \texttt{BitSet} zajmuje $\lceil H/64 \rceil$ słów maszynowych.
+    \item \textbf{Bezpieczeństwo:} stała \texttt{MAX\_HORIZON\_DAYS = 3650} (10 lat) jako ograniczenie pętli.
+\end{itemize}
+
+\subsection{Strategie porównawcze}
+
+Dla~celów badawczych (Rozdział~5) zaimplementowano dwie dodatkowe strategie, współdzielące rdzeń SSGS ale różniące się regułą priorytetową:
+
+\begin{itemize}
+    \item \textbf{FIFO:} Sortowanie po~\texttt{originalStartOffset} (rosnąco).
+    \item \textbf{SPT:} Sortowanie po~\texttt{duration} (rosnąco).
+\end{itemize}
+
+Wszystkie trzy strategie gwarantują zerowe konflikty zasobowe.
+
+\subsection{Mapowanie wag priorytetów}
+
+\begin{table}[H]
+\centering
+\caption{Mapowanie priorytetów na~wagi $w_j$ modelu MORCPSP}
+\label{tab:priority_weights}
+\begin{tabular}{|l|c|c|l|}
+\hline
+\textbf{Priorytet} & \textbf{getWeight()} & $w_j$ & \textbf{Uzasadnienie} \\ \hline
+LOWEST & 1 & 1 & Zadania opcjonalne \\ \hline
+LOW & 2 & 3 & Niska istotność \\ \hline
+MEDIUM & 3 & 5 & Typowe zadania \\ \hline
+HIGH & 4 & 8 & Ważne dla~sprintu \\ \hline
+HIGHEST & 5 & 10 & Krytyczne dla~biznesu \\ \hline
+\end{tabular}
+\end{table}
+
+Nieliniowe mapowanie ($w_j \neq 2 \cdot \text{getWeight()}$) odzwierciedla praktykę, w~której zadania krytyczne mają \textit{nieproporcjonalnie} większe znaczenie.
+
+\subsection{Serwis optymalizacyjny (OptimizationService)}
+
+Serwis Spring orkiestrujący przepływ danych:
+
+\begin{enumerate}
+    \item \textbf{Autoryzacja:} Weryfikacja \texttt{hasAccess(userId)} dla~każdego projektu.
+    \item \textbf{Pobieranie hurtowe:} \texttt{findByProjectIdsWithDetails()} z~grafem encji (jedno zapytanie SQL).
+    \item \textbf{Wzbogacenie CPM:} Oznaczenie \texttt{isCritical} metodą ścieżki krytycznej.
+    \item \textbf{Ustalenie horyzontu:} $T_0 = \min_j(\text{startDate}_j)$ --- zapobiega przesuwaniu zadań z~przeszłości.
+    \item \textbf{Ewaluacja:} \texttt{evaluateOriginal()} --- metryki bieżącego harmonogramu (z~konfliktami).
+    \item \textbf{Optymalizacja:} \texttt{optimize()} --- metryki po~optymalizacji (bez~konfliktów).
+    \item \textbf{Budowa sugestii:} Porównanie dat oryginalnych z~sugerowanymi.
+\end{enumerate}
+
+Adnotacja \texttt{@Transactional(readOnly = true)} zapewnia otwartą sesję Hibernate bez zapisu. Metoda \texttt{applyOptimization()} z~\texttt{@Transactional(rollbackFor = Exception.class)} implementuje atomową aktualizację --- albo~wszystkie sugestie, albo~żadna.
+
+\subsection{Kontroler REST (OptimizationController)}
+
+\begin{table}[H]
+\centering
+\caption{Endpointy modułu optymalizacyjnego}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Metoda} & \textbf{Ścieżka} & \textbf{Opis} & \textbf{Zapis} \\ \hline
+POST & /api/optimization/simulate & Symulacja SSGS & Nie \\ \hline
+POST & /api/optimization/apply & Zastosowanie sugestii & Tak \\ \hline
+\end{tabular}
+\end{table}
+
+Domyślne wartości: $\alpha = 0{,}8$, $\beta = 0{,}2$ (konfigurowalne: \texttt{optimization.default-alpha/beta}).
+
+% ========================================================================
+\section{Warstwa klienta (Frontend)}
+% ========================================================================
+
+\subsection{Routing i~ochrona tras}
+
+Aplikacja definiuje 6~tras z~podziałem na~publiczne i~chronione:
+
+\begin{verbatim}
+/              → AuthPage (rejestracja) — publiczna
+/login         → AuthPage (logowanie) — publiczna
+/register      → AuthPage (rejestracja) — publiczna
+/dashboard     → DashboardPage — chroniona (JWT)
+/projects      → ProjectsPage — chroniona (JWT)
+*              → przekierowanie na /
+\end{verbatim}
+
+Komponenty \texttt{ProtectedRoute} i~\texttt{PublicRoute} weryfikują stan \texttt{user} z~\texttt{DataContext}. Trasy chronione wymagają zalogowanego użytkownika; publiczne przekierowują zalogowanych na~\texttt{/dashboard}. Ładowanie leniwe (\texttt{React.lazy + Suspense}) realizuje dzielenie kodu (\textit{code splitting}).
+
+\subsection{Zarządzanie stanem (DataContext)}
+
+Centralny \texttt{React Context} przechowuje stan aplikacji:
+
+\begin{verbatim}
+{
+    user,                 // zalogowany użytkownik
+    projects,             // tablica projektów z zadaniami
+    notifications,        // tablica powiadomień
+    refreshProjects(),    // odświeżenie po mutacji
+    createTask(), updateTask(), deleteTask(),
+    createProject(), updateProject(), deleteProject(),
+    refreshNotifications() // polling co 30 sekund
+}
+\end{verbatim}
+
+\textbf{Wzorzec mutacji:} Każda operacja CRUD wywołuje endpoint REST, a~po~sukcesie automatycznie \texttt{refreshProjects()} --- zapewnia spójność widoku z~bazą danych.
+
+\textbf{Polling powiadomień:} Co~30~sekund z~wykładniczym wycofywaniem (\textit{exponential backoff}) przy błędach (max 5~minut). Zatrzymywany gdy karta przeglądarki jest niewidoczna (Visibility API).
+
+\subsection{Hooki niestandardowe}
+
+\subsubsection{useTaskFiltering --- filtrowanie i~sortowanie}
+
+Hook implementujący 6~typów filtrów z~pełną memoizacją:
+
+\begin{itemize}
+    \item \textbf{Filtry URL:} \texttt{projectKey}, \texttt{critical=true}, \texttt{delayed=true}, \texttt{upcomingDeadline=true}.
+    \item \textbf{Filtry stanu:} etykiety, wykonawca, daty, priorytet, status opóźnienia.
+    \item \textbf{Filtr ``przypisane do mnie'':} Porównanie \texttt{task.assignee} z~\texttt{user.email}.
+    \item \textbf{Wyszukiwanie:} Podciąg w~\texttt{task.summary} (case-insensitive).
+    \item \textbf{Sortowanie:} Po~dowolnym polu z~obsługą typów: data, priorytet (mapowany na~liczbę), tekst, boolean.
+\end{itemize}
+
+Zwraca: \texttt{filteredTasks}, \texttt{filteredTaskIds} (Set), \texttt{filteredProjectKeys} (Set), \texttt{hasActiveFilters()}.
+
+\subsubsection{useTimelineResize --- przeciąganie pasków Gantta}
+
+Hook obsługujący zmianę dat zadań przez przeciąganie krawędzi pasków na~osi czasu:
+
+\begin{itemize}
+    \item \textbf{Konwersja pikseli na~dni:} \texttt{deltaDays = Math.round((clientX - startX) / dayWidth)}.
+    \item \textbf{Globalne nasłuchiwanie:} \texttt{mousemove} i~\texttt{mouseup} na~\texttt{document} (nie na~elemencie).
+    \item \textbf{Debouncing kliknięcia:} \texttt{wasResizingRef} z~timeoutem 100~ms zapobiega otwieraniu modala po~zakończeniu przeciągania.
+    \item \texttt{shouldPreventClick()} --- zwraca \texttt{true} jeśli trwa lub~niedawno zakończono przeciąganie.
+\end{itemize}
+
+\subsection{Integracja modułu optymalizacyjnego z~widokiem Gantta}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=0.8cm,
+    step/.style={draw, thick, rounded corners=4pt, minimum width=5cm,
+                 minimum height=0.9cm, font=\small, align=center, fill=#1},
+    arrow/.style={-{Stealth[length=5pt]}, thick},
+    choice/.style={draw, diamond, aspect=2, font=\small, thick,
+                   fill=orange!8, inner sep=2pt, align=center}
+]
+\node[step=blue!8] (s1) {1. Użytkownik klika\\``Optimize'' na osi czasu};
+\node[step=gray!8, below=0.7cm of s1] (s2) {2. Frontend wysyła\\POST /api/optimization/simulate};
+\node[step=green!8, below=0.7cm of s2] (s3) {3. Backend: pobranie zadań,\\CPM, SSGS optymalizacja};
+\node[step=gray!8, below=0.7cm of s3] (s4) {4. Odpowiedź: sugestie +\\metryki ``przed'' i ``po''};
+\node[step=purple!8, below=0.7cm of s4] (s5) {5. Wyświetlenie Ghost Bars\\+ panel metryk};
+\node[choice, below=0.8cm of s5] (s6) {Użytkownik\\decyduje};
+\node[step=green!12, below left=1cm and 1cm of s6] (s7a) {``Apply Schedule''\\POST /apply $\rightarrow$ zapis dat};
+\node[step=red!8, below right=1cm and 1cm of s6] (s7b) {``Dismiss''\\usunięcie duchów};
+\node[step=blue!8, below=0.7cm of s7a] (s8) {Odświeżenie widoku\\z nowymi datami};
+\draw[arrow] (s1) -- (s2);
+\draw[arrow] (s2) -- (s3);
+\draw[arrow] (s3) -- (s4);
+\draw[arrow] (s4) -- (s5);
+\draw[arrow] (s5) -- (s6);
+\draw[arrow] (s6) -| node[above left, font=\scriptsize] {Akceptuj} (s7a);
+\draw[arrow] (s6) -| node[above right, font=\scriptsize] {Odrzuć} (s7b);
+\draw[arrow] (s7a) -- (s8);
+\end{tikzpicture}
+\caption{Przepływ interakcji użytkownika z~modułem optymalizacji harmonogramu}
+\label{fig:optimization_flow}
+\end{figure}
+
+\subsubsection{Przycisk ``Optimize''}
+
+Umieszczony w~nagłówku osi czasu. Po~kliknięciu:
+\begin{enumerate}
+    \item Frontend gromadzi \texttt{projectKeys} ze~wszystkich widocznych projektów.
+    \item Wywołuje \texttt{POST /api/optimization/simulate} z~\texttt{\{projectKeys, alpha: 0.8, beta: 0.2\}}.
+    \item Podczas oczekiwania: animowany spinner z~etykietą ``Solving...''.
+    \item Po~odpowiedzi: buduje \texttt{Map<taskKey, suggestion>} dla~O(1) lookupów.
+    \item Jeśli \texttt{shiftedCount === 0}: toast ``Schedule is already optimal''.
+\end{enumerate}
+
+\subsubsection{``Ghost Bars'' --- sugerowane pozycje}
+
+Dla każdego przesuniętego zadania renderowany jest ``duch'' (\textit{ghost bar}):
+
+\begin{itemize}
+    \item \textbf{Wygląd:} Przerywana obwódka w~kolorze indygo z~półprzezroczystym wypełnieniem i~animacją migotania (\textit{shimmer}).
+    \item \textbf{Pozycja:} Obliczana identyczną funkcją \texttt{calculateTaskPosition()}, ale z~datami sugerowanymi.
+    \item \textbf{Linia łącząca:} Przerywana linia SVG od~oryginalnego paska do~ducha, wskazująca kierunek przesunięcia.
+    \item \textbf{Tooltip:} Najechanie wyświetla ``taskKey~$\bullet$~optimized'' z~sugerowanymi datami.
+    \item \textbf{Wydajność:} Sugestie w~\texttt{Map<taskKey, suggestion>} --- wyszukiwanie $O(1)$ per zadanie.
+\end{itemize}
+
+\subsubsection{Panel metryk (OptimizationMetrics)}
+
+Trzypoziomowy panel z~ciemnym gradientem tła:
+
+\begin{enumerate}
+    \item \textbf{Wiersz 1 --- Podsumowanie operacyjne:} Liczba przeniesionych zadań, średnie przesunięcie [dni], konflikty (przed $\rightarrow$ po), liczba dotkniętych osób, stosunek terminowych.
+
+    \item \textbf{Wiersz 2 --- Metryki MORCPSP:} Wzór $Z = \alpha \sum w_j T_j + \beta C_{max}$, wartości ``przed'' i~``po'' dla~ważonego opóźnienia, makespanu, wartości~$Z$. Ostrzeżenie o~niedopuszczalności oryginalnego harmonogramu, jeśli zawierał konflikty.
+
+    \item \textbf{Wiersz 3 --- Tabela szczegółowa (rozwijana):} Lista przeniesionych zadań posortowana malejąco wg~wielkości przesunięcia. Kolumny: klucz, daty oryginalne, daty sugerowane, przesunięcie [dni], opóźnienie, wykonawca, ścieżka krytyczna, priorytet.
+\end{enumerate}
+
+Animacje wejścia: \texttt{optPanelIn} (slide-down), \texttt{optCountUp} (staggered fade), \texttt{optPulseRing} (pulsujący wskaźnik aktywności), \texttt{optRowIn} (animowane wiersze tabeli).
+
+% ========================================================================
+\section{Konfiguracja i~wdrożenie}
+% ========================================================================
+
+\subsection{Konfiguracja CORS}
+
+\begin{verbatim}
+registry.addMapping("/**")
+    .allowedOrigins("http://localhost:3000")
+    .allowedMethods("GET","POST","PUT","DELETE","OPTIONS","PATCH")
+    .allowCredentials(true)
+    .exposedHeaders("Set-Cookie", "X-CSRF-Token")
+    .maxAge(600);
+\end{verbatim}
+
+Flaga \texttt{allowCredentials(true)} w~połączeniu z~\texttt{withCredentials: true} w~Axios umożliwia transmisję ciasteczek \texttt{HttpOnly} między domenami.
+
+\subsection{Pula połączeń bazodanowych}
+
+\begin{table}[H]
+\centering
+\caption{Parametry puli połączeń HikariCP}
+\begin{tabular}{|l|c|l|}
+\hline
+\textbf{Parametr} & \textbf{Wartość} & \textbf{Uzasadnienie} \\ \hline
+minimum-idle & 5 & Gotowość na~typowe obciążenie \\ \hline
+maximum-pool-size & 20 & Formuła: $2 \times \text{rdzenie} + \text{dyski}$ \\ \hline
+idle-timeout & 300~s & Zwalnianie nieużywanych połączeń \\ \hline
+max-lifetime & 1200~s & Rotacja przed timeout PostgreSQL \\ \hline
+cachePrepStmts & true & Cache przygotowanych zapytań \\ \hline
+prepStmtCacheSize & 250 & Rozmiar cache SQL \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Zadania cykliczne}
+\label{sec:scheduled_tasks}
+
+Klasa \texttt{ScheduledTasks} realizuje automatyczne czyszczenie:
+
+\begin{verbatim}
+@Scheduled(fixedDelay = 3600000, initialDelay = 60000)
+public void cleanupExpiredRefreshTokens() {
+    tokenService.cleanupExpiredTokens();
+}
+\end{verbatim}
+
+Interwał: 1~godzina (po~zakończeniu poprzedniego), opóźnienie startowe: 1~minuta. Usuwa wygasłe rekordy \texttt{RefreshToken} z~bazy.
+
+% ========================================================================
+\section{Testowanie}
+% ========================================================================
+
+System pokryty jest automatycznymi testami na~dwóch poziomach:
+
+\subsection{Testy jednostkowe}
+
+\begin{itemize}
+    \item \textbf{ScheduleOptimizerTest} (75+ testów): Weryfikacja poprawności algorytmu SSGS w~22~grupach tematycznych: obsługa null/pustych danych, konflikty zasobowe, ograniczenia kolejnościowe, grafy diamentowe, zadania ukończone, funkcja celu, mapowanie priorytetów, konwersja dat, scenariusze złożone (20--50~zadań), przypadki brzegowe, zależności cykliczne, stabilność.
+
+    \item \textbf{ScheduleOptimizerExperimentTest} (10 eksperymentów): Porównanie FIFO/SPT/MORCPSP na~30~losowych ziarnach, analiza wrażliwości $\alpha/\beta$, skalowalność do~2000~zadań, wpływ rozkładu priorytetów.
+
+    \item \textbf{TokenServiceTest} (22 testy): Generowanie JWT, walidacja podpisu, odświeżanie, ciasteczka.
+
+    \item \textbf{AuthServiceTest} (15 testów): Logowanie, nieprawidłowe dane, odporność na~ataki czasowe.
+
+    \item \textbf{JwtAuthenticationFilterTest} (16 testów): Endpointy publiczne, ochrona, odpowiedzi 401.
+
+    \item \textbf{CsrfProtectionFilterTest} (18 testów): Walidacja tokenów CSRF, bezpieczne metody.
+
+    \item \textbf{ValidationUtilTest} (21 testów): Walidacja email, hasła, nazw, znaków specjalnych.
+\end{itemize}
+
+Łącznie: \textbf{ponad 180 testów} z~wykorzystaniem JUnit~5, Mockito i~bazy H2 w~trybie \texttt{MODE=PostgreSQL}.
+
+\subsection{Testy integracyjne}
+
+Baza H2 konfigurowana jest z~automatycznym schematem \texttt{create-drop}, co~zapewnia izolację między uruchomieniami:
+
+\begin{verbatim}
+# application-test.properties
+spring.datasource.url=jdbc:h2:mem:testdb;MODE=PostgreSQL
+spring.jpa.hibernate.ddl-auto=create-drop
+\end{verbatim}
