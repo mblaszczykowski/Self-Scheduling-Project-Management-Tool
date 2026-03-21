@@ -109,24 +109,24 @@ const FilterBar = ({
     const filterButtonClass = (isActive) =>
         'flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-colors '
         + (isActive
-            ? 'bg-slate-100 border-slate-300'
-            : 'bg-white border-slate-200 hover:bg-slate-50');
+            ? 'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600'
+            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700');
 
     const dropdownOptionClass = (isActive) =>
-        'w-full px-3 py-1.5 text-left text-sm hover:bg-slate-50 '
-        + (isActive ? 'bg-slate-100 font-medium' : '');
+        'w-full px-3 py-1.5 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors '
+        + (isActive ? 'bg-slate-100 dark:bg-slate-700 font-medium' : '');
 
     const dropdownClass =
-        'absolute top-full left-0 mt-1 bg-white border border-slate-200'
-        + ' rounded-lg shadow-lg z-50';
+        'absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'
+        + ' rounded-xl shadow-lg z-50';
 
     return (
         <div
-            className="flex-1 bg-white rounded-xl border border-slate-200 px-3 py-2"
+            className="flex-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2"
             ref={filterRef}
         >
             <div className="flex flex-wrap items-center gap-1">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-2">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mr-2">
                     Filters
                 </span>
 
@@ -139,7 +139,7 @@ const FilterBar = ({
                     >
                         <FolderIcon className={iconClass} />
                         {projectKeyFilter && (
-                            <span className="text-xs font-medium text-slate-700">
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-200">
                                 {projects.find(p => p.projectKey === projectKeyFilter)?.summary
                                     || projectKeyFilter}
                             </span>
@@ -147,8 +147,8 @@ const FilterBar = ({
                     </button>
                     {openFilterDropdown === 'project' && (
                         <div className={`${dropdownClass} min-w-[180px] max-h-64 overflow-y-auto`}>
-                            <div className="px-3 py-2 border-b border-slate-100 bg-slate-50 rounded-t-lg">
-                                <span className="text-xs font-semibold text-slate-600">Project</span>
+                            <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 rounded-t-xl">
+                                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Project</span>
                             </div>
                             <div className="py-1">
                                 <button
@@ -191,7 +191,7 @@ const FilterBar = ({
                         >
                             {icon}
                             {filters[field] && filters[field] !== 'All' && (
-                                <span className="text-xs font-medium text-slate-700 whitespace-nowrap">
+                                <span className="text-xs font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
                                     {options.find(o => o.value === filters[field])?.label
                                         || filters[field]}
                                 </span>
@@ -202,10 +202,10 @@ const FilterBar = ({
                                 `${dropdownClass} min-w-[150px] max-h-64 overflow-y-auto`
                             }>
                                 <div className={
-                                    'px-3 py-2 border-b border-slate-100'
-                                    + ' bg-slate-50 rounded-t-lg'
+                                    'px-3 py-2 border-b border-slate-100 dark:border-slate-700'
+                                    + ' bg-slate-50 dark:bg-slate-800/80 rounded-t-xl'
                                 }>
-                                    <span className="text-xs font-semibold text-slate-600">
+                                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                                         {label}
                                     </span>
                                 </div>
@@ -251,15 +251,15 @@ const FilterBar = ({
                         >
                             {icon}
                             {filters[field] && (
-                                <span className="text-xs font-medium text-slate-700 whitespace-nowrap">
+                                <span className="text-xs font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
                                     {filters[field]}
                                 </span>
                             )}
                         </button>
                         {openFilterDropdown === field && (
                             <div className={`${dropdownClass} p-2`}>
-                                <div className="px-1 pb-2 mb-2 border-b border-slate-100">
-                                    <span className="text-xs font-semibold text-slate-600">
+                                <div className="px-1 pb-2 mb-2 border-b border-slate-100 dark:border-slate-700">
+                                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                                         {label}
                                     </span>
                                 </div>
@@ -271,9 +271,9 @@ const FilterBar = ({
                                         if (e.target.value) onFilterDropdownToggle(null);
                                     }}
                                     className={
-                                        'px-2 py-1.5 bg-white border border-slate-200'
-                                        + ' rounded text-sm text-slate-700'
-                                        + ' focus:outline-none focus:ring-1 focus:ring-slate-900'
+                                        'px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'
+                                        + ' rounded-lg text-sm text-slate-700 dark:text-slate-200'
+                                        + ' focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500'
                                     }
                                     autoFocus
                                 />
@@ -285,7 +285,7 @@ const FilterBar = ({
                                         }}
                                         className={
                                             'mt-1.5 w-full px-2 py-1 text-xs'
-                                            + ' text-slate-600 hover:bg-slate-100 rounded'
+                                            + ' text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors'
                                         }
                                     >
                                         Clear
@@ -296,7 +296,7 @@ const FilterBar = ({
                     </div>
                 ))}
 
-                <div className="w-px h-6 bg-slate-200 mx-1" />
+                <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1" />
 
                 <div className="relative">
                     <button
@@ -307,15 +307,15 @@ const FilterBar = ({
                     >
                         <SearchIcon className={iconClass} />
                         {searchInput && (
-                            <span className="text-xs font-medium text-slate-700 whitespace-nowrap">
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
                                 {searchInput}
                             </span>
                         )}
                     </button>
                     {openFilterDropdown === 'search' && (
                         <div className={`${dropdownClass} p-2`}>
-                            <div className="px-1 pb-2 mb-2 border-b border-slate-100">
-                                <span className="text-xs font-semibold text-slate-600">
+                            <div className="px-1 pb-2 mb-2 border-b border-slate-100 dark:border-slate-700">
+                                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                                     Search
                                 </span>
                             </div>
@@ -327,10 +327,10 @@ const FilterBar = ({
                                 onChange={e => onSearchInputChange(e.target.value)}
                                 className={
                                     'px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'
-                                    + ' rounded text-sm text-slate-700 dark:text-slate-200'
+                                    + ' rounded-lg text-sm text-slate-700 dark:text-slate-200'
                                     + ' placeholder-slate-400 dark:placeholder-slate-500'
                                     + ' focus:outline-none focus:ring-1'
-                                    + ' focus:ring-slate-900 dark:focus:ring-slate-400 w-40'
+                                    + ' focus:ring-slate-400 dark:focus:ring-slate-500 w-40'
                                 }
                                 autoFocus
                             />
@@ -346,7 +346,7 @@ const FilterBar = ({
                 >
                     <UserCircleIcon className={iconClass} />
                     {assignedToMe && (
-                        <span className="text-xs font-medium text-slate-700 whitespace-nowrap">
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
                             Me
                         </span>
                     )}

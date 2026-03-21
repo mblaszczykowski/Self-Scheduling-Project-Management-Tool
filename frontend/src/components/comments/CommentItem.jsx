@@ -31,7 +31,7 @@ const CommentItem = React.memo(({
         lastname: comment.authorName?.split(' ')[1],
     };
 
-    const actionBtnClass = 'text-[11px] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors';
+    const actionBtnClass = 'text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors';
 
     return (
         <div
@@ -68,11 +68,11 @@ const CommentItem = React.memo(({
                         <>
                             <div className="group">
                                 <div className="flex items-baseline gap-1.5 mb-0.5">
-                                    <span className="font-medium text-slate-800 dark:text-slate-200 text-[13px]">
+                                    <span className="font-medium text-slate-800 dark:text-slate-200 text-sm">
                                         {comment.authorName}
                                     </span>
                                     <span
-                                        className="text-[11px] text-slate-400 dark:text-slate-500"
+                                        className="text-xs text-slate-400 dark:text-slate-500"
                                         title={new Date(comment.timestamp).toLocaleString()}
                                     >
                                         {formatDistanceToNow(
@@ -81,10 +81,10 @@ const CommentItem = React.memo(({
                                         )}
                                     </span>
                                     {comment.editedAt && (
-                                        <span className="text-[10px] text-slate-300 dark:text-slate-600">edited</span>
+                                        <span className="text-xs text-slate-300 dark:text-slate-600">edited</span>
                                     )}
                                 </div>
-                                <div className="text-[13px] text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                                <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
                                     {comment.content}
                                 </div>
 
@@ -103,7 +103,7 @@ const CommentItem = React.memo(({
                                         onHandleReactToComment(comment.id, 'LIKE')
                                     }
                                     className={
-                                        'flex items-center gap-0.5 text-[11px] transition-colors '
+                                        'flex items-center gap-0.5 text-xs transition-colors '
                                         + (comment.likedByCurrentUser
                                             ? 'text-slate-800 dark:text-slate-200 font-medium'
                                             : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')
@@ -121,7 +121,7 @@ const CommentItem = React.memo(({
                                         onHandleReactToComment(comment.id, 'DISLIKE')
                                     }
                                     className={
-                                        'flex items-center gap-0.5 text-[11px] transition-colors '
+                                        'flex items-center gap-0.5 text-xs transition-colors '
                                         + (comment.dislikedByCurrentUser
                                             ? 'text-red-500 font-medium'
                                             : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')
@@ -142,7 +142,7 @@ const CommentItem = React.memo(({
                                         Reply
                                     </button>
                                 ) : (
-                                    <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">max depth</span>
+                                    <span className="text-xs text-slate-300 dark:text-slate-600 italic">max depth</span>
                                 )}
                                 {isOwner && (
                                     <>

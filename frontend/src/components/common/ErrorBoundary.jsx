@@ -47,18 +47,18 @@ class ErrorBoundary extends React.Component {
                 return (
                     <div className="flex items-center justify-center py-12 px-4">
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 max-w-sm text-center">
-                            <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
-                                <AlertTriangleIcon className="w-5 h-5 text-red-600" />
+                            <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                <AlertTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400" />
                             </div>
-                            <h2 className="text-base font-semibold text-slate-800 mb-1">
+                            <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-1">
                                 Something went wrong
                             </h2>
-                            <p className="text-sm text-slate-500 mb-4">
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
                                 This section encountered an error.
                             </p>
                             <button
                                 onClick={this.handleRetry}
-                                className="px-3 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors"
+                                className="px-3 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
                             >
                                 Try Again
                             </button>
@@ -80,25 +80,25 @@ class ErrorBoundary extends React.Component {
             return (
                 <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-lg max-w-md text-center">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
-                            <AlertTriangleIcon className="w-8 h-8 text-red-600" />
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                            <AlertTriangleIcon className="w-8 h-8 text-red-600 dark:text-red-400" />
                         </div>
-                        <h1 className="text-xl font-semibold text-slate-800 mb-2">
+                        <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-2">
                             Something went wrong
                         </h1>
-                        <p className="text-slate-600 mb-6">
+                        <p className="text-slate-600 dark:text-slate-400 mb-6">
                             We encountered an unexpected error. Please try refreshing the page.
                         </p>
                         <div className="flex gap-3 justify-center">
                             <button
                                 onClick={this.handleReload}
-                                className="px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors"
+                                className="px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
                             >
                                 Refresh Page
                             </button>
                             <button
                                 onClick={this.handleGoHome}
-                                className="px-4 py-2.5 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors"
+                                className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                             >
                                 Go to Home
                             </button>

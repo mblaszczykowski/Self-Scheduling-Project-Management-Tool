@@ -65,9 +65,9 @@ const AttachmentUploader = ({
     return (
         <>
             <div
-                className={`border border-dashed rounded-md transition-colors ${
+                className={`border border-dashed rounded-lg transition-colors ${
                     isDragging
-                        ? 'border-slate-400 dark:border-indigo-500/50 bg-slate-50 dark:bg-indigo-950/10'
+                        ? 'border-slate-400 dark:border-blue-500/50 bg-slate-50 dark:bg-blue-950/10'
                         : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                 }`}
                 onDrop={handleDrop}
@@ -82,8 +82,8 @@ const AttachmentUploader = ({
                 )}
                 <label htmlFor={inputId} className="cursor-pointer flex items-center justify-center gap-2 py-3 px-3">
                     <HiOutlineCloudUpload className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                    <span className="text-[12px] text-slate-400 dark:text-slate-500">{label}</span>
-                    <span className="text-[11px] text-slate-300 dark:text-slate-600">(max 5MB)</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">{label}</span>
+                    <span className="text-xs text-slate-300 dark:text-slate-600">(max 5MB)</span>
                     <input
                         type="file"
                         id={inputId}

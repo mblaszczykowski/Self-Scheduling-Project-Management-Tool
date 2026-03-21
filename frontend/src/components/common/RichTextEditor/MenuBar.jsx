@@ -50,7 +50,7 @@ const MenuBar = ({ editor }) => {
                                 isActive={isActive(item)}
                                 title={item.title}
                             >
-                                {item.icon ? <item.icon className="w-3 h-3" /> : <span className="text-[11px] font-semibold">{item.label}</span>}
+                                {item.icon ? <item.icon className="w-3 h-3" /> : <span className="text-xs font-semibold">{item.label}</span>}
                             </MenuButton>
                         ))}
                     </div>

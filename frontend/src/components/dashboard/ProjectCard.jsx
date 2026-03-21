@@ -55,7 +55,7 @@ const ProjectCard = ({
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                             <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{project.projectKey}</span>
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${health.bg} ${health.color}`}>
+                            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${health.bg} ${health.color}`}>
                                 {health.label}
                             </span>
                         </div>
@@ -109,13 +109,13 @@ const ProjectCard = ({
             <div className="px-5 pb-5">
                 <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-0.5 uppercase tracking-wide">Start</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 uppercase tracking-wide">Start</p>
                         <p className="text-sm font-medium text-slate-900 dark:text-white">
                             {project.projectStartDate ? formatShortDate(project.projectStartDate) : '\u2014'}
                         </p>
                     </div>
                     <div>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-0.5 uppercase tracking-wide">Due</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 uppercase tracking-wide">Due</p>
                         <p className="text-sm font-medium text-slate-900 dark:text-white">
                             {project.projectDueDate ? formatShortDate(project.projectDueDate) : '\u2014'}
                         </p>

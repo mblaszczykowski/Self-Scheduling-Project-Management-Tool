@@ -108,7 +108,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
         >
             <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 rounded-t-xl">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-bold text-slate-900">Account Settings</h2>
+                    <h2 className="text-xl font-semibold text-slate-900">Account Settings</h2>
                     <button
                         onClick={handleClose}
                         className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -137,7 +137,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                 <div className="flex-1">
                                     <label className="block">
                                         <span
-                                            className="text-sm font-medium text-slate-700 mb-1 block"
+                                            className="text-xs font-medium text-slate-700 mb-1 block"
                                         >
                                             Profile Photo
                                         </span>
@@ -155,7 +155,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label htmlFor="firstname" className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    <label htmlFor="firstname" className="block text-xs font-medium text-slate-700 mb-1.5">
                                         First Name
                                     </label>
                                     <Field
@@ -167,7 +167,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                     <ErrorMessage name="firstname" component="div" className="text-red-500 text-xs mt-1" />
                                 </div>
                                 <div>
-                                    <label htmlFor="lastname" className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    <label htmlFor="lastname" className="block text-xs font-medium text-slate-700 mb-1.5">
                                         Last Name
                                     </label>
                                     <Field
@@ -181,7 +181,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                             </div>
 
                             <div>
-                                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5">
+                                <label htmlFor="email" className="block text-xs font-medium text-slate-700 mb-1.5">
                                     Email
                                 </label>
                                 <Field
@@ -194,10 +194,10 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                             </div>
 
                             <div className="pt-4 border-t border-slate-200">
-                                <h3 className="text-sm font-semibold text-slate-800 mb-4">Change Password</h3>
+                                <h3 className="text-sm font-semibold text-slate-900 mb-4">Change Password</h3>
                                 <div className="space-y-4">
                                     <div>
-                                        <label htmlFor="currentPassword" className="block text-sm font-medium text-slate-700 mb-1.5">
+                                        <label htmlFor="currentPassword" className="block text-xs font-medium text-slate-700 mb-1.5">
                                             Current Password
                                         </label>
                                         <Field
@@ -210,7 +210,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label htmlFor="newPassword" className="block text-sm font-medium text-slate-700 mb-1.5">
+                                            <label htmlFor="newPassword" className="block text-xs font-medium text-slate-700 mb-1.5">
                                                 New Password
                                             </label>
                                             <Field
@@ -222,7 +222,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                             <ErrorMessage name="newPassword" component="div" className="text-red-500 text-xs mt-1" />
                                         </div>
                                         <div>
-                                            <label htmlFor="confirmNewPassword" className="block text-sm font-medium text-slate-700 mb-1.5">
+                                            <label htmlFor="confirmNewPassword" className="block text-xs font-medium text-slate-700 mb-1.5">
                                                 Confirm Password
                                             </label>
                                             <Field

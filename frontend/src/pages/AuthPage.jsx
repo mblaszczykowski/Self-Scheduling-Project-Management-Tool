@@ -96,11 +96,11 @@ const GanttChart = () => {
                         className="group text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 flex items-center gap-1.5 text-white overflow-hidden"
                         style={{
                             background: showOptimization
-                                ? 'linear-gradient(135deg, #4338ca, #6366f1)'
-                                : 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                                ? 'linear-gradient(135deg, #2563eb, #3b82f6)'
+                                : 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
                             boxShadow: showOptimization
-                                ? '0 0 12px rgba(99,102,241,0.3)'
-                                : '0 1px 3px rgba(79,70,229,0.3)',
+                                ? '0 0 12px rgba(59,130,246,0.3)'
+                                : '0 1px 3px rgba(37,99,235,0.3)',
                         }}
                     >
                         <svg width="10" height="10" viewBox="0 0 11 11" fill="none" className={`flex-shrink-0 transition-transform duration-300 ${showOptimization ? 'rotate-90' : ''}`}>
@@ -231,13 +231,13 @@ const GanttChart = () => {
                                                     <svg className="absolute pointer-events-none" style={{ left: 0, top: 0, width: '100%', height: '100%', zIndex: 1, overflow: 'visible' }}>
                                                         <defs>
                                                             <marker id={`ghost-arr-${task.key}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                                                                <polygon points="0 0, 6 3, 0 6" fill="rgba(99,102,241,0.55)" />
+                                                                <polygon points="0 0, 6 3, 0 6" fill="rgba(59,130,246,0.55)" />
                                                             </marker>
                                                         </defs>
                                                         <line
                                                             x1={`${task.left + task.w}%`} y1="50%"
                                                             x2={`${task.ghost.left}%`} y2="50%"
-                                                            stroke="rgba(99,102,241,0.5)" strokeWidth="1.5" strokeDasharray="4 3"
+                                                            stroke="rgba(59,130,246,0.5)" strokeWidth="1.5" strokeDasharray="4 3"
                                                             markerEnd={`url(#ghost-arr-${task.key})`}
                                                         />
                                                     </svg>
@@ -246,8 +246,8 @@ const GanttChart = () => {
                                                         style={{
                                                             left: `${task.ghost.left}%`,
                                                             width: `${task.ghost.w}%`,
-                                                            border: '1.5px dashed rgba(129,140,248,0.6)',
-                                                            boxShadow: '0 0 8px rgba(129,140,248,0.12)',
+                                                            border: '1.5px dashed rgba(96,165,250,0.6)',
+                                                            boxShadow: '0 0 8px rgba(96,165,250,0.12)',
                                                         }}
                                                     />
                                                 </>
@@ -297,7 +297,7 @@ const GanttChart = () => {
                 <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" />{activeTasks} active</span>
                 <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500" />{totalTasks - doneTasks - activeTasks} upcoming</span>
                 {showOptimization && (
-                    <span className="ml-auto text-indigo-600 font-semibold hidden sm:inline">
+                    <span className="ml-auto text-blue-600 font-semibold hidden sm:inline">
                         &#10022; {ghostCount} tasks optimized
                     </span>
                 )}
@@ -342,13 +342,13 @@ export default function AuthPage({ show }) {
 
             {/* Ambient glows */}
             <div className="absolute top-[-5%] left-[10%] w-[500px] h-[500px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%)' }} />
-            <div className="absolute bottom-[-10%] right-[5%] w-[600px] h-[600px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.04) 0%, transparent 70%)' }} />
+            <div className="absolute bottom-[-10%] right-[5%] w-[600px] h-[600px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.04) 0%, transparent 70%)' }} />
 
             {/* ── Navigation ── */}
             <nav className="anim-in anim-d1 relative z-20 flex items-center justify-between px-6 lg:px-12 py-5">
                 <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                        <div className="w-3.5 h-3.5 bg-white rounded-[3px]" />
+                        <div className="w-3.5 h-3.5 bg-white rounded" />
                     </div>
                     <span className="text-sm font-semibold text-[var(--text-primary)] tracking-tight">Flowlink</span>
                 </div>
@@ -384,7 +384,7 @@ export default function AuthPage({ show }) {
                     <div className="flex-1 min-w-0">
                         <h1 className="auth-heading anim-in anim-d2 text-[clamp(2.2rem,4.5vw,3.5rem)] leading-[1.08] tracking-tight text-[var(--text-primary)] mb-4">
                             Schedules that<br />
-                            <em className="italic text-indigo-600">optimize</em> themselves.
+                            <em className="italic text-blue-600">optimize</em> themselves.
                         </h1>
                         <p className="anim-in anim-d3 text-sm text-[var(--text-secondary)] leading-relaxed mb-8 max-w-lg">
                             Built-in RCPSP solver analyzes dependencies, resources, and deadlines

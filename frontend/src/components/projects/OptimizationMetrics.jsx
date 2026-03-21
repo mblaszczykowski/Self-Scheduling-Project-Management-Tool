@@ -74,7 +74,7 @@ const StatCard = ({ value, label, sublabel, accent = 'emerald', delay = 0 }) => 
             style={{ animation: `optFadeUp 0.4s ${delay}ms cubic-bezier(0.22, 1, 0.36, 1) both` }}
         >
             <span className="text-2xl font-bold tabular-nums leading-none tracking-tight">{value}</span>
-            <span className="text-[11px] mt-1 font-medium opacity-70">{label}</span>
+            <span className="text-xs mt-1 font-medium opacity-70">{label}</span>
             {sublabel && <span className="text-[10px] opacity-50">{sublabel}</span>}
         </div>
     );
@@ -282,7 +282,7 @@ const OptimizationMetrics = ({
                                 />
                             </div>
                             {lateAfter > 0 && (
-                                <p className="text-[11px] text-amber-600 mt-1">
+                                <p className="text-xs text-amber-600 mt-1">
                                     {lateAfter} {lateAfter === 1 ? 'task' : 'tasks'} still late — consider adjusting deadlines or adding resources
                                 </p>
                             )}
@@ -343,7 +343,7 @@ const OptimizationMetrics = ({
                         {showDetails && summary.shifted.length > 0 && (
                             <div className="mt-3 rounded-lg border border-slate-100 overflow-hidden">
                                 {/* Table header */}
-                                <div className="grid grid-cols-[1fr_120px_120px_55px_50px_80px] gap-3 px-4 py-2 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100">
+                                <div className="grid grid-cols-[1fr_120px_120px_55px_50px_80px] gap-3 px-4 py-2 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100">
                                     <span>Task</span>
                                     <span>Current</span>
                                     <span>Proposed</span>

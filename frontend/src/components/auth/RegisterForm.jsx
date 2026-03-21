@@ -148,7 +148,7 @@ function RegisterForm({ onToggleForm }) {
                     <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-[10px] transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50"
+                        className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm hover:shadow-md disabled:opacity-50"
                     >
                         {isSubmitting ? 'Creating account...' : 'Create account'}
                     </button>

@@ -39,12 +39,12 @@ export default function NotificationDropdown({
                 aria-expanded={isOpen}
                 aria-haspopup="true"
                 aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
-                className="relative p-2 bg-white dark:bg-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 focus:outline-none transition-colors border border-slate-200 dark:border-slate-700"
+                className="relative p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none transition-colors"
                 onClick={handleClick}
             >
-                <HiOutlineBell className="h-5 w-5 text-slate-600" aria-hidden="true" />
+                <HiOutlineBell className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                 {unreadCount > 0 && (
-                    <span aria-hidden="true" className="absolute -top-1 -right-1 inline-flex items-center justify-center h-5 w-5 text-xs font-semibold text-white bg-red-500 rounded-full">
+                    <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center h-4 w-4 text-xs font-bold text-white bg-red-500 rounded-full">
                         {unreadCount}
                     </span>
                 )}
@@ -57,7 +57,7 @@ export default function NotificationDropdown({
                             {unreadCount > 0 && (
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onMarkAsRead(); }}
-                                    className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+                                    className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                                 >
                                     Mark all read
                                 </button>
@@ -65,7 +65,7 @@ export default function NotificationDropdown({
                         </div>
 
                         {unreadNotifications.length > 0 && (
-                            <div className="border-b border-slate-100">
+                            <div className="border-b border-slate-100 dark:border-slate-700">
                                 <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800/50">
                                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Unread</span>
                                 </div>

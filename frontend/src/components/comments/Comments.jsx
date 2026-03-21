@@ -141,17 +141,17 @@ export default function Comments({ taskId, currentUserId }) {
         <div>
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
                         Comments
                     </span>
-                    <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                    <span className="text-xs font-mono text-slate-400 dark:text-slate-500">
                         {comments.length}
                     </span>
                 </div>
                 {!showCommentForm && (
                     <button
                         onClick={() => setShowCommentForm(true)}
-                        className="text-[12px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                        className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                     >
                         + Add
                     </button>
@@ -195,7 +195,7 @@ export default function Comments({ taskId, currentUserId }) {
                 </div>
             ) : (
                 <div className="py-6 text-center">
-                    <p className="text-[12px] text-slate-300 dark:text-slate-600">No comments yet</p>
+                    <p className="text-xs text-slate-300 dark:text-slate-600">No comments yet</p>
                 </div>
             )}
 

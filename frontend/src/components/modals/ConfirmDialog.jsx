@@ -30,11 +30,11 @@ const ConfirmDialog = ({
 
     return (
         <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-[80] flex items-center justify-center"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80] flex items-center justify-center"
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-[#1a1a2e] border border-slate-200 dark:border-slate-700/60 rounded-lg shadow-[0_16px_48px_-12px_rgba(0,0,0,0.25)] max-w-sm w-full mx-4 overflow-hidden"
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg max-w-sm w-full mx-4 overflow-hidden animate-scale-in"
                 onClick={e => e.stopPropagation()}
                 role="alertdialog"
                 aria-modal="true"
@@ -50,7 +50,7 @@ const ConfirmDialog = ({
                             <h3 id="confirm-dialog-title" className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                                 {title}
                             </h3>
-                            <p id="confirm-dialog-description" className="text-[13px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                            <p id="confirm-dialog-description" className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                                 {message}
                             </p>
                         </div>
@@ -58,13 +58,13 @@ const ConfirmDialog = ({
                     <div className="flex justify-end gap-2 mt-4">
                         <button
                             onClick={onClose}
-                            className="px-3 py-1.5 text-[13px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                            className="px-3 py-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                         >
                             {cancelText}
                         </button>
                         <button
                             onClick={onConfirm}
-                            className={`px-3 py-1.5 text-[13px] font-semibold text-white rounded transition-colors ${styles.confirmBg}`}
+                            className={`px-3 py-1.5 text-sm font-semibold text-white rounded-lg transition-colors ${styles.confirmBg}`}
                         >
                             {confirmText}
                         </button>

@@ -116,11 +116,11 @@ const TimelineHeader = ({
                                 title="Optimize schedule across all projects (RCPSP solver)"
                                 style={{
                                     background: optimization?.loading
-                                        ? 'linear-gradient(135deg, #4338ca, #6366f1)'
-                                        : 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                                        ? 'linear-gradient(135deg, #2563eb, #3b82f6)'
+                                        : 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
                                     boxShadow: optimization?.loading
-                                        ? '0 0 12px rgba(99,102,241,0.3)'
-                                        : '0 1px 3px rgba(79,70,229,0.3)',
+                                        ? '0 0 12px rgba(59,130,246,0.3)'
+                                        : '0 1px 3px rgba(37,99,235,0.3)',
                                 }}
                             >
                                 {optimization?.loading ? (

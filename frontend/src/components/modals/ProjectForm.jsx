@@ -33,7 +33,7 @@ const ProjectForm = ({
 
     return (
         <>
-            <div className="flex-1 px-6 py-5 border-r border-slate-200 overflow-y-auto">
+            <div className="flex-1 px-6 py-5 border-r border-slate-200 dark:border-slate-700 overflow-y-auto">
                 <div className="mb-6">
                     <InputLabel htmlFor="summary" required>
                         Project Name
@@ -80,7 +80,7 @@ const ProjectForm = ({
                 </div>
             </div>
 
-            <div className="w-full md:w-[400px] shrink-0 px-6 py-5 overflow-y-auto bg-slate-50/50">
+            <div className="w-full md:w-[400px] shrink-0 px-6 py-5 overflow-y-auto bg-slate-50/50 dark:bg-slate-800/20">
                 <div className="space-y-5">
                     {modalMode === 'create' && (
                         <div>
@@ -120,25 +120,25 @@ const ProjectForm = ({
                                             key={m.id || m.email || i}
                                             className={
                                                 'flex items-center justify-between py-2 px-3'
-                                                + ' bg-white rounded-lg border border-slate-200'
-                                                + ' group hover:border-slate-300 transition-colors'
+                                                + ' bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700'
+                                                + ' group hover:border-slate-300 dark:hover:border-slate-600 transition-colors'
                                             }
                                         >
                                             <div className="flex items-center gap-2.5">
                                                 <Avatar user={m} size="sm" className="rounded-lg" />
                                                 <div className="min-w-0">
-                                                    <div className="text-xs font-medium text-slate-800 truncate">
+                                                    <div className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">
                                                         {m.firstname
                                                             ? `${m.firstname} ${m.lastname}`
                                                             : m.email}
                                                         {isMemberOwner && (
-                                                            <span className="ml-1.5 text-[10px] text-slate-400">
+                                                            <span className="ml-1.5 text-xs text-slate-400">
                                                                 (Owner)
                                                             </span>
                                                         )}
                                                     </div>
                                                     {m.firstname && (
-                                                        <div className="text-[10px] text-slate-400 truncate">
+                                                        <div className="text-xs text-slate-400 truncate">
                                                             {m.email}
                                                         </div>
                                                     )}
@@ -182,8 +182,8 @@ const ProjectForm = ({
                                     )}
                                     disabled={emailLoading}
                                     className={
-                                        'px-4 py-2.5 bg-slate-900 text-white rounded-lg'
-                                        + ' hover:bg-slate-800 transition-all text-sm'
+                                        'px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg'
+                                        + ' hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors text-sm'
                                         + ' font-semibold disabled:opacity-50'
                                     }
                                 >
@@ -211,8 +211,8 @@ const ProjectForm = ({
                                             key={depKey}
                                             className={
                                                 'inline-flex items-center gap-2 px-2.5 py-1'
-                                                + ' bg-white border border-slate-200'
-                                                + ' text-slate-700 rounded-lg text-xs font-semibold'
+                                                + ' bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700'
+                                                + ' text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold'
                                             }
                                         >
                                             <HiOutlineFolder className="w-3 h-3 text-slate-500" />

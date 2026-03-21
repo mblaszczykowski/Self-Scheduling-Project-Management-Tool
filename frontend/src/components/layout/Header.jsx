@@ -47,8 +47,8 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
             to={to}
             className={
                 location.pathname === to
-                    ? 'py-2 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-medium rounded-lg transition-colors'
-                    : 'py-2 px-4 text-slate-600 dark:text-slate-400 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors'
+                    ? 'py-1.5 px-3 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-medium rounded-lg transition-colors'
+                    : 'py-1.5 px-3 text-slate-500 dark:text-slate-400 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors'
             }
         >
             {children}
@@ -56,17 +56,17 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
     );
 
     return (
-        <header className="w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50">
-            <nav className="mx-auto px-6 lg:px-12 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-8">
+        <header className="w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-50">
+            <nav className="mx-auto px-4 lg:px-8 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-6">
                     <Link to="/dashboard" className="flex items-center">
-                        <div className="w-8 h-8 bg-slate-900 dark:bg-white rounded-lg flex items-center justify-center">
-                            <div className="w-4 h-4 bg-white dark:bg-slate-900 rounded" />
+                        <div className="w-7 h-7 bg-slate-900 dark:bg-white rounded-lg flex items-center justify-center">
+                            <div className="w-3.5 h-3.5 bg-white dark:bg-slate-900 rounded" />
                         </div>
-                        <span className="ml-3 text-lg font-semibold text-slate-900 dark:text-white">Flowlink</span>
+                        <span className="ml-2.5 text-sm font-semibold text-slate-900 dark:text-white tracking-tight">Flowlink</span>
                     </Link>
 
-                    <div className="hidden xl:flex items-center gap-1">
+                    <div className="hidden xl:flex items-center gap-0.5">
                         <NavLink to="/dashboard">Dashboard</NavLink>
                         <NavLink to="/projects">Projects</NavLink>
                         <CreateMenu
@@ -79,18 +79,18 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                     <button
                         onClick={toggleTheme}
-                        className="p-2 bg-white dark:bg-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
+                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                         aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                     >
                         {theme === 'dark' ? (
-                            <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                             </svg>
                         ) : (
-                            <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                             </svg>
                         )}
@@ -102,7 +102,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                         onClose={() => setNotificationsOpen(false)}
                         onMarkAsRead={handleMarkNotificationsAsRead}
                     />
-                    <div className="hidden xl:flex items-center gap-2">
+                    <div className="hidden xl:flex items-center gap-1">
                         <UserMenu
                             user={user}
                             onOpenAccountModal={() => setAccountModalOpen(true)}
@@ -114,12 +114,12 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                         aria-expanded={mobileMenuOpen}
                         aria-controls="mobile-menu"
                         aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-                        className="xl:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus:outline-none transition-colors"
+                        className="xl:hidden p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus:outline-none transition-colors"
                     >
                         {mobileMenuOpen ? (
-                            <HiOutlineX className="h-5 w-5 text-slate-600" aria-hidden="true" />
+                            <HiOutlineX className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                         ) : (
-                            <HiOutlineMenu className="h-5 w-5 text-slate-600" aria-hidden="true" />
+                            <HiOutlineMenu className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                         )}
                     </button>
                 </div>

@@ -266,7 +266,7 @@ const TaskListView = ({
                                                     : task.isUpcomingDeadline
                                                     ? 'bg-amber-100 text-amber-700'
                                                     : task.isDelayedByDependency
-                                                    ? 'bg-violet-100 text-violet-700'
+                                                    ? 'bg-blue-100 text-blue-700'
                                                     : 'bg-emerald-100 text-emerald-700'
                                             }`}
                                         >
@@ -277,7 +277,7 @@ const TaskListView = ({
                                                         : task.isUpcomingDeadline
                                                         ? 'bg-amber-500'
                                                         : task.isDelayedByDependency
-                                                        ? 'bg-violet-500'
+                                                        ? 'bg-blue-500'
                                                         : 'bg-emerald-500'
                                                 }`}
                                             />

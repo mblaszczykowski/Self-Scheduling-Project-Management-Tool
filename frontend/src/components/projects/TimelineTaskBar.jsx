@@ -34,7 +34,7 @@ const GhostTaskBar = ({ task, taskPosition, suggestion, timelineStart, onTooltip
                         y1="50%"
                         x2={goesRight ? arrowEndX - 2 : arrowEndX + ghostPos.width + 2}
                         y2="50%"
-                        stroke="rgba(129,140,248,0.35)"
+                        stroke="rgba(96,165,250,0.35)"
                         strokeWidth="1"
                         strokeDasharray="3 2"
                     />
@@ -43,7 +43,7 @@ const GhostTaskBar = ({ task, taskPosition, suggestion, timelineStart, onTooltip
                             ? `${arrowEndX - 2},${0} ${arrowEndX + 2},${0} ${arrowEndX},${0}`
                             : `${arrowEndX + ghostPos.width + 2},${0} ${arrowEndX + ghostPos.width - 2},${0} ${arrowEndX + ghostPos.width},${0}`
                         }
-                        fill="rgba(129,140,248,0.4)"
+                        fill="rgba(96,165,250,0.4)"
                         style={{ transform: 'translateY(calc(50% - 0px))' }}
                     />
                 </svg>
@@ -53,11 +53,11 @@ const GhostTaskBar = ({ task, taskPosition, suggestion, timelineStart, onTooltip
                 style={{
                     marginLeft: `${ghostPos.marginLeft}px`,
                     width: `${ghostPos.width}px`,
-                    background: 'linear-gradient(90deg, rgba(129,140,248,0.15), rgba(129,140,248,0.3), rgba(129,140,248,0.15))',
+                    background: 'linear-gradient(90deg, rgba(96,165,250,0.15), rgba(96,165,250,0.3), rgba(96,165,250,0.15))',
                     backgroundSize: '200% 100%',
                     animation: 'optGhostShimmer 2.5s ease-in-out infinite',
-                    border: '1.5px dashed rgba(129,140,248,0.6)',
-                    boxShadow: '0 0 8px rgba(129,140,248,0.12)',
+                    border: '1.5px dashed rgba(96,165,250,0.6)',
+                    boxShadow: '0 0 8px rgba(96,165,250,0.12)',
                 }}
                 onMouseEnter={(e) => onTooltipShow(e, {
                     type: 'task',

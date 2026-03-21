@@ -8,11 +8,11 @@ export default function UserMenu({
     onLogoutClick
 }) {
     return (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1">
             <button
                 type="button"
                 aria-label="Account settings"
-                className="p-2 bg-white rounded-lg hover:bg-slate-50 focus:outline-none transition-colors border border-slate-200"
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none transition-colors"
                 onClick={onOpenAccountModal}
             >
                 <Avatar user={user} size="xs" />
@@ -20,11 +20,11 @@ export default function UserMenu({
 
             <button
                 type="button"
-                className="p-2 inline-flex items-center text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                className="p-1.5 inline-flex items-center rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 onClick={onLogoutClick}
                 title="Log out"
             >
-                <HiOutlineLogout className="h-5 w-5" />
+                <HiOutlineLogout className="h-4 w-4" />
             </button>
         </div>
     );

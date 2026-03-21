@@ -43,12 +43,12 @@ const CommentForm = ({
                 ) : fileType === 'pdf' ? (
                     <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 hover:border-slate-300 transition-colors">
                         <HiOutlineDocumentText className="w-2.5 h-2.5 text-red-500" />
-                        <span className="text-[10px] text-slate-500 truncate max-w-[50px]">{fileName}</span>
+                        <span className="text-xs text-slate-500 truncate max-w-[50px]">{fileName}</span>
                     </div>
                 ) : (
                     <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 hover:border-slate-300 transition-colors">
                         <HiOutlineDocument className="w-2.5 h-2.5 text-slate-400" />
-                        <span className="text-[10px] text-slate-500 truncate max-w-[50px]">{fileName}</span>
+                        <span className="text-xs text-slate-500 truncate max-w-[50px]">{fileName}</span>
                     </div>
                 )}
                 <button
@@ -84,9 +84,9 @@ const CommentForm = ({
                         rows={2}
                         className={
                             'w-full px-3 py-2 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700'
-                            + ' rounded-md text-sm text-slate-700 dark:text-slate-200'
-                            + ' focus:ring-1 focus:ring-slate-400 dark:focus:ring-indigo-500/50'
-                            + ' focus:border-slate-400 dark:focus:border-indigo-500/50 focus:outline-none'
+                            + ' rounded-lg text-sm text-slate-700 dark:text-slate-200'
+                            + ' focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500'
+                            + ' focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none'
                             + ' transition-colors resize-none placeholder-slate-400 dark:placeholder-slate-500'
                         }
                         placeholder={
@@ -98,7 +98,7 @@ const CommentForm = ({
                     <ErrorMessage
                         name="content"
                         component="div"
-                        className="text-red-500 text-[11px]"
+                        className="text-red-500 text-xs"
                     />
 
                     <div className="flex items-center justify-between">
@@ -124,14 +124,14 @@ const CommentForm = ({
                             <button
                                 type="button"
                                 onClick={onCancel}
-                                className="px-2.5 py-1 text-[12px] font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                                className="px-2.5 py-1 text-xs font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="px-3 py-1 bg-slate-900 dark:bg-indigo-500 text-white rounded text-[12px] font-semibold hover:bg-slate-800 dark:hover:bg-indigo-400 transition-colors disabled:opacity-40"
+                                className="px-3 py-1 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors disabled:opacity-40"
                             >
                                 {isSubmitting ? '...' : buttonText}
                             </button>

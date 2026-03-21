@@ -18,7 +18,7 @@ const LoadingSpinner = () => (
     <div className="flex justify-center items-center h-screen bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
             <div className="w-10 h-10 bg-slate-900 dark:bg-white rounded-xl flex items-center justify-center mx-auto mb-4">
-                <div className="w-5 h-5 bg-white dark:bg-slate-900 rounded-[4px]" />
+                <div className="w-5 h-5 bg-white dark:bg-slate-900 rounded" />
             </div>
             <div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-white mx-auto" />
             <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading</p>
@@ -61,7 +61,7 @@ function AppRoutes() {
                 draggable={false}
                 pauseOnHover
                 theme="light"
-                style={{ marginTop: '4rem' }}
+                style={{ marginTop: '3rem' }}
             />
             <Routes>
                 <Route
