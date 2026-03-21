@@ -75,7 +75,7 @@ const TimelineHeader = ({
 
     return (
         <div
-            className="flex mb-3 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+            className="flex mb-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm"
             ref={headerRef}
             onScroll={syncScroll}
         >
@@ -102,7 +102,7 @@ const TimelineHeader = ({
                         {onScrollToToday && (
                             <button
                                 onClick={onScrollToToday}
-                                className="text-[10px] px-2 py-1 rounded-md font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                className="text-xs px-2.5 py-1 rounded-lg font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                                 title="Scroll to today"
                             >
                                 Today
@@ -112,7 +112,7 @@ const TimelineHeader = ({
                             <button
                                 onClick={onOptimize}
                                 disabled={optimization?.loading}
-                                className="group relative text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 disabled:opacity-60 flex items-center gap-1.5 text-white overflow-hidden"
+                                className="group relative text-xs px-3 py-1 rounded-lg font-semibold transition-all duration-200 disabled:opacity-60 flex items-center gap-1.5 text-white overflow-hidden"
                                 title="Optimize schedule across all projects (RCPSP solver)"
                                 style={{
                                     background: optimization?.loading

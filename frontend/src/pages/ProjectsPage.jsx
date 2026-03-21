@@ -270,8 +270,8 @@ const ProjectsPage = () => {
                 onCreateTask={() => openModal('task', 'create')}
             />
 
-            <div className="flex-grow flex flex-col px-4 lg:px-6 py-6">
-                <div className="mb-4 flex items-center gap-4 animate-[fadeInSlide_0.3s_ease-out_both]">
+            <div className="flex-grow flex flex-col px-6 lg:px-10 py-6">
+                <div className="mb-5 flex items-center gap-4 animate-[fadeInSlide_0.3s_ease-out_both]">
                     <FilterBar
                         projects={projects}
                         allTasks={allTasks}

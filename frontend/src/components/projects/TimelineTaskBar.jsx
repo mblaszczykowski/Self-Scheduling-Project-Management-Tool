@@ -111,8 +111,8 @@ const TimelineTaskBar = ({
         timelineStart
     );
 
-    const taskRowClass = `sticky left-0 z-10 bg-slate-50 dark:bg-slate-800/50 border-x border-b border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-all duration-200 ${
-        isLastTask ? 'rounded-b-lg' : ''
+    const taskRowClass = `sticky left-0 z-10 bg-slate-50 dark:bg-slate-800/50 border-x border-b border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/50 cursor-pointer transition-colors ${
+        isLastTask ? 'rounded-b-xl' : ''
     }`;
 
     const filteredDeps = task.dependencies?.filter(depKey => {

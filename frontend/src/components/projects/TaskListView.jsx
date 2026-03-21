@@ -64,7 +64,7 @@ const TaskListView = ({
             ? 'Try adjusting your filters to see more results.'
             : 'Create your first task to get started with tracking your work.';
         return (
-            <div className={'bg-white rounded-xl border border-slate-200'
+            <div className={'bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700'
                 + ' shadow-sm overflow-hidden flex-grow flex flex-col'}>
                 <EmptyState
                     variant={hasActiveFilters ? 'search' : 'table'}
@@ -77,19 +77,19 @@ const TaskListView = ({
     }
 
     return (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-grow flex flex-col">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-grow flex flex-col">
             <div className="overflow-x-auto flex-grow">
                 <table className="min-w-full">
-                    <thead className="bg-slate-50 sticky top-0 z-10">
-                        <tr className="border-b border-slate-200">
+                    <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-10">
+                        <tr className="border-b border-slate-200 dark:border-slate-700">
                             {columns.map(([field, label, width]) => {
                                 const isNonSortable = ['labels', 'dependencies'].includes(field);
                                 const isSorted = sortField === field;
-                                const baseClasses = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500';
+                                const baseClasses = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400';
                                 const sortableClasses = !isNonSortable
-                                    ? 'hover:text-slate-800 cursor-pointer select-none'
+                                    ? 'hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer select-none'
                                     : '';
-                                const sortedClasses = isSorted ? 'text-slate-800 bg-slate-100/50' : '';
+                                const sortedClasses = isSorted ? 'text-slate-800 dark:text-slate-200 bg-slate-100/50 dark:bg-slate-700/50' : '';
                                 const thClassName = `${baseClasses} ${width} ${sortableClasses} ${sortedClasses}`;
                                 const divClassName = `flex items-center gap-1.5 ${
                                     width.includes('text-center') ? 'justify-center' : ''
@@ -113,13 +113,13 @@ const TaskListView = ({
                             })}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                         {filteredTasks.map((task, index) => {
                             const project = projectKeyToProject
                                 ? projectKeyToProject.get(task.projectKey)
                                 : processedProjects.find(p => p.projectKey === task.projectKey);
-                            const rowClassName = `hover:bg-blue-50/50 cursor-pointer transition-colors group ${
-                                index % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
+                            const rowClassName = `hover:bg-blue-50/50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors group ${
+                                index % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/30 dark:bg-slate-800/50'
                             }`;
                             return (
                                 <tr
@@ -129,10 +129,10 @@ const TaskListView = ({
                                 >
                                     <td className="px-4 py-3">
                                         <div className="flex flex-col">
-                                            <span className="text-sm font-semibold text-slate-800 truncate">
+                                            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
                                                 {task.projectKey}
                                             </span>
-                                            <span className="text-xs text-slate-500 truncate max-w-[80px]">
+                                            <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[80px]">
                                                 {task.projectSummary}
                                             </span>
                                         </div>
@@ -140,14 +140,14 @@ const TaskListView = ({
                                     <td className="px-4 py-3">
                                         <span
                                             className={`text-sm font-bold ${
-                                                task.isCritical ? 'text-red-600' : 'text-slate-700'
+                                                task.isCritical ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'
                                             }`}
                                         >
                                             {task.taskKey}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3">
-                                        <span className="text-sm text-slate-700 line-clamp-2 leading-snug group-hover:text-slate-900">
+                                        <span className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 leading-snug group-hover:text-slate-900 dark:group-hover:text-white">
                                             {task.summary}
                                         </span>
                                     </td>
@@ -166,36 +166,36 @@ const TaskListView = ({
                                                 <div className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
                                                     {task.assignee.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                                                 </div>
-                                                <span className="text-sm text-slate-700 truncate">
+                                                <span className="text-sm text-slate-700 dark:text-slate-300 truncate">
                                                     {task.assignee}
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className="text-sm text-slate-400 italic">Unassigned</span>
+                                            <span className="text-sm text-slate-400 dark:text-slate-500 italic">Unassigned</span>
                                         )}
                                     </td>
                                     <td className="px-4 py-3">
-                                        <span className="text-sm text-slate-600 tabular-nums">
+                                        <span className="text-sm text-slate-600 dark:text-slate-400 tabular-nums">
                                             {task.startDate ? formatShortDate(task.startDate) : '-'}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3">
                                         <span
                                             className={`text-sm tabular-nums ${
-                                                task.isDelayed ? 'text-red-600 font-medium' : 'text-slate-600'
+                                                task.isDelayed ? 'text-red-600 dark:text-red-400 font-medium' : 'text-slate-600 dark:text-slate-400'
                                             }`}
                                         >
                                             {task.dueDate ? formatShortDate(task.dueDate) : '-'}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-center">
-                                        <span className="text-sm font-medium text-slate-700 tabular-nums">
+                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 tabular-nums">
                                             {task.duration !== 'N/A' ? task.duration : '-'}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2">
-                                            <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                            <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                                 <div
                                                     className={`h-full rounded-full transition-all ${
                                                         task.progress >= 100
@@ -207,7 +207,7 @@ const TaskListView = ({
                                                     style={{ width: `${Math.min(task.progress, 100)}%` }}
                                                 />
                                             </div>
-                                            <span className="text-xs font-semibold text-slate-600 w-8 text-right tabular-nums">
+                                            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 w-8 text-right tabular-nums">
                                                 {task.progress}%
                                             </span>
                                         </div>
@@ -296,13 +296,13 @@ const TaskListView = ({
                     </tbody>
                 </table>
             </div>
-            <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
+            <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
                 <div className="flex items-center justify-between">
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
                         Showing{' '}
-                        <span className="font-semibold text-slate-900">{filteredTasks.length}</span>{' '}
+                        <span className="font-semibold text-slate-900 dark:text-white">{filteredTasks.length}</span>{' '}
                         {filteredTasks.length === 1 ? 'task' : 'tasks'}
-                        {hasActiveFilters && <span className="text-slate-500"> (filtered)</span>}
+                        {hasActiveFilters && <span className="text-slate-500 dark:text-slate-500"> (filtered)</span>}
                     </p>
                 </div>
             </div>

@@ -42,12 +42,12 @@ const TimelineProjectRow = ({
     if (projectFilteredTasks.length === 0 && hasActiveFilters) return null;
 
     const projectContainerClass = isExpanded
-        ? 'rounded-t-lg border-b-0'
-        : 'rounded-lg';
+        ? 'rounded-t-xl border-b-0'
+        : 'rounded-xl';
     const sidebarBaseClass = 'sticky left-0 z-10 bg-white dark:bg-slate-800'
         + ' border border-slate-200 dark:border-slate-700 transition-all'
         + ' duration-200 hover:border-slate-300 dark:hover:border-slate-600'
-        + ' border-l-[3px] border-l-blue-500'
+        + ' border-l-[3px] border-l-blue-500 shadow-sm'
         + ` ${projectContainerClass}`;
 
     const tasksToRender = hasActiveFilters ? projectFilteredTasks : project.tasks;

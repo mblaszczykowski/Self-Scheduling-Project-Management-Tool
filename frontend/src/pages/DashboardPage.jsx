@@ -77,7 +77,7 @@ const DashboardPage = () => {
             {projectsLoading && <DashboardSkeleton />}
 
             {!projectsLoading && projectsError && (
-                <div className="px-8 lg:px-12 py-16 text-center">
+                <div className="px-6 lg:px-10 py-16 text-center">
                     <div className="w-14 h-14 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center mx-auto mb-4">
                         <AlertTriangleIcon className="w-7 h-7 text-red-600 dark:text-red-400" />
                     </div>
@@ -98,7 +98,7 @@ const DashboardPage = () => {
                         <DashboardHero user={user} stats={stats} />
                     </ErrorBoundary>
 
-                    <div className="px-8 lg:px-12 py-8">
+                    <div className="px-6 lg:px-10 py-8">
                         <div className="max-w-[1400px] mx-auto space-y-10">
                             <section className="animate-[fadeInSlide_0.4s_ease-out_0.1s_both]">
                                 <SectionHeader

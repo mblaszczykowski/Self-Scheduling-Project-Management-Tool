@@ -98,7 +98,7 @@ const TimelineView = ({
                 headerRef={headerRef}
                 syncScroll={syncScroll}
             />
-            <div className="space-y-2 overflow-auto flex-grow" ref={timelineRef} onScroll={syncScroll}>
+            <div className="space-y-2.5 overflow-auto flex-grow" ref={timelineRef} onScroll={syncScroll}>
                 {visibleProjects.map((project) => (
                     <TimelineProjectRow
                         key={project.projectKey}

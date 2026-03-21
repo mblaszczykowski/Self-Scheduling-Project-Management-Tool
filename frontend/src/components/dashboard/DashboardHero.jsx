@@ -28,7 +28,7 @@ const DashboardHero = ({ user, stats }) => {
                 </div>
             </div>
 
-            <div className="relative z-10 px-8 lg:px-12 py-10 lg:py-12">
+            <div className="relative z-10 px-6 lg:px-10 py-10 lg:py-12">
                 <div className="max-w-[1400px] mx-auto">
                     <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
                         <div>

@@ -61,7 +61,7 @@ function AppRoutes() {
                 draggable={false}
                 pauseOnHover
                 theme="light"
-                style={{ marginTop: '3rem' }}
+                style={{ marginTop: '3.5rem' }}
             />
             <Routes>
                 <Route

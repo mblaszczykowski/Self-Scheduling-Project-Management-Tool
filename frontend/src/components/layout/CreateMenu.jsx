@@ -29,7 +29,7 @@ export default function CreateMenu({
                 aria-expanded={isOpen}
                 aria-haspopup="menu"
                 aria-label="Create new item"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
             >
                 Create
                 <HiOutlineChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
