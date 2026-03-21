@@ -187,7 +187,7 @@ const TimelineTaskBar = ({
                     </div>
                 )}
             </div>
-            <div className="flex-1 flex items-center relative">
+            <div className="flex-1 flex items-center relative z-[3]">
                 <div
                     className={`absolute ${
                         task.isCritical
