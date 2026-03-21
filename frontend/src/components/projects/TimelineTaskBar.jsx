@@ -5,7 +5,6 @@ import {
     calculateTaskPosition,
 } from '../../util/helpers';
 import { AlertTriangleFilledIcon } from '../common/Icons';
-import DependencyArrow from './DependencyArrow';
 
 const GhostTaskBar = ({ task, taskPosition, suggestion, timelineStart, onTooltipShow, onTooltipMove, onTooltipHide }) => {
     const ghostPos = calculateTaskPosition(
@@ -49,7 +48,7 @@ const GhostTaskBar = ({ task, taskPosition, suggestion, timelineStart, onTooltip
                 </svg>
             )}
             <div
-                className="absolute h-3.5 rounded-full z-[2]"
+                className="absolute h-2.5 rounded-[3px] z-[2]"
                 style={{
                     marginLeft: `${ghostPos.marginLeft}px`,
                     width: `${ghostPos.width}px`,
@@ -114,18 +113,6 @@ const TimelineTaskBar = ({
     const taskRowClass = `sticky left-0 z-10 bg-white dark:bg-slate-800/80 border-x border-b border-slate-200 dark:border-slate-700 hover:bg-blue-50/40 dark:hover:bg-slate-700/40 cursor-pointer transition-colors ${
         isLastTask ? 'rounded-b-xl' : ''
     }`;
-
-    const filteredDeps = task.dependencies?.filter(depKey => {
-        const depTask = taskKeyMap.get(depKey);
-        if (!depTask || !filteredTaskIds.has(depTask.id)) return false;
-        const depProject = projectKeyToProject.get(depTask.projectKey);
-        return depProject &&
-            expandedProjects[depProject.projectKey] &&
-            (!projectKeyFilter ||
-                depProject.projectKey === projectKeyFilter) &&
-            (filteredProjectKeys.has(depProject.projectKey) ||
-                !hasActiveFilters);
-    }) || [];
 
     return (
         <div
@@ -204,9 +191,12 @@ const TimelineTaskBar = ({
                 <div
                     className={`absolute ${
                         task.isCritical
-                            ? 'bg-red-500 hover:bg-red-400 dark:bg-red-500 dark:hover:bg-red-400'
-                            : 'bg-blue-500 hover:bg-blue-400 dark:bg-blue-400 dark:hover:bg-blue-300'
-                    } h-3.5 rounded-full cursor-pointer transition-colors shadow-sm`}
+                            ? 'bg-red-500 dark:bg-red-400'
+                            : task.progress >= 100
+                                ? 'bg-green-500 dark:bg-green-400'
+                                : 'bg-blue-500 dark:bg-blue-400'
+                    } h-2.5 rounded-[3px] cursor-pointer hover:brightness-110 transition-all duration-150`}
+                    data-task-key={task.taskKey}
                     style={{
                         marginLeft: `${taskPosition.marginLeft}px`,
                         width: `${taskPosition.width}px`
@@ -283,38 +273,12 @@ const TimelineTaskBar = ({
                             top: -14
                         }}
                     >
-                        <span className="text-[10px] py-0.5 px-2 rounded-full bg-amber-100 text-amber-700 font-semibold flex items-center gap-1 shadow-sm border border-amber-200">
+                        <span className="text-[10px] py-0.5 px-1.5 rounded bg-amber-50 text-amber-600 font-medium flex items-center gap-0.5 border border-amber-200/60">
                             <AlertTriangleFilledIcon />
-                            Delayed
+                            delayed
                         </span>
                     </div>
                 )}
-                {filteredDeps.map(depKey => {
-                    const depTask = taskKeyMap.get(depKey);
-                    const depProject = projectKeyToProject.get(depTask.projectKey);
-                    if (!depProject || !depTask) return null;
-
-                    const depProjectIndex = projectIndexMap.get(depProject.projectKey);
-                    const depTaskIndex = depProject.tasks.findIndex(
-                        t => t.id === depTask.id
-                    );
-
-                    return (
-                        <DependencyArrow
-                            key={`dep-${depTask.id}-${task.id}`}
-                            depTask={depTask}
-                            task={task}
-                            taskPosition={taskPosition}
-                            sidebarCollapsed={sidebarCollapsed}
-                            timelineStart={timelineStart}
-                            projectIndex={projectIndex}
-                            depProjectIndex={depProjectIndex}
-                            depTaskIndex={depTaskIndex}
-                            taskGlobalIndex={taskGlobalIndex}
-                            projectRowOffsets={projectRowOffsets}
-                        />
-                    );
-                })}
             </div>
         </div>
     );

@@ -65,9 +65,9 @@ const AttachmentUploader = ({
     return (
         <>
             <div
-                className={`border border-dashed rounded-lg transition-colors ${
+                className={`border-2 border-dashed rounded-xl transition-colors ${
                     isDragging
-                        ? 'border-slate-400 dark:border-blue-500/50 bg-slate-50 dark:bg-blue-950/10'
+                        ? 'border-blue-400 dark:border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/10'
                         : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                 }`}
                 onDrop={handleDrop}
@@ -80,10 +80,10 @@ const AttachmentUploader = ({
                         {newAttachments.map(f => renderAttachmentPreview(f))}
                     </div>
                 )}
-                <label htmlFor={inputId} className="cursor-pointer flex items-center justify-center gap-2 py-3 px-3">
-                    <HiOutlineCloudUpload className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                    <span className="text-xs text-slate-400 dark:text-slate-500">{label}</span>
-                    <span className="text-xs text-slate-300 dark:text-slate-600">(max 5MB)</span>
+                <label htmlFor={inputId} className="cursor-pointer flex flex-col items-center justify-center gap-1 py-5 px-3">
+                    <HiOutlineCloudUpload className="w-5 h-5 text-slate-300 dark:text-slate-600" />
+                    <span className="text-sm text-slate-400 dark:text-slate-500">{label}</span>
+                    <span className="text-xs text-slate-300 dark:text-slate-600">Max 5MB per file</span>
                     <input
                         type="file"
                         id={inputId}

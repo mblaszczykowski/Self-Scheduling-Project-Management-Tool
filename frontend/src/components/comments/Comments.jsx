@@ -139,21 +139,23 @@ export default function Comments({ taskId, currentUserId }) {
 
     return (
         <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                         Comments
                     </span>
-                    <span className="text-xs font-mono text-slate-400 dark:text-slate-500">
-                        {comments.length}
-                    </span>
+                    {comments.length > 0 && (
+                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded-md tabular-nums">
+                            {comments.length}
+                        </span>
+                    )}
                 </div>
                 {!showCommentForm && (
                     <button
                         onClick={() => setShowCommentForm(true)}
-                        className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                        className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                     >
-                        + Add
+                        Add comment
                     </button>
                 )}
             </div>

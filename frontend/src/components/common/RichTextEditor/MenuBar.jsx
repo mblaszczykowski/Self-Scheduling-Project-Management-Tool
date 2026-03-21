@@ -38,7 +38,7 @@ const MenuBar = ({ editor }) => {
     };
 
     return (
-        <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-slate-100 dark:border-slate-700/40 bg-slate-50/50 dark:bg-slate-800/30">
+        <div className="flex flex-wrap items-center gap-0.5 px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/50">
             {TOOLBAR_GROUPS.map((group, gi) => (
                 <React.Fragment key={group.id}>
                     {gi > 0 && <MenuDivider />}

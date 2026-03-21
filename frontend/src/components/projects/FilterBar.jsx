@@ -77,10 +77,10 @@ const FilterBar = ({
     ];
 
     const filterButtonClass = (isActive) =>
-        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-colors '
+        'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-colors '
         + (isActive
             ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-medium'
-            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200');
+            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200');
 
     const dropdownOptionClass = (isActive) =>
         'w-full px-3.5 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors '
@@ -101,9 +101,9 @@ const FilterBar = ({
                         className={filterButtonClass(!!projectKeyFilter)}
                     >
                         <FolderIcon className={iconClass} />
-                        <span>{projectKeyFilter
-                            ? (projects.find(p => p.projectKey === projectKeyFilter)?.summary || projectKeyFilter)
-                            : 'Project'}</span>
+                        {projectKeyFilter && (
+                            <span className="text-xs">{projects.find(p => p.projectKey === projectKeyFilter)?.summary || projectKeyFilter}</span>
+                        )}
                     </button>
                     {openFilterDropdown === 'project' && (
                         <div className={`${dropdownClass} min-w-[200px] max-h-72 overflow-y-auto`}>
@@ -138,9 +138,9 @@ const FilterBar = ({
                             className={filterButtonClass(filters[field] && filters[field] !== 'All')}
                         >
                             {icon}
-                            <span>{(filters[field] && filters[field] !== 'All')
-                                ? (options.find(o => o.value === filters[field])?.label || filters[field])
-                                : label}</span>
+                            {(filters[field] && filters[field] !== 'All') && (
+                                <span className="text-xs">{options.find(o => o.value === filters[field])?.label || filters[field]}</span>
+                            )}
                         </button>
                         {openFilterDropdown === field && (
                             <div className={`${dropdownClass} min-w-[180px] max-h-72 overflow-y-auto`}>
@@ -174,7 +174,9 @@ const FilterBar = ({
                             className={filterButtonClass(!!filters[field])}
                         >
                             {icon}
-                            <span>{filters[field] || label}</span>
+                            {filters[field] && (
+                                <span className="text-xs">{filters[field]}</span>
+                            )}
                         </button>
                         {openFilterDropdown === field && (
                             <div className={`${dropdownClass} p-3`}>
@@ -212,7 +214,9 @@ const FilterBar = ({
                         className={filterButtonClass(!!searchInput)}
                     >
                         <SearchIcon className={iconClass} />
-                        <span>{searchInput || 'Search'}</span>
+                        {searchInput && (
+                            <span className="text-xs">{searchInput}</span>
+                        )}
                     </button>
                     {openFilterDropdown === 'search' && (
                         <div className={`${dropdownClass} p-3`}>
@@ -239,7 +243,7 @@ const FilterBar = ({
                     className={filterButtonClass(assignedToMe)}
                 >
                     <UserCircleIcon className={iconClass} />
-                    <span>My Tasks</span>
+                    {assignedToMe && <span className="text-xs">Me</span>}
                 </button>
 
                 {hasActiveFilters && (

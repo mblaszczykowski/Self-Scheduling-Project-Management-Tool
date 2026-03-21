@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { Form, Formik } from 'formik';
-import { HiOutlineX, HiOutlineTrash } from 'react-icons/hi';
+import { HiOutlineTrash } from 'react-icons/hi';
 import { AuthContext } from '../../context/AuthContext';
 import { ProjectsContext } from '../../context/ProjectsContext';
 import TaskForm from './TaskForm';
@@ -55,7 +55,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
             setUiState(prev => ({ ...prev, closeConfirmOpen: true }));
         } else {
             setUiState(prev => ({ ...prev, isVisible: false }));
-            setTimeout(onClose, 150);
+            setTimeout(onClose, 200);
         }
     }, [onClose, uiState.isDirty, modalMode]);
 
@@ -173,10 +173,10 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
             {/* Overlay */}
             <div
                 className={
-                    'fixed inset-0 z-[60] transition-all duration-150 '
+                    'fixed inset-0 z-[60] transition-opacity duration-200 '
                     + (uiState.isVisible
-                        ? 'bg-black/40 backdrop-blur-sm'
-                        : 'bg-black/0 backdrop-blur-0')
+                        ? 'bg-black/50 opacity-100'
+                        : 'bg-black/50 opacity-0')
                 }
                 onClick={handleCloseAttempt}
                 aria-hidden="true"
@@ -194,53 +194,13 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                     + ' bg-white dark:bg-slate-800'
                     + ' border border-slate-200 dark:border-slate-700'
                     + ' rounded-xl z-[70] flex flex-col'
-                    + ' shadow-lg'
-                    + ' transition-all duration-150 '
+                    + ' shadow-2xl'
+                    + ' transition-all duration-200 '
                     + (uiState.isVisible
                         ? 'scale-100 opacity-100 translate-y-[-50%]'
-                        : 'scale-[0.98] opacity-0 translate-y-[calc(-50%+8px)]')
+                        : 'scale-95 opacity-0 translate-y-[-50%]')
                 }
             >
-                {/* ─── Header ─── */}
-                <div className="flex-shrink-0 px-5 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        {entityKey && (
-                            <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded text-xs font-mono font-semibold tracking-wide shrink-0">
-                                {entityKey}
-                            </span>
-                        )}
-                        <h2
-                            id="modal-title"
-                            className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate"
-                        >
-                            {modalMode === 'create'
-                                ? `New ${modalType === 'task' ? 'task' : 'project'}`
-                                : (modalType === 'task' ? task?.summary : project?.summary) || 'Untitled'}
-                        </h2>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                        {modalMode === 'edit' && (
-                            <button
-                                type="button"
-                                onClick={() => setUiState(prev => ({
-                                    ...prev, deleteConfirmOpen: true,
-                                }))}
-                                className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
-                                title="Delete"
-                            >
-                                <HiOutlineTrash className="w-4 h-4" />
-                            </button>
-                        )}
-                        <button
-                            onClick={handleCloseAttempt}
-                            aria-label="Close dialog"
-                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                        >
-                            <HiOutlineX className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-
                 {/* ─── Body ─── */}
                 <div className="flex-1 overflow-y-auto min-h-0">
                     <Formik
@@ -260,6 +220,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                                         modalMode={modalMode}
                                         task={task}
                                         project={project}
+                                        entityKey={entityKey}
                                         projects={projects}
                                         currentUser={user}
                                         dependencies={dependencies}
@@ -275,6 +236,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                                         setFieldValue={setFieldValue}
                                         modalMode={modalMode}
                                         project={project}
+                                        entityKey={entityKey}
                                         projects={projects}
                                         currentUser={user}
                                         dependencies={dependencies}
@@ -294,11 +256,24 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                 </div>
 
                 {/* ─── Footer ─── */}
-                <div className="flex-shrink-0 px-5 py-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-end gap-2">
+                <div className="flex-shrink-0 px-5 py-2.5 border-t border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/50 rounded-b-xl flex items-center gap-2">
+                    {modalMode === 'edit' && (
+                        <button
+                            type="button"
+                            onClick={() => setUiState(prev => ({
+                                ...prev, deleteConfirmOpen: true,
+                            }))}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                        >
+                            <HiOutlineTrash className="w-3.5 h-3.5" />
+                            Delete
+                        </button>
+                    )}
+                    <div className="flex-1" />
                     <button
                         type="button"
                         onClick={handleCloseAttempt}
-                        className="px-3 py-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                        className="px-3.5 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
                     >
                         Cancel
                     </button>
@@ -307,7 +282,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                         onClick={() => formikRef.current?.submitForm()}
                         disabled={formikRef.current?.isSubmitting}
                         className={
-                            'px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors'
+                            'px-4 py-1.5 text-sm font-medium rounded-lg transition-colors'
                             + ' disabled:opacity-40 disabled:cursor-not-allowed'
                             + ' flex items-center gap-1.5'
                             + ' bg-slate-900 dark:bg-white text-white dark:text-slate-900'
@@ -317,7 +292,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                         {formikRef.current?.isSubmitting ? (
                             <>
                                 <div className="w-3 h-3 border-[1.5px] border-white/30 dark:border-slate-900/30 border-t-white dark:border-t-slate-900 rounded-full animate-spin" />
-                                <span>Saving</span>
+                                <span>Saving...</span>
                             </>
                         ) : (
                             <span>{modalMode === 'create' ? 'Create' : 'Save'}</span>

@@ -271,37 +271,17 @@ const ProjectsPage = () => {
             />
 
             <div className="flex-grow flex flex-col">
-                {/* Page header */}
-                <div className="px-6 lg:px-10 pt-6 pb-4 border-b border-slate-200/60 dark:border-slate-800/60 bg-white/50 dark:bg-slate-900/50 animate-[fadeInSlide_0.3s_ease-out_both]">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Projects</h1>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                                {allTasks.length} tasks across {projects.length} projects
-                            </p>
+                {/* Toolbar */}
+                <div className="px-6 lg:px-10 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-[fadeInSlide_0.3s_ease-out_both]">
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2.5 shrink-0 mr-1">
+                            <h1 className="text-sm font-semibold text-slate-900 dark:text-white">Projects</h1>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">{allTasks.length} tasks</span>
                         </div>
-                        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg shrink-0">
-                            {['timeline', 'list'].map(mode => (
-                                <button
-                                    key={mode}
-                                    onClick={() => setViewState(prev => ({ ...prev, mode }))}
-                                    className={
-                                        'py-1.5 px-3.5 text-sm font-medium rounded-md transition-all duration-200 '
-                                        + (mode === 'timeline' ? 'hidden sm:flex ' : '')
-                                        + (viewState.mode === mode
-                                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200')
-                                    }
-                                >
-                                    <span className="flex items-center gap-2">
-                                        {mode === 'timeline' ? <ChartBarIcon /> : <ListIcon />}
-                                        <span className="hidden sm:inline">{mode.charAt(0).toUpperCase() + mode.slice(1)}</span>
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <FilterBar
+
+                        <div className="w-px h-5 bg-slate-200 dark:bg-slate-700" />
+
+                        <FilterBar
                         projects={projects}
                         allTasks={allTasks}
                         filters={filterState.filters}
@@ -325,9 +305,31 @@ const ProjectsPage = () => {
                         onFilterTooltipHide={handleFilterTooltipHide}
                         filterRef={filterRef}
                     />
+
+                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg shrink-0 ml-auto">
+                            {['timeline', 'list'].map(mode => (
+                                <button
+                                    key={mode}
+                                    onClick={() => setViewState(prev => ({ ...prev, mode }))}
+                                    className={
+                                        'py-1.5 px-3 text-sm font-medium rounded-md transition-all duration-200 '
+                                        + (mode === 'timeline' ? 'hidden sm:flex ' : '')
+                                        + (viewState.mode === mode
+                                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200')
+                                    }
+                                >
+                                    <span className="flex items-center gap-1.5">
+                                        {mode === 'timeline' ? <ChartBarIcon /> : <ListIcon />}
+                                        <span className="hidden sm:inline">{mode.charAt(0).toUpperCase() + mode.slice(1)}</span>
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
 
-                <div className="px-6 lg:px-10 pt-5 pb-6 flex-grow flex flex-col">
+                <div className="px-6 lg:px-10 pt-4 pb-6 flex-grow flex flex-col">
 
                 {optimization.result && viewState.mode === 'timeline' && (
                     <OptimizationMetrics

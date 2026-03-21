@@ -27,9 +27,9 @@ const PropRow = ({ label, children }) => (
 
 /* ── Section card ── */
 const SidebarSection = ({ title, children }) => (
-    <div className="rounded-xl bg-slate-50/90 dark:bg-slate-800/30 border border-slate-200/80 dark:border-slate-700/50 px-4 py-3 transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm">
+    <div className="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 transition-colors hover:border-slate-300 dark:hover:border-slate-600">
         {title && (
-            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2.5 pb-1.5 border-b border-slate-200/60 dark:border-slate-700/50">{title}</div>
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">{title}</div>
         )}
         <div className="space-y-0.5">{children}</div>
     </div>
@@ -150,7 +150,8 @@ const TaskForm = ({
     values, setFieldValue, handleChange,
     modalMode, task, project, projects, currentUser,
     dependencies, setDependencies,
-    existingAttachments, newAttachments, onAddAttachments, onRemoveAttachment
+    existingAttachments, newAttachments, onAddAttachments, onRemoveAttachment,
+    entityKey,
 }) => {
     const allTasks = projects.flatMap(p => p.tasks || []);
 
@@ -166,14 +167,21 @@ const TaskForm = ({
     return (
         <>
             {/* ─── Main content ─── */}
-            <div className="flex-1 px-5 py-4 border-r border-slate-100 dark:border-slate-700 overflow-y-auto">
-                <div className="mb-5">
-                    <Field
-                        type="text" id="summary" name="summary" maxLength={200}
-                        placeholder="Task name"
-                        className="w-full px-0 py-1.5 bg-transparent border-0 border-b border-transparent text-lg font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 focus:outline-none focus:border-slate-200 dark:focus:border-slate-700 transition-colors"
-                    />
-                    <div className="flex justify-between mt-1">
+            <div className="flex-1 px-6 py-5 border-r border-slate-200 dark:border-slate-700 overflow-y-auto">
+                <div className="mb-6">
+                    <div className="flex items-center gap-2.5">
+                        {entityKey && (
+                            <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-md text-xs font-mono font-semibold tracking-wide shrink-0">
+                                {entityKey}
+                            </span>
+                        )}
+                        <Field
+                            type="text" id="summary" name="summary" maxLength={200}
+                            placeholder="Task name"
+                            className="flex-1 px-0 py-1 bg-transparent border-0 text-lg font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 focus:outline-none transition-colors"
+                        />
+                    </div>
+                    <div className="flex justify-between mt-1.5">
                         <ErrorMessage name="summary" component="div" className="text-red-500 text-xs" />
                         {values.summary?.length > 160 && (
                             <span className={`text-xs tabular-nums ${values.summary?.length > 180 ? 'text-amber-500' : 'text-slate-400'}`}>
@@ -183,15 +191,16 @@ const TaskForm = ({
                     </div>
                 </div>
 
-                <div className="mb-5">
+                <div className="mb-6">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Description</span>
                     <RichTextEditor
                         value={values.description || ''} onChange={val => setFieldValue('description', val)}
-                        placeholder="Add description..." minHeight="180px"
+                        placeholder="Add a description..." minHeight="200px"
                     />
                 </div>
 
-                <div className="mb-5">
-                    <SectionHeader icon={HiOutlineCloudUpload} title="Attachments" />
+                <div className="mb-6">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Attachments</span>
                     <AttachmentUploader
                         existingAttachments={existingAttachments} newAttachments={newAttachments}
                         onAddAttachments={onAddAttachments} onRemoveAttachment={onRemoveAttachment}
@@ -200,14 +209,15 @@ const TaskForm = ({
                 </div>
 
                 {modalMode === 'edit' && task && currentUser && (
-                    <div className="pt-5 border-t border-slate-100 dark:border-slate-700">
+                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3 block">Activity</span>
                         <Comments taskId={task.id} currentUserId={currentUser.id} />
                     </div>
                 )}
             </div>
 
             {/* ─── Sidebar ─── */}
-            <div className="w-full md:w-[340px] shrink-0 px-4 py-4 overflow-y-auto space-y-3.5">
+            <div className="w-full md:w-[360px] shrink-0 px-5 py-5 overflow-y-auto space-y-4 bg-slate-50/50 dark:bg-slate-800/20">
 
                 {/* ══ Details ══ */}
                 <SidebarSection title="Details">
@@ -233,7 +243,11 @@ const TaskForm = ({
                                 {STATUS_CONFIG[values.status]?.label || values.status}
                             </div>
                             <Field as="select" id="status" name="status"
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                                {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                                    <option key={key} value={key}>{cfg.label}</option>
+                                ))}
+                            </Field>
                         </div>
                     </PropRow>
 
@@ -245,7 +259,11 @@ const TaskForm = ({
                                 {PRIORITY_CONFIG[values.priority]?.label || values.priority}
                             </div>
                             <Field as="select" id="priority" name="priority"
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                                {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => (
+                                    <option key={key} value={key}>{cfg.label}</option>
+                                ))}
+                            </Field>
                         </div>
                     </PropRow>
 
@@ -276,9 +294,9 @@ const TaskForm = ({
                 {/* ══ Schedule ══ */}
                 <SidebarSection title="Schedule">
                     {/* Date cells */}
-                    <div className="grid grid-cols-2 gap-2.5">
-                        <div className="bg-white dark:bg-slate-800/50 rounded-lg px-3 py-2.5 border border-slate-200/80 dark:border-slate-700/50 hover:border-slate-400 dark:hover:border-slate-500 transition-all duration-150 hover:shadow-sm group/date cursor-pointer">
-                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide block mb-1">Start</span>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
+                            <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide block mb-1">Start</span>
                             <Field type="date" id="startDate" name="startDate"
                                 className="text-sm font-medium text-slate-800 dark:text-slate-200 bg-transparent focus:outline-none w-full cursor-pointer"
                                 onChange={(e) => {
@@ -289,9 +307,9 @@ const TaskForm = ({
                             />
                             <ErrorMessage name="startDate" component="div" className="text-red-500 text-xs mt-0.5" />
                         </div>
-                        <div className="bg-white dark:bg-slate-800/50 rounded-lg px-3 py-2.5 border border-slate-200/80 dark:border-slate-700/50 hover:border-slate-400 dark:hover:border-slate-500 transition-all duration-150 hover:shadow-sm cursor-pointer">
+                        <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
                             <div className="flex items-center gap-1 mb-1">
-                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Due</span>
+                                <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide">Due</span>
                                 <DueBadge date={values.dueDate} />
                             </div>
                             <Field type="date" id="dueDate" name="dueDate"

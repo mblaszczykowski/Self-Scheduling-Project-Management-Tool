@@ -17,6 +17,7 @@ const ProjectForm = ({
     modalMode,
     project,
     projects,
+    entityKey,
     currentUser,
     dependencies,
     setDependencies,
@@ -35,31 +36,37 @@ const ProjectForm = ({
         <>
             <div className="flex-1 px-6 py-5 border-r border-slate-200 dark:border-slate-700 overflow-y-auto">
                 <div className="mb-6">
-                    <InputLabel htmlFor="summary" required>
-                        Project Name
-                    </InputLabel>
-                    <Field
-                        type="text"
-                        id="summary"
-                        name="summary"
-                        maxLength={200}
-                        placeholder="Enter project name..."
-                        className={`${inputClass} text-base font-medium`}
-                    />
+                    <div className="flex items-center gap-2.5">
+                        {entityKey && (
+                            <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-md text-xs font-mono font-semibold tracking-wide shrink-0">
+                                {entityKey}
+                            </span>
+                        )}
+                        <Field
+                            type="text"
+                            id="summary"
+                            name="summary"
+                            maxLength={200}
+                            placeholder="Project name"
+                            className="flex-1 px-0 py-1 bg-transparent border-0 text-lg font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 focus:outline-none transition-colors"
+                        />
+                    </div>
                     <div className="flex justify-between mt-1.5">
                         <ErrorMessage
                             name="summary"
                             component="div"
                             className="text-red-500 text-xs font-medium"
                         />
-                        <span className={`text-xs ${values.summary?.length > 180 ? 'text-amber-600' : 'text-slate-400'}`}>
-                            {values.summary?.length || 0}/200
-                        </span>
+                        {values.summary?.length > 160 && (
+                            <span className={`text-xs ${values.summary?.length > 180 ? 'text-amber-600' : 'text-slate-400'}`}>
+                                {values.summary?.length || 0}/200
+                            </span>
+                        )}
                     </div>
                 </div>
 
                 <div className="mb-6">
-                    <InputLabel>Description</InputLabel>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Description</span>
                     <RichTextEditor
                         value={values.description || ''}
                         onChange={val => setFieldValue('description', val)}
@@ -69,7 +76,7 @@ const ProjectForm = ({
                 </div>
 
                 <div className="mb-6">
-                    <SectionHeader icon={HiOutlineCloudUpload} title="Attachments" />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Attachments</span>
                     <AttachmentUploader
                         existingAttachments={existingAttachments}
                         newAttachments={newAttachments}
@@ -80,13 +87,13 @@ const ProjectForm = ({
                 </div>
             </div>
 
-            <div className="w-full md:w-[400px] shrink-0 px-6 py-5 overflow-y-auto bg-slate-50/50 dark:bg-slate-800/20">
+            <div className="w-full md:w-[400px] shrink-0 px-5 py-5 overflow-y-auto bg-slate-50/50 dark:bg-slate-800/20">
                 <div className="space-y-5">
                     {modalMode === 'create' && (
-                        <div>
-                            <InputLabel htmlFor="projectKey" required>
-                                Project Key
-                            </InputLabel>
+                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                            <label htmlFor="projectKey" className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
+                                Project Key <span className="text-red-400">*</span>
+                            </label>
                             <Field
                                 type="text"
                                 id="projectKey"
@@ -108,8 +115,8 @@ const ProjectForm = ({
                         </div>
                     )}
 
-                    <div>
-                        <InputLabel>Team Members</InputLabel>
+                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Team Members</label>
                         {values.members?.length > 0 && (
                             <div className="space-y-2 mb-3">
                                 {values.members.map((m, i) => {
@@ -198,8 +205,8 @@ const ProjectForm = ({
                         )}
                     </div>
 
-                    <div>
-                        <InputLabel>Project Dependencies</InputLabel>
+                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Dependencies</label>
                         {dependencies.length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-3">
                                 {dependencies.map(depKey => {

@@ -129,7 +129,7 @@ const TimelineProjectRow = ({
                 <div className="flex-1 flex items-center relative">
                     {project.projectStartDate && project.projectDueDate && (
                         <div
-                            className="absolute bg-slate-800 dark:bg-slate-300 h-4 rounded-full cursor-pointer hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors shadow-sm"
+                            className="absolute h-1.5 rounded-[2px] bg-slate-300 dark:bg-slate-600 cursor-pointer hover:bg-slate-400 dark:hover:bg-slate-500 transition-colors"
                             style={calculateTaskPosition(
                                 project.projectStartDate,
                                 project.projectDueDate,

@@ -112,7 +112,7 @@ const RichTextEditor = ({
         },
         editorProps: {
             attributes: {
-                class: `prose prose-slate prose-sm max-w-none focus:outline-none px-3 py-2.5 ${className}`,
+                class: `prose prose-slate prose-sm max-w-none focus:outline-none px-4 py-3 ${className}`,
                 style: `min-height: ${minHeight}; max-height: ${maxHeight}; overflow-y: auto;`,
             },
         },
@@ -125,7 +125,7 @@ const RichTextEditor = ({
     }, [editor, value]);
 
     return (
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden focus-within:ring-1 focus-within:ring-slate-400 dark:focus-within:ring-slate-500 focus-within:border-slate-400 dark:focus-within:border-slate-500 transition-colors hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/30">
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden focus-within:border-slate-300 dark:focus-within:border-slate-600 transition-colors hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/30">
             {showMenuBar && <MenuBar editor={editor} />}
             {showBubbleMenu && <BubbleMenuBar editor={editor} />}
             {showFloatingMenu && <FloatingMenuBar editor={editor} />}

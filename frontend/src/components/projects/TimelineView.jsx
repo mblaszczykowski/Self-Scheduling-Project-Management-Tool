@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { EmptyState } from '../common';
 import TimelineHeader from './TimelineHeader';
 import TimelineProjectRow from './TimelineProjectRow';
+import DependencyOverlay from './DependencyOverlay';
 
 const TimelineView = ({
     processedProjects,
@@ -98,7 +99,18 @@ const TimelineView = ({
                 headerRef={headerRef}
                 syncScroll={syncScroll}
             />
-            <div className="space-y-3 overflow-auto flex-grow" ref={timelineRef} onScroll={syncScroll}>
+            <div className="space-y-3 overflow-auto flex-grow relative" ref={timelineRef} onScroll={syncScroll}>
+                <DependencyOverlay
+                    containerRef={timelineRef}
+                    allTasks={allTasks}
+                    taskKeyMap={taskKeyMap}
+                    expandedProjects={expandedProjects}
+                    projectKeyToProject={projectKeyToProject}
+                    filteredTaskIds={filteredTaskIds}
+                    filteredProjectKeys={filteredProjectKeys}
+                    hasActiveFilters={hasActiveFilters}
+                    projectKeyFilter={projectKeyFilter}
+                />
                 {visibleProjects.map((project) => (
                     <TimelineProjectRow
                         key={project.projectKey}
