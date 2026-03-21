@@ -33,17 +33,14 @@ const TimelineHeader = ({
                 const day = new Date(currentYear, currentMonth, i + 1);
                 const isToday = today.toDateString() === day.toDateString();
                 const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-                const weekendClass = isWeekend ? 'bg-slate-50 dark:bg-slate-800/50' : '';
+                const weekendClass = isWeekend ? 'bg-slate-50/80 dark:bg-slate-800/30' : '';
                 const todayClass = isToday
-                    ? 'bg-slate-900 text-white font-semibold'
-                    : 'text-slate-500';
-                const dayClassName = `text-xs p-1 border-l border-slate-200 dark:border-slate-700 flex items-center justify-center ${
-                    weekendClass
-                } ${todayClass}`;
+                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold rounded-md'
+                    : 'text-slate-400 dark:text-slate-500';
                 return (
                     <div
                         key={`${currentYear}-${currentMonth}-${i}`}
-                        className={dayClassName}
+                        className={`text-xs p-1 border-l border-slate-100 dark:border-slate-800 flex items-center justify-center ${weekendClass} ${todayClass}`}
                         style={{ width: `${DAY_WIDTH}px`, minWidth: `${DAY_WIDTH}px` }}
                     >
                         {i + 1}
@@ -51,14 +48,13 @@ const TimelineHeader = ({
                 );
             });
 
-            const monthHeaderClass = 'text-xs font-semibold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 p-2 bg-white dark:bg-slate-800';
             months.push(
                 <div
                     key={`${year}-${month}`}
-                    className="flex flex-col text-center border-r border-slate-200 dark:border-slate-700"
+                    className="flex flex-col text-center border-r border-slate-100 dark:border-slate-800"
                     style={{ width: `${daysInMonth * DAY_WIDTH}px` }}
                 >
-                    <div className={monthHeaderClass}>
+                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 px-3 py-2 bg-slate-50/50 dark:bg-slate-800/30 tracking-wide">
                         {monthDate.toLocaleDateString('default', { month: 'short' }).toUpperCase()} {year}
                     </div>
                     <div className="flex">{days}</div>
@@ -71,39 +67,32 @@ const TimelineHeader = ({
         return months;
     }, [timelineStart, timelineEnd]);
 
-    const headerSidebarClass = 'sticky left-0 z-10 flex items-center justify-between bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transition-all duration-200';
-
     return (
         <div
-            className="flex mb-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm"
+            className="flex mb-4 overflow-hidden rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm"
             ref={headerRef}
             onScroll={syncScroll}
         >
             <div
-                className={headerSidebarClass}
+                className="sticky left-0 z-10 flex items-center justify-between bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transition-all duration-200"
                 style={{ minWidth: `${sidebarWidth}px`, width: `${sidebarWidth}px` }}
             >
                 <button
                     onClick={onSidebarToggle}
-                    className="p-2 ml-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    className="p-2 ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
-                    <ChevronsLeftIcon
-                        className={`w-4 h-4 transition-transform ${
-                            sidebarCollapsed ? 'rotate-180' : ''
-                        }`}
-                    />
+                    <ChevronsLeftIcon className={`w-4 h-4 transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`} />
                 </button>
                 {!sidebarCollapsed && (
-                    <div className="flex items-center gap-2.5 pr-3">
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-2 pr-3">
+                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500 tabular-nums">
                             {processedProjects.length} projects
                         </span>
                         {onScrollToToday && (
                             <button
                                 onClick={onScrollToToday}
                                 className="text-xs px-2.5 py-1 rounded-lg font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                                title="Scroll to today"
                             >
                                 Today
                             </button>
@@ -112,15 +101,11 @@ const TimelineHeader = ({
                             <button
                                 onClick={onOptimize}
                                 disabled={optimization?.loading}
-                                className="group relative text-xs px-3 py-1 rounded-lg font-semibold transition-all duration-200 disabled:opacity-60 flex items-center gap-1.5 text-white overflow-hidden"
-                                title="Optimize schedule across all projects (RCPSP solver)"
+                                className="group text-xs px-3 py-1 rounded-lg font-semibold transition-all duration-200 disabled:opacity-60 flex items-center gap-1.5 text-white"
+                                title="Optimize schedule (RCPSP solver)"
                                 style={{
-                                    background: optimization?.loading
-                                        ? 'linear-gradient(135deg, #2563eb, #3b82f6)'
-                                        : 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
-                                    boxShadow: optimization?.loading
-                                        ? '0 0 12px rgba(59,130,246,0.3)'
-                                        : '0 1px 3px rgba(37,99,235,0.3)',
+                                    background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
+                                    boxShadow: '0 1px 3px rgba(37,99,235,0.3)',
                                 }}
                             >
                                 {optimization?.loading ? (

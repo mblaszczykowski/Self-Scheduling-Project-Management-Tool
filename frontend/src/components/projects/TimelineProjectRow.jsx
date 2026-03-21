@@ -46,8 +46,7 @@ const TimelineProjectRow = ({
         : 'rounded-xl';
     const sidebarBaseClass = 'sticky left-0 z-10 bg-white dark:bg-slate-800'
         + ' border border-slate-200 dark:border-slate-700 transition-all'
-        + ' duration-200 hover:border-slate-300 dark:hover:border-slate-600'
-        + ' border-l-[3px] border-l-blue-500 shadow-sm'
+        + ' duration-200 hover:border-slate-300 dark:hover:border-slate-600 shadow-sm'
         + ` ${projectContainerClass}`;
 
     const tasksToRender = hasActiveFilters ? projectFilteredTasks : project.tasks;
@@ -74,11 +73,11 @@ const TimelineProjectRow = ({
                             </button>
                         </div>
                     ) : (
-                        <div className="p-3">
+                        <div className="p-3 pl-3.5">
                             <div className="flex items-center gap-2.5">
                                 <button
                                     onClick={() => onToggleExpand(project.projectKey)}
-                                    className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors flex-shrink-0"
+                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 transition-colors flex-shrink-0"
                                     title={isExpanded ? 'Collapse tasks' : 'Expand tasks'}
                                 >
                                     <ChevronRightIcon
@@ -88,35 +87,37 @@ const TimelineProjectRow = ({
                                     />
                                 </button>
                                 <div
-                                    className="flex-1 min-w-0 cursor-pointer"
+                                    className="flex-1 min-w-0 cursor-pointer group/proj"
                                     onClick={() => onOpenProjectModal(project)}
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-slate-500">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 font-mono">
                                             {project.projectKey}
                                         </span>
-                                        <span className="text-sm font-medium text-slate-800 truncate">
+                                        <span className="text-sm font-medium text-slate-900 dark:text-white truncate group-hover/proj:text-blue-600 dark:group-hover/proj:text-blue-400 transition-colors">
                                             {project.summary}
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden max-w-[100px]">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden max-w-[100px]">
                                             <div
-                                                className="h-full bg-slate-700 rounded-full"
+                                                className={`h-full rounded-full transition-all duration-500 ${
+                                                    project.projectProgress === 100 ? 'bg-green-500' : 'bg-slate-700 dark:bg-slate-300'
+                                                }`}
                                                 style={{ width: `${project.projectProgress}%` }}
                                             />
                                         </div>
-                                        <span className="text-xs text-slate-500">
+                                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">
                                             {project.projectProgress}%
                                         </span>
-                                        <span className="text-xs text-slate-400">
-                                            - {project.tasks?.length || 0} tasks
+                                        <span className="text-xs text-slate-400 dark:text-slate-500">
+                                            {project.tasks?.length || 0} tasks
                                         </span>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => onOpenTaskModal(project, null)}
-                                    className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors flex-shrink-0"
+                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
                                     title="Add task"
                                 >
                                     <PlusIcon className="w-3.5 h-3.5" />
@@ -128,7 +129,7 @@ const TimelineProjectRow = ({
                 <div className="flex-1 flex items-center relative">
                     {project.projectStartDate && project.projectDueDate && (
                         <div
-                            className="absolute bg-slate-800 h-4 rounded cursor-pointer hover:bg-slate-700 transition-colors"
+                            className="absolute bg-slate-800 dark:bg-slate-300 h-4 rounded-full cursor-pointer hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors shadow-sm"
                             style={calculateTaskPosition(
                                 project.projectStartDate,
                                 project.projectDueDate,
