@@ -168,7 +168,7 @@ public class ProjectService {
         }
 
         if (projectDTO.members() != null) {
-            updateProjectMembersAndNotifyNewMembers(project, projectDTO.members());
+            updateProjectMembersAndNotify(project, projectDTO.members());
         }
 
         if (projectDTO.dependencies() != null) {
@@ -181,6 +181,7 @@ public class ProjectService {
         }
 
         var updatedProject = projectRepository.save(project);
+        notifyProjectMembersOfUpdate(updatedProject, userId);
         return convertToDTO(updatedProject);
     }
 
@@ -222,13 +223,18 @@ public class ProjectService {
         return members;
     }
 
-    private void updateProjectMembersAndNotifyNewMembers(Project project, List<UserDTO> memberDTOs) {
-        var existingMemberIds = project.getMembers().stream()
+    private void updateProjectMembersAndNotify(Project project, List<UserDTO> memberDTOs) {
+        var existingMembers = new HashSet<>(project.getMembers());
+        var existingMemberIds = existingMembers.stream()
                 .map(User::getId)
                 .collect(Collectors.toSet());
 
         var owner = project.getOwner();
         var updatedMembers = resolveMembersFromEmails(memberDTOs, owner);
+        var updatedMemberIds = updatedMembers.stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
+
         project.replaceMembers(updatedMembers);
 
         for (var member : updatedMembers) {
@@ -236,6 +242,27 @@ public class ProjectService {
             var isNotOwner = !member.getId().equals(owner.getId());
             if (isNewMember && isNotOwner) {
                 notifyMemberAddedToProject(member, project);
+            }
+        }
+
+        for (var member : existingMembers) {
+            if (!updatedMemberIds.contains(member.getId()) && !member.getId().equals(owner.getId())) {
+                notifyMemberRemovedFromProject(member, project);
+            }
+        }
+    }
+
+    private void notifyMemberRemovedFromProject(User member, Project project) {
+        var message = "You have been removed from project: " + project.getSummary();
+        notificationService.createNotification(member, message, NotificationType.MEMBER_REMOVED, null);
+    }
+
+    private void notifyProjectMembersOfUpdate(Project project, Integer updaterId) {
+        var link = "/projects?projectKey=" + project.getProjectKey();
+        var message = "Project '" + project.getSummary() + "' has been updated";
+        for (var member : project.getMembers()) {
+            if (!member.getId().equals(updaterId)) {
+                notificationService.createNotification(member, message, NotificationType.PROJECT_UPDATED, link);
             }
         }
     }
@@ -250,7 +277,7 @@ public class ProjectService {
 
     private void notifyMemberAddedToProject(User member, Project project) {
         var message = "You have been added to project: " + project.getSummary();
-        var link = "/projects/" + project.getProjectKey();
+        var link = "/projects?projectKey=" + project.getProjectKey();
         notificationService.createNotification(member, message, NotificationType.PROJECT_INVITATION, link);
     }
 

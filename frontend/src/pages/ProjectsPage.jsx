@@ -59,6 +59,7 @@ const ProjectsPage = () => {
         baseCloseModal();
         const params = new URLSearchParams(location.search);
         params.delete('selectedIssue');
+        params.delete('commentId');
         navigate(`?${params.toString()}`, { replace: true });
     }, [baseCloseModal, location.search, navigate]);
 

@@ -30,19 +30,22 @@ public class CommentService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final NotificationService notificationService;
+    private final TaskActivityService taskActivityService;
 
     public CommentService(CommentRepository commentRepository,
                           CommentReactionRepository commentReactionRepository,
                           TaskRepository taskRepository,
                           UserRepository userRepository,
                           FileStorageService fileStorageService,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          TaskActivityService taskActivityService) {
         this.commentRepository = commentRepository;
         this.commentReactionRepository = commentReactionRepository;
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
         this.fileStorageService = fileStorageService;
         this.notificationService = notificationService;
+        this.taskActivityService = taskActivityService;
     }
 
     @Transactional(readOnly = true)
@@ -88,7 +91,9 @@ public class CommentService {
         var comment = new Comment(task, user, parentComment, sanitizedContent, attachmentUrls);
         var savedComment = commentRepository.save(comment);
         initializeLazyCollections(savedComment);
-        notifyParentCommentAuthorIfDifferentUser(parentComment, userId, task);
+        taskActivityService.logCommentAdded(task, user);
+        notifyParentCommentAuthorIfDifferentUser(parentComment, userId, task, savedComment.getId());
+        notifyTaskAssigneeOfNewComment(task, userId, savedComment.getId());
         return convertToDTO(savedComment, userId);
     }
 
@@ -124,6 +129,10 @@ public class CommentService {
 
         verifyProjectAccess(comment.getTask().getProject(), userId);
         verifyCommentOwnership(comment, userId);
+
+        var user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        taskActivityService.logCommentDeleted(comment.getTask(), user);
 
         commentRepository.delete(comment);
     }
@@ -204,14 +213,24 @@ public class CommentService {
         comment.getReactions().size();
     }
 
-    private void notifyParentCommentAuthorIfDifferentUser(Comment parentComment, Integer userId, Task task) {
+    private void notifyParentCommentAuthorIfDifferentUser(Comment parentComment, Integer userId, Task task, Integer commentId) {
         if (parentComment == null || parentComment.getAuthor().getId().equals(userId)) {
             return;
         }
         var message = "Someone replied to your comment on task: " + task.getSummary();
-        var link = "/projects?selectedIssue=" + task.getTaskKey();
+        var link = "/projects?selectedIssue=" + task.getTaskKey() + "&commentId=" + commentId;
         notificationService.createNotification(parentComment.getAuthor(), message,
                 NotificationType.COMMENT_REPLY, link);
+    }
+
+    private void notifyTaskAssigneeOfNewComment(Task task, Integer commentAuthorId, Integer commentId) {
+        if (task.getAssignee() == null || task.getAssignee().getId().equals(commentAuthorId)) {
+            return;
+        }
+        var message = "New comment on task: " + task.getSummary();
+        var link = "/projects?selectedIssue=" + task.getTaskKey() + "&commentId=" + commentId;
+        notificationService.createNotification(task.getAssignee(), message,
+                NotificationType.TASK_COMMENT, link);
     }
 
     private boolean processReaction(Comment comment, User user, ReactionType reactionType, Integer commentId) {
@@ -242,7 +261,7 @@ public class CommentService {
 
     private void notifyCommentAuthorOfReaction(Comment comment) {
         var message = "Someone reacted to your comment on task: " + comment.getTask().getSummary();
-        var link = "/projects?selectedIssue=" + comment.getTask().getTaskKey();
+        var link = "/projects?selectedIssue=" + comment.getTask().getTaskKey() + "&commentId=" + comment.getId();
         notificationService.createNotification(comment.getAuthor(), message,
                 NotificationType.COMMENT_REACTION, link);
     }

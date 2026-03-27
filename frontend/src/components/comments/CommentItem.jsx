@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 import { formatDistanceToNow } from 'date-fns';
 import Avatar from '../common/Avatar';
@@ -13,6 +13,7 @@ const CommentItem = React.memo(({
     currentUserId,
     editingComment,
     replyingCommentId,
+    highlightCommentId,
     onSetEditingComment,
     onSetReplyingCommentId,
     onHandleUpdateComment,
@@ -23,6 +24,16 @@ const CommentItem = React.memo(({
     openPreview,
 }) => {
     const [isVisible] = useAnimateIn();
+    const commentRef = useRef(null);
+    const isHighlighted = highlightCommentId === comment.id;
+
+    useEffect(() => {
+        if (isHighlighted && commentRef.current) {
+            setTimeout(() => {
+                commentRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+        }
+    }, [isHighlighted]);
 
     const isOwner = comment.authorId === currentUserId;
 
@@ -35,10 +46,12 @@ const CommentItem = React.memo(({
 
     return (
         <div
+            ref={commentRef}
             className={
                 `${level > 0 ? 'ml-5 mt-2' : 'mt-2'}`
-                + ` transition-all duration-150`
+                + ` transition-all duration-500`
                 + ` ${isVisible ? 'opacity-100' : 'opacity-0'}`
+                + ` ${isHighlighted ? ' rounded-lg ring-2 ring-blue-400 dark:ring-blue-500 bg-blue-50/50 dark:bg-blue-900/20 p-2 -m-2' : ''}`
             }
         >
             <div className="flex gap-2">
@@ -187,6 +200,7 @@ const CommentItem = React.memo(({
                             currentUserId={currentUserId}
                             editingComment={editingComment}
                             replyingCommentId={replyingCommentId}
+                            highlightCommentId={highlightCommentId}
                             onSetEditingComment={onSetEditingComment}
                             onSetReplyingCommentId={onSetReplyingCommentId}
                             onHandleUpdateComment={onHandleUpdateComment}

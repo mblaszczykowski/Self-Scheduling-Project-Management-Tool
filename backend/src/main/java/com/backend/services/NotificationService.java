@@ -17,9 +17,12 @@ import java.util.List;
 @Service
 public class NotificationService {
     private final NotificationRepository notificationRepository;
+    private final SseEmitterManager sseEmitterManager;
 
-    public NotificationService(NotificationRepository notificationRepository) {
+    public NotificationService(NotificationRepository notificationRepository,
+                               SseEmitterManager sseEmitterManager) {
         this.notificationRepository = notificationRepository;
+        this.sseEmitterManager = sseEmitterManager;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -31,6 +34,8 @@ public class NotificationService {
         notification.setTimestamp(Instant.now());
         notification.setLink(link);
         notificationRepository.save(notification);
+
+        sseEmitterManager.sendNotification(recipient.getId(), convertToDTO(notification));
     }
 
     @Transactional(readOnly = true)

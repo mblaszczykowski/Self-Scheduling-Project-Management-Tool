@@ -1,14 +1,14 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import config from '../config';
 import { getNotifications } from '../util/api';
 import { AuthContext } from './AuthContext';
-
-const NOTIFICATION_POLL_MS = 30000;
 
 export const NotificationsContext = createContext();
 
 export const NotificationsProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
     const [notifications, setNotifications] = useState([]);
+    const eventSourceRef = useRef(null);
 
     const refreshNotifications = useCallback(async () => {
         try {
@@ -19,75 +19,44 @@ export const NotificationsProvider = ({ children }) => {
         }
     }, []);
 
-    // Initial fetch
     useEffect(() => {
         if (!user) {
             setNotifications([]);
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+                eventSourceRef.current = null;
+            }
             return;
         }
+
+        // Fetch existing notifications on login
         refreshNotifications();
-    }, [user, refreshNotifications]);
 
-    // Polling
-    useEffect(() => {
-        if (!user) return;
+        // Open SSE connection for real-time updates
+        const url = `${config.API_BASE_URL}/api/notifications/stream`;
+        const es = new EventSource(url, { withCredentials: true });
+        eventSourceRef.current = es;
 
-        let pollIntervalId = null;
-        let backoffTimeoutId = null;
-        let consecutiveFailures = 0;
-
-        const pollWithErrorHandling = async () => {
+        es.addEventListener('notification', (event) => {
             try {
-                await refreshNotifications();
-                consecutiveFailures = 0;
-            } catch {
-                consecutiveFailures++;
-                if (consecutiveFailures >= 5) {
-                    stopPolling();
-                    const backoffMs = Math.min(NOTIFICATION_POLL_MS * Math.pow(2, consecutiveFailures - 5), 300000);
-                    backoffTimeoutId = setTimeout(() => {
-                        backoffTimeoutId = null;
-                        startPolling();
-                    }, backoffMs);
-                }
+                const notification = JSON.parse(event.data);
+                setNotifications(prev => [notification, ...prev]);
+            } catch (err) {
+                console.error('Error parsing SSE notification:', err);
             }
-        };
+        });
 
-        const startPolling = () => {
-            if (pollIntervalId) return;
-            pollIntervalId = setInterval(pollWithErrorHandling, NOTIFICATION_POLL_MS);
-        };
-
-        const stopPolling = () => {
-            if (pollIntervalId) {
-                clearInterval(pollIntervalId);
-                pollIntervalId = null;
-            }
-            if (backoffTimeoutId) {
-                clearTimeout(backoffTimeoutId);
-                backoffTimeoutId = null;
-            }
-        };
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                consecutiveFailures = 0;
+        es.onerror = () => {
+            // EventSource auto-reconnects on error.
+            // On reconnect we refresh the full list to avoid gaps.
+            if (es.readyState === EventSource.CONNECTING) {
                 refreshNotifications();
-                startPolling();
-            } else {
-                stopPolling();
             }
         };
-
-        if (document.visibilityState === 'visible') {
-            startPolling();
-        }
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
-            stopPolling();
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            es.close();
+            eventSourceRef.current = null;
         };
     }, [user, refreshNotifications]);
 

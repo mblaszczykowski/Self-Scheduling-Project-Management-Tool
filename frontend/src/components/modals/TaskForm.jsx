@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ErrorMessage, Field } from 'formik';
 import {
     HiOutlineChevronDown,
@@ -9,6 +9,7 @@ import {
 import RichTextEditor from '../common/RichTextEditor';
 import AttachmentUploader from './AttachmentUploader';
 import Comments from '../comments/Comments';
+import ActivityTab from '../comments/ActivityTab';
 import { SectionHeader } from '../common/formHelpers';
 import { STATUS_CONFIG, PRIORITY_CONFIG, daysBetween, toDateString, MS_PER_DAY } from '../../util/helpers';
 import Avatar from '../common/Avatar';
@@ -146,6 +147,11 @@ const DueBadge = ({ date }) => {
    TaskForm
    ═══════════════════════════════════════════════════════════ */
 
+const ACTIVITY_TABS = [
+    { key: 'comments', label: 'Comments' },
+    { key: 'history', label: 'History' },
+];
+
 const TaskForm = ({
     values, setFieldValue, handleChange,
     modalMode, task, project, projects, currentUser,
@@ -153,6 +159,7 @@ const TaskForm = ({
     existingAttachments, newAttachments, onAddAttachments, onRemoveAttachment,
     entityKey,
 }) => {
+    const [activeActivityTab, setActiveActivityTab] = useState('comments');
     const allTasks = projects.flatMap(p => p.tasks || []);
 
     const assignee = useMemo(() => {
@@ -210,8 +217,29 @@ const TaskForm = ({
 
                 {modalMode === 'edit' && task && currentUser && (
                     <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3 block">Activity</span>
-                        <Comments taskId={task.id} currentUserId={currentUser.id} />
+                        <div className="flex items-center gap-1 mb-4">
+                            {ACTIVITY_TABS.map(tab => (
+                                <button
+                                    key={tab.key}
+                                    type="button"
+                                    onClick={() => setActiveActivityTab(tab.key)}
+                                    className={
+                                        'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors '
+                                        + (activeActivityTab === tab.key
+                                            ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                                            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300')
+                                    }
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                        {activeActivityTab === 'comments' && (
+                            <Comments taskId={task.id} currentUserId={currentUser.id} />
+                        )}
+                        {activeActivityTab === 'history' && (
+                            <ActivityTab taskId={task.id} />
+                        )}
                     </div>
                 )}
             </div>

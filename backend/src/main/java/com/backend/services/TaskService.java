@@ -23,15 +23,17 @@ public class TaskService {
     private final FileStorageService fileStorageService;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final TaskActivityService taskActivityService;
 
     public TaskService(TaskRepository taskRepository, ProjectRepository projectRepository,
                        FileStorageService fileStorageService, UserRepository userRepository,
-                       NotificationService notificationService) {
+                       NotificationService notificationService, TaskActivityService taskActivityService) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
         this.fileStorageService = fileStorageService;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.taskActivityService = taskActivityService;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -79,6 +81,11 @@ public class TaskService {
 
         var savedTask = taskRepository.save(task);
 
+        var author = userRepository.findById(userId).orElse(null);
+        if (author != null) {
+            taskActivityService.logCreated(savedTask, author);
+        }
+
         if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
             var message = "You have been assigned to task: " + task.getSummary();
             var link = "/projects?selectedIssue=" + savedTask.getTaskKey();
@@ -107,6 +114,17 @@ public class TaskService {
         if (!task.getProject().getId().equals(project.getId())) {
             throw new ValidationException("Task does not belong to the specified project");
         }
+
+        // Snapshot old values for activity logging
+        var oldStatus = task.getStatus();
+        var oldPriority = task.getPriority();
+        var oldAssignee = task.getAssignee() != null ? task.getAssignee().getFullName() : null;
+        var oldProgress = task.getProgress();
+        var oldStartDate = task.getStartDate() != null ? task.getStartDate().toString() : null;
+        var oldDueDate = task.getDueDate() != null ? task.getDueDate().toString() : null;
+        var oldSummary = task.getSummary();
+        var oldLabels = task.getLabels();
+        var oldDeps = String.join(",", extractDependencyKeys(task) != null ? extractDependencyKeys(task) : List.of());
 
         task.setSummary(taskDTO.summary());
         task.setDescription(taskDTO.description());
@@ -140,6 +158,25 @@ public class TaskService {
         updateTaskDependencies(task, taskDTO.dependencyKeys(), userId);
 
         var updatedTask = taskRepository.save(task);
+
+        // Log activity
+        var author = userRepository.findById(userId).orElse(null);
+        if (author != null) {
+            var newAssignee = task.getAssignee() != null ? task.getAssignee().getFullName() : null;
+            var newStartDate = task.getStartDate() != null ? task.getStartDate().toString() : null;
+            var newDueDate = task.getDueDate() != null ? task.getDueDate().toString() : null;
+            var newDeps = String.join(",", extractDependencyKeys(task) != null ? extractDependencyKeys(task) : List.of());
+            taskActivityService.logFieldChanges(updatedTask, author,
+                    oldStatus, task.getStatus(),
+                    oldPriority, task.getPriority(),
+                    oldAssignee, newAssignee,
+                    oldProgress, task.getProgress(),
+                    oldStartDate, newStartDate,
+                    oldDueDate, newDueDate,
+                    oldSummary, task.getSummary(),
+                    oldLabels, task.getLabels(),
+                    oldDeps, newDeps);
+        }
 
         if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
             var message = "Task '" + task.getSummary() + "' has been updated";
@@ -288,6 +325,12 @@ public class TaskService {
 
         if (!task.getProject().getId().equals(project.getId())) {
             throw new ValidationException("Task does not belong to the specified project");
+        }
+
+        if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
+            var message = "Task '" + task.getSummary() + "' has been deleted";
+            notificationService.createNotification(task.getAssignee(), message,
+                    NotificationType.TASK_DELETED, null);
         }
 
         deleteTaskAttachmentsSilently(task);

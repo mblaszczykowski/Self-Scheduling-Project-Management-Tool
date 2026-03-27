@@ -163,6 +163,9 @@ export const reactToComment = (taskId, commentId, reactionType) =>
         params: { type: reactionType }
     }).then(res => res.data);
 
+export const getTaskActivities = (taskId) =>
+    api.get(`/api/tasks/${taskId}/activities`).then(res => res.data);
+
 export const getNotifications = () =>
     api.get('/api/notifications').then(res => res.data);
 

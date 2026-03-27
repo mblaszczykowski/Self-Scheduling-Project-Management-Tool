@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ProjectsContext } from '../../context/ProjectsContext';
 import { getFileInfo } from '../../util/helpers';
 import PreviewModal from '../common/PreviewModal';
@@ -8,6 +9,8 @@ import CommentItem from './CommentItem';
 import CommentForm from './CommentForm';
 
 export default function Comments({ taskId, currentUserId }) {
+    const location = useLocation();
+    const highlightCommentId = new URLSearchParams(location.search).get('commentId');
     const {
         getComments, createComment, updateComment,
         deleteComment, reactToComment,
@@ -184,6 +187,7 @@ export default function Comments({ taskId, currentUserId }) {
                             currentUserId={currentUserId}
                             editingComment={editingComment}
                             replyingCommentId={replyingCommentId}
+                            highlightCommentId={highlightCommentId ? Number(highlightCommentId) : null}
                             onSetEditingComment={setEditingComment}
                             onSetReplyingCommentId={setReplyingCommentId}
                             onHandleUpdateComment={handleUpdateComment}

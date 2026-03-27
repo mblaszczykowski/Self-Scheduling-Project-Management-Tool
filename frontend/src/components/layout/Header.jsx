@@ -42,6 +42,15 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
         }
     };
 
+    const handleMarkSingleRead = async (notificationId) => {
+        try {
+            await markNotificationsAsRead([notificationId]);
+            setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n));
+        } catch (err) {
+            console.error('Error marking notification as read:', err);
+        }
+    };
+
     const NavLink = ({ to, children }) => (
         <Link
             to={to}
@@ -101,6 +110,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                         onToggle={() => setNotificationsOpen(true)}
                         onClose={() => setNotificationsOpen(false)}
                         onMarkAsRead={handleMarkNotificationsAsRead}
+                        onMarkSingleRead={handleMarkSingleRead}
                     />
                     <div className="hidden xl:flex items-center gap-1">
                         <UserMenu
