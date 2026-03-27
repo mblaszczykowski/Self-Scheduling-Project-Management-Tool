@@ -6,15 +6,17 @@ import { formatShortDate } from '../../util/helpers';
 import {
     CheckCircleIcon, AlertTriangleIcon, BlockedIcon,
     TrendingUpIcon, ChartBarIcon, UsersIcon, LightningIcon,
+    ClockIcon, FlagIcon,
 } from '../common/Icons';
 
 const AnalyticsSection = ({ stats }) => {
     return (
         <section>
-            <SectionHeader title="Analytics" subtitle="Critical path optimization" />
+            <SectionHeader title="Analytics" subtitle="Critical path optimization & schedule intelligence" />
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
 
-                                <ChartCard title="Critical Path Health" subtitle="Overall critical task status">
+                {/* ── 1. Critical Path Health (existing) ── */}
+                <ChartCard title="Critical Path Health" subtitle="Overall critical task status">
                     <div className="flex items-start justify-between mb-4">
                         <div>
                             <div className="text-4xl font-bold text-slate-900 mb-1">
@@ -50,25 +52,306 @@ const AnalyticsSection = ({ stats }) => {
                     </div>
                 </ChartCard>
 
-                                <CriticalPathTimelineCard stats={stats} />
+                {/* ── 2. Schedule Health (NEW) ── */}
+                <ScheduleHealthCard stats={stats} />
 
-                                <ProjectProgressCard stats={stats} />
+                {/* ── 3. Resource Conflicts (NEW) ── */}
+                <ResourceConflictsCard stats={stats} />
 
-                                <OverdueCriticalCard stats={stats} />
+                {/* ── 4. Critical Path Duration (existing) ── */}
+                <CriticalPathTimelineCard stats={stats} />
 
-                                <BlockedTasksCard stats={stats} />
+                {/* ── 5. Project Velocity (NEW) ── */}
+                <ProjectVelocityCard stats={stats} />
 
-                                <CriticalWorkloadCard stats={stats} />
+                {/* ── 6. Project Progress (existing) ── */}
+                <ProjectProgressCard stats={stats} />
 
-                                <NearCriticalCard stats={stats} />
+                {/* ── 7. Dependency Chain Analysis (NEW) ── */}
+                <DependencyChainCard stats={stats} />
 
-                                <CrossProjectDepsCard stats={stats} />
+                {/* ── 8. Overdue Critical (existing) ── */}
+                <OverdueCriticalCard stats={stats} />
 
-                                <UpcomingDeadlinesCard stats={stats} />
+                {/* ── 9. Blocked Tasks (existing) ── */}
+                <BlockedTasksCard stats={stats} />
+
+                {/* ── 10. Assignee Load (NEW) ── */}
+                <AssigneeLoadCard stats={stats} />
+
+                {/* ── 11. Critical Path Workload (existing) ── */}
+                <CriticalWorkloadCard stats={stats} />
+
+                {/* ── 12. Near-Critical (existing) ── */}
+                <NearCriticalCard stats={stats} />
+
+                {/* ── 13. Cross-Project Deps (existing) ── */}
+                <CrossProjectDepsCard stats={stats} />
+
+                {/* ── 14. Upcoming Deadlines (existing) ── */}
+                <UpcomingDeadlinesCard stats={stats} />
             </div>
         </section>
     );
 };
+
+/* ══════════════════════════════════════════════════════════
+   NEW CARDS
+   ══════════════════════════════════════════════════════════ */
+
+const ScheduleHealthCard = ({ stats }) => {
+    const h = stats.scheduleHealth;
+    const scoreColor = h.scheduleHealthScore >= 75 ? 'text-green-600'
+        : h.scheduleHealthScore >= 50 ? 'text-amber-600' : 'text-red-600';
+    const bgColor = h.scheduleHealthScore >= 75 ? 'bg-green-100'
+        : h.scheduleHealthScore >= 50 ? 'bg-amber-100' : 'bg-red-100';
+    const iconColor = h.scheduleHealthScore >= 75 ? 'text-green-600'
+        : h.scheduleHealthScore >= 50 ? 'text-amber-600' : 'text-red-600';
+
+    return (
+        <ChartCard title="Schedule Health" subtitle="Progress vs time elapsed">
+            <div className="flex items-start justify-between mb-4">
+                <div>
+                    <div className={`text-4xl font-bold ${scoreColor} mb-1`}>
+                        {h.scheduleHealthScore}%
+                    </div>
+                    <div className="text-xs text-slate-500">
+                        {h.totalActive} active tasks tracked
+                    </div>
+                </div>
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${bgColor}`}>
+                    <ClockIcon className={`w-7 h-7 ${iconColor}`} />
+                </div>
+            </div>
+            <div className="space-y-1.5 pt-4 border-t border-slate-100">
+                <HealthRow label="On track" value={h.onTrack} color="text-green-600" />
+                <HealthRow label="Slightly behind (<15%)" value={h.slightlyBehind} color="text-amber-500" />
+                <HealthRow label="Behind (15-30%)" value={h.behind} color="text-orange-600" />
+                <HealthRow label="Critically behind (>30%)" value={h.criticallyBehind} color="text-red-600" />
+                <HealthRow label="Not yet started" value={h.notStarted} color="text-slate-400" />
+            </div>
+            {h.worstBehind.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-slate-100">
+                    <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">Most behind</p>
+                    {h.worstBehind.slice(0, 3).map(task => (
+                        <Link key={task.taskKey} to={`/projects?selectedIssue=${task.taskKey}`}
+                            className="block text-xs text-slate-600 hover:text-slate-900 truncate transition-colors mb-0.5">
+                            <span className="font-mono font-medium">{task.taskKey}</span>
+                            <span className="text-red-500 ml-1">{task.gap}% behind</span>
+                            <span className="text-slate-400 ml-1">({task.progress}% vs {task.expected}% expected)</span>
+                        </Link>
+                    ))}
+                </div>
+            )}
+        </ChartCard>
+    );
+};
+
+const HealthRow = ({ label, value, color }) => (
+    <div className="flex justify-between text-xs">
+        <span className="text-slate-600">{label}</span>
+        <span className={`font-semibold ${color}`}>{value}</span>
+    </div>
+);
+
+const ResourceConflictsCard = ({ stats }) => {
+    const rc = stats.resourceConflicts;
+    const hasConflicts = rc.totalConflicts > 0;
+
+    return (
+        <ChartCard title="Resource Conflicts" subtitle="Overlapping task assignments">
+            <div className="flex items-start justify-between mb-4">
+                <div>
+                    <div className={`text-4xl font-bold mb-1 ${hasConflicts ? 'text-red-600' : 'text-green-600'}`}>
+                        {rc.totalConflicts}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                        {rc.affectedAssignees.length} people over-allocated
+                    </div>
+                </div>
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${hasConflicts ? 'bg-red-100' : 'bg-green-100'}`}>
+                    <UsersIcon className={`w-7 h-7 ${hasConflicts ? 'text-red-600' : 'text-green-600'}`} />
+                </div>
+            </div>
+            {hasConflicts ? (
+                <div className="space-y-2 pt-4 border-t border-slate-100">
+                    <div className="flex justify-between text-xs">
+                        <span className="text-slate-600">Involve critical tasks</span>
+                        <span className="font-semibold text-red-600">{rc.criticalConflicts}</span>
+                    </div>
+                    <div className="mt-2 space-y-1.5">
+                        {rc.conflicts.slice(0, 4).map((c, i) => (
+                            <div key={i} className="text-xs flex items-center gap-1.5">
+                                <span className="text-slate-500 truncate max-w-[80px]">{c.assignee.split('@')[0]}</span>
+                                <span className="font-mono text-slate-700">{c.task1}</span>
+                                <span className="text-slate-300">/</span>
+                                <span className="font-mono text-slate-700">{c.task2}</span>
+                                <span className="text-red-500 ml-auto shrink-0">{c.overlapDays}d overlap</span>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-2">
+                        Run the optimizer to resolve scheduling conflicts
+                    </p>
+                </div>
+            ) : (
+                <div className="pt-4 border-t border-slate-100">
+                    <p className="text-xs text-green-600 font-medium">No resource conflicts detected</p>
+                    <p className="text-[10px] text-slate-400 mt-1">All assignees have non-overlapping schedules</p>
+                </div>
+            )}
+        </ChartCard>
+    );
+};
+
+const velocityStatusConfig = {
+    comfortable: { color: 'bg-green-500', label: 'Comfortable', textColor: 'text-green-600' },
+    moderate: { color: 'bg-blue-500', label: 'Moderate', textColor: 'text-blue-600' },
+    tight: { color: 'bg-amber-500', label: 'Tight', textColor: 'text-amber-600' },
+    critical: { color: 'bg-red-500', label: 'Critical', textColor: 'text-red-600' },
+};
+
+const ProjectVelocityCard = ({ stats }) => (
+    <ChartCard title="Required Velocity" subtitle="Daily progress needed to meet deadlines">
+        <div className="space-y-3">
+            {stats.projectVelocity.length > 0 ? (
+                stats.projectVelocity.slice(0, 6).map(pv => {
+                    const cfg = velocityStatusConfig[pv.status];
+                    return (
+                        <div key={pv.projectKey} className="space-y-1">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-slate-900">{pv.projectKey}</span>
+                                    <span className={`text-[10px] font-medium ${cfg.textColor} px-1.5 py-0.5 rounded-full bg-opacity-10 ${cfg.color.replace('bg-', 'bg-')}/10`}>
+                                        {cfg.label}
+                                    </span>
+                                </div>
+                                <span className={`text-sm font-bold ${cfg.textColor}`}>
+                                    {pv.avgVelocityNeeded > 100 ? '99+' : pv.avgVelocityNeeded}%/day
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                                <span>{pv.activeTasks} active</span>
+                                {pv.urgentCount > 0 && (
+                                    <span className="text-amber-600">{pv.urgentCount} need >15%/day</span>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })
+            ) : (
+                <EmptyState icon="trend" message="No active tasks with schedules" />
+            )}
+        </div>
+    </ChartCard>
+);
+
+const DependencyChainCard = ({ stats }) => {
+    const da = stats.dependencyAnalysis;
+    return (
+        <ChartCard title="Dependency Analysis" subtitle="Chain depth & bottleneck tasks">
+            <div className="flex items-start justify-between mb-4">
+                <div>
+                    <div className="text-4xl font-bold text-slate-900 mb-1">
+                        {da.longestChainLength}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                        Longest dependency chain
+                    </div>
+                </div>
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${
+                    da.longestChainLength > 3 ? 'bg-amber-100' : 'bg-slate-100'
+                }`}>
+                    <LightningIcon className={`w-7 h-7 ${
+                        da.longestChainLength > 3 ? 'text-amber-600' : 'text-slate-400'
+                    }`} />
+                </div>
+            </div>
+            {da.bottlenecks.length > 0 ? (
+                <div className="pt-4 border-t border-slate-100">
+                    <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-2">
+                        Bottleneck tasks (most dependents)
+                    </p>
+                    <div className="space-y-2">
+                        {da.bottlenecks.map(b => (
+                            <Link key={b.taskKey} to={`/projects?selectedIssue=${b.taskKey}`}
+                                className="flex items-center justify-between text-xs hover:bg-slate-50 -mx-1 px-1 rounded transition-colors">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="font-mono font-medium text-slate-800">{b.taskKey}</span>
+                                    {b.isCritical && (
+                                        <span className="text-[9px] text-red-600 bg-red-50 px-1 py-px rounded font-medium">C</span>
+                                    )}
+                                    <span className="text-slate-400 truncate">{b.task?.summary}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 ml-2">
+                                    <span className="text-slate-500">{b.progress}%</span>
+                                    <span className="font-semibold text-slate-700">{b.dependentCount} downstream</span>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                    {da.longestChainLength > 3 && (
+                        <p className="text-[10px] text-amber-600 mt-2">
+                            Deep chains amplify delays. Consider parallelizing work.
+                        </p>
+                    )}
+                </div>
+            ) : (
+                <div className="pt-4 border-t border-slate-100">
+                    <p className="text-xs text-slate-500">No active bottleneck tasks</p>
+                </div>
+            )}
+        </ChartCard>
+    );
+};
+
+const AssigneeLoadCard = ({ stats }) => (
+    <ChartCard title="Team Load Distribution" subtitle="Active workload per assignee">
+        <div className="space-y-2">
+            {stats.assigneeLoad.length > 0 ? (
+                stats.assigneeLoad.map(a => {
+                    const isOverloaded = a.total > 5 || a.overdue > 1;
+                    return (
+                        <div key={a.assignee} className="flex items-center gap-2">
+                            <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0">
+                                <span className="text-[10px] font-medium text-slate-700">
+                                    {a.assignee.split('@')[0].substring(0, 2).toUpperCase()}
+                                </span>
+                            </div>
+                            <span className="text-xs text-slate-700 truncate min-w-0 flex-1">{a.assignee.split('@')[0]}</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isOverloaded ? 'text-red-600 bg-red-50' : 'text-slate-600 bg-slate-100'}`}>
+                                    {a.total} tasks
+                                </span>
+                                {a.critical > 0 && (
+                                    <span className="text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded font-medium">
+                                        {a.critical}C
+                                    </span>
+                                )}
+                                {a.overdue > 0 && (
+                                    <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                                        {a.overdue} late
+                                    </span>
+                                )}
+                                {a.conflicts > 0 && (
+                                    <span className="text-[10px] text-red-500 bg-red-50 px-1 py-0.5 rounded">
+                                        {a.conflicts} conflicts
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })
+            ) : (
+                <EmptyState icon="users" message="No assigned active tasks" />
+            )}
+        </div>
+    </ChartCard>
+);
+
+/* ══════════════════════════════════════════════════════════
+   EXISTING CARDS (preserved)
+   ══════════════════════════════════════════════════════════ */
 
 const CriticalPathTimelineCard = ({ stats }) => (
     <ChartCard title="Critical Path Duration" subtitle="Timeline by project">
@@ -364,6 +647,8 @@ const UpcomingDeadlinesCard = ({ stats }) => (
         </div>
     </ChartCard>
 );
+
+/* ── Shared Empty State ── */
 
 const iconMap = {
     trend: TrendingUpIcon,
