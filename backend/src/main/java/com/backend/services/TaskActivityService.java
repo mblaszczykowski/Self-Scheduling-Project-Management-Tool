@@ -3,6 +3,7 @@ package com.backend.services;
 import com.backend.dtos.TaskActivityDTO;
 import com.backend.entities.*;
 import com.backend.repositories.TaskActivityRepository;
+import com.backend.util.EntityMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,9 +14,11 @@ import java.util.Objects;
 public class TaskActivityService {
 
     private final TaskActivityRepository taskActivityRepository;
+    private final EntityMapper entityMapper;
 
-    public TaskActivityService(TaskActivityRepository taskActivityRepository) {
+    public TaskActivityService(TaskActivityRepository taskActivityRepository, EntityMapper entityMapper) {
         this.taskActivityRepository = taskActivityRepository;
+        this.entityMapper = entityMapper;
     }
 
     @Transactional(readOnly = true)
@@ -25,10 +28,12 @@ public class TaskActivityService {
                 .toList();
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void logCreated(Task task, User author) {
         save(new TaskActivity(task, author, TaskActivityType.CREATED, null, null, null));
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void logFieldChanges(Task task, User author,
                                 TaskStatus oldStatus, TaskStatus newStatus,
                                 TaskPriority oldPriority, TaskPriority newPriority,
@@ -75,10 +80,12 @@ public class TaskActivityService {
         }
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void logCommentAdded(Task task, User author) {
         save(new TaskActivity(task, author, TaskActivityType.COMMENT_ADDED, null, null, null));
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void logCommentDeleted(Task task, User author) {
         save(new TaskActivity(task, author, TaskActivityType.COMMENT_DELETED, null, null, null));
     }
@@ -88,17 +95,7 @@ public class TaskActivityService {
     }
 
     private TaskActivityDTO convertToDTO(TaskActivity activity) {
-        var author = activity.getAuthor();
-        return new TaskActivityDTO(
-                activity.getId(),
-                activity.getType(),
-                activity.getFieldName(),
-                activity.getOldValue(),
-                activity.getNewValue(),
-                author != null ? author.getFullName() : null,
-                author != null ? author.getProfilePicture() : null,
-                activity.getTimestamp()
-        );
+        return entityMapper.toTaskActivityDTO(activity);
     }
 
     private String formatEnum(Enum<?> val) {

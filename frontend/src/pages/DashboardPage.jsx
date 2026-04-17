@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLogout } from '../hooks/useLogout';
 import {
-    ArcElement, BarElement, CategoryScale, Chart as ChartJS, Legend,
+    ArcElement, BarElement, CategoryScale, Chart as ChartJS, Filler, Legend,
     LinearScale, LineElement, PointElement, TimeScale, Title, Tooltip,
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
@@ -24,7 +24,7 @@ import { computeProjectDateRange } from '../util/projectUtils';
 
 ChartJS.register(
     TimeScale, CategoryScale, LinearScale, BarElement,
-    PointElement, LineElement, Title, Tooltip, Legend, ArcElement
+    PointElement, LineElement, Title, Tooltip, Legend, ArcElement, Filler
 );
 
 const DashboardPage = () => {

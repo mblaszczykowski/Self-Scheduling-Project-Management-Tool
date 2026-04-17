@@ -62,7 +62,7 @@ function NotificationItem({ notification, onClose, onMarkSingleRead }) {
         </div>
     );
 
-    if (notification.link) {
+    if (notification.link && notification.link.trim()) {
         return (
             <Link
                 to={notification.link}

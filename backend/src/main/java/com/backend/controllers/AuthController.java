@@ -4,6 +4,7 @@ import com.backend.requests.LoginRequest;
 import com.backend.services.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +24,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest, HttpServletRequest httpRequest) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest, HttpServletRequest httpRequest) {
         var result = authService.authenticateUser(loginRequest, httpRequest);
         var headers = new HttpHeaders();
         headers.add(HttpHeaders.SET_COOKIE, result.tokens().accessCookie().toString());

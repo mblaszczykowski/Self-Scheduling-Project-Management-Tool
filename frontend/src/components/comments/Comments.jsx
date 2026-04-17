@@ -1,7 +1,8 @@
 import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ProjectsContext } from '../../context/ProjectsContext';
-import { getFileInfo } from '../../util/helpers';
+import { getFileInfo, getErrorMessage } from '../../util/helpers';
+import { showToast } from '../../util/toast';
 import PreviewModal from '../common/PreviewModal';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import ConfirmDialog from '../modals/ConfirmDialog';
@@ -59,7 +60,7 @@ export default function Comments({ taskId, currentUserId }) {
             if (parentCommentId) setReplyingCommentId(null);
             setShowCommentForm(false);
         } catch (err) {
-            console.error('Error adding comment:', err);
+            showToast(getErrorMessage(err, 'Failed to add comment'), 'error');
         } finally {
             setSubmitting(false);
         }
@@ -74,7 +75,7 @@ export default function Comments({ taskId, currentUserId }) {
             await fetchComments();
             setEditingComment(null);
         } catch (err) {
-            console.error('Error updating comment:', err);
+            showToast(getErrorMessage(err, 'Failed to update comment'), 'error');
         } finally {
             setSubmitting(false);
         }
@@ -90,7 +91,7 @@ export default function Comments({ taskId, currentUserId }) {
             await deleteComment(taskId, deleteConfirmId);
             await fetchComments();
         } catch (err) {
-            console.error('Error deleting comment:', err);
+            showToast(getErrorMessage(err, 'Failed to delete comment'), 'error');
         } finally {
             setDeleteConfirmId(null);
         }
@@ -101,7 +102,7 @@ export default function Comments({ taskId, currentUserId }) {
             await reactToComment(taskId, commentId, reactionType);
             await fetchComments();
         } catch (err) {
-            console.error('Error reacting to comment:', err);
+            showToast(getErrorMessage(err, 'Failed to react'), 'error');
         }
     };
 

@@ -1,5 +1,6 @@
 package com.backend.services;
 
+import com.backend.config.CookieProperties;
 import com.backend.entities.RefreshToken;
 import com.backend.exception.AuthorizationException;
 import com.backend.repositories.RefreshTokenRepository;
@@ -52,13 +53,16 @@ class TokenServiceTest {
         byte[] hash = digest.digest(secret.getBytes(StandardCharsets.UTF_8));
         secretKey = new SecretKeySpec(hash, "HmacSHA256");
 
+        CookieProperties cookieProperties = new CookieProperties();
+        cookieProperties.setSecure(false);
+        cookieProperties.setSameSite("Strict");
+
         tokenService = new TokenService(
                 secretKey,
                 ACCESS_TOKEN_EXPIRATION,
                 REFRESH_TOKEN_EXPIRATION,
                 refreshTokenRepository,
-                false,
-                "Strict"
+                cookieProperties
         );
     }
 

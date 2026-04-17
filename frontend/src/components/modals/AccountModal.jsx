@@ -3,7 +3,7 @@ import { useAnimateIn } from '../../hooks/useAnimateIn';
 import Modal from 'react-modal';
 import { ErrorMessage, Field, Form, Formik } from 'formik';
 import * as Yup from 'yup';
-import { updateUser } from '../../util/api';
+import { updateUser, updateEmailPreferences } from '../../util/api';
 import { getImageUrl } from '../../util/helpers';
 import Avatar from '../common/Avatar';
 import { CloseIcon } from '../common/Icons';
@@ -18,11 +18,37 @@ const validationSchema = Yup.object().shape({
     confirmNewPassword: Yup.string().oneOf([Yup.ref('newPassword'), null], 'Passwords must match'),
 });
 
+const EmailToggle = ({ label, description, checked, onChange, disabled }) => (
+    <label className={`flex items-center justify-between p-3 rounded-lg border border-slate-200 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-slate-50'}`}>
+        <div className="flex-1 mr-3">
+            <span className="block text-sm font-medium text-slate-800">{label}</span>
+            {description && <span className="block text-xs text-slate-500 mt-0.5">{description}</span>}
+        </div>
+        <div className="relative inline-flex items-center">
+            <input
+                type="checkbox"
+                checked={checked}
+                onChange={onChange}
+                disabled={disabled}
+                className="sr-only peer"
+            />
+            <div className="w-9 h-5 bg-slate-300 peer-checked:bg-slate-900 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+        </div>
+    </label>
+);
+
 const AccountModal = ({ user, onClose, onUpdateUser }) => {
     const [profilePreview, setProfilePreview] = useState(
         user.profilePicture ? getImageUrl(user.profilePicture) : null
     );
     const [isVisible, setIsVisible] = useAnimateIn();
+    const [emailPrefs, setEmailPrefs] = useState({
+        emailNotificationsEnabled: user.emailNotificationsEnabled ?? true,
+        emailOnTaskAssigned: user.emailOnTaskAssigned ?? true,
+        emailOnCommentReply: user.emailOnCommentReply ?? true,
+        emailOnProjectInvitation: user.emailOnProjectInvitation ?? true,
+    });
+    const [emailPrefsSaving, setEmailPrefsSaving] = useState(false);
 
     const handleClose = React.useCallback(() => {
         setIsVisible(false);
@@ -65,6 +91,21 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
             }
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    const handleEmailPrefToggle = async (key) => {
+        const updated = { ...emailPrefs, [key]: !emailPrefs[key] };
+        setEmailPrefs(updated);
+        setEmailPrefsSaving(true);
+        try {
+            const updatedUser = await updateEmailPreferences(updated);
+            onUpdateUser?.(updatedUser);
+        } catch (err) {
+            setEmailPrefs(emailPrefs);
+            console.error('Error updating email preferences:', err);
+        } finally {
+            setEmailPrefsSaving(false);
         }
     };
 
@@ -234,6 +275,40 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                             <ErrorMessage name="confirmNewPassword" component="div" className="text-red-500 text-xs mt-1" />
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-200">
+                                <h3 className="text-sm font-semibold text-slate-900 mb-4">Email Notifications</h3>
+                                <div className="space-y-3">
+                                    <EmailToggle
+                                        label="Email notifications enabled"
+                                        description="Master toggle for all email notifications"
+                                        checked={emailPrefs.emailNotificationsEnabled}
+                                        onChange={() => handleEmailPrefToggle('emailNotificationsEnabled')}
+                                        disabled={emailPrefsSaving}
+                                    />
+                                    <EmailToggle
+                                        label="Task assignments & updates"
+                                        description="Get notified when you are assigned to or a task changes"
+                                        checked={emailPrefs.emailOnTaskAssigned}
+                                        onChange={() => handleEmailPrefToggle('emailOnTaskAssigned')}
+                                        disabled={emailPrefsSaving || !emailPrefs.emailNotificationsEnabled}
+                                    />
+                                    <EmailToggle
+                                        label="Comment replies & reactions"
+                                        description="Get notified about replies and reactions to your comments"
+                                        checked={emailPrefs.emailOnCommentReply}
+                                        onChange={() => handleEmailPrefToggle('emailOnCommentReply')}
+                                        disabled={emailPrefsSaving || !emailPrefs.emailNotificationsEnabled}
+                                    />
+                                    <EmailToggle
+                                        label="Project invitations & updates"
+                                        description="Get notified about project invitations and changes"
+                                        checked={emailPrefs.emailOnProjectInvitation}
+                                        onChange={() => handleEmailPrefToggle('emailOnProjectInvitation')}
+                                        disabled={emailPrefsSaving || !emailPrefs.emailNotificationsEnabled}
+                                    />
                                 </div>
                             </div>
 

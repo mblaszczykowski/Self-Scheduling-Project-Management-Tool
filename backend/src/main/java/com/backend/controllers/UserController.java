@@ -1,10 +1,12 @@
 package com.backend.controllers;
 
 import com.backend.dtos.UserDTO;
+import com.backend.requests.EmailPreferencesRequest;
 import com.backend.requests.UserRegistrationRequest;
 import com.backend.services.TokenService;
 import com.backend.services.UserService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -42,7 +44,7 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<?> registerUser(@RequestBody UserRegistrationRequest request) {
+    public ResponseEntity<?> registerUser(@Valid @RequestBody UserRegistrationRequest request) {
         var result = userService.registerUser(request);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, result.tokens().accessCookie().toString())
@@ -58,6 +60,16 @@ public class UserController {
     public ResponseEntity<?> checkUserExists(@RequestParam String email) {
         boolean exists = userService.existsUserByEmail(email);
         return ResponseEntity.ok().body(Map.of("exists", exists));
+    }
+
+    @PatchMapping("/email-preferences")
+    public ResponseEntity<UserDTO> updateEmailPreferences(
+            HttpServletRequest request,
+            @RequestBody EmailPreferencesRequest preferencesRequest
+    ) {
+        Integer userId = tokenService.getUserIdFromRequest(request);
+        UserDTO updatedUser = userService.updateEmailPreferences(userId, preferencesRequest);
+        return ResponseEntity.ok(updatedUser);
     }
 
     @PutMapping(consumes = {"multipart/form-data"})

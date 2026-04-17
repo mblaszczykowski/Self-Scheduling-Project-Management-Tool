@@ -2,13 +2,17 @@ package com.backend.services;
 
 import com.backend.dtos.TaskDTO;
 import com.backend.entities.*;
+import com.backend.events.NotificationEvent;
 import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
 import com.backend.repositories.UserRepository;
-import com.backend.util.ValidationUtil;
+import com.backend.requests.TaskCreateRequest;
+import com.backend.util.AccessGuard;
+import com.backend.util.EntityMapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,23 +26,29 @@ public class TaskService {
     private final ProjectRepository projectRepository;
     private final FileStorageService fileStorageService;
     private final UserRepository userRepository;
-    private final NotificationService notificationService;
     private final TaskActivityService taskActivityService;
+    private final EntityMapper entityMapper;
+    private final AccessGuard accessGuard;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public TaskService(TaskRepository taskRepository, ProjectRepository projectRepository,
                        FileStorageService fileStorageService, UserRepository userRepository,
-                       NotificationService notificationService, TaskActivityService taskActivityService) {
+                       TaskActivityService taskActivityService,
+                       EntityMapper entityMapper, AccessGuard accessGuard,
+                       ApplicationEventPublisher applicationEventPublisher) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
         this.fileStorageService = fileStorageService;
         this.userRepository = userRepository;
-        this.notificationService = notificationService;
         this.taskActivityService = taskActivityService;
+        this.entityMapper = entityMapper;
+        this.accessGuard = accessGuard;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public TaskDTO createTask(String projectKey, TaskDTO taskDTO, Integer userId, List<MultipartFile> files) {
-        validateTaskDTO(taskDTO);
+    public TaskDTO createTask(String projectKey, TaskCreateRequest request, Integer userId, List<MultipartFile> files) {
+        validateLabels(request.labels());
 
         var attachmentUrls = (files != null && !files.isEmpty())
                 ? fileStorageService.storeFiles(files)
@@ -47,36 +57,34 @@ public class TaskService {
         var project = projectRepository.findByProjectKeyWithLock(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
-        if (!project.hasAccess(userId)) {
-            throw new ResourceNotFoundException("Project not found");
-        }
+        accessGuard.requireAccess(project, userId);
 
         var task = new Task();
-        task.setSummary(taskDTO.summary());
-        task.setDescription(taskDTO.description());
-        task.setStatus(Objects.requireNonNullElse(taskDTO.status(), TaskStatus.BACKLOG));
-        task.setStartDate(taskDTO.startDate());
-        task.setDueDate(taskDTO.dueDate());
-        task.setPriority(Objects.requireNonNullElse(taskDTO.priority(), TaskPriority.MEDIUM));
-        task.setProgress(Objects.requireNonNullElse(taskDTO.progress(), 0));
+        task.setSummary(request.summary());
+        task.setDescription(request.description());
+        task.setStatus(Objects.requireNonNullElse(request.status(), TaskStatus.BACKLOG));
+        task.setStartDate(request.startDate());
+        task.setDueDate(request.dueDate());
+        task.setPriority(Objects.requireNonNullElse(request.priority(), TaskPriority.MEDIUM));
+        task.setProgress(Objects.requireNonNullElse(request.progress(), 0));
         task.setProject(project);
         task.setTaskNumber(project.allocateNextTaskNumber());
         task.replaceAttachments(attachmentUrls);
 
-        if (taskDTO.assignee() != null && !taskDTO.assignee().isEmpty()) {
-            var assignee = userRepository.findByEmail(taskDTO.assignee())
+        if (request.assignee() != null && !request.assignee().isEmpty()) {
+            var assignee = userRepository.findByEmail(request.assignee())
                     .orElseThrow(() -> new ValidationException("Assignee not found"));
             task.setAssignee(assignee);
         }
 
-        if (taskDTO.labels() != null && !taskDTO.labels().isEmpty()) {
-            task.setLabels(String.join(",", taskDTO.labels()));
+        if (request.labels() != null && !request.labels().isEmpty()) {
+            task.setLabels(String.join(",", request.labels()));
         }
 
         projectRepository.save(project);
 
-        if (taskDTO.dependencyKeys() != null && !taskDTO.dependencyKeys().isEmpty()) {
-            task.replaceDependencies(resolveDependenciesBatch(taskDTO.dependencyKeys(), userId));
+        if (request.dependencyKeys() != null && !request.dependencyKeys().isEmpty()) {
+            task.replaceDependencies(resolveDependenciesBatch(request.dependencyKeys(), userId));
         }
 
         var savedTask = taskRepository.save(task);
@@ -89,24 +97,22 @@ public class TaskService {
         if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
             var message = "You have been assigned to task: " + task.getSummary();
             var link = "/projects?selectedIssue=" + savedTask.getTaskKey();
-            notificationService.createNotification(task.getAssignee(), message,
-                    NotificationType.TASK_ASSIGNED, link);
+            applicationEventPublisher.publishEvent(new NotificationEvent(task.getAssignee(), message,
+                    NotificationType.TASK_ASSIGNED, link));
         }
 
         return convertToDTO(savedTask);
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public TaskDTO updateTask(String projectKey, String taskKey, TaskDTO taskDTO,
+    public TaskDTO updateTask(String projectKey, String taskKey, TaskCreateRequest request,
                               Integer userId, List<MultipartFile> files) {
-        validateTaskDTO(taskDTO);
+        validateLabels(request.labels());
 
         var project = projectRepository.findByProjectKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
-        if (!project.hasAccess(userId)) {
-            throw new ResourceNotFoundException("Project not found");
-        }
+        accessGuard.requireAccess(project, userId);
 
         var task = taskRepository.findByTaskKey(taskKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
@@ -126,28 +132,28 @@ public class TaskService {
         var oldLabels = task.getLabels();
         var oldDeps = String.join(",", extractDependencyKeys(task) != null ? extractDependencyKeys(task) : List.of());
 
-        task.setSummary(taskDTO.summary());
-        task.setDescription(taskDTO.description());
-        task.setStatus(Objects.requireNonNullElse(taskDTO.status(), TaskStatus.BACKLOG));
-        task.setStartDate(taskDTO.startDate());
-        task.setDueDate(taskDTO.dueDate());
-        task.setProgress(Objects.requireNonNullElse(taskDTO.progress(), 0));
-        task.setPriority(Objects.requireNonNullElse(taskDTO.priority(), TaskPriority.MEDIUM));
+        task.setSummary(request.summary());
+        task.setDescription(request.description());
+        task.setStatus(Objects.requireNonNullElse(request.status(), TaskStatus.BACKLOG));
+        task.setStartDate(request.startDate());
+        task.setDueDate(request.dueDate());
+        task.setProgress(Objects.requireNonNullElse(request.progress(), 0));
+        task.setPriority(Objects.requireNonNullElse(request.priority(), TaskPriority.MEDIUM));
 
-        if (taskDTO.assignee() != null && !taskDTO.assignee().isEmpty()) {
-            var assignee = userRepository.findByEmail(taskDTO.assignee())
+        if (request.assignee() != null && !request.assignee().isEmpty()) {
+            var assignee = userRepository.findByEmail(request.assignee())
                     .orElseThrow(() -> new ValidationException("Assignee not found"));
             task.setAssignee(assignee);
         } else {
             task.setAssignee(null);
         }
 
-        if (taskDTO.labels() != null) {
-            task.setLabels(String.join(",", taskDTO.labels()));
+        if (request.labels() != null) {
+            task.setLabels(String.join(",", request.labels()));
         }
 
-        task.replaceAttachments(taskDTO.attachments() != null
-                ? new ArrayList<>(taskDTO.attachments())
+        task.replaceAttachments(request.attachments() != null
+                ? new ArrayList<>(request.attachments())
                 : new ArrayList<>());
 
         if (files != null && !files.isEmpty()) {
@@ -155,7 +161,7 @@ public class TaskService {
             task.addAttachments(newAttachments);
         }
 
-        updateTaskDependencies(task, taskDTO.dependencyKeys(), userId);
+        updateTaskDependencies(task, request.dependencyKeys(), userId);
 
         var updatedTask = taskRepository.save(task);
 
@@ -181,55 +187,25 @@ public class TaskService {
         if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
             var message = "Task '" + task.getSummary() + "' has been updated";
             var link = "/projects?selectedIssue=" + updatedTask.getTaskKey();
-            notificationService.createNotification(task.getAssignee(), message,
-                    NotificationType.TASK_UPDATED, link);
+            applicationEventPublisher.publishEvent(new NotificationEvent(task.getAssignee(), message,
+                    NotificationType.TASK_UPDATED, link));
         }
 
         return convertToDTO(updatedTask);
     }
 
-    public void validateTaskDTO(TaskDTO taskDTO) {
-        ValidationUtil.validateSummaryAndDescription(taskDTO.summary(), taskDTO.description());
-        if (taskDTO.progress() != null && (taskDTO.progress() < 0 || taskDTO.progress() > 100)) {
-            throw new ValidationException("Progress must be between 0 and 100");
-        }
-        if (taskDTO.labels() != null) {
-            for (String label : taskDTO.labels()) {
+    public TaskDTO convertToDTO(Task task) {
+        return entityMapper.toTaskDTO(task);
+    }
+
+    private void validateLabels(List<String> labels) {
+        if (labels != null) {
+            for (String label : labels) {
                 if (label != null && label.contains(",")) {
                     throw new ValidationException("Labels cannot contain commas");
                 }
             }
         }
-    }
-
-    public TaskDTO convertToDTO(Task task) {
-        var dependencyKeys = extractDependencyKeys(task);
-        var labels = parseLabels(task.getLabels());
-        var assigneeEmail = task.getAssignee() != null ? task.getAssignee().getEmail() : null;
-        var attachments = task.getAttachments() != null
-                ? new ArrayList<>(task.getAttachments())
-                : new ArrayList<String>();
-
-        return new TaskDTO(
-                task.getId(),
-                task.getTaskNumber(),
-                task.getTaskKey(),
-                task.getProject().getProjectKey(),
-                task.getSummary(),
-                task.getDescription(),
-                task.getStatus(),
-                task.getStartDate(),
-                task.getDueDate(),
-                assigneeEmail,
-                labels,
-                dependencyKeys,
-                null,
-                attachments,
-                task.getCreated(),
-                task.getUpdated(),
-                task.getProgress(),
-                task.getPriority()
-        );
     }
 
     private List<String> extractDependencyKeys(Task task) {
@@ -239,13 +215,6 @@ public class TaskService {
         return task.getDependencies().stream()
                 .map(Task::getTaskKey)
                 .toList();
-    }
-
-    private List<String> parseLabels(String labelsString) {
-        if (labelsString == null || labelsString.isEmpty()) {
-            return null;
-        }
-        return Arrays.asList(labelsString.split(","));
     }
 
     private void updateTaskDependencies(Task task, List<String> dependencyKeys, Integer userId) {
@@ -316,9 +285,7 @@ public class TaskService {
         var project = projectRepository.findByProjectKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
-        if (!project.isOwner(userId)) {
-            throw new AuthorizationException("Only project owner can delete tasks");
-        }
+        accessGuard.requireOwner(project, userId);
 
         var task = taskRepository.findByTaskKey(taskKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
@@ -329,8 +296,8 @@ public class TaskService {
 
         if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
             var message = "Task '" + task.getSummary() + "' has been deleted";
-            notificationService.createNotification(task.getAssignee(), message,
-                    NotificationType.TASK_DELETED, null);
+            applicationEventPublisher.publishEvent(new NotificationEvent(task.getAssignee(), message,
+                    NotificationType.TASK_DELETED, null));
         }
 
         deleteTaskAttachmentsSilently(task);

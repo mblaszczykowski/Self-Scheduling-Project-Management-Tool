@@ -1,10 +1,11 @@
 package com.backend.controllers;
 
 import com.backend.dtos.TaskDTO;
+import com.backend.requests.TaskCreateRequest;
 import com.backend.services.TaskService;
 import com.backend.services.TokenService;
+import com.backend.util.RequestValidator;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,12 +20,12 @@ public class TaskController {
 
     private final TaskService taskService;
     private final TokenService tokenService;
-    private final ObjectMapper objectMapper;
+    private final RequestValidator requestValidator;
 
-    public TaskController(TaskService taskService, TokenService tokenService, ObjectMapper objectMapper) {
+    public TaskController(TaskService taskService, TokenService tokenService, RequestValidator requestValidator) {
         this.taskService = taskService;
         this.tokenService = tokenService;
-        this.objectMapper = objectMapper;
+        this.requestValidator = requestValidator;
     }
 
     @PostMapping(consumes = {"multipart/form-data"})
@@ -35,8 +36,8 @@ public class TaskController {
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
         var userId = tokenService.getUserIdFromRequest(request);
-        var taskDTO = objectMapper.readValue(taskDTOStr, TaskDTO.class);
-        var createdTask = taskService.createTask(projectKey, taskDTO, userId, attachments);
+        var taskRequest = requestValidator.parseAndValidate(taskDTOStr, TaskCreateRequest.class);
+        var createdTask = taskService.createTask(projectKey, taskRequest, userId, attachments);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdTask);
     }
 
@@ -49,8 +50,8 @@ public class TaskController {
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
         var userId = tokenService.getUserIdFromRequest(request);
-        var taskDTO = objectMapper.readValue(taskDTOStr, TaskDTO.class);
-        var updatedTask = taskService.updateTask(projectKey, taskKey, taskDTO, userId, attachments);
+        var taskRequest = requestValidator.parseAndValidate(taskDTOStr, TaskCreateRequest.class);
+        var updatedTask = taskService.updateTask(projectKey, taskKey, taskRequest, userId, attachments);
         return ResponseEntity.ok(updatedTask);
     }
 

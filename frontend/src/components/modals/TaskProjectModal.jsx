@@ -32,6 +32,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
     const modalRef = useRef(null);
     const formikRef = useRef(null);
     const [emailState, setEmailState] = useState({ loading: false, error: '' });
+    const [isSaving, setIsSaving] = useState(false);
     const [uiState, setUiState] = useState({
         isVisible: false, deleteConfirmOpen: false,
         closeConfirmOpen: false, isDirty: false,
@@ -67,8 +68,17 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
     useClickOutside(modalRef, handleCloseAttempt);
 
     const handleSubmit = async (values, { setSubmitting }) => {
+        if (isSaving) return;
+        setIsSaving(true);
         try {
             if (modalType === 'task') {
+                const projectKey = project?.projectKey || task?.projectKey || values.projectKey;
+                if (!projectKey) {
+                    showToast('Please select a project', 'error');
+                    setIsSaving(false);
+                    setSubmitting(false);
+                    return;
+                }
                 const taskDTO = {
                     summary: values.summary,
                     description: values.description,
@@ -82,7 +92,6 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                     priority: values.priority,
                     attachments: attachments.existing,
                 };
-                const projectKey = project?.projectKey || task?.projectKey || values.projectKey;
                 if (modalMode === 'create') {
                     await createTask(projectKey, taskDTO, attachments.new);
                     showToast('Task created', 'success');
@@ -112,6 +121,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
             showToast(getErrorMessage(err, 'Failed to save'), 'error');
         } finally {
             setSubmitting(false);
+            setIsSaving(false);
         }
     };
 
@@ -144,6 +154,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
     const handleAddMember = (email, values, setFieldValue) => {
         if (!email) return;
         const normalizedEmail = email.toLowerCase().trim();
+        if (!normalizedEmail) return;
 
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
             setEmailState(prev => ({ ...prev, error: 'Invalid email format' }));
@@ -280,7 +291,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                     <button
                         type="button"
                         onClick={() => formikRef.current?.submitForm()}
-                        disabled={formikRef.current?.isSubmitting}
+                        disabled={isSaving}
                         className={
                             'px-4 py-1.5 text-sm font-medium rounded-lg transition-colors'
                             + ' disabled:opacity-40 disabled:cursor-not-allowed'
@@ -289,7 +300,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                             + ' hover:bg-slate-800 dark:hover:bg-slate-100'
                         }
                     >
-                        {formikRef.current?.isSubmitting ? (
+                        {isSaving ? (
                             <>
                                 <div className="w-3 h-3 border-[1.5px] border-white/30 dark:border-slate-900/30 border-t-white dark:border-t-slate-900 rounded-full animate-spin" />
                                 <span>Saving...</span>

@@ -1,5 +1,6 @@
 package com.backend.filter;
 
+import com.backend.config.CookieProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.Cookie;
@@ -47,7 +48,10 @@ class CsrfProtectionFilterTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        filter = new CsrfProtectionFilter(objectMapper, false, "Lax");
+        CookieProperties cookieProperties = new CookieProperties();
+        cookieProperties.setSecure(false);
+        cookieProperties.setSameSite("Lax");
+        filter = new CsrfProtectionFilter(objectMapper, cookieProperties);
     }
 
     @Nested

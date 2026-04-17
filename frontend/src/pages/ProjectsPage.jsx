@@ -139,6 +139,8 @@ const ProjectsPage = () => {
             summary: task.summary, description: task.description, status: task.status,
             startDate: newStartDate, dueDate: newDueDate, assignee: task.assignee,
             labels: task.labels, dependencyKeys: task.dependencies || [],
+        }).then(() => {
+            showToast('Task dates updated', 'success');
         }).catch(err => {
             console.error('Error updating task:', err);
             showToast('Failed to update task dates. Reverting changes.', 'error');

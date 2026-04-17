@@ -21,9 +21,10 @@ public class WebConfig implements WebMvcConfigurer {
                         "Accept",
                         "X-Requested-With",
                         "Cache-Control",
-                        "X-CSRF-Token"
+                        "X-CSRF-Token",
+                        "Last-Event-ID"
                 )
-                .exposedHeaders("Set-Cookie", "X-CSRF-Token")
+                .exposedHeaders("Set-Cookie", "X-CSRF-Token", "Cache-Control", "Content-Type")
                 .allowCredentials(true)
                 .maxAge(600);
     }

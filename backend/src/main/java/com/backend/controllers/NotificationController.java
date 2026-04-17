@@ -1,5 +1,6 @@
 package com.backend.controllers;
 
+import com.backend.config.AppProperties;
 import com.backend.services.NotificationService;
 import com.backend.services.SseEmitterManager;
 import com.backend.services.TokenService;
@@ -19,16 +20,16 @@ public class NotificationController {
     private final NotificationService notificationService;
     private final SseEmitterManager sseEmitterManager;
     private final TokenService tokenService;
-
-    private static final int DEFAULT_PAGE_SIZE = 50;
-    private static final int MAX_PAGE_SIZE = 100;
+    private final AppProperties appProperties;
 
     public NotificationController(NotificationService notificationService,
                                   SseEmitterManager sseEmitterManager,
-                                  TokenService tokenService) {
+                                  TokenService tokenService,
+                                  AppProperties appProperties) {
         this.notificationService = notificationService;
         this.sseEmitterManager = sseEmitterManager;
         this.tokenService = tokenService;
+        this.appProperties = appProperties;
     }
 
     @GetMapping
@@ -38,7 +39,8 @@ public class NotificationController {
             @RequestParam(defaultValue = "50") int size
     ) {
         var userId = tokenService.getUserIdFromRequest(request);
-        var clampedSize = Math.min(size, MAX_PAGE_SIZE);
+        var pagination = appProperties.getPagination();
+        var clampedSize = Math.min(size, pagination.getMaxSize());
 
         var pageable = PageRequest.of(page, clampedSize);
         var notificationPage = notificationService.getAllNotificationsPaged(userId, pageable);
@@ -47,7 +49,7 @@ public class NotificationController {
                 .map(notificationService::convertToDTO)
                 .toList();
 
-        var isDefaultFirstPage = page == 0 && clampedSize == DEFAULT_PAGE_SIZE && !notificationPage.hasNext();
+        var isDefaultFirstPage = page == 0 && clampedSize == pagination.getDefaultSize() && !notificationPage.hasNext();
         if (isDefaultFirstPage) {
             return ResponseEntity.ok(notificationDTOs);
         }

@@ -7,13 +7,17 @@ import com.backend.entities.NotificationType;
 import com.backend.entities.Project;
 import com.backend.entities.Task;
 import com.backend.entities.User;
-import com.backend.exception.AuthorizationException;
+import com.backend.events.InvitationEmailEvent;
+import com.backend.events.NotificationEvent;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
+import com.backend.requests.ProjectCreateRequest;
+import com.backend.util.AccessGuard;
 import com.backend.util.CriticalPathMethodHelper;
-import com.backend.util.ValidationUtil;
+import com.backend.util.EntityMapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -28,54 +32,37 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final UserService userService;
-    private final TaskService taskService;
     private final TaskRepository taskRepository;
-    private final NotificationService notificationService;
     private final FileStorageService fileStorageService;
     private final CriticalPathMethodHelper cpmHelper;
+    private final EntityMapper entityMapper;
+    private final AccessGuard accessGuard;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public ProjectService(
             ProjectRepository projectRepository,
             UserService userService,
-            TaskService taskService,
             TaskRepository taskRepository,
-            NotificationService notificationService,
             FileStorageService fileStorageService,
-            CriticalPathMethodHelper cpmHelper
+            CriticalPathMethodHelper cpmHelper,
+            EntityMapper entityMapper,
+            AccessGuard accessGuard,
+            ApplicationEventPublisher applicationEventPublisher
     ) {
         this.projectRepository = projectRepository;
         this.userService = userService;
-        this.taskService = taskService;
         this.taskRepository = taskRepository;
-        this.notificationService = notificationService;
         this.fileStorageService = fileStorageService;
         this.cpmHelper = cpmHelper;
-    }
-
-    public Project getAccessibleProject(String projectKey, Integer userId) {
-        var project = projectRepository.findByProjectKeyWithOwnerAndMembers(projectKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-        if (!project.hasAccess(userId)) {
-            throw new ResourceNotFoundException("Project not found");
-        }
-        return project;
-    }
-
-    public Project getAccessibleProjectWithLock(String projectKey, Integer userId) {
-        var project = projectRepository.findByProjectKeyWithLock(projectKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-        if (!project.hasAccess(userId)) {
-            throw new ResourceNotFoundException("Project not found");
-        }
-        return project;
+        this.entityMapper = entityMapper;
+        this.accessGuard = accessGuard;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public ProjectDTO createProject(ProjectDTO projectDTO, Integer userId, List<MultipartFile> attachments) {
-        validateProjectDTO(projectDTO);
-
-        if (projectRepository.existsByProjectKey(projectDTO.projectKey())) {
-            throw new ValidationException("Project key already exists: " + projectDTO.projectKey());
+    public ProjectDTO createProject(ProjectCreateRequest request, Integer userId, List<MultipartFile> attachments) {
+        if (projectRepository.existsByProjectKey(request.projectKey())) {
+            throw new ValidationException("Project key already exists: " + request.projectKey());
         }
 
         var owner = userService.getRequiredUserById(userId);
@@ -85,18 +72,18 @@ public class ProjectService {
                 : new ArrayList<String>();
 
         var project = new Project();
-        project.setProjectKey(projectDTO.projectKey());
-        project.setSummary(projectDTO.summary());
-        project.setDescription(projectDTO.description());
+        project.setProjectKey(request.projectKey());
+        project.setSummary(request.summary());
+        project.setDescription(request.description());
         project.setOwner(owner);
         project.setNextTaskNumber(1);
         project.replaceAttachments(attachmentUrls);
 
-        var members = resolveMembersFromEmails(projectDTO.members(), owner);
+        var members = resolveMembersFromEmails(request.members(), owner, request.summary());
         project.replaceMembers(members);
 
-        if (projectDTO.dependencies() != null && !projectDTO.dependencies().isEmpty()) {
-            var dependencies = projectDTO.dependencies().stream()
+        if (request.dependencies() != null && !request.dependencies().isEmpty()) {
+            var dependencies = request.dependencies().stream()
                     .map(depKey -> projectRepository.findByProjectKey(depKey)
                             .orElseThrow(() -> new ValidationException("Dependency project not found: " + depKey)))
                     .collect(Collectors.toList());
@@ -111,7 +98,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public ProjectDTO getProjectByKey(String projectKey, Integer userId) {
-        var project = getAccessibleProject(projectKey, userId);
+        var project = accessGuard.getAccessibleProject(projectKey, userId);
         return convertToDTOWithCPM(project);
     }
 
@@ -149,30 +136,26 @@ public class ProjectService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public ProjectDTO updateProject(String projectKey, ProjectDTO projectDTO, Integer userId, List<MultipartFile> attachments) {
-        validateProjectDTO(projectDTO);
-
+    public ProjectDTO updateProject(String projectKey, ProjectCreateRequest request, Integer userId, List<MultipartFile> attachments) {
         var project = projectRepository.findByProjectKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
-        if (!project.isOwner(userId)) {
-            throw new AuthorizationException("Only project owner can update the project");
-        }
+        accessGuard.requireOwner(project, userId);
 
-        project.setSummary(projectDTO.summary());
-        project.setDescription(projectDTO.description());
+        project.setSummary(request.summary());
+        project.setDescription(request.description());
 
         if (attachments != null && !attachments.isEmpty()) {
             var newAttachments = fileStorageService.storeFiles(attachments);
             project.addAttachments(newAttachments);
         }
 
-        if (projectDTO.members() != null) {
-            updateProjectMembersAndNotify(project, projectDTO.members());
+        if (request.members() != null) {
+            updateProjectMembersAndNotify(project, request.members());
         }
 
-        if (projectDTO.dependencies() != null) {
-            var dependencies = projectDTO.dependencies().stream()
+        if (request.dependencies() != null) {
+            var dependencies = request.dependencies().stream()
                     .map(depKey -> projectRepository.findByProjectKey(depKey)
                             .orElseThrow(() -> new ValidationException("Dependency project not found: " + depKey)))
                     .collect(Collectors.toList());
@@ -190,15 +173,13 @@ public class ProjectService {
         var project = projectRepository.findByProjectKey(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
-        if (!project.isOwner(userId)) {
-            throw new AuthorizationException("Only project owner can delete the project");
-        }
+        accessGuard.requireOwner(project, userId);
 
         deleteAllProjectAttachmentsSilently(project);
         projectRepository.delete(project);
     }
 
-    private Set<User> resolveMembersFromEmails(List<UserDTO> memberDTOs, User owner) {
+    private Set<User> resolveMembersFromEmails(List<UserDTO> memberDTOs, User owner, String projectName) {
         var members = new HashSet<User>();
         members.add(owner);
         if (memberDTOs == null || memberDTOs.isEmpty()) return members;
@@ -214,10 +195,11 @@ public class ProjectService {
 
         for (String email : emailsToFetch) {
             var user = usersByEmail.get(email);
-            if (user == null) {
-                throw new ValidationException("User with email " + email + " does not exist");
+            if (user != null) {
+                members.add(user);
+            } else {
+                applicationEventPublisher.publishEvent(new InvitationEmailEvent(email, projectName, owner.getFullName()));
             }
-            members.add(user);
         }
 
         return members;
@@ -230,7 +212,7 @@ public class ProjectService {
                 .collect(Collectors.toSet());
 
         var owner = project.getOwner();
-        var updatedMembers = resolveMembersFromEmails(memberDTOs, owner);
+        var updatedMembers = resolveMembersFromEmails(memberDTOs, owner, project.getSummary());
         var updatedMemberIds = updatedMembers.stream()
                 .map(User::getId)
                 .collect(Collectors.toSet());
@@ -254,7 +236,7 @@ public class ProjectService {
 
     private void notifyMemberRemovedFromProject(User member, Project project) {
         var message = "You have been removed from project: " + project.getSummary();
-        notificationService.createNotification(member, message, NotificationType.MEMBER_REMOVED, null);
+        applicationEventPublisher.publishEvent(new NotificationEvent(member, message, NotificationType.MEMBER_REMOVED, null));
     }
 
     private void notifyProjectMembersOfUpdate(Project project, Integer updaterId) {
@@ -262,7 +244,7 @@ public class ProjectService {
         var message = "Project '" + project.getSummary() + "' has been updated";
         for (var member : project.getMembers()) {
             if (!member.getId().equals(updaterId)) {
-                notificationService.createNotification(member, message, NotificationType.PROJECT_UPDATED, link);
+                applicationEventPublisher.publishEvent(new NotificationEvent(member, message, NotificationType.PROJECT_UPDATED, link));
             }
         }
     }
@@ -278,7 +260,7 @@ public class ProjectService {
     private void notifyMemberAddedToProject(User member, Project project) {
         var message = "You have been added to project: " + project.getSummary();
         var link = "/projects?projectKey=" + project.getProjectKey();
-        notificationService.createNotification(member, message, NotificationType.PROJECT_INVITATION, link);
+        applicationEventPublisher.publishEvent(new NotificationEvent(member, message, NotificationType.PROJECT_INVITATION, link));
     }
 
     private void deleteAllProjectAttachmentsSilently(Project project) {
@@ -293,23 +275,6 @@ public class ProjectService {
 
     private void deleteAttachmentsSilently(Collection<String> attachments) {
         fileStorageService.deleteFilesSilently(attachments);
-    }
-
-    private void validateProjectDTO(ProjectDTO projectDTO) {
-        if (ValidationUtil.isNullOrEmpty(projectDTO.projectKey())) {
-            throw new ValidationException("Project key and summary are required");
-        }
-
-        if (projectDTO.projectKey().length() > ValidationUtil.MAX_PROJECT_KEY_LENGTH) {
-            throw new ValidationException("Project key exceeds maximum length of " + ValidationUtil.MAX_PROJECT_KEY_LENGTH + " characters");
-        }
-
-        if (!projectDTO.projectKey().matches("^[A-Z][A-Z0-9]*$")) {
-            throw new ValidationException(
-                    "Project key must start with a letter and contain only uppercase letters and numbers");
-        }
-
-        ValidationUtil.validateSummaryAndDescription(projectDTO.summary(), projectDTO.description());
     }
 
     private void validateNoProjectCycles(Project project, List<Project> newDependencies) {
@@ -333,14 +298,14 @@ public class ProjectService {
 
     private ProjectDTO convertToDTO(Project project) {
         var tasks = project.getTasks() != null
-                ? project.getTasks().stream().map(taskService::convertToDTO).toList()
+                ? project.getTasks().stream().map(entityMapper::toTaskDTO).toList()
                 : new ArrayList<TaskDTO>();
 
         var members = project.getMembers() != null
-                ? project.getMembers().stream().map(this::convertUserToDTO).toList()
+                ? project.getMembers().stream().map(entityMapper::toUserDTO).toList()
                 : new ArrayList<UserDTO>();
 
-        var ownerDTO = convertUserToDTO(project.getOwner());
+        var ownerDTO = entityMapper.toUserDTO(project.getOwner());
 
         var dependencyKeys = project.getDependencies() != null
                 ? project.getDependencies().stream().map(Project::getProjectKey).toList()
@@ -373,13 +338,13 @@ public class ProjectService {
         sortedTasks.sort(Comparator.comparingInt(Task::getTaskNumber));
 
         var taskDTOs = sortedTasks.stream()
-                .map(taskService::convertToDTO)
+                .map(entityMapper::toTaskDTO)
                 .toList();
 
         var updatedTaskDTOs = cpmHelper.calculateTaskDTOsWithCPM(taskDTOs);
 
         var members = project.getMembers().stream()
-                .map(this::convertUserToDTO)
+                .map(entityMapper::toUserDTO)
                 .toList();
 
         var dependencyKeys = project.getDependencies() != null
@@ -398,12 +363,8 @@ public class ProjectService {
                 updatedTaskDTOs,
                 members,
                 attachments,
-                convertUserToDTO(project.getOwner()),
+                entityMapper.toUserDTO(project.getOwner()),
                 dependencyKeys
         );
-    }
-
-    private UserDTO convertUserToDTO(User user) {
-        return userService.convertToDTO(user);
     }
 }

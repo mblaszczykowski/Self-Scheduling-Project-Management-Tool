@@ -9,6 +9,7 @@ export const NotificationsProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
     const [notifications, setNotifications] = useState([]);
     const eventSourceRef = useRef(null);
+    const errorRefreshTimerRef = useRef(null);
 
     const refreshNotifications = useCallback(async () => {
         try {
@@ -25,6 +26,10 @@ export const NotificationsProvider = ({ children }) => {
             if (eventSourceRef.current) {
                 eventSourceRef.current.close();
                 eventSourceRef.current = null;
+            }
+            if (errorRefreshTimerRef.current) {
+                clearTimeout(errorRefreshTimerRef.current);
+                errorRefreshTimerRef.current = null;
             }
             return;
         }
@@ -47,16 +52,23 @@ export const NotificationsProvider = ({ children }) => {
         });
 
         es.onerror = () => {
-            // EventSource auto-reconnects on error.
-            // On reconnect we refresh the full list to avoid gaps.
+            // Debounce refresh on reconnect to avoid thundering herd
             if (es.readyState === EventSource.CONNECTING) {
-                refreshNotifications();
+                if (errorRefreshTimerRef.current) clearTimeout(errorRefreshTimerRef.current);
+                errorRefreshTimerRef.current = setTimeout(() => {
+                    errorRefreshTimerRef.current = null;
+                    refreshNotifications();
+                }, 2000);
             }
         };
 
         return () => {
             es.close();
             eventSourceRef.current = null;
+            if (errorRefreshTimerRef.current) {
+                clearTimeout(errorRefreshTimerRef.current);
+                errorRefreshTimerRef.current = null;
+            }
         };
     }, [user, refreshNotifications]);
 

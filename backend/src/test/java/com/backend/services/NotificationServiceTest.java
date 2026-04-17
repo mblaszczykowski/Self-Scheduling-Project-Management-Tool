@@ -1,11 +1,13 @@
 package com.backend.services;
 
 import com.backend.TestEntityFactory;
+import com.backend.dtos.NotificationDTO;
 import com.backend.entities.Notification;
 import com.backend.entities.NotificationType;
 import com.backend.entities.User;
 import com.backend.exception.AuthorizationException;
 import com.backend.repositories.NotificationRepository;
+import com.backend.util.EntityMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,6 +29,15 @@ class NotificationServiceTest {
     @Mock
     private NotificationRepository notificationRepository;
 
+    @Mock
+    private SseEmitterManager sseEmitterManager;
+
+    @Mock
+    private EmailService emailService;
+
+    @Mock
+    private EntityMapper entityMapper;
+
     private NotificationService notificationService;
 
     private User user;
@@ -34,7 +45,8 @@ class NotificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        notificationService = new NotificationService(notificationRepository);
+        notificationService = new NotificationService(notificationRepository,
+                sseEmitterManager, emailService, entityMapper);
         user = TestEntityFactory.createUser(1, "user@example.com");
         otherUser = TestEntityFactory.createUser(2, "other@example.com");
     }
@@ -121,10 +133,14 @@ class NotificationServiceTest {
     class ConvertToDTOTests {
 
         @Test
-        @DisplayName("should convert notification to DTO with all fields")
-        void shouldConvertToDTO() {
+        @DisplayName("should delegate conversion to entityMapper")
+        void shouldDelegateConversionToEntityMapper() {
             var notification = TestEntityFactory.createNotification(1, user);
             notification.setLink("/projects/PROJ");
+
+            var expectedDTO = new NotificationDTO(1, "Notification 1",
+                    notification.getTimestamp(), false, NotificationType.TASK_ASSIGNED, "/projects/PROJ");
+            when(entityMapper.toNotificationDTO(notification)).thenReturn(expectedDTO);
 
             var dto = notificationService.convertToDTO(notification);
 
@@ -134,6 +150,7 @@ class NotificationServiceTest {
             assertFalse(dto.isRead());
             assertEquals(NotificationType.TASK_ASSIGNED, dto.type());
             assertEquals("/projects/PROJ", dto.link());
+            verify(entityMapper).toNotificationDTO(notification);
         }
 
         @Test
@@ -141,6 +158,10 @@ class NotificationServiceTest {
         void shouldConvertReadNotification() {
             var notification = TestEntityFactory.createNotification(1, user);
             notification.setIsRead(true);
+
+            var expectedDTO = new NotificationDTO(1, "Notification 1",
+                    notification.getTimestamp(), true, NotificationType.TASK_ASSIGNED, null);
+            when(entityMapper.toNotificationDTO(notification)).thenReturn(expectedDTO);
 
             var dto = notificationService.convertToDTO(notification);
 

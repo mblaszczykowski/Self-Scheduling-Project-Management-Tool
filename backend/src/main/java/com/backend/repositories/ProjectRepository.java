@@ -49,4 +49,10 @@ public interface ProjectRepository extends JpaRepository<Project, Integer> {
             "WHERE (p.owner.id = :userId1 OR :userId1 IN (SELECT m1.id FROM p.members m1)) " +
             "AND (p.owner.id = :userId2 OR :userId2 IN (SELECT m2.id FROM p.members m2))")
     boolean doUsersShareProject(@Param("userId1") Integer userId1, @Param("userId2") Integer userId2);
+
+    @Query("SELECT p FROM Project p LEFT JOIN FETCH p.owner WHERE " +
+           "(p.owner.id = :userId OR p.id IN (SELECT p2.id FROM Project p2 JOIN p2.members m WHERE m.id = :userId)) " +
+           "AND (LOWER(p.summary) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "OR LOWER(p.projectKey) LIKE LOWER(CONCAT('%', :query, '%')))")
+    List<Project> searchAccessible(@Param("userId") Integer userId, @Param("query") String query, Pageable pageable);
 }

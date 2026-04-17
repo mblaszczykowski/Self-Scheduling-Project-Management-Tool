@@ -1,5 +1,6 @@
 package com.backend.services;
 
+import com.backend.config.AppProperties;
 import com.backend.dtos.NotificationDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -15,17 +16,18 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class SseEmitterManager {
     private static final Logger log = LoggerFactory.getLogger(SseEmitterManager.class);
-    private static final long SSE_TIMEOUT = 300_000L; // 5 minutes
 
     private final ConcurrentHashMap<Integer, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
+    private final AppProperties appProperties;
 
-    public SseEmitterManager(ObjectMapper objectMapper) {
+    public SseEmitterManager(ObjectMapper objectMapper, AppProperties appProperties) {
         this.objectMapper = objectMapper;
+        this.appProperties = appProperties;
     }
 
     public SseEmitter createEmitter(Integer userId) {
-        var emitter = new SseEmitter(SSE_TIMEOUT);
+        var emitter = new SseEmitter(appProperties.getSse().getTimeoutMs());
         emitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
 
         Runnable removeEmitter = () -> removeEmitter(userId, emitter);

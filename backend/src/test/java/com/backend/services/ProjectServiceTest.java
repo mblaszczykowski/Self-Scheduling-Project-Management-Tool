@@ -7,20 +7,26 @@ import com.backend.dtos.UserDTO;
 import com.backend.entities.NotificationType;
 import com.backend.entities.Project;
 import com.backend.entities.User;
+import com.backend.events.NotificationEvent;
 import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
+import com.backend.requests.ProjectCreateRequest;
+import com.backend.util.AccessGuard;
 import com.backend.util.CriticalPathMethodHelper;
+import com.backend.util.EntityMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.*;
 
@@ -38,19 +44,22 @@ class ProjectServiceTest {
     private UserService userService;
 
     @Mock
-    private TaskService taskService;
-
-    @Mock
     private TaskRepository taskRepository;
-
-    @Mock
-    private NotificationService notificationService;
 
     @Mock
     private FileStorageService fileStorageService;
 
     @Mock
     private CriticalPathMethodHelper cpmHelper;
+
+    @Mock
+    private EntityMapper entityMapper;
+
+    @Mock
+    private AccessGuard accessGuard;
+
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     private ProjectService projectService;
 
@@ -61,8 +70,9 @@ class ProjectServiceTest {
     @BeforeEach
     void setUp() {
         projectService = new ProjectService(
-                projectRepository, userService, taskService,
-                taskRepository, notificationService, fileStorageService, cpmHelper
+                projectRepository, userService, taskRepository,
+                fileStorageService, cpmHelper, entityMapper,
+                accessGuard, applicationEventPublisher
         );
 
         owner = TestEntityFactory.createUser(1, "owner@example.com");
@@ -78,8 +88,8 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should create project with valid data")
         void shouldCreateProjectWithValidData() {
-            var dto = new ProjectDTO(null, "TEST", "Test Project", "desc",
-                    null, null, null, null, null);
+            var request = new ProjectCreateRequest("TEST", "Test Project", "desc",
+                    null, null, null);
 
             when(projectRepository.existsByProjectKey("TEST")).thenReturn(false);
             when(userService.getRequiredUserById(1)).thenReturn(owner);
@@ -88,10 +98,10 @@ class ProjectServiceTest {
                 p.setId(10);
                 return p;
             });
-            when(userService.convertToDTO(any(User.class))).thenReturn(
-                    new UserDTO(1, "User", "1", "owner@example.com", null));
+            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
+                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
-            var result = projectService.createProject(dto, 1, null);
+            var result = projectService.createProject(request, 1, null);
 
             assertNotNull(result);
             verify(projectRepository).save(any(Project.class));
@@ -100,82 +110,63 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should throw when project key already exists")
         void shouldThrowWhenProjectKeyExists() {
-            var dto = new ProjectDTO(null, "TEST", "Test Project", "desc",
-                    null, null, null, null, null);
+            var request = new ProjectCreateRequest("TEST", "Test Project", "desc",
+                    null, null, null);
 
             when(projectRepository.existsByProjectKey("TEST")).thenReturn(true);
 
             assertThrows(ValidationException.class, () ->
-                    projectService.createProject(dto, 1, null));
-        }
-
-        @Test
-        @DisplayName("should throw when project key is empty")
-        void shouldThrowWhenProjectKeyEmpty() {
-            var dto = new ProjectDTO(null, "", "Test Project", "desc",
-                    null, null, null, null, null);
-
-            assertThrows(ValidationException.class, () ->
-                    projectService.createProject(dto, 1, null));
-        }
-
-        @Test
-        @DisplayName("should throw when project key is lowercase")
-        void shouldThrowWhenProjectKeyLowercase() {
-            var dto = new ProjectDTO(null, "test", "Test Project", "desc",
-                    null, null, null, null, null);
-
-            assertThrows(ValidationException.class, () ->
-                    projectService.createProject(dto, 1, null));
-        }
-
-        @Test
-        @DisplayName("should throw when summary is empty")
-        void shouldThrowWhenSummaryEmpty() {
-            var dto = new ProjectDTO(null, "TEST", "", "desc",
-                    null, null, null, null, null);
-
-            assertThrows(ValidationException.class, () ->
-                    projectService.createProject(dto, 1, null));
+                    projectService.createProject(request, 1, null));
         }
 
         @Test
         @DisplayName("should notify new members excluding owner")
         void shouldNotifyNewMembersExcludingOwner() {
-            var memberDTO = new UserDTO(null, null, null, "member@example.com", null);
-            var dto = new ProjectDTO(null, "TEST", "Test Project", "desc",
-                    null, List.of(memberDTO), null, null, null);
+            var memberDTO = new UserDTO(null, null, null, "member@example.com", null, null, null, null, null);
+            var request = new ProjectCreateRequest("TEST", "Test Project", "desc",
+                    List.of(memberDTO), null, null);
 
             when(projectRepository.existsByProjectKey("TEST")).thenReturn(false);
             when(userService.getRequiredUserById(1)).thenReturn(owner);
             when(userService.findByEmailsAsMap(Set.of("member@example.com")))
                     .thenReturn(Map.of("member@example.com", member));
             when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(userService.convertToDTO(any(User.class))).thenReturn(
-                    new UserDTO(1, "User", "1", "owner@example.com", null));
+            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
+                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
-            projectService.createProject(dto, 1, null);
+            projectService.createProject(request, 1, null);
 
-            verify(notificationService).createNotification(
-                    eq(member), contains("added to project"), eq(NotificationType.PROJECT_INVITATION), anyString());
-            verify(notificationService, never()).createNotification(
-                    eq(owner), anyString(), any(), anyString());
+            var captor = ArgumentCaptor.forClass(NotificationEvent.class);
+            verify(applicationEventPublisher, atLeastOnce()).publishEvent(captor.capture());
+
+            var events = captor.getAllValues();
+            assertTrue(events.stream().anyMatch(e ->
+                    e.recipient().equals(member) &&
+                    e.message().contains("added to project") &&
+                    e.type() == NotificationType.PROJECT_INVITATION));
+            assertTrue(events.stream().noneMatch(e -> e.recipient().equals(owner)));
         }
 
         @Test
-        @DisplayName("should throw when member email does not exist")
-        void shouldThrowWhenMemberEmailNotFound() {
-            var memberDTO = new UserDTO(null, null, null, "unknown@example.com", null);
-            var dto = new ProjectDTO(null, "TEST", "Test Project", "desc",
-                    null, List.of(memberDTO), null, null, null);
+        @DisplayName("should send invitation email event when member email does not exist")
+        void shouldSendInvitationEmailWhenMemberEmailNotFound() {
+            var memberDTO = new UserDTO(null, null, null, "unknown@example.com", null, null, null, null, null);
+            var request = new ProjectCreateRequest("TEST", "Test Project", "desc",
+                    List.of(memberDTO), null, null);
 
             when(projectRepository.existsByProjectKey("TEST")).thenReturn(false);
             when(userService.getRequiredUserById(1)).thenReturn(owner);
             when(userService.findByEmailsAsMap(Set.of("unknown@example.com")))
                     .thenReturn(Map.of());
+            when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
+                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
-            assertThrows(ValidationException.class, () ->
-                    projectService.createProject(dto, 1, null));
+            projectService.createProject(request, 1, null);
+
+            verify(applicationEventPublisher).publishEvent(
+                    ArgumentMatchers.<Object>argThat(event ->
+                            event instanceof com.backend.events.InvitationEmailEvent));
         }
 
         @Test
@@ -184,8 +175,8 @@ class ProjectServiceTest {
             var depProject = TestEntityFactory.createProject(20, "DEP", owner);
             depProject.replaceDependencies(List.of(project));
 
-            var dto = new ProjectDTO(null, "TEST", "Test Project", "desc",
-                    null, null, null, null, List.of("DEP"));
+            var request = new ProjectCreateRequest("TEST", "Test Project", "desc",
+                    null, List.of("DEP"), null);
 
             when(projectRepository.existsByProjectKey("TEST")).thenReturn(false);
             when(userService.getRequiredUserById(1)).thenReturn(owner);
@@ -198,7 +189,7 @@ class ProjectServiceTest {
 
             // cycle: project(10) -> DEP(20) -> project(10)
             assertThrows(ValidationException.class, () ->
-                    projectService.createProject(dto, 1, null));
+                    projectService.createProject(request, 1, null));
         }
     }
 
@@ -209,12 +200,11 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should return project for authorized user")
         void shouldReturnProjectForAuthorizedUser() {
-            when(projectRepository.findByProjectKeyWithOwnerAndMembers("PROJ"))
-                    .thenReturn(Optional.of(project));
+            when(accessGuard.getAccessibleProject("PROJ", 1)).thenReturn(project);
             when(taskRepository.findByProjectIdWithDetails(10)).thenReturn(List.of());
             when(cpmHelper.calculateTaskDTOsWithCPM(anyList())).thenReturn(List.of());
-            when(userService.convertToDTO(any(User.class))).thenReturn(
-                    new UserDTO(1, "User", "1", "owner@example.com", null));
+            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
+                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
             var result = projectService.getProjectByKey("PROJ", 1);
 
@@ -225,8 +215,8 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should throw when project not found")
         void shouldThrowWhenProjectNotFound() {
-            when(projectRepository.findByProjectKeyWithOwnerAndMembers("NOPE"))
-                    .thenReturn(Optional.empty());
+            when(accessGuard.getAccessibleProject("NOPE", 1))
+                    .thenThrow(new ResourceNotFoundException("Project not found"));
 
             assertThrows(ResourceNotFoundException.class, () ->
                     projectService.getProjectByKey("NOPE", 1));
@@ -235,8 +225,8 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should throw when user has no access")
         void shouldThrowWhenUserHasNoAccess() {
-            when(projectRepository.findByProjectKeyWithOwnerAndMembers("PROJ"))
-                    .thenReturn(Optional.of(project));
+            when(accessGuard.getAccessibleProject("PROJ", 99))
+                    .thenThrow(new ResourceNotFoundException("Project not found"));
 
             // userId 99 is neither owner nor member
             assertThrows(ResourceNotFoundException.class, () ->
@@ -251,15 +241,16 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should update project for owner")
         void shouldUpdateProjectForOwner() {
-            var dto = new ProjectDTO(null, "PROJ", "Updated Summary", "Updated desc",
-                    null, null, null, null, null);
+            var request = new ProjectCreateRequest("PROJ", "Updated Summary", "Updated desc",
+                    null, null, null);
 
             when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            doNothing().when(accessGuard).requireOwner(project, 1);
             when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(userService.convertToDTO(any(User.class))).thenReturn(
-                    new UserDTO(1, "User", "1", "owner@example.com", null));
+            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
+                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
-            var result = projectService.updateProject("PROJ", dto, 1, null);
+            var result = projectService.updateProject("PROJ", request, 1, null);
 
             assertNotNull(result);
             verify(projectRepository).save(any(Project.class));
@@ -268,25 +259,27 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should throw when non-owner tries to update")
         void shouldThrowWhenNonOwnerUpdates() {
-            var dto = new ProjectDTO(null, "PROJ", "Updated", "desc",
-                    null, null, null, null, null);
+            var request = new ProjectCreateRequest("PROJ", "Updated", "desc",
+                    null, null, null);
 
             when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            doThrow(new AuthorizationException("Only project owner can perform this action"))
+                    .when(accessGuard).requireOwner(project, 99);
 
             assertThrows(AuthorizationException.class, () ->
-                    projectService.updateProject("PROJ", dto, 99, null));
+                    projectService.updateProject("PROJ", request, 99, null));
         }
 
         @Test
         @DisplayName("should throw when project not found for update")
         void shouldThrowWhenProjectNotFoundForUpdate() {
-            var dto = new ProjectDTO(null, "NOPE", "Updated", "desc",
-                    null, null, null, null, null);
+            var request = new ProjectCreateRequest("NOPE", "Updated", "desc",
+                    null, null, null);
 
             when(projectRepository.findByProjectKey("NOPE")).thenReturn(Optional.empty());
 
             assertThrows(ResourceNotFoundException.class, () ->
-                    projectService.updateProject("NOPE", dto, 1, null));
+                    projectService.updateProject("NOPE", request, 1, null));
         }
 
         @Test
@@ -294,21 +287,31 @@ class ProjectServiceTest {
         void shouldNotifyNewlyAddedMembersOnUpdate() {
             project.replaceMembers(Set.of(owner));
 
-            var newMemberDTO = new UserDTO(null, null, null, "member@example.com", null);
-            var dto = new ProjectDTO(null, "PROJ", "Updated", "desc",
-                    null, List.of(newMemberDTO), null, null, null);
+            var newMemberDTO = new UserDTO(null, null, null, "member@example.com", null, null, null, null, null);
+            var request = new ProjectCreateRequest("PROJ", "Updated", "desc",
+                    List.of(newMemberDTO), null, null);
 
             when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            doNothing().when(accessGuard).requireOwner(project, 1);
             when(userService.findByEmailsAsMap(Set.of("member@example.com")))
                     .thenReturn(Map.of("member@example.com", member));
             when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(userService.convertToDTO(any(User.class))).thenReturn(
-                    new UserDTO(1, "User", "1", "owner@example.com", null));
+            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
+                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
-            projectService.updateProject("PROJ", dto, 1, null);
+            projectService.updateProject("PROJ", request, 1, null);
 
-            verify(notificationService).createNotification(
-                    eq(member), contains("added to project"), eq(NotificationType.PROJECT_INVITATION), anyString());
+            var captor = ArgumentCaptor.forClass(Object.class);
+            verify(applicationEventPublisher, atLeastOnce()).publishEvent(captor.capture());
+
+            var events = captor.getAllValues();
+            assertTrue(events.stream()
+                    .filter(e -> e instanceof NotificationEvent)
+                    .map(e -> (NotificationEvent) e)
+                    .anyMatch(e ->
+                            e.recipient().equals(member) &&
+                            e.message().contains("added to project") &&
+                            e.type() == NotificationType.PROJECT_INVITATION));
         }
     }
 
@@ -320,6 +323,7 @@ class ProjectServiceTest {
         @DisplayName("should delete project for owner")
         void shouldDeleteProjectForOwner() {
             when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            doNothing().when(accessGuard).requireOwner(project, 1);
 
             projectService.deleteProject("PROJ", 1);
 
@@ -330,6 +334,8 @@ class ProjectServiceTest {
         @DisplayName("should throw when non-owner tries to delete")
         void shouldThrowWhenNonOwnerDeletes() {
             when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            doThrow(new AuthorizationException("Only project owner can perform this action"))
+                    .when(accessGuard).requireOwner(project, 99);
 
             assertThrows(AuthorizationException.class, () ->
                     projectService.deleteProject("PROJ", 99));
@@ -350,6 +356,7 @@ class ProjectServiceTest {
         void shouldDeleteAttachmentsBeforeDeleting() {
             project.replaceAttachments(List.of("file1.png", "file2.png"));
             when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            doNothing().when(accessGuard).requireOwner(project, 1);
 
             projectService.deleteProject("PROJ", 1);
 

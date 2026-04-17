@@ -1,10 +1,12 @@
 package com.backend.controllers;
 
+import com.backend.config.AppProperties;
 import com.backend.dtos.ProjectDTO;
+import com.backend.requests.ProjectCreateRequest;
 import com.backend.services.ProjectService;
 import com.backend.services.TokenService;
+import com.backend.util.RequestValidator;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -20,13 +22,15 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final TokenService tokenService;
-    private final ObjectMapper objectMapper;
+    private final RequestValidator requestValidator;
+    private final AppProperties appProperties;
 
     public ProjectController(ProjectService projectService, TokenService tokenService,
-                             ObjectMapper objectMapper) {
+                             RequestValidator requestValidator, AppProperties appProperties) {
         this.projectService = projectService;
         this.tokenService = tokenService;
-        this.objectMapper = objectMapper;
+        this.requestValidator = requestValidator;
+        this.appProperties = appProperties;
     }
 
     @GetMapping
@@ -37,7 +41,7 @@ public class ProjectController {
     ) {
         var userId = tokenService.getUserIdFromRequest(request);
         if (page != null) {
-            var pageable = PageRequest.of(page, Math.min(size, 100));
+            var pageable = PageRequest.of(page, Math.min(size, appProperties.getPagination().getMaxSize()));
             return ResponseEntity.ok(projectService.getAllProjectsPaginated(userId, pageable));
         }
         return ResponseEntity.ok(projectService.getAllProjects(userId));
@@ -60,8 +64,8 @@ public class ProjectController {
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
         var userId = tokenService.getUserIdFromRequest(request);
-        var projectDTO = objectMapper.readValue(projectDTOStr, ProjectDTO.class);
-        var createdProject = projectService.createProject(projectDTO, userId, attachments);
+        var projectRequest = requestValidator.parseAndValidate(projectDTOStr, ProjectCreateRequest.class);
+        var createdProject = projectService.createProject(projectRequest, userId, attachments);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdProject);
     }
 
@@ -73,8 +77,8 @@ public class ProjectController {
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
         var userId = tokenService.getUserIdFromRequest(request);
-        var projectDTO = objectMapper.readValue(projectDTOStr, ProjectDTO.class);
-        var updatedProject = projectService.updateProject(projectKey, projectDTO, userId, attachments);
+        var projectRequest = requestValidator.parseAndValidate(projectDTOStr, ProjectCreateRequest.class);
+        var updatedProject = projectService.updateProject(projectKey, projectRequest, userId, attachments);
         return ResponseEntity.ok(updatedProject);
     }
 

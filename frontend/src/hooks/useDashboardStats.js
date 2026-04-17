@@ -182,6 +182,194 @@ const computeProjectVelocity = (projects, today) => {
     }).filter(Boolean).sort((a, b) => b.avgVelocityNeeded - a.avgVelocityNeeded);
 };
 
+/** Status distribution: count tasks per status */
+const computeStatusDistribution = (allTasks) => {
+    const counts = {};
+    allTasks.forEach(task => {
+        const status = task.status || 'BACKLOG';
+        counts[status] = (counts[status] || 0) + 1;
+    });
+    return counts;
+};
+
+/** Priority distribution: count tasks per priority */
+const computePriorityDistribution = (allTasks) => {
+    const counts = {};
+    allTasks.forEach(task => {
+        const priority = task.priority || 'MEDIUM';
+        counts[priority] = (counts[priority] || 0) + 1;
+    });
+    return counts;
+};
+
+/** Completion trend: weekly completed tasks over the past 8 weeks */
+const computeCompletionTrend = (allTasks, today) => {
+    const weeks = [];
+    const MS_PER_WEEK = 7 * MS_PER_DAY;
+
+    // Build 8 week buckets ending at today
+    for (let i = 7; i >= 0; i--) {
+        const weekEnd = new Date(today.getTime() - i * MS_PER_WEEK);
+        const weekStart = new Date(weekEnd.getTime() - MS_PER_WEEK);
+        weeks.push({ start: weekStart, end: weekEnd, count: 0 });
+    }
+
+    const completedStatuses = new Set(['DONE', 'RELEASED']);
+    allTasks.forEach(task => {
+        if (!completedStatuses.has(task.status)) return;
+        const updated = task.updated ? new Date(task.updated).getTime() : null;
+        if (!updated) return;
+        for (const week of weeks) {
+            if (updated >= week.start.getTime() && updated < week.end.getTime()) {
+                week.count++;
+                break;
+            }
+        }
+    });
+
+    return weeks.map(w => ({
+        label: `${w.end.getMonth() + 1}/${w.end.getDate()}`,
+        count: w.count,
+    }));
+};
+
+/** Slack distribution: run CPM forward/backward pass to compute totalFloat per task */
+const computeSlackDistribution = (allTasks, taskKeyMap) => {
+    const scheduled = allTasks.filter(t => t.startDate && t.dueDate && t.progress < 100);
+    if (scheduled.length === 0) return { buckets: [], avgSlack: 0, zeroSlackCount: 0, totalScheduled: 0 };
+
+    // Build graph with day offsets from earliest start
+    const dates = scheduled.map(t => new Date(t.startDate).getTime());
+    const epoch = Math.min(...dates);
+    const dayOf = (d) => Math.round((new Date(d).getTime() - epoch) / MS_PER_DAY);
+
+    const nodes = {};
+    for (const t of scheduled) {
+        const start = dayOf(t.startDate);
+        const due = dayOf(t.dueDate);
+        nodes[t.taskKey] = {
+            duration: Math.max(due - start + 1, 1),
+            deps: (t.dependencies || []).filter(d => nodes[d] !== undefined || scheduled.some(s => s.taskKey === d)),
+            successors: [],
+            es: 0, ef: 0, ls: 0, lf: 0, slack: 0,
+        };
+    }
+
+    // Build successor links
+    for (const [key, node] of Object.entries(nodes)) {
+        for (const dep of node.deps) {
+            if (nodes[dep]) nodes[dep].successors.push(key);
+        }
+    }
+
+    // Forward pass (topological via Kahn's)
+    const inDeg = {};
+    for (const [k, n] of Object.entries(nodes)) inDeg[k] = n.deps.filter(d => nodes[d]).length;
+    const queue = Object.keys(nodes).filter(k => inDeg[k] === 0);
+    const order = [];
+    while (queue.length > 0) {
+        const k = queue.shift();
+        order.push(k);
+        for (const s of nodes[k].successors) {
+            inDeg[s]--;
+            if (inDeg[s] === 0) queue.push(s);
+        }
+    }
+
+    for (const k of order) {
+        const n = nodes[k];
+        let maxPredFinish = 0;
+        for (const dep of n.deps) {
+            if (nodes[dep]) maxPredFinish = Math.max(maxPredFinish, nodes[dep].ef);
+        }
+        n.es = maxPredFinish;
+        n.ef = n.es + n.duration;
+    }
+
+    // Backward pass
+    const projectFinish = Math.max(...Object.values(nodes).map(n => n.ef));
+    for (let i = order.length - 1; i >= 0; i--) {
+        const n = nodes[order[i]];
+        if (n.successors.length === 0) {
+            n.lf = projectFinish;
+        } else {
+            n.lf = Math.min(...n.successors.map(s => nodes[s].ls));
+        }
+        n.ls = n.lf - n.duration;
+        n.slack = Math.max(0, n.ls - n.es);
+    }
+
+    // Bucket into ranges
+    const slackValues = Object.values(nodes).map(n => n.slack);
+    const zeroSlackCount = slackValues.filter(s => s === 0).length;
+    const avgSlack = slackValues.length > 0 ? Math.round(slackValues.reduce((a, b) => a + b, 0) / slackValues.length) : 0;
+
+    const ranges = [
+        { label: '0 days', min: 0, max: 0, color: '#ef4444' },
+        { label: '1-2 days', min: 1, max: 2, color: '#f97316' },
+        { label: '3-5 days', min: 3, max: 5, color: '#eab308' },
+        { label: '6-10 days', min: 6, max: 10, color: '#22c55e' },
+        { label: '10+ days', min: 11, max: Infinity, color: '#3b82f6' },
+    ];
+
+    const buckets = ranges.map(r => ({
+        ...r,
+        count: slackValues.filter(s => s >= r.min && s <= r.max).length,
+    }));
+
+    return { buckets, avgSlack, zeroSlackCount, totalScheduled: scheduled.length };
+};
+
+/** Optimization opportunity score: how much could the optimizer improve things */
+const computeOptimizationOpportunity = (resourceConflicts, scheduleHealth, allTasks, today) => {
+    const active = allTasks.filter(t => t.startDate && t.dueDate && t.progress < 100);
+    if (active.length === 0) return { score: 0, factors: [], recommendation: 'No active tasks to optimize' };
+
+    const factors = [];
+    let rawScore = 0;
+
+    // Factor 1: Resource conflicts (big opportunity)
+    const conflicts = resourceConflicts.totalConflicts;
+    if (conflicts > 0) {
+        const conflictScore = Math.min(conflicts * 12, 35);
+        rawScore += conflictScore;
+        factors.push({ label: 'Resource conflicts', value: conflicts, impact: conflictScore > 20 ? 'high' : 'medium' });
+    }
+
+    // Factor 2: Tasks behind schedule
+    const behind = scheduleHealth.behind + scheduleHealth.criticallyBehind;
+    if (behind > 0) {
+        const behindScore = Math.min(behind * 8, 30);
+        rawScore += behindScore;
+        factors.push({ label: 'Tasks behind schedule', value: behind, impact: behindScore > 15 ? 'high' : 'medium' });
+    }
+
+    // Factor 3: Overdue tasks
+    const overdue = active.filter(t => new Date(t.dueDate) < today).length;
+    if (overdue > 0) {
+        const overdueScore = Math.min(overdue * 10, 25);
+        rawScore += overdueScore;
+        factors.push({ label: 'Overdue tasks', value: overdue, impact: overdueScore > 15 ? 'high' : 'medium' });
+    }
+
+    // Factor 4: Critical conflicts specifically
+    const critConflicts = resourceConflicts.criticalConflicts;
+    if (critConflicts > 0) {
+        const critScore = Math.min(critConflicts * 15, 20);
+        rawScore += critScore;
+        factors.push({ label: 'Critical path conflicts', value: critConflicts, impact: 'high' });
+    }
+
+    const score = Math.min(Math.round(rawScore), 100);
+
+    const recommendation = score >= 70 ? 'Strongly recommended — significant improvements possible'
+        : score >= 40 ? 'Recommended — moderate scheduling improvements available'
+        : score >= 15 ? 'Optional — minor improvements possible'
+        : 'Schedule looks good — optimization not needed';
+
+    return { score, factors, recommendation };
+};
+
 /** Assignee load: total active tasks, critical tasks, overdue, and conflict count */
 const computeAssigneeLoad = (allTasks, resourceConflicts, today) => {
     const load = {};
@@ -236,6 +424,11 @@ export const useDashboardStats = (projects) => {
         const dependencyAnalysis = computeDependencyChainAnalysis(allTasks, taskKeyMap);
         const projectVelocity = computeProjectVelocity(projects, today);
         const assigneeLoad = computeAssigneeLoad(allTasks, resourceConflicts, today);
+        const statusDistribution = computeStatusDistribution(allTasks);
+        const priorityDistribution = computePriorityDistribution(allTasks);
+        const completionTrend = computeCompletionTrend(allTasks, today);
+        const slackDistribution = computeSlackDistribution(allTasks, taskKeyMap);
+        const optimizationOpportunity = computeOptimizationOpportunity(resourceConflicts, scheduleHealth, allTasks, today);
 
         return {
             totalProjects: projects.length,
@@ -257,6 +450,11 @@ export const useDashboardStats = (projects) => {
             dependencyAnalysis,
             projectVelocity,
             assigneeLoad,
+            statusDistribution,
+            priorityDistribution,
+            completionTrend,
+            slackDistribution,
+            optimizationOpportunity,
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projects, todayStr]);

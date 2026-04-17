@@ -5,5 +5,9 @@ public record UserDTO(
         String firstname,
         String lastname,
         String email,
-        String profilePicture
+        String profilePicture,
+        Boolean emailNotificationsEnabled,
+        Boolean emailOnTaskAssigned,
+        Boolean emailOnCommentReply,
+        Boolean emailOnProjectInvitation
 ) {}

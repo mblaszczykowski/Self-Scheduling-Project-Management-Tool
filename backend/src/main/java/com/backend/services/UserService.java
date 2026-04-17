@@ -6,7 +6,9 @@ import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.UserRepository;
+import com.backend.requests.EmailPreferencesRequest;
 import com.backend.requests.UserRegistrationRequest;
+import com.backend.util.EntityMapper;
 import com.backend.util.FileValidationConstants;
 import com.backend.util.ValidationUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,18 +30,21 @@ public class UserService {
     private final FileStorageService fileStorageService;
     private final ProjectRepository projectRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final EntityMapper entityMapper;
 
     @Autowired
     public UserService(UserRepository userRepository,
                        TokenService tokenService,
                        FileStorageService fileStorageService,
                        ProjectRepository projectRepository,
-                       BCryptPasswordEncoder passwordEncoder) {
+                       BCryptPasswordEncoder passwordEncoder,
+                       EntityMapper entityMapper) {
         this.userRepository = userRepository;
         this.tokenService = tokenService;
         this.fileStorageService = fileStorageService;
         this.projectRepository = projectRepository;
         this.passwordEncoder = passwordEncoder;
+        this.entityMapper = entityMapper;
     }
 
     public boolean shareProjectWith(Integer userId1, Integer userId2) {
@@ -65,7 +70,7 @@ public class UserService {
     }
 
     public UserDTO convertToDTO(User user) {
-        return new UserDTO(user.getId(), user.getFirstname(), user.getLastname(), user.getEmail(), user.getProfilePicture());
+        return entityMapper.toUserDTO(user);
     }
 
     public UserDTO getUserByEmailForRequester(String email, Integer requesterId) {
@@ -90,10 +95,10 @@ public class UserService {
 
     @Transactional(rollbackFor = Exception.class)
     public RegistrationResult registerUser(UserRegistrationRequest request) {
-        validateRegistrationRequest(request);
+        if (userRepository.existsByEmail(request.email().toLowerCase().trim())) {
+            throw new ValidationException("Registration failed. Please check your details.");
+        }
         ValidationUtil.validatePassword(request.password());
-        ValidationUtil.validateName(request.firstname(), "First name");
-        ValidationUtil.validateName(request.lastname(), "Last name");
 
         var hashedPassword = passwordEncoder.encode(request.password());
 
@@ -172,21 +177,25 @@ public class UserService {
         return convertToDTO(user);
     }
 
-    private void validateRegistrationRequest(UserRegistrationRequest request) {
-        if (ValidationUtil.isNullOrEmpty(request.firstname()) ||
-                ValidationUtil.isNullOrEmpty(request.lastname()) ||
-                ValidationUtil.isNullOrEmpty(request.email()) ||
-                ValidationUtil.isNullOrEmpty(request.password())) {
-            throw new ValidationException("All fields are required");
+    @Transactional(rollbackFor = Exception.class)
+    public UserDTO updateEmailPreferences(Integer userId, EmailPreferencesRequest request) {
+        var user = getRequiredUserById(userId);
+
+        if (request.emailNotificationsEnabled() != null) {
+            user.setEmailNotificationsEnabled(request.emailNotificationsEnabled());
+        }
+        if (request.emailOnTaskAssigned() != null) {
+            user.setEmailOnTaskAssigned(request.emailOnTaskAssigned());
+        }
+        if (request.emailOnCommentReply() != null) {
+            user.setEmailOnCommentReply(request.emailOnCommentReply());
+        }
+        if (request.emailOnProjectInvitation() != null) {
+            user.setEmailOnProjectInvitation(request.emailOnProjectInvitation());
         }
 
-        if (!ValidationUtil.isValidEmail(request.email())) {
-            throw new ValidationException("Invalid email format");
-        }
-
-        if (userRepository.existsByEmail(request.email().toLowerCase().trim())) {
-            throw new ValidationException("Registration failed. Please check your details.");
-        }
+        userRepository.save(user);
+        return convertToDTO(user);
     }
 
     private void validateProfilePictureUpload(MultipartFile profilePicture) {

@@ -1,7 +1,9 @@
 package com.backend.services;
 
 import com.backend.TestEntityFactory;
+import com.backend.dtos.CommentDTO;
 import com.backend.entities.*;
+import com.backend.events.NotificationEvent;
 import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
@@ -9,6 +11,8 @@ import com.backend.repositories.CommentReactionRepository;
 import com.backend.repositories.CommentRepository;
 import com.backend.repositories.TaskRepository;
 import com.backend.repositories.UserRepository;
+import com.backend.util.AccessGuard;
+import com.backend.util.EntityMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.*;
 
@@ -43,7 +48,16 @@ class CommentServiceTest {
     private FileStorageService fileStorageService;
 
     @Mock
-    private NotificationService notificationService;
+    private TaskActivityService taskActivityService;
+
+    @Mock
+    private EntityMapper entityMapper;
+
+    @Mock
+    private AccessGuard accessGuard;
+
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     private CommentService commentService;
 
@@ -55,7 +69,8 @@ class CommentServiceTest {
     @BeforeEach
     void setUp() {
         commentService = new CommentService(commentRepository, commentReactionRepository,
-                taskRepository, userRepository, fileStorageService, notificationService);
+                taskRepository, userRepository, fileStorageService, taskActivityService,
+                entityMapper, accessGuard, applicationEventPublisher);
 
         author = TestEntityFactory.createUser(1, "author@example.com");
         otherUser = TestEntityFactory.createUser(2, "other@example.com");
@@ -77,6 +92,12 @@ class CommentServiceTest {
                 Comment c = inv.getArgument(0);
                 c.setId(1);
                 return c;
+            });
+            when(entityMapper.toCommentDTO(any(Comment.class), eq(1))).thenAnswer(inv -> {
+                Comment c = inv.getArgument(0);
+                return new CommentDTO(c.getId(), 100, 1, "Author", null,
+                        c.getContent(), c.getTimestamp(), null, List.of(),
+                        0, 0, List.of(), List.of(), false, false, List.of());
             });
 
             var result = commentService.addComment(100, 1,
@@ -123,6 +144,8 @@ class CommentServiceTest {
         @DisplayName("should throw when user has no access to project")
         void shouldThrowWhenNoProjectAccess() {
             when(taskRepository.findById(100)).thenReturn(Optional.of(task));
+            doThrow(new ResourceNotFoundException("Project not found"))
+                    .when(accessGuard).requireAccess(task.getProject(), 99);
 
             assertThrows(ResourceNotFoundException.class, () ->
                     commentService.addComment(100, 99, "content", null, null));
@@ -141,11 +164,18 @@ class CommentServiceTest {
                 c.setId(2);
                 return c;
             });
+            when(entityMapper.toCommentDTO(any(Comment.class), eq(1))).thenReturn(
+                    new CommentDTO(2, 100, 1, "Author", null, "Reply content",
+                            null, null, List.of(), 0, 0, List.of(), List.of(), false, false, List.of()));
 
             commentService.addComment(100, 1, "Reply content", null, 50);
 
-            verify(notificationService).createNotification(
-                    eq(otherUser), contains("replied"), eq(NotificationType.COMMENT_REPLY), anyString());
+            var captor = ArgumentCaptor.forClass(NotificationEvent.class);
+            verify(applicationEventPublisher, atLeastOnce()).publishEvent(captor.capture());
+            assertTrue(captor.getAllValues().stream().anyMatch(e ->
+                    e.recipient().equals(otherUser) &&
+                    e.message().contains("replied") &&
+                    e.type() == NotificationType.COMMENT_REPLY));
         }
 
         @Test
@@ -161,10 +191,13 @@ class CommentServiceTest {
                 c.setId(2);
                 return c;
             });
+            when(entityMapper.toCommentDTO(any(Comment.class), eq(1))).thenReturn(
+                    new CommentDTO(2, 100, 1, "Author", null, "Self reply",
+                            null, null, List.of(), 0, 0, List.of(), List.of(), false, false, List.of()));
 
             commentService.addComment(100, 1, "Self reply", null, 50);
 
-            verify(notificationService, never()).createNotification(any(), anyString(), any(), anyString());
+            verify(applicationEventPublisher, never()).publishEvent(any(NotificationEvent.class));
         }
     }
 
@@ -179,6 +212,9 @@ class CommentServiceTest {
 
             when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
             when(commentRepository.save(any(Comment.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(entityMapper.toCommentDTO(any(Comment.class), eq(1))).thenReturn(
+                    new CommentDTO(1, 100, 1, "Author", null, "Updated content",
+                            null, null, List.of(), 0, 0, List.of(), List.of(), false, false, List.of()));
 
             var result = commentService.updateComment(1, 1, "Updated content", null);
 
@@ -192,6 +228,8 @@ class CommentServiceTest {
             var comment = TestEntityFactory.createComment(1, task, author);
 
             when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
+            doThrow(new AuthorizationException("User not authorized to modify this comment"))
+                    .when(accessGuard).requireCommentOwnership(comment, 2);
 
             assertThrows(AuthorizationException.class, () ->
                     commentService.updateComment(1, 2, "Hacked content", null));
@@ -204,6 +242,9 @@ class CommentServiceTest {
 
             when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
             when(commentRepository.save(any(Comment.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(entityMapper.toCommentDTO(any(Comment.class), eq(1))).thenReturn(
+                    new CommentDTO(1, 100, 1, "Author", null, "<b>Bold</b>",
+                            null, null, List.of(), 0, 0, List.of(), List.of(), false, false, List.of()));
 
             commentService.updateComment(1, 1, "<b>Bold</b><script>evil()</script>", null);
 
@@ -222,6 +263,7 @@ class CommentServiceTest {
             var comment = TestEntityFactory.createComment(1, task, author);
 
             when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
+            when(userRepository.findById(1)).thenReturn(Optional.of(author));
 
             commentService.deleteComment(1, 1);
 
@@ -234,6 +276,8 @@ class CommentServiceTest {
             var comment = TestEntityFactory.createComment(1, task, author);
 
             when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
+            doThrow(new AuthorizationException("User not authorized to modify this comment"))
+                    .when(accessGuard).requireCommentOwnership(comment, 2);
 
             assertThrows(AuthorizationException.class, () ->
                     commentService.deleteComment(1, 2));
@@ -267,12 +311,18 @@ class CommentServiceTest {
             when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
             when(userRepository.findById(2)).thenReturn(Optional.of(otherUser));
             when(commentReactionRepository.findByCommentIdAndUserId(1, 2)).thenReturn(Optional.empty());
+            when(entityMapper.toCommentDTO(any(Comment.class), eq(2))).thenReturn(
+                    new CommentDTO(1, 100, 1, "Author", null, "content",
+                            null, null, List.of(), 1, 0, List.of("Other User"), List.of(), false, false, List.of()));
 
             commentService.reactToComment(1, 2, ReactionType.LIKE);
 
             verify(commentReactionRepository).save(any(CommentReaction.class));
-            verify(notificationService).createNotification(
-                    eq(author), contains("reacted"), eq(NotificationType.COMMENT_REACTION), anyString());
+            var captor = ArgumentCaptor.forClass(NotificationEvent.class);
+            verify(applicationEventPublisher).publishEvent(captor.capture());
+            assertEquals(author, captor.getValue().recipient());
+            assertTrue(captor.getValue().message().contains("reacted"));
+            assertEquals(NotificationType.COMMENT_REACTION, captor.getValue().type());
         }
 
         @Test
@@ -281,11 +331,14 @@ class CommentServiceTest {
             when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
             when(userRepository.findById(1)).thenReturn(Optional.of(author));
             when(commentReactionRepository.findByCommentIdAndUserId(1, 1)).thenReturn(Optional.empty());
+            when(entityMapper.toCommentDTO(any(Comment.class), eq(1))).thenReturn(
+                    new CommentDTO(1, 100, 1, "Author", null, "content",
+                            null, null, List.of(), 1, 0, List.of("Author"), List.of(), false, false, List.of()));
 
             commentService.reactToComment(1, 1, ReactionType.LIKE);
 
             verify(commentReactionRepository).save(any(CommentReaction.class));
-            verify(notificationService, never()).createNotification(any(), anyString(), any(), anyString());
+            verify(applicationEventPublisher, never()).publishEvent(any(NotificationEvent.class));
         }
 
         @Test
@@ -298,6 +351,9 @@ class CommentServiceTest {
             when(userRepository.findById(2)).thenReturn(Optional.of(otherUser));
             when(commentReactionRepository.findByCommentIdAndUserId(1, 2))
                     .thenReturn(Optional.of(existingReaction));
+            when(entityMapper.toCommentDTO(any(Comment.class), eq(2))).thenReturn(
+                    new CommentDTO(1, 100, 1, "Author", null, "content",
+                            null, null, List.of(), 0, 0, List.of(), List.of(), false, false, List.of()));
 
             commentService.reactToComment(1, 2, ReactionType.LIKE);
 
@@ -315,6 +371,9 @@ class CommentServiceTest {
             when(userRepository.findById(2)).thenReturn(Optional.of(otherUser));
             when(commentReactionRepository.findByCommentIdAndUserId(1, 2))
                     .thenReturn(Optional.of(existingReaction));
+            when(entityMapper.toCommentDTO(any(Comment.class), eq(2))).thenReturn(
+                    new CommentDTO(1, 100, 1, "Author", null, "content",
+                            null, null, List.of(), 0, 1, List.of(), List.of("Other User"), false, true, List.of()));
 
             commentService.reactToComment(1, 2, ReactionType.DISLIKE);
 

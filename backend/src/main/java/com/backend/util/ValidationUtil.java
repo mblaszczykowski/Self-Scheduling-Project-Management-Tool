@@ -67,6 +67,12 @@ public class ValidationUtil {
         }
     }
 
+    public static void validatePasswordMatch(String password, String confirmPassword) {
+        if (password == null || !password.equals(confirmPassword)) {
+            throw new ValidationException("Passwords do not match");
+        }
+    }
+
     public static void validateSummaryAndDescription(String summary, String description) {
         if (isNullOrEmpty(summary)) {
             throw new ValidationException("Summary is required");

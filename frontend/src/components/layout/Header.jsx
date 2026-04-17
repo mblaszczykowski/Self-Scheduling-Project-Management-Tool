@@ -11,6 +11,7 @@ import UserMenu from './UserMenu';
 import ConfirmDialog from '../modals/ConfirmDialog';
 import MobileMenu from './MobileMenu';
 import { markNotificationsAsRead } from '../../util/api';
+import SearchBar from './SearchBar';
 
 export default function Header({ onLogout, onCreateProject, onCreateTask }) {
     const { user, setUser } = useContext(AuthContext);
@@ -89,6 +90,9 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                 </div>
 
                 <div className="flex items-center gap-1">
+                    <div className="hidden xl:block mr-2">
+                        <SearchBar />
+                    </div>
                     <button
                         onClick={toggleTheme}
                         className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"

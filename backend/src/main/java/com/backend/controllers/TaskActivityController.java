@@ -3,6 +3,7 @@ package com.backend.controllers;
 import com.backend.dtos.TaskActivityDTO;
 import com.backend.services.TaskActivityService;
 import com.backend.services.TokenService;
+import com.backend.util.AccessGuard;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,10 +16,14 @@ public class TaskActivityController {
 
     private final TaskActivityService taskActivityService;
     private final TokenService tokenService;
+    private final AccessGuard accessGuard;
 
-    public TaskActivityController(TaskActivityService taskActivityService, TokenService tokenService) {
+    public TaskActivityController(TaskActivityService taskActivityService,
+                                  TokenService tokenService,
+                                  AccessGuard accessGuard) {
         this.taskActivityService = taskActivityService;
         this.tokenService = tokenService;
+        this.accessGuard = accessGuard;
     }
 
     @GetMapping
@@ -26,7 +31,8 @@ public class TaskActivityController {
             HttpServletRequest request,
             @PathVariable Integer taskId
     ) {
-        tokenService.getUserIdFromRequest(request);
+        var userId = tokenService.getUserIdFromRequest(request);
+        accessGuard.getAccessibleTaskById(taskId, userId);
         var activities = taskActivityService.getActivitiesForTask(taskId);
         return ResponseEntity.ok(activities);
     }

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { SectionHeader, ChartCard, chartOptions } from './ChartComponents';
+import { STATUS_CONFIG, PRIORITY_CONFIG } from '../../util/helpers';
 import { formatShortDate } from '../../util/helpers';
 import {
     CheckCircleIcon, AlertTriangleIcon, BlockedIcon,
@@ -9,87 +10,76 @@ import {
     ClockIcon, FlagIcon,
 } from '../common/Icons';
 
+const SectionDivider = ({ title }) => (
+    <div className="col-span-full pt-6 pb-2 first:pt-0">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3>
+    </div>
+);
+
 const AnalyticsSection = ({ stats }) => {
     return (
         <section>
             <SectionHeader title="Analytics" subtitle="Critical path optimization & schedule intelligence" />
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
 
-                {/* ── 1. Critical Path Health (existing) ── */}
+                {/* ═══ Overview ═══ */}
+                <SectionDivider title="Overview" />
+                <StatusDistributionCard stats={stats} />
+                <PriorityDistributionCard stats={stats} />
+                <ProjectProgressCard stats={stats} />
+                <CompletionTrendCard stats={stats} />
+                <OptimizationOpportunityCard stats={stats} />
+
+                {/* ═══ Schedule & Health ═══ */}
+                <SectionDivider title="Schedule & Health" />
                 <ChartCard title="Critical Path Health" subtitle="Overall critical task status">
                     <div className="flex items-start justify-between mb-4">
                         <div>
-                            <div className="text-4xl font-bold text-slate-900 mb-1">
+                            <div className="text-4xl font-bold text-slate-900 dark:text-white mb-1">
                                 {stats.criticalHealthScore}%
                             </div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
                                 {stats.criticalTasksList.length} critical tasks
                             </div>
                         </div>
                         <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${
-                            stats.criticalHealthScore >= 80 ? 'bg-green-100' :
-                            stats.criticalHealthScore >= 60 ? 'bg-yellow-100' : 'bg-red-100'
+                            stats.criticalHealthScore >= 80 ? 'bg-green-100 dark:bg-green-900/30' :
+                            stats.criticalHealthScore >= 60 ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-red-100 dark:bg-red-900/30'
                         }`}>
                             <CheckCircleIcon className={`w-7 h-7 ${
-                                stats.criticalHealthScore >= 80 ? 'text-green-600' :
-                                stats.criticalHealthScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                                stats.criticalHealthScore >= 80 ? 'text-green-600 dark:text-green-400' :
+                                stats.criticalHealthScore >= 60 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
                             }`} />
                         </div>
                     </div>
-                    <div className="space-y-2 pt-4 border-t border-slate-100">
+                    <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-700">
                         <div className="flex justify-between text-xs">
-                            <span className="text-slate-600">On Track</span>
-                            <span className="font-semibold text-green-600">{stats.criticalOnTime}</span>
+                            <span className="text-slate-600 dark:text-slate-400">On Track</span>
+                            <span className="font-semibold text-green-600 dark:text-green-400">{stats.criticalOnTime}</span>
                         </div>
                         <div className="flex justify-between text-xs">
-                            <span className="text-slate-600">At Risk</span>
-                            <span className="font-semibold text-yellow-600">{stats.criticalAtRisk.length}</span>
+                            <span className="text-slate-600 dark:text-slate-400">At Risk</span>
+                            <span className="font-semibold text-yellow-600 dark:text-yellow-400">{stats.criticalAtRisk.length}</span>
                         </div>
                         <div className="flex justify-between text-xs">
-                            <span className="text-slate-600">Delayed</span>
-                            <span className="font-semibold text-red-600">{stats.criticalDelayed.length}</span>
+                            <span className="text-slate-600 dark:text-slate-400">Delayed</span>
+                            <span className="font-semibold text-red-600 dark:text-red-400">{stats.criticalDelayed.length}</span>
                         </div>
                     </div>
                 </ChartCard>
-
-                {/* ── 2. Schedule Health (NEW) ── */}
                 <ScheduleHealthCard stats={stats} />
-
-                {/* ── 3. Resource Conflicts (NEW) ── */}
-                <ResourceConflictsCard stats={stats} />
-
-                {/* ── 4. Critical Path Duration (existing) ── */}
-                <CriticalPathTimelineCard stats={stats} />
-
-                {/* ── 5. Project Velocity (NEW) ── */}
+                <SlackDistributionCard stats={stats} />
                 <ProjectVelocityCard stats={stats} />
-
-                {/* ── 6. Project Progress (existing) ── */}
-                <ProjectProgressCard stats={stats} />
-
-                {/* ── 7. Dependency Chain Analysis (NEW) ── */}
-                <DependencyChainCard stats={stats} />
-
-                {/* ── 8. Overdue Critical (existing) ── */}
-                <OverdueCriticalCard stats={stats} />
-
-                {/* ── 9. Blocked Tasks (existing) ── */}
-                <BlockedTasksCard stats={stats} />
-
-                {/* ── 10. Assignee Load (NEW) ── */}
-                <AssigneeLoadCard stats={stats} />
-
-                {/* ── 11. Critical Path Workload (existing) ── */}
-                <CriticalWorkloadCard stats={stats} />
-
-                {/* ── 12. Near-Critical (existing) ── */}
-                <NearCriticalCard stats={stats} />
-
-                {/* ── 13. Cross-Project Deps (existing) ── */}
-                <CrossProjectDepsCard stats={stats} />
-
-                {/* ── 14. Upcoming Deadlines (existing) ── */}
+                <ResourceConflictsCard stats={stats} />
                 <UpcomingDeadlinesCard stats={stats} />
+
+                {/* ═══ Dependencies & Team ═══ */}
+                <SectionDivider title="Dependencies & Team" />
+                <CriticalPathTimelineCard stats={stats} />
+                <DependencyChainCard stats={stats} />
+                <BlockedTasksCard stats={stats} />
+                <CrossProjectDepsCard stats={stats} />
+                <TeamWorkloadBarCard stats={stats} />
             </div>
         </section>
     );
@@ -305,49 +295,258 @@ const DependencyChainCard = ({ stats }) => {
     );
 };
 
-const AssigneeLoadCard = ({ stats }) => (
-    <ChartCard title="Team Load Distribution" subtitle="Active workload per assignee">
-        <div className="space-y-2">
-            {stats.assigneeLoad.length > 0 ? (
-                stats.assigneeLoad.map(a => {
-                    const isOverloaded = a.total > 5 || a.overdue > 1;
-                    return (
-                        <div key={a.assignee} className="flex items-center gap-2">
-                            <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0">
-                                <span className="text-[10px] font-medium text-slate-700">
-                                    {a.assignee.split('@')[0].substring(0, 2).toUpperCase()}
-                                </span>
-                            </div>
-                            <span className="text-xs text-slate-700 truncate min-w-0 flex-1">{a.assignee.split('@')[0]}</span>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isOverloaded ? 'text-red-600 bg-red-50' : 'text-slate-600 bg-slate-100'}`}>
-                                    {a.total} tasks
-                                </span>
-                                {a.critical > 0 && (
-                                    <span className="text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded font-medium">
-                                        {a.critical}C
-                                    </span>
-                                )}
-                                {a.overdue > 0 && (
-                                    <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                                        {a.overdue} late
-                                    </span>
-                                )}
-                                {a.conflicts > 0 && (
-                                    <span className="text-[10px] text-red-500 bg-red-50 px-1 py-0.5 rounded">
-                                        {a.conflicts} conflicts
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })
-            ) : (
+/* ── Status distribution color map (hex values matching STATUS_CONFIG dot colors) ── */
+const STATUS_CHART_COLORS = {
+    BACKLOG: '#94a3b8',
+    TODO: '#3b82f6',
+    IN_PROGRESS: '#f59e0b',
+    IN_TEST: '#0ea5e9',
+    TO_TEST: '#3b82f6',
+    TO_REVIEW: '#06b6d4',
+    READY_TO_MERGE: '#14b8a6',
+    READY_TO_DEPLOY: '#10b981',
+    DONE: '#22c55e',
+    RELEASED: '#16a34a',
+    WITHDRAWN: '#ef4444',
+    GATHERING_INTEREST: '#f97316',
+};
+
+const PRIORITY_CHART_COLORS = {
+    LOWEST: '#94a3b8',
+    LOW: '#3b82f6',
+    MEDIUM: '#f59e0b',
+    HIGH: '#f97316',
+    HIGHEST: '#ef4444',
+};
+
+const doughnutOptions = {
+    plugins: {
+        legend: { display: false },
+        tooltip: {
+            ...chartOptions.plugins.tooltip,
+            displayColors: true,
+        },
+    },
+    maintainAspectRatio: false,
+    cutout: '65%',
+};
+
+const StatusDistributionCard = ({ stats }) => {
+    const distribution = stats.statusDistribution || {};
+    const statuses = Object.keys(distribution).filter(s => distribution[s] > 0);
+
+    if (statuses.length === 0) {
+        return (
+            <ChartCard title="Status Distribution" subtitle="Tasks by current status">
+                <EmptyState icon="chart" message="No tasks to display" />
+            </ChartCard>
+        );
+    }
+
+    const data = {
+        labels: statuses.map(s => STATUS_CONFIG[s]?.label || s),
+        datasets: [{
+            data: statuses.map(s => distribution[s]),
+            backgroundColor: statuses.map(s => STATUS_CHART_COLORS[s] || '#94a3b8'),
+            borderWidth: 2,
+            borderColor: '#ffffff',
+            hoverOffset: 4,
+        }],
+    };
+
+    return (
+        <ChartCard title="Status Distribution" subtitle="Tasks by current status">
+            <div className="h-48 flex items-center justify-center">
+                <Doughnut data={data} options={doughnutOptions} />
+            </div>
+            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-x-4 gap-y-1">
+                {statuses.map(s => (
+                    <div key={s} className="flex items-center gap-1.5 text-xs">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_CHART_COLORS[s] }} />
+                        <span className="text-slate-600 truncate">{STATUS_CONFIG[s]?.label || s}</span>
+                        <span className="font-semibold text-slate-800 ml-auto">{distribution[s]}</span>
+                    </div>
+                ))}
+            </div>
+        </ChartCard>
+    );
+};
+
+const TeamWorkloadBarCard = ({ stats }) => {
+    const assignees = stats.assigneeLoad || [];
+
+    if (assignees.length === 0) {
+        return (
+            <ChartCard title="Team Workload" subtitle="Tasks per assignee (critical vs normal)">
                 <EmptyState icon="users" message="No assigned active tasks" />
-            )}
-        </div>
-    </ChartCard>
-);
+            </ChartCard>
+        );
+    }
+
+    const labels = assignees.map(a => a.assignee.split('@')[0]);
+    const criticalData = assignees.map(a => a.critical);
+    const normalData = assignees.map(a => a.total - a.critical);
+
+    const data = {
+        labels,
+        datasets: [
+            {
+                label: 'Critical',
+                data: criticalData,
+                backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                hoverBackgroundColor: 'rgba(220, 38, 38, 1)',
+                borderRadius: 4,
+                borderSkipped: false,
+            },
+            {
+                label: 'Normal',
+                data: normalData,
+                backgroundColor: 'rgba(71, 85, 105, 0.7)',
+                hoverBackgroundColor: 'rgba(51, 65, 85, 1)',
+                borderRadius: 4,
+                borderSkipped: false,
+            },
+        ],
+    };
+
+    const options = {
+        ...chartOptions,
+        indexAxis: 'y',
+        plugins: {
+            ...chartOptions.plugins,
+            legend: {
+                display: true,
+                position: 'top',
+                labels: {
+                    boxWidth: 10,
+                    boxHeight: 10,
+                    borderRadius: 2,
+                    useBorderRadius: true,
+                    font: { size: 10, family: 'system-ui' },
+                    color: '#64748b',
+                    padding: 12,
+                },
+            },
+        },
+        scales: {
+            ...chartOptions.scales,
+            x: {
+                ...chartOptions.scales.x,
+                stacked: true,
+                beginAtZero: true,
+                grid: { display: true, color: 'rgba(148, 163, 184, 0.1)' },
+                ticks: { ...chartOptions.scales.x.ticks, stepSize: 1 },
+            },
+            y: {
+                ...chartOptions.scales.y,
+                stacked: true,
+            },
+        },
+    };
+
+    return (
+        <ChartCard title="Team Workload" subtitle="Tasks per assignee (critical vs normal)">
+            <div className="h-56">
+                <Bar data={data} options={options} />
+            </div>
+        </ChartCard>
+    );
+};
+
+const PriorityDistributionCard = ({ stats }) => {
+    const distribution = stats.priorityDistribution || {};
+    const priorities = ['LOWEST', 'LOW', 'MEDIUM', 'HIGH', 'HIGHEST'].filter(p => distribution[p] > 0);
+
+    if (priorities.length === 0) {
+        return (
+            <ChartCard title="Priority Distribution" subtitle="Tasks by priority level">
+                <EmptyState icon="chart" message="No tasks to display" />
+            </ChartCard>
+        );
+    }
+
+    const data = {
+        labels: priorities.map(p => PRIORITY_CONFIG[p]?.label || p),
+        datasets: [{
+            data: priorities.map(p => distribution[p]),
+            backgroundColor: priorities.map(p => PRIORITY_CHART_COLORS[p] || '#94a3b8'),
+            borderWidth: 2,
+            borderColor: '#ffffff',
+            hoverOffset: 4,
+        }],
+    };
+
+    return (
+        <ChartCard title="Priority Distribution" subtitle="Tasks by priority level">
+            <div className="h-48 flex items-center justify-center">
+                <Doughnut data={data} options={doughnutOptions} />
+            </div>
+            <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-x-4 gap-y-1 justify-center">
+                {priorities.map(p => (
+                    <div key={p} className="flex items-center gap-1.5 text-xs">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: PRIORITY_CHART_COLORS[p] }} />
+                        <span className="text-slate-600">{PRIORITY_CONFIG[p]?.label || p}</span>
+                        <span className="font-semibold text-slate-800">{distribution[p]}</span>
+                    </div>
+                ))}
+            </div>
+        </ChartCard>
+    );
+};
+
+const CompletionTrendCard = ({ stats }) => {
+    const trend = stats.completionTrend || [];
+    const hasData = trend.some(w => w.count > 0);
+
+    if (!hasData) {
+        return (
+            <ChartCard title="Completion Trend" subtitle="Weekly completed tasks (8 weeks)">
+                <EmptyState icon="trend" message="No completions in the past 8 weeks" />
+            </ChartCard>
+        );
+    }
+
+    const data = {
+        labels: trend.map(w => w.label),
+        datasets: [{
+            label: 'Completed',
+            data: trend.map(w => w.count),
+            borderColor: 'rgba(71, 85, 105, 0.9)',
+            backgroundColor: 'rgba(71, 85, 105, 0.1)',
+            fill: true,
+            tension: 0.35,
+            pointBackgroundColor: '#475569',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+        }],
+    };
+
+    const options = {
+        ...chartOptions,
+        plugins: {
+            ...chartOptions.plugins,
+            legend: { display: false },
+        },
+        scales: {
+            ...chartOptions.scales,
+            y: {
+                ...chartOptions.scales.y,
+                beginAtZero: true,
+                ticks: { ...chartOptions.scales.y.ticks, stepSize: 1 },
+            },
+        },
+    };
+
+    return (
+        <ChartCard title="Completion Trend" subtitle="Weekly completed tasks (8 weeks)">
+            <div className="h-56">
+                <Line data={data} options={options} />
+            </div>
+        </ChartCard>
+    );
+};
 
 /* ══════════════════════════════════════════════════════════
    EXISTING CARDS (preserved)
@@ -433,37 +632,6 @@ const ProjectProgressCard = ({ stats }) => (
     </ChartCard>
 );
 
-const OverdueCriticalCard = ({ stats }) => (
-    <ChartCard title="Overdue Critical Tasks" subtitle="Delaying critical path">
-        <div className="space-y-3">
-            {stats.overdueCriticalByProject.length > 0 ? (
-                stats.overdueCriticalByProject.slice(0, 5).map(project => (
-                    <div key={project.projectKey}>
-                        <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm text-slate-700 font-medium truncate">
-                                {project.projectKey}
-                            </span>
-                            <span className="text-sm font-semibold text-red-600">
-                                {project.overdueCount}
-                            </span>
-                        </div>
-                        {project.overdueTasks.length > 0 && (
-                            <Link
-                                to={`/projects?selectedIssue=${project.overdueTasks[0].taskKey}`}
-                                className="block text-xs text-slate-500 hover:text-slate-900 truncate transition-colors"
-                            >
-                                {project.overdueTasks[0].taskKey} - {project.overdueTasks[0].summary}
-                            </Link>
-                        )}
-                    </div>
-                ))
-            ) : (
-                <EmptyState icon="check" message="All critical tasks on time" />
-            )}
-        </div>
-    </ChartCard>
-);
-
 const BlockedTasksCard = ({ stats }) => {
     const hasBlocked = stats.blockedTasks.length > 0;
     const blockedIconWrapCls = 'w-14 h-14 rounded-xl'
@@ -511,75 +679,6 @@ const BlockedTasksCard = ({ stats }) => {
     </ChartCard>
     );
 };
-
-const CriticalWorkloadCard = ({ stats }) => (
-    <ChartCard title="Critical Path Workload" subtitle="Team resources on critical tasks">
-        <div className="space-y-3">
-            {stats.criticalWorkload.length > 0 ? (
-                stats.criticalWorkload.slice(0, 5).map(({ assignee, criticalCount, criticalOverdue }) => (
-                    <div key={assignee} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs font-medium text-slate-700">
-                                    {assignee.split('@')[0].substring(0, 2).toUpperCase()}
-                                </span>
-                            </div>
-                            <span className="text-sm text-slate-700 truncate">
-                                {assignee.split('@')[0]}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {criticalOverdue > 0 && (
-                                <span className="text-xs text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
-                                    {criticalOverdue} late
-                                </span>
-                            )}
-                            <span className="text-sm font-semibold text-slate-900 w-6 text-right">
-                                {criticalCount}
-                            </span>
-                        </div>
-                    </div>
-                ))
-            ) : (
-                <EmptyState icon="users" message="No critical tasks assigned" />
-            )}
-        </div>
-    </ChartCard>
-);
-
-const NearCriticalCard = ({ stats }) => (
-    <ChartCard title="Near-Critical Tasks" subtitle="Tasks at risk of becoming critical">
-        <div className="flex items-start justify-between mb-4">
-            <div>
-                <div className="text-4xl font-bold text-slate-900 mb-1">
-                    {stats.nearCriticalTasks.length}
-                </div>
-                <div className="text-xs text-slate-500">
-                    {stats.nearCriticalTasks.length === 0 ? 'No risks' : 'Tasks with low slack'}
-                </div>
-            </div>
-            <div className={`w-14 h-14 ${stats.nearCriticalTasks.length > 0 ? 'bg-amber-100' : 'bg-slate-100'} rounded-xl flex items-center justify-center shrink-0`}>
-                <AlertTriangleIcon className={`w-7 h-7 ${stats.nearCriticalTasks.length > 0 ? 'text-amber-600' : 'text-slate-400'}`} />
-            </div>
-        </div>
-        {stats.nearCriticalTasks.length > 0 && (
-            <div className="pt-4 border-t border-slate-100">
-                <div className="space-y-2">
-                    {stats.nearCriticalTasks.slice(0, 4).map(task => (
-                        <Link key={task.id} to={`/projects?selectedIssue=${task.taskKey}`} className="block text-xs">
-                            <div className="text-slate-900 font-medium truncate">
-                                {task.taskKey}
-                            </div>
-                            <div className="text-slate-500 truncate">
-                                {task.summary}
-                            </div>
-                        </Link>
-                    ))}
-                </div>
-            </div>
-        )}
-    </ChartCard>
-);
 
 const CrossProjectDepsCard = ({ stats }) => (
     <ChartCard title="Cross-Project Dependencies" subtitle="Inter-project links">
@@ -668,6 +767,129 @@ const EmptyState = ({ icon, message, fullHeight = false }) => {
             </div>
             <p className="text-xs text-slate-500">{message}</p>
         </div>
+    );
+};
+
+/* ── Slack Distribution ── */
+
+const SlackDistributionCard = ({ stats }) => {
+    const sd = stats.slackDistribution;
+    if (!sd || sd.totalScheduled === 0) {
+        return (
+            <ChartCard title="Slack Distribution" subtitle="Schedule flexibility per task">
+                <EmptyState icon="chart" message="No scheduled tasks" />
+            </ChartCard>
+        );
+    }
+
+    const maxCount = Math.max(...sd.buckets.map(b => b.count), 1);
+    const fragilePercent = sd.totalScheduled > 0 ? Math.round((sd.zeroSlackCount / sd.totalScheduled) * 100) : 0;
+    const fragilityColor = fragilePercent >= 50 ? 'text-red-600 dark:text-red-400'
+        : fragilePercent >= 25 ? 'text-amber-600 dark:text-amber-400'
+        : 'text-green-600 dark:text-green-400';
+
+    return (
+        <ChartCard title="Slack Distribution" subtitle="Schedule flexibility per task">
+            <div className="flex items-center justify-between mb-4">
+                <div>
+                    <div className="text-3xl font-bold text-slate-900 dark:text-white">{sd.avgSlack}d</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">avg slack</div>
+                </div>
+                <div className="text-right">
+                    <div className={`text-2xl font-bold ${fragilityColor}`}>{fragilePercent}%</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">zero slack</div>
+                </div>
+            </div>
+            <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-700">
+                {sd.buckets.map(bucket => (
+                    <div key={bucket.label} className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 dark:text-slate-400 w-16 shrink-0">{bucket.label}</span>
+                        <div className="flex-1 h-5 bg-slate-100 dark:bg-slate-700/50 rounded overflow-hidden">
+                            <div
+                                className="h-full rounded transition-all duration-500"
+                                style={{
+                                    width: `${Math.max((bucket.count / maxCount) * 100, bucket.count > 0 ? 8 : 0)}%`,
+                                    backgroundColor: bucket.color,
+                                    opacity: 0.85,
+                                }}
+                            />
+                        </div>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 w-6 text-right tabular-nums">
+                            {bucket.count}
+                        </span>
+                    </div>
+                ))}
+            </div>
+            {fragilePercent >= 40 && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-3 pt-2 border-t border-slate-100 dark:border-slate-700">
+                    High fragility — {sd.zeroSlackCount} of {sd.totalScheduled} tasks have no scheduling flexibility
+                </p>
+            )}
+        </ChartCard>
+    );
+};
+
+/* ── Optimization Opportunity ── */
+
+const IMPACT_COLORS = {
+    high: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
+    medium: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
+    low: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20',
+};
+
+const OptimizationOpportunityCard = ({ stats }) => {
+    const oo = stats.optimizationOpportunity;
+    if (!oo) return null;
+
+    const ringColor = oo.score >= 70 ? '#ef4444' : oo.score >= 40 ? '#f59e0b' : oo.score >= 15 ? '#3b82f6' : '#22c55e';
+    const bgColor = oo.score >= 70 ? 'bg-red-100 dark:bg-red-900/30' : oo.score >= 40 ? 'bg-amber-100 dark:bg-amber-900/30' : oo.score >= 15 ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-green-100 dark:bg-green-900/30';
+    const textColor = oo.score >= 70 ? 'text-red-600 dark:text-red-400' : oo.score >= 40 ? 'text-amber-600 dark:text-amber-400' : oo.score >= 15 ? 'text-blue-600 dark:text-blue-400' : 'text-green-600 dark:text-green-400';
+
+    const size = 56;
+    const stroke = 5;
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    const offset = c - (oo.score / 100) * c;
+
+    return (
+        <ChartCard title="Optimization Opportunity" subtitle="How much can the optimizer help">
+            <div className="flex items-start gap-4 mb-4">
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${bgColor}`}>
+                    <svg width={size} height={size} className="-rotate-90">
+                        <circle cx={size/2} cy={size/2} r={r} fill="none" strokeWidth={stroke}
+                            className="text-slate-200 dark:text-slate-700" stroke="currentColor" />
+                        <circle cx={size/2} cy={size/2} r={r} fill="none" strokeWidth={stroke}
+                            strokeLinecap="round" strokeDasharray={c} strokeDashoffset={offset}
+                            stroke={ringColor} className="transition-all duration-700" />
+                        <text x={size/2} y={size/2} textAnchor="middle" dominantBaseline="central"
+                            className={`fill-current text-[11px] font-bold rotate-90 origin-center ${textColor}`}>
+                            {oo.score}
+                        </text>
+                    </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className={`text-sm font-semibold ${textColor} mb-0.5`}>
+                        {oo.score >= 70 ? 'High opportunity' : oo.score >= 40 ? 'Moderate opportunity' : oo.score >= 15 ? 'Low opportunity' : 'Schedule is healthy'}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{oo.recommendation}</p>
+                </div>
+            </div>
+            {oo.factors.length > 0 && (
+                <div className="space-y-1.5 pt-3 border-t border-slate-100 dark:border-slate-700">
+                    {oo.factors.map((f, i) => (
+                        <div key={i} className="flex items-center justify-between">
+                            <span className="text-xs text-slate-600 dark:text-slate-400">{f.label}</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{f.value}</span>
+                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${IMPACT_COLORS[f.impact]}`}>
+                                    {f.impact}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </ChartCard>
     );
 };
 

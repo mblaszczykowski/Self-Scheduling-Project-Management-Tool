@@ -102,6 +102,9 @@ export const updateUser = (formData) =>
         headers: { 'Content-Type': 'multipart/form-data' }
     }).then(res => res.data);
 
+export const updateEmailPreferences = (preferences) =>
+    api.patch('/api/users/email-preferences', preferences).then(res => res.data);
+
 export const getProjects = () => api.get('/api/projects').then(res => res.data);
 
 export const getProject = (projectKey) =>
@@ -186,6 +189,9 @@ export const initCsrfToken = async () => {
     } catch (e) {
     }
 };
+
+export const globalSearch = (query) =>
+    api.get('/api/search', { params: { q: query } }).then(res => res.data);
 
 export const simulateOptimization = (requestDTO) =>
     api.post('/api/optimization/simulate', requestDTO).then(res => res.data);

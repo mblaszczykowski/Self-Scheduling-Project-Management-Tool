@@ -30,6 +30,18 @@ public class User {
     @Column(name = "profile_picture")
     private String profilePicture;
 
+    @Column(name = "email_notifications_enabled", nullable = false, columnDefinition = "boolean not null default true")
+    private Boolean emailNotificationsEnabled = true;
+
+    @Column(name = "email_on_task_assigned", nullable = false, columnDefinition = "boolean not null default true")
+    private Boolean emailOnTaskAssigned = true;
+
+    @Column(name = "email_on_comment_reply", nullable = false, columnDefinition = "boolean not null default true")
+    private Boolean emailOnCommentReply = true;
+
+    @Column(name = "email_on_project_invitation", nullable = false, columnDefinition = "boolean not null default true")
+    private Boolean emailOnProjectInvitation = true;
+
 
     public User() {
     }
@@ -91,5 +103,37 @@ public class User {
 
     public void setProfilePicture(String profilePicture) {
         this.profilePicture = profilePicture;
+    }
+
+    public Boolean getEmailNotificationsEnabled() {
+        return emailNotificationsEnabled;
+    }
+
+    public void setEmailNotificationsEnabled(Boolean emailNotificationsEnabled) {
+        this.emailNotificationsEnabled = emailNotificationsEnabled;
+    }
+
+    public Boolean getEmailOnTaskAssigned() {
+        return emailOnTaskAssigned;
+    }
+
+    public void setEmailOnTaskAssigned(Boolean emailOnTaskAssigned) {
+        this.emailOnTaskAssigned = emailOnTaskAssigned;
+    }
+
+    public Boolean getEmailOnCommentReply() {
+        return emailOnCommentReply;
+    }
+
+    public void setEmailOnCommentReply(Boolean emailOnCommentReply) {
+        this.emailOnCommentReply = emailOnCommentReply;
+    }
+
+    public Boolean getEmailOnProjectInvitation() {
+        return emailOnProjectInvitation;
+    }
+
+    public void setEmailOnProjectInvitation(Boolean emailOnProjectInvitation) {
+        this.emailOnProjectInvitation = emailOnProjectInvitation;
     }
 }

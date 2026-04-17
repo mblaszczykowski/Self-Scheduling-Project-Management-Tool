@@ -3,19 +3,25 @@ package com.backend.services;
 import com.backend.TestEntityFactory;
 import com.backend.dtos.TaskDTO;
 import com.backend.entities.*;
+import com.backend.events.NotificationEvent;
 import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
 import com.backend.repositories.UserRepository;
+import com.backend.requests.TaskCreateRequest;
+import com.backend.util.AccessGuard;
+import com.backend.util.EntityMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -41,7 +47,16 @@ class TaskServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private NotificationService notificationService;
+    private TaskActivityService taskActivityService;
+
+    @Mock
+    private EntityMapper entityMapper;
+
+    @Mock
+    private AccessGuard accessGuard;
+
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     private TaskService taskService;
 
@@ -52,12 +67,24 @@ class TaskServiceTest {
     @BeforeEach
     void setUp() {
         taskService = new TaskService(taskRepository, projectRepository,
-                fileStorageService, userRepository, notificationService);
+                fileStorageService, userRepository, taskActivityService,
+                entityMapper, accessGuard, applicationEventPublisher);
 
         owner = TestEntityFactory.createUser(1, "owner@example.com");
         assignee = TestEntityFactory.createUser(2, "assignee@example.com");
         project = TestEntityFactory.createProject(10, "PROJ", owner);
         project.replaceMembers(java.util.Set.of(owner, assignee));
+    }
+
+    private TaskDTO createTaskDTOFromTask(Task t) {
+        return new TaskDTO(t.getId(), t.getTaskNumber(), t.getTaskKey(),
+                t.getProject().getProjectKey(), t.getSummary(), t.getDescription(),
+                t.getStatus(), t.getStartDate(), t.getDueDate(),
+                t.getAssignee() != null ? t.getAssignee().getEmail() : null,
+                t.getLabels() != null && !t.getLabels().isEmpty()
+                        ? java.util.Arrays.asList(t.getLabels().split(",")) : null,
+                null, null, null, t.getCreated(), t.getUpdated(),
+                t.getProgress(), t.getPriority());
     }
 
     @Nested
@@ -67,9 +94,10 @@ class TaskServiceTest {
         @Test
         @DisplayName("should create task with valid data and allocate task number")
         void shouldCreateTaskWithValidData() {
-            var dto = new TaskDTO(null, null, null, "PROJ", "New Task", "desc",
-                    TaskStatus.TODO, LocalDate.now(), LocalDate.now().plusDays(7),
-                    null, null, null, null, null, null, null, 0, TaskPriority.HIGH);
+            var request = new TaskCreateRequest("New Task", "desc",
+                    TaskStatus.TODO, TaskPriority.HIGH, 0,
+                    LocalDate.now(), LocalDate.now().plusDays(7),
+                    null, null, null, null);
 
             when(projectRepository.findByProjectKeyWithLock("PROJ")).thenReturn(Optional.of(project));
             when(taskRepository.save(any(Task.class))).thenAnswer(inv -> {
@@ -78,8 +106,12 @@ class TaskServiceTest {
                 return t;
             });
             when(projectRepository.save(any(Project.class))).thenReturn(project);
+            when(entityMapper.toTaskDTO(any(Task.class))).thenAnswer(inv -> {
+                Task t = inv.getArgument(0);
+                return createTaskDTOFromTask(t);
+            });
 
-            var result = taskService.createTask("PROJ", dto, 1, null);
+            var result = taskService.createTask("PROJ", request, 1, null);
 
             assertNotNull(result);
             assertEquals("New Task", result.summary());
@@ -92,14 +124,19 @@ class TaskServiceTest {
         void shouldAllocateIncrementingTaskNumbers() {
             project.setNextTaskNumber(5);
 
-            var dto = new TaskDTO(null, null, null, "PROJ", "Task Five", "desc",
-                    null, null, null, null, null, null, null, null, null, null, null, null);
+            var request = new TaskCreateRequest("Task Five", "desc",
+                    null, null, null,
+                    null, null, null, null, null, null);
 
             when(projectRepository.findByProjectKeyWithLock("PROJ")).thenReturn(Optional.of(project));
             when(taskRepository.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
             when(projectRepository.save(any(Project.class))).thenReturn(project);
+            when(entityMapper.toTaskDTO(any(Task.class))).thenAnswer(inv -> {
+                Task t = inv.getArgument(0);
+                return createTaskDTOFromTask(t);
+            });
 
-            var result = taskService.createTask("PROJ", dto, 1, null);
+            var result = taskService.createTask("PROJ", request, 1, null);
 
             assertEquals(5, result.taskNumber());
             assertEquals(6, project.getNextTaskNumber());
@@ -108,32 +145,37 @@ class TaskServiceTest {
         @Test
         @DisplayName("should throw when project not found")
         void shouldThrowWhenProjectNotFound() {
-            var dto = new TaskDTO(null, null, null, "NOPE", "Task", "desc",
-                    null, null, null, null, null, null, null, null, null, null, null, null);
+            var request = new TaskCreateRequest("Task", "desc",
+                    null, null, null,
+                    null, null, null, null, null, null);
 
             when(projectRepository.findByProjectKeyWithLock("NOPE")).thenReturn(Optional.empty());
 
             assertThrows(ResourceNotFoundException.class, () ->
-                    taskService.createTask("NOPE", dto, 1, null));
+                    taskService.createTask("NOPE", request, 1, null));
         }
 
         @Test
         @DisplayName("should throw when user has no access to project")
         void shouldThrowWhenUserHasNoAccess() {
-            var dto = new TaskDTO(null, null, null, "PROJ", "Task", "desc",
-                    null, null, null, null, null, null, null, null, null, null, null, null);
+            var request = new TaskCreateRequest("Task", "desc",
+                    null, null, null,
+                    null, null, null, null, null, null);
 
             when(projectRepository.findByProjectKeyWithLock("PROJ")).thenReturn(Optional.of(project));
+            doThrow(new ResourceNotFoundException("Project not found"))
+                    .when(accessGuard).requireAccess(project, 99);
 
             assertThrows(ResourceNotFoundException.class, () ->
-                    taskService.createTask("PROJ", dto, 99, null));
+                    taskService.createTask("PROJ", request, 99, null));
         }
 
         @Test
         @DisplayName("should notify assignee when different from creator")
         void shouldNotifyAssigneeWhenDifferentFromCreator() {
-            var dto = new TaskDTO(null, null, null, "PROJ", "Assigned Task", "desc",
-                    null, null, null, "assignee@example.com", null, null, null, null, null, null, null, null);
+            var request = new TaskCreateRequest("Assigned Task", "desc",
+                    null, null, null,
+                    null, null, "assignee@example.com", null, null, null);
 
             when(projectRepository.findByProjectKeyWithLock("PROJ")).thenReturn(Optional.of(project));
             when(userRepository.findByEmail("assignee@example.com")).thenReturn(Optional.of(assignee));
@@ -143,54 +185,72 @@ class TaskServiceTest {
                 return t;
             });
             when(projectRepository.save(any(Project.class))).thenReturn(project);
+            when(entityMapper.toTaskDTO(any(Task.class))).thenAnswer(inv -> {
+                Task t = inv.getArgument(0);
+                return createTaskDTOFromTask(t);
+            });
 
-            taskService.createTask("PROJ", dto, 1, null);
+            taskService.createTask("PROJ", request, 1, null);
 
-            verify(notificationService).createNotification(
-                    eq(assignee), contains("assigned"), eq(NotificationType.TASK_ASSIGNED), anyString());
+            var captor = ArgumentCaptor.forClass(NotificationEvent.class);
+            verify(applicationEventPublisher).publishEvent(captor.capture());
+            assertEquals(assignee, captor.getValue().recipient());
+            assertTrue(captor.getValue().message().contains("assigned"));
+            assertEquals(NotificationType.TASK_ASSIGNED, captor.getValue().type());
         }
 
         @Test
         @DisplayName("should not notify when assignee is the creator")
         void shouldNotNotifyWhenAssigneeIsCreator() {
-            var dto = new TaskDTO(null, null, null, "PROJ", "Self Task", "desc",
-                    null, null, null, "owner@example.com", null, null, null, null, null, null, null, null);
+            var request = new TaskCreateRequest("Self Task", "desc",
+                    null, null, null,
+                    null, null, "owner@example.com", null, null, null);
 
             when(projectRepository.findByProjectKeyWithLock("PROJ")).thenReturn(Optional.of(project));
             when(userRepository.findByEmail("owner@example.com")).thenReturn(Optional.of(owner));
             when(taskRepository.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
             when(projectRepository.save(any(Project.class))).thenReturn(project);
+            when(entityMapper.toTaskDTO(any(Task.class))).thenAnswer(inv -> {
+                Task t = inv.getArgument(0);
+                return createTaskDTOFromTask(t);
+            });
 
-            taskService.createTask("PROJ", dto, 1, null);
+            taskService.createTask("PROJ", request, 1, null);
 
-            verify(notificationService, never()).createNotification(any(), anyString(), any(), anyString());
+            verify(applicationEventPublisher, never()).publishEvent(any(NotificationEvent.class));
         }
 
         @Test
         @DisplayName("should throw when assignee not found")
         void shouldThrowWhenAssigneeNotFound() {
-            var dto = new TaskDTO(null, null, null, "PROJ", "Task", "desc",
-                    null, null, null, "nobody@example.com", null, null, null, null, null, null, null, null);
+            var request = new TaskCreateRequest("Task", "desc",
+                    null, null, null,
+                    null, null, "nobody@example.com", null, null, null);
 
             when(projectRepository.findByProjectKeyWithLock("PROJ")).thenReturn(Optional.of(project));
             when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
             when(projectRepository.save(any(Project.class))).thenReturn(project);
 
             assertThrows(ValidationException.class, () ->
-                    taskService.createTask("PROJ", dto, 1, null));
+                    taskService.createTask("PROJ", request, 1, null));
         }
 
         @Test
         @DisplayName("should default status to BACKLOG when not specified")
         void shouldDefaultStatusToBacklog() {
-            var dto = new TaskDTO(null, null, null, "PROJ", "Task", "desc",
-                    null, null, null, null, null, null, null, null, null, null, null, null);
+            var request = new TaskCreateRequest("Task", "desc",
+                    null, null, null,
+                    null, null, null, null, null, null);
 
             when(projectRepository.findByProjectKeyWithLock("PROJ")).thenReturn(Optional.of(project));
             when(taskRepository.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
             when(projectRepository.save(any(Project.class))).thenReturn(project);
+            when(entityMapper.toTaskDTO(any(Task.class))).thenAnswer(inv -> {
+                Task t = inv.getArgument(0);
+                return createTaskDTOFromTask(t);
+            });
 
-            var result = taskService.createTask("PROJ", dto, 1, null);
+            var result = taskService.createTask("PROJ", request, 1, null);
 
             assertEquals(TaskStatus.BACKLOG, result.status());
         }
@@ -210,14 +270,19 @@ class TaskServiceTest {
         @Test
         @DisplayName("should update task for authorized user")
         void shouldUpdateTaskForAuthorizedUser() {
-            var dto = new TaskDTO(null, null, null, "PROJ", "Updated Task", "new desc",
-                    TaskStatus.IN_PROGRESS, null, null, null, null, null, null, null, null, null, 50, TaskPriority.HIGH);
+            var request = new TaskCreateRequest("Updated Task", "new desc",
+                    TaskStatus.IN_PROGRESS, TaskPriority.HIGH, 50,
+                    null, null, null, null, null, null);
 
             when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
             when(taskRepository.findByTaskKey("PROJ-1")).thenReturn(Optional.of(existingTask));
             when(taskRepository.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(entityMapper.toTaskDTO(any(Task.class))).thenAnswer(inv -> {
+                Task t = inv.getArgument(0);
+                return createTaskDTOFromTask(t);
+            });
 
-            var result = taskService.updateTask("PROJ", "PROJ-1", dto, 1, null);
+            var result = taskService.updateTask("PROJ", "PROJ-1", request, 1, null);
 
             assertEquals("Updated Task", result.summary());
             assertEquals(TaskStatus.IN_PROGRESS, result.status());
@@ -230,14 +295,15 @@ class TaskServiceTest {
             var otherProject = TestEntityFactory.createProject(99, "OTHER", owner);
             var otherTask = TestEntityFactory.createTask(200, 1, otherProject);
 
-            var dto = new TaskDTO(null, null, null, "PROJ", "Task", "desc",
-                    null, null, null, null, null, null, null, null, null, null, null, null);
+            var request = new TaskCreateRequest("Task", "desc",
+                    null, null, null,
+                    null, null, null, null, null, null);
 
             when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
             when(taskRepository.findByTaskKey("OTHER-1")).thenReturn(Optional.of(otherTask));
 
             assertThrows(ValidationException.class, () ->
-                    taskService.updateTask("PROJ", "OTHER-1", dto, 1, null));
+                    taskService.updateTask("PROJ", "OTHER-1", request, 1, null));
         }
     }
 
@@ -268,6 +334,8 @@ class TaskServiceTest {
         @DisplayName("should throw when non-owner tries to delete task")
         void shouldThrowWhenNonOwnerDeletesTask() {
             when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            doThrow(new AuthorizationException("Only project owner can perform this action"))
+                    .when(accessGuard).requireOwner(project, 2);
 
             assertThrows(AuthorizationException.class, () ->
                     taskService.deleteTask("PROJ", "PROJ-1", 2));
@@ -303,14 +371,20 @@ class TaskServiceTest {
     class ConvertToDTOTests {
 
         @Test
-        @DisplayName("should convert task with all fields")
-        void shouldConvertTaskWithAllFields() {
+        @DisplayName("should delegate to entityMapper")
+        void shouldDelegateToEntityMapper() {
             var task = TestEntityFactory.createTask(100, 3, project);
             task.setAssignee(assignee);
             task.setLabels("bug,frontend");
             task.setStatus(TaskStatus.IN_PROGRESS);
             task.setPriority(TaskPriority.HIGH);
             task.setProgress(75);
+
+            var expectedDTO = new TaskDTO(100, 3, "PROJ-3", "PROJ", task.getSummary(),
+                    task.getDescription(), TaskStatus.IN_PROGRESS, null, null,
+                    "assignee@example.com", List.of("bug", "frontend"), null, null, null,
+                    task.getCreated(), task.getUpdated(), 75, TaskPriority.HIGH);
+            when(entityMapper.toTaskDTO(task)).thenReturn(expectedDTO);
 
             var result = taskService.convertToDTO(task);
 
@@ -323,13 +397,20 @@ class TaskServiceTest {
             assertEquals(TaskStatus.IN_PROGRESS, result.status());
             assertEquals(TaskPriority.HIGH, result.priority());
             assertEquals(75, result.progress());
+            verify(entityMapper).toTaskDTO(task);
         }
 
         @Test
-        @DisplayName("should convert task with null assignee")
-        void shouldConvertTaskWithNullAssignee() {
+        @DisplayName("should handle null assignee via entityMapper")
+        void shouldHandleNullAssignee() {
             var task = TestEntityFactory.createTask(100, 1, project);
             task.setAssignee(null);
+
+            var expectedDTO = new TaskDTO(100, 1, "PROJ-1", "PROJ", task.getSummary(),
+                    task.getDescription(), task.getStatus(), null, null,
+                    null, null, null, null, null, task.getCreated(), task.getUpdated(),
+                    task.getProgress(), task.getPriority());
+            when(entityMapper.toTaskDTO(task)).thenReturn(expectedDTO);
 
             var result = taskService.convertToDTO(task);
 
@@ -337,10 +418,16 @@ class TaskServiceTest {
         }
 
         @Test
-        @DisplayName("should return null labels when labels string is null")
-        void shouldReturnNullLabelsWhenEmpty() {
+        @DisplayName("should handle null labels via entityMapper")
+        void shouldHandleNullLabels() {
             var task = TestEntityFactory.createTask(100, 1, project);
             task.setLabels(null);
+
+            var expectedDTO = new TaskDTO(100, 1, "PROJ-1", "PROJ", task.getSummary(),
+                    task.getDescription(), task.getStatus(), null, null,
+                    null, null, null, null, null, task.getCreated(), task.getUpdated(),
+                    task.getProgress(), task.getPriority());
+            when(entityMapper.toTaskDTO(task)).thenReturn(expectedDTO);
 
             var result = taskService.convertToDTO(task);
 
@@ -349,43 +436,40 @@ class TaskServiceTest {
     }
 
     @Nested
-    @DisplayName("validateTaskDTO")
-    class ValidateTaskDTOTests {
-
-        @Test
-        @DisplayName("should throw when progress is negative")
-        void shouldThrowWhenProgressNegative() {
-            var dto = new TaskDTO(null, null, null, null, "Task", "desc",
-                    null, null, null, null, null, null, null, null, null, null, -1, null);
-
-            assertThrows(ValidationException.class, () -> taskService.validateTaskDTO(dto));
-        }
-
-        @Test
-        @DisplayName("should throw when progress exceeds 100")
-        void shouldThrowWhenProgressExceeds100() {
-            var dto = new TaskDTO(null, null, null, null, "Task", "desc",
-                    null, null, null, null, null, null, null, null, null, null, 101, null);
-
-            assertThrows(ValidationException.class, () -> taskService.validateTaskDTO(dto));
-        }
+    @DisplayName("label validation")
+    class LabelValidationTests {
 
         @Test
         @DisplayName("should throw when label contains comma")
         void shouldThrowWhenLabelContainsComma() {
-            var dto = new TaskDTO(null, null, null, null, "Task", "desc",
-                    null, null, null, null, List.of("label,with,commas"), null, null, null, null, null, null, null);
+            var request = new TaskCreateRequest("Task", "desc",
+                    null, null, null,
+                    null, null, null, List.of("label,with,commas"), null, null);
 
-            assertThrows(ValidationException.class, () -> taskService.validateTaskDTO(dto));
+            when(projectRepository.findByProjectKeyWithLock("PROJ")).thenReturn(Optional.of(project));
+            when(projectRepository.save(any(Project.class))).thenReturn(project);
+
+            assertThrows(ValidationException.class, () ->
+                    taskService.createTask("PROJ", request, 1, null));
         }
 
         @Test
-        @DisplayName("should pass validation for valid DTO")
-        void shouldPassForValidDTO() {
-            var dto = new TaskDTO(null, null, null, null, "Valid Task", "desc",
-                    null, null, null, null, List.of("bug", "frontend"), null, null, null, null, null, 50, null);
+        @DisplayName("should accept valid labels")
+        void shouldAcceptValidLabels() {
+            var request = new TaskCreateRequest("Valid Task", "desc",
+                    null, null, 50,
+                    null, null, null, List.of("bug", "frontend"), null, null);
 
-            assertDoesNotThrow(() -> taskService.validateTaskDTO(dto));
+            when(projectRepository.findByProjectKeyWithLock("PROJ")).thenReturn(Optional.of(project));
+            when(taskRepository.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(projectRepository.save(any(Project.class))).thenReturn(project);
+            when(entityMapper.toTaskDTO(any(Task.class))).thenAnswer(inv -> {
+                Task t = inv.getArgument(0);
+                return createTaskDTOFromTask(t);
+            });
+
+            assertDoesNotThrow(() ->
+                    taskService.createTask("PROJ", request, 1, null));
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.backend.controllers;
 
+import com.backend.config.AppProperties;
 import com.backend.dtos.OptimizationRequestDTO;
 import com.backend.dtos.OptimizationResultDTO;
 import com.backend.dtos.TaskScheduleSuggestionDTO;
@@ -7,7 +8,6 @@ import com.backend.services.OptimizationService;
 import com.backend.services.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,16 +18,13 @@ public class OptimizationController {
 
     private final OptimizationService optimizationService;
     private final TokenService tokenService;
+    private final AppProperties appProperties;
 
-    @Value("${optimization.default-alpha:0.8}")
-    private double defaultAlpha;
-
-    @Value("${optimization.default-beta:0.2}")
-    private double defaultBeta;
-
-    public OptimizationController(OptimizationService optimizationService, TokenService tokenService) {
+    public OptimizationController(OptimizationService optimizationService, TokenService tokenService,
+                                  AppProperties appProperties) {
         this.optimizationService = optimizationService;
         this.tokenService = tokenService;
+        this.appProperties = appProperties;
     }
 
     @PostMapping("/simulate")
@@ -37,8 +34,9 @@ public class OptimizationController {
     ) {
         var userId = tokenService.getUserIdFromRequest(request);
 
-        double alpha = requestDTO.alpha() != null ? requestDTO.alpha() : defaultAlpha;
-        double beta = requestDTO.beta() != null ? requestDTO.beta() : defaultBeta;
+        var optimization = appProperties.getOptimization();
+        double alpha = requestDTO.alpha() != null ? requestDTO.alpha() : optimization.getDefaultAlpha();
+        double beta = requestDTO.beta() != null ? requestDTO.beta() : optimization.getDefaultBeta();
 
         var result = optimizationService.optimizeSchedule(
                 requestDTO.projectKeys(),

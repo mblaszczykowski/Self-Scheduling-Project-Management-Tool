@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ErrorMessage, Field, Form, Formik } from 'formik';
+import { ErrorMessage, Field, Formik } from 'formik';
 import * as Yup from 'yup';
 import { HiOutlinePlus, HiOutlineX, HiOutlineDocument, HiOutlineDocumentText } from 'react-icons/hi';
 import { getFileInfo } from '../../util/helpers';
@@ -68,6 +68,7 @@ const CommentForm = ({
 
     const handleFormSubmit = (values, actions) => {
         onSubmit(values, actions, localAttachments);
+        setLocalAttachments([]);
     };
 
     return (
@@ -76,8 +77,8 @@ const CommentForm = ({
             validationSchema={CommentSchema}
             onSubmit={handleFormSubmit}
         >
-            {({ isSubmitting }) => (
-                <Form className="space-y-1.5">
+            {({ isSubmitting, handleSubmit: formikSubmit }) => (
+                <div className="space-y-1.5">
                     <Field
                         as="textarea"
                         name="content"
@@ -94,6 +95,12 @@ const CommentForm = ({
                                 ? 'Write a reply...'
                                 : 'Write a comment...'
                         }
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                e.preventDefault();
+                                formikSubmit();
+                            }
+                        }}
                     />
                     <ErrorMessage
                         name="content"
@@ -129,15 +136,16 @@ const CommentForm = ({
                                 Cancel
                             </button>
                             <button
-                                type="submit"
+                                type="button"
                                 disabled={isSubmitting}
+                                onClick={formikSubmit}
                                 className="px-3 py-1 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors disabled:opacity-40"
                             >
                                 {isSubmitting ? '...' : buttonText}
                             </button>
                         </div>
                     </div>
-                </Form>
+                </div>
             )}
         </Formik>
     );

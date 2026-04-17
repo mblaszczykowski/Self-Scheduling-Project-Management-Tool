@@ -6,6 +6,7 @@ import com.backend.entities.NotificationType;
 import com.backend.entities.User;
 import com.backend.exception.AuthorizationException;
 import com.backend.repositories.NotificationRepository;
+import com.backend.util.EntityMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,17 @@ import java.util.List;
 public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final SseEmitterManager sseEmitterManager;
+    private final EmailService emailService;
+    private final EntityMapper entityMapper;
 
     public NotificationService(NotificationRepository notificationRepository,
-                               SseEmitterManager sseEmitterManager) {
+                               SseEmitterManager sseEmitterManager,
+                               EmailService emailService,
+                               EntityMapper entityMapper) {
         this.notificationRepository = notificationRepository;
         this.sseEmitterManager = sseEmitterManager;
+        this.emailService = emailService;
+        this.entityMapper = entityMapper;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -35,7 +42,9 @@ public class NotificationService {
         notification.setLink(link);
         notificationRepository.save(notification);
 
-        sseEmitterManager.sendNotification(recipient.getId(), convertToDTO(notification));
+        sseEmitterManager.sendNotification(recipient.getId(), entityMapper.toNotificationDTO(notification));
+
+        emailService.sendNotificationEmail(recipient, message, type, link);
     }
 
     @Transactional(readOnly = true)
@@ -65,14 +74,7 @@ public class NotificationService {
     }
 
     public NotificationDTO convertToDTO(Notification notification) {
-        return new NotificationDTO(
-                notification.getId(),
-                notification.getMessage(),
-                notification.getTimestamp(),
-                notification.getIsRead(),
-                notification.getType(),
-                notification.getLink()
-        );
+        return entityMapper.toNotificationDTO(notification);
     }
 
     private void markAllAsRead(List<Notification> notifications) {
