@@ -18,7 +18,9 @@ const taskMatchesFilter = (task, filterField, filterValue) => {
         case 'labels':
             return task.labels?.includes(filterValue);
         case 'assignee':
-            return task.assignee === filterValue;
+            // FilterBar surfaces unassigned tasks under the 'Unassigned' option,
+            // but the raw value is null/'' — match it explicitly.
+            return filterValue === 'Unassigned' ? !task.assignee : task.assignee === filterValue;
         case 'startDate':
         case 'dueDate':
             return task[filterField] && toDateString(task[filterField]) === filterValue;

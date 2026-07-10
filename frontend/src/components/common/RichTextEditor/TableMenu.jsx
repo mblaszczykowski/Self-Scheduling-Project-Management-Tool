@@ -1,12 +1,12 @@
 import React from 'react';
 
 const btnBase = [
-    'px-3 py-1.5 text-xs font-medium bg-white border rounded-lg',
+    'px-3 py-1.5 text-xs font-medium bg-white dark:bg-slate-800 border rounded-lg',
     'transition-all duration-150 active:scale-95',
 ].join(' ');
 
-const normalBtn = `${btnBase} text-slate-700 hover:text-slate-900 hover:bg-slate-50 border-slate-200`;
-const dangerBtn = `${btnBase} text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200`;
+const normalBtn = `${btnBase} text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-600`;
+const dangerBtn = `${btnBase} text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800`;
 
 const TableMenu = ({ editor }) => {
     if (!editor || !editor.isActive('table')) return null;
@@ -17,7 +17,8 @@ const TableMenu = ({ editor }) => {
         <div
             className={
                 'flex items-center gap-2 p-3 mb-3 bg-gradient-to-r'
-                + ' from-slate-50 to-slate-100 border border-slate-200'
+                + ' from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/70'
+                + ' border border-slate-200 dark:border-slate-700'
                 + ' rounded-xl shadow-sm'
             }
         >

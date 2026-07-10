@@ -136,6 +136,18 @@ export const getFileInfo = (attachment) => {
     return { isFile, url, fileName, fileType };
 };
 
+// Release the object URL created for a File preview. Call this when the owning
+// component unmounts / the file is removed so blob URLs don't accumulate for the
+// lifetime of the page.
+export const revokeFileUrl = (file) => {
+    if (!blobUrlCache || !(file instanceof File)) return;
+    const url = blobUrlCache.get(file);
+    if (url) {
+        URL.revokeObjectURL(url);
+        blobUrlCache.delete(file);
+    }
+};
+
 // Single source of truth for status styling. `hex` is the canonical colour for
 // canvas contexts (Chart.js) that can't read Tailwind classes; `dot`/`color`
 // are the Tailwind equivalents for DOM badges.

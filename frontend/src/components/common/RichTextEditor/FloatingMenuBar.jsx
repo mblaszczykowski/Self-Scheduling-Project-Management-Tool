@@ -8,8 +8,8 @@ const FloatingMenuBar = ({ editor }) => {
     return (
         <FloatingMenu
             editor={editor}
-            tippyOptions={{ duration: 150, placement: 'left' }}
-            className="flex items-center gap-1.5 p-2 bg-white rounded-xl shadow-xl border border-slate-200 backdrop-blur-sm animate-in fade-in slide-in-from-right-2 duration-150"
+            options={{ placement: 'left' }}
+            className="flex items-center gap-1.5 p-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 backdrop-blur-sm animate-fade-in"
         >
             {FLOATING_MENU_ITEMS.map(item => (
                 <button

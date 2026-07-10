@@ -46,8 +46,11 @@ const RichTextEditor = ({
         }),
         Link.configure({
             openOnClick: false,
+            protocols: ['http', 'https', 'mailto'],
             HTMLAttributes: {
-                class: 'text-blue-600 underline decoration-blue-400 hover:text-blue-700 hover:decoration-blue-600 cursor-pointer transition-colors duration-150',
+                rel: 'noopener noreferrer nofollow',
+                target: '_blank',
+                class: 'text-blue-600 dark:text-blue-400 underline decoration-blue-400 hover:text-blue-700 hover:decoration-blue-600 cursor-pointer transition-colors duration-150',
             },
         }),
         Image.configure({
@@ -112,7 +115,7 @@ const RichTextEditor = ({
         },
         editorProps: {
             attributes: {
-                class: `prose prose-slate prose-sm max-w-none focus:outline-none px-4 py-3 ${className}`,
+                class: `prose prose-slate dark:prose-invert prose-sm max-w-none focus:outline-none px-4 py-3 ${className}`,
                 style: `min-height: ${minHeight}; max-height: ${maxHeight}; overflow-y: auto;`,
             },
         },
@@ -132,10 +135,10 @@ const RichTextEditor = ({
             <TableMenu editor={editor} />
             <EditorContent editor={editor} />
             {(showCharacterCount || characterLimit) && editor && (
-                <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">
+                <div className="px-4 py-2.5 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between text-xs">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">
                         {editor.storage.characterCount.characters()} characters
-                        {characterLimit && <span className="text-slate-400"> / {characterLimit}</span>}
+                        {characterLimit && <span className="text-slate-400 dark:text-slate-500"> / {characterLimit}</span>}
                     </span>
                     {characterLimit && (
                         <span

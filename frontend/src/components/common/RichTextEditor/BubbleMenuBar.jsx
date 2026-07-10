@@ -13,8 +13,7 @@ const BubbleMenuBar = ({ editor }) => {
     return (
         <BubbleMenu
             editor={editor}
-            tippyOptions={{ duration: 150, animation: 'scale' }}
-            className="flex items-center gap-0.5 p-2 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 backdrop-blur-lg animate-in fade-in zoom-in duration-150"
+            className="flex items-center gap-0.5 p-2 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 backdrop-blur-lg animate-scale-in"
         >
             {BUBBLE_MENU_ITEMS.map(item => (
                 <button

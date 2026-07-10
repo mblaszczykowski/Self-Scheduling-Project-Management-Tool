@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HiOutlineCloudUpload } from 'react-icons/hi';
-import { getFileInfo } from '../../util/helpers';
+import { getFileInfo, revokeFileUrl } from '../../util/helpers';
 import { showToast } from '../../util/toast';
 import PreviewModal from '../common/PreviewModal';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
@@ -18,6 +18,14 @@ const AttachmentUploader = ({
 }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [preview, setPreview] = useState(null);
+
+    // Revoke object URLs created for the newly-added File previews on unmount so
+    // their blobs are released (the File objects are discarded with the form).
+    const newAttachmentsRef = useRef(newAttachments);
+    newAttachmentsRef.current = newAttachments;
+    useEffect(() => () => {
+        newAttachmentsRef.current.forEach(revokeFileUrl);
+    }, []);
 
     const validateAndAdd = (files) => {
         const valid = [];

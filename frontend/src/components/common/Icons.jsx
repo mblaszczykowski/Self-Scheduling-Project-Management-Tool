@@ -1,26 +1,4 @@
 import React from 'react';
-import {
-    HiOutlineChevronUp,
-    HiOutlineChevronDown,
-    HiOutlinePlus,
-    HiStar
-} from 'react-icons/hi';
-
-export const CollapseIcon = ({ className = "h-4 w-4", ...props }) => (
-    <HiOutlineChevronUp className={className} {...props} />
-);
-
-export const ExpandIcon = ({ className = "h-4 w-4", ...props }) => (
-    <HiOutlineChevronDown className={className} {...props} />
-);
-
-export const AddIcon = ({ className = "h-5 w-5", ...props }) => (
-    <HiOutlinePlus className={className} {...props} />
-);
-
-export const StarIcon = ({ className = "h-3.5 w-3.5", ...props }) => (
-    <HiStar className={className} {...props} />
-);
 
 export const CalendarIcon = ({ className = "w-4 h-4", ...props }) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
