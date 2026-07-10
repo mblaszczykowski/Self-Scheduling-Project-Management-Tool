@@ -63,6 +63,24 @@ public class EntityMapper {
         );
     }
 
+    public ProjectDTO toProjectDTO(Project project, List<TaskDTO> tasks) {
+        var members = project.getMembers().stream().map(this::toUserDTO).toList();
+        var dependencyKeys = project.getDependencies().stream().map(Project::getProjectKey).toList();
+        var attachments = toListOrEmpty(project.getAttachments());
+
+        return new ProjectDTO(
+                project.getId(),
+                project.getProjectKey(),
+                project.getSummary(),
+                project.getDescription(),
+                tasks,
+                members,
+                attachments,
+                toUserDTO(project.getOwner()),
+                dependencyKeys
+        );
+    }
+
     public TaskActivityDTO toTaskActivityDTO(TaskActivity activity) {
         var author = activity.getAuthor();
         return new TaskActivityDTO(

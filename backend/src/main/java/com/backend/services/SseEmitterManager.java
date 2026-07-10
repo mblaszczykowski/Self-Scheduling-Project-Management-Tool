@@ -33,7 +33,17 @@ public class SseEmitterManager {
         Runnable removeEmitter = () -> removeEmitter(userId, emitter);
         emitter.onCompletion(removeEmitter);
         emitter.onTimeout(removeEmitter);
-        emitter.onError(e -> removeEmitter.run());
+        emitter.onError(e -> {
+            emitter.completeWithError(e);
+            removeEmitter.run();
+        });
+
+        // Send an initial event so proxies flush headers and the client confirms the stream is open.
+        try {
+            emitter.send(SseEmitter.event().name("connected").data("ok"));
+        } catch (IOException e) {
+            removeEmitter.run();
+        }
 
         return emitter;
     }
@@ -56,12 +66,13 @@ public class SseEmitterManager {
     }
 
     private void removeEmitter(Integer userId, SseEmitter emitter) {
-        var userEmitters = emitters.get(userId);
-        if (userEmitters != null) {
-            userEmitters.remove(emitter);
-            if (userEmitters.isEmpty()) {
-                emitters.remove(userId);
-            }
-        }
+        // Atomic: remove the emitter and drop the user's entry only if it is now empty, all under
+        // the map bucket lock. This closes the check-then-remove race with a concurrent
+        // createEmitter (which locks the same bucket via computeIfAbsent) that could otherwise
+        // orphan a freshly-added emitter.
+        emitters.computeIfPresent(userId, (key, list) -> {
+            list.remove(emitter);
+            return list.isEmpty() ? null : list;
+        });
     }
 }

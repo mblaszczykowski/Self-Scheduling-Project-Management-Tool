@@ -93,7 +93,7 @@ public class ProjectService {
 
         var savedProject = projectRepository.save(project);
         notifyNewMembersExcludingOwner(members, owner, savedProject);
-        return convertToDTO(savedProject);
+        return convertToDTOWithCPM(savedProject);
     }
 
     @Transactional(readOnly = true)
@@ -169,7 +169,7 @@ public class ProjectService {
 
         var updatedProject = projectRepository.save(project);
         notifyProjectMembersOfUpdate(updatedProject, userId);
-        return convertToDTO(updatedProject);
+        return convertToDTOWithCPM(updatedProject);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -300,75 +300,19 @@ public class ProjectService {
         }
     }
 
-    private ProjectDTO convertToDTO(Project project) {
-        var tasks = project.getTasks() != null
-                ? project.getTasks().stream().map(entityMapper::toTaskDTO).toList()
-                : new ArrayList<TaskDTO>();
-
-        var members = project.getMembers() != null
-                ? project.getMembers().stream().map(entityMapper::toUserDTO).toList()
-                : new ArrayList<UserDTO>();
-
-        var ownerDTO = entityMapper.toUserDTO(project.getOwner());
-
-        var dependencyKeys = project.getDependencies() != null
-                ? project.getDependencies().stream().map(Project::getProjectKey).toList()
-                : new ArrayList<String>();
-
-        var attachments = project.getAttachments() != null
-                ? new ArrayList<>(project.getAttachments())
-                : new ArrayList<String>();
-
-        return new ProjectDTO(
-                project.getId(),
-                project.getProjectKey(),
-                project.getSummary(),
-                project.getDescription(),
-                tasks,
-                members,
-                attachments,
-                ownerDTO,
-                dependencyKeys
-        );
-    }
-
     private ProjectDTO convertToDTOWithCPM(Project project) {
         var tasks = taskRepository.findByProjectIdWithDetails(project.getId());
         return convertToDTOWithCPM(project, tasks);
     }
 
+    /** Single canonical project mapping: sort tasks, enrich with CPM criticality, then map. */
     private ProjectDTO convertToDTOWithCPM(Project project, List<Task> tasks) {
-        var sortedTasks = new ArrayList<>(tasks);
-        sortedTasks.sort(Comparator.comparingInt(Task::getTaskNumber));
-
-        var taskDTOs = sortedTasks.stream()
+        var taskDTOs = tasks.stream()
+                .sorted(Comparator.comparingInt(Task::getTaskNumber))
                 .map(entityMapper::toTaskDTO)
                 .toList();
 
-        var updatedTaskDTOs = cpmHelper.calculateTaskDTOsWithCPM(taskDTOs);
-
-        var members = project.getMembers().stream()
-                .map(entityMapper::toUserDTO)
-                .toList();
-
-        var dependencyKeys = project.getDependencies() != null
-                ? project.getDependencies().stream().map(Project::getProjectKey).toList()
-                : new ArrayList<String>();
-
-        var attachments = project.getAttachments() != null
-                ? new ArrayList<>(project.getAttachments())
-                : new ArrayList<String>();
-
-        return new ProjectDTO(
-                project.getId(),
-                project.getProjectKey(),
-                project.getSummary(),
-                project.getDescription(),
-                updatedTaskDTOs,
-                members,
-                attachments,
-                entityMapper.toUserDTO(project.getOwner()),
-                dependencyKeys
-        );
+        var cpmTaskDTOs = cpmHelper.calculateTaskDTOsWithCPM(taskDTOs);
+        return entityMapper.toProjectDTO(project, cpmTaskDTOs);
     }
 }

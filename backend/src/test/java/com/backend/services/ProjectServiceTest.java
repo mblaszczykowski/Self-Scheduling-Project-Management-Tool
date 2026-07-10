@@ -79,6 +79,11 @@ class ProjectServiceTest {
         member = TestEntityFactory.createUser(2, "member@example.com");
         project = TestEntityFactory.createProject(10, "PROJ", owner);
         project.replaceMembers(Set.of(owner));
+
+        // Project-to-DTO mapping is exercised via EntityMapper (a mock here); the service tests
+        // assert service behavior, not the mapping, so a lenient stub covers the mapped result.
+        lenient().when(entityMapper.toProjectDTO(any(Project.class), anyList())).thenReturn(
+                new ProjectDTO(10, "PROJ", "summary", "desc", List.of(), List.of(), List.of(), null, List.of()));
     }
 
     @Nested
@@ -98,8 +103,6 @@ class ProjectServiceTest {
                 p.setId(10);
                 return p;
             });
-            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
-                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
             var result = projectService.createProject(request, 1, null);
 
@@ -131,8 +134,6 @@ class ProjectServiceTest {
             when(userService.findByEmailsAsMap(Set.of("member@example.com")))
                     .thenReturn(Map.of("member@example.com", member));
             when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
-                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
             projectService.createProject(request, 1, null);
 
@@ -159,8 +160,6 @@ class ProjectServiceTest {
             when(userService.findByEmailsAsMap(Set.of("unknown@example.com")))
                     .thenReturn(Map.of());
             when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
-                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
             projectService.createProject(request, 1, null);
 
@@ -200,8 +199,6 @@ class ProjectServiceTest {
             when(accessGuard.getAccessibleProject("PROJ", 1)).thenReturn(project);
             when(taskRepository.findByProjectIdWithDetails(10)).thenReturn(List.of());
             when(cpmHelper.calculateTaskDTOsWithCPM(anyList())).thenReturn(List.of());
-            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
-                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
             var result = projectService.getProjectByKey("PROJ", 1);
 
@@ -244,8 +241,6 @@ class ProjectServiceTest {
             when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
             doNothing().when(accessGuard).requireOwner(project, 1);
             when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
-                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
             var result = projectService.updateProject("PROJ", request, 1, null);
 
@@ -293,8 +288,6 @@ class ProjectServiceTest {
             when(userService.findByEmailsAsMap(Set.of("member@example.com")))
                     .thenReturn(Map.of("member@example.com", member));
             when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(entityMapper.toUserDTO(any(User.class))).thenReturn(
-                    new UserDTO(1, "User", "1", "owner@example.com", null, null, null, null, null));
 
             projectService.updateProject("PROJ", request, 1, null);
 
