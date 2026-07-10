@@ -3,6 +3,7 @@ package com.backend.util;
 import com.backend.dtos.TaskDTO;
 import com.backend.entities.TaskPriority;
 import com.backend.entities.TaskStatus;
+import com.backend.exception.ValidationException;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -553,12 +554,18 @@ class ScheduleOptimizerTest {
         }
 
         @Test
-        @DisplayName("Objective value = alpha * weightedTardiness + beta * makespan")
+        @DisplayName("Objective Z = alpha * normalizedTardiness + beta * normalizedMakespan")
         void objectiveFormula() {
             var tasks = List.of(task("T-1", "2025-01-01", "2025-01-05", "alice@test.com"));
             var result = optimizer.optimize(tasks, HORIZON, ALPHA, BETA);
 
-            double expected = ALPHA * result.weightedTardiness() + BETA * result.makespan();
+            // The schedule is independent of alpha/beta (they only weigh the reported Z),
+            // so Z(alpha,beta) is the alpha/beta-weighted sum of the two normalized components,
+            // each obtained by isolating one term. This verifies the normalized formula
+            // (Z = alpha*(WT/WT_ref) + beta*(Cmax/H)) without exposing the denominators.
+            double normTardiness = optimizer.optimize(tasks, HORIZON, 1.0, 0.0).objectiveValue();
+            double normMakespan = optimizer.optimize(tasks, HORIZON, 0.0, 1.0).objectiveValue();
+            double expected = ALPHA * normTardiness + BETA * normMakespan;
             assertEquals(expected, result.objectiveValue(), 0.001);
         }
 
@@ -577,7 +584,10 @@ class ScheduleOptimizerTest {
             );
             var result = optimizer.optimize(tasks, HORIZON, alpha, beta);
 
-            double expected = alpha * result.weightedTardiness() + beta * result.makespan();
+            // Z is linear in (alpha, beta) since the schedule does not depend on them.
+            double normTardiness = optimizer.optimize(tasks, HORIZON, 1.0, 0.0).objectiveValue();
+            double normMakespan = optimizer.optimize(tasks, HORIZON, 0.0, 1.0).objectiveValue();
+            double expected = alpha * normTardiness + beta * normMakespan;
             assertEquals(expected, result.objectiveValue(), 0.001);
         }
 
@@ -767,8 +777,10 @@ class ScheduleOptimizerTest {
             // All 5 tasks should be present
             assertEquals(5, optimized.tasks().size());
 
-            // Optimized objective is computed correctly
-            double expectedObj = ALPHA * optimized.weightedTardiness() + BETA * optimized.makespan();
+            // Optimized objective is the alpha/beta-weighted sum of the normalized components
+            double normTardiness = optimizer.optimize(tasks, HORIZON, 1.0, 0.0).objectiveValue();
+            double normMakespan = optimizer.optimize(tasks, HORIZON, 0.0, 1.0).objectiveValue();
+            double expectedObj = ALPHA * normTardiness + BETA * normMakespan;
             assertEquals(expectedObj, optimized.objectiveValue(), 0.001);
         }
 
@@ -1036,7 +1048,9 @@ class ScheduleOptimizerTest {
             // T-2 tardiness = max(0, 6 - 3) = 3
             // weightedTardiness = 10*0 + 3*3 = 9
             // makespan = 6
-            // objective = 0.8*9 + 0.2*6 = 7.2 + 1.2 = 8.4
+            // Normalized objective (eq 3.7): Z = alpha*(WT/WT_ref) + beta*(Cmax/H)
+            //   WT_ref = 10*3 + 3*3 = 39 (Σ w_j·p_j); H = max(max d_j=3, Σp_j=6) floored to 30
+            //   Z = 0.8*(9/39) + 0.2*(6/30) = 0.184615 + 0.04 = 0.224615
 
             var tasks = List.of(
                     task("T-1", "2025-01-01", "2025-01-03", "alice@test.com", TaskPriority.HIGHEST),
@@ -1060,7 +1074,7 @@ class ScheduleOptimizerTest {
             // Metrics
             assertEquals(9.0, result.weightedTardiness(), 0.001, "10*0 + 3*3 = 9");
             assertEquals(6, result.makespan(), "Last task ends at day 6");
-            assertEquals(8.4, result.objectiveValue(), 0.001, "0.8*9 + 0.2*6 = 8.4");
+            assertEquals(0.224615, result.objectiveValue(), 0.001, "0.8*(9/39) + 0.2*(6/30)");
             assertEquals(0, result.resourceConflicts());
             assertEquals(1, result.tasksShifted(), "T-2 was shifted from day 0 to day 3");
         }
@@ -1296,14 +1310,15 @@ class ScheduleOptimizerTest {
     class MalformedDependencies {
 
         @Test
-        @DisplayName("Self-referencing dependency is handled gracefully")
+        @DisplayName("Self-referencing dependency is rejected as a cycle")
         void selfReferencingDependency() {
             var tasks = List.of(
                     taskWithDeps("T-1", "2025-01-01", "2025-01-03", "alice@test.com",
                             TaskPriority.HIGH, List.of("T-1"))
             );
-            // Should not infinite loop or crash
-            assertDoesNotThrow(() -> optimizer.optimize(tasks, HORIZON, ALPHA, BETA));
+            // A task cannot precede itself: the eligible set never releases it, so the
+            // optimizer rejects the infeasible input rather than silently mis-scheduling.
+            assertThrows(ValidationException.class, () -> optimizer.optimize(tasks, HORIZON, ALPHA, BETA));
         }
 
         @Test
@@ -1320,7 +1335,7 @@ class ScheduleOptimizerTest {
         }
 
         @Test
-        @DisplayName("Circular dependency A->B->A does not crash")
+        @DisplayName("Circular dependency A->B->A is rejected")
         void circularDependency() {
             var tasks = List.of(
                     taskWithDeps("A", "2025-01-01", "2025-01-03", "alice@test.com",
@@ -1328,10 +1343,9 @@ class ScheduleOptimizerTest {
                     taskWithDeps("B", "2025-01-01", "2025-01-03", "bob@test.com",
                             TaskPriority.HIGH, List.of("A"))
             );
-            // Circular deps should be prevented at the service layer, but optimizer must not crash
-            assertDoesNotThrow(() -> optimizer.optimize(tasks, HORIZON, ALPHA, BETA));
-            var result = optimizer.optimize(tasks, HORIZON, ALPHA, BETA);
-            assertEquals(2, result.tasks().size());
+            // Neither task can ever become eligible (each waits on the other), so the
+            // optimizer surfaces the infeasible cycle instead of producing a bogus schedule.
+            assertThrows(ValidationException.class, () -> optimizer.optimize(tasks, HORIZON, ALPHA, BETA));
         }
     }
 
