@@ -172,12 +172,4 @@ public class EntityMapper {
     public static <T> List<T> toListOrEmpty(Collection<T> collection) {
         return collection != null ? new ArrayList<>(collection) : new ArrayList<>();
     }
-
-    public static String getFullNameOrNull(User user) {
-        return user != null ? user.getFullName() : null;
-    }
-
-    public static String getEmailOrNull(User user) {
-        return user != null ? user.getEmail() : null;
-    }
 }
