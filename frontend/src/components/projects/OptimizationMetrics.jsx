@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { formatAssigneeName } from '../../util/helpers';
 
 const keyframes = `
 @keyframes optSlideIn {
@@ -160,7 +161,7 @@ const OptimizationMetrics = ({
                                 </div>
                             </div>
 
-                            {/* Infeasible warning */}
+                            {/* Infeasible note */}
                             {infeasible && (
                                 <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
                                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0 text-amber-500">
@@ -169,7 +170,7 @@ const OptimizationMetrics = ({
                                         <line x1="7" y1="5" x2="7" y2="8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                                     </svg>
                                     <span className="text-xs text-amber-700">
-                                        Current schedule has {conflictsBefore} resource {conflictsBefore === 1 ? 'conflict' : 'conflicts'} (people double-booked) — "before" numbers are unreliable
+                                        Original schedule contains {conflictsBefore} resource {conflictsBefore === 1 ? 'conflict' : 'conflicts'}; the "before" metrics below are computed naively (assuming overlapping tasks run in parallel) and serve as a lower bound for the true cost.
                                     </span>
                                 </div>
                             )}
@@ -302,27 +303,23 @@ const OptimizationMetrics = ({
                             label="Tasks late"
                             before={lateBefore}
                             after={lateAfter}
-                            infeasible={infeasible}
                         />
                         <BeforeAfter
                             label="Tasks on time"
                             before={onTimeBefore}
                             after={onTimeAfter}
                             lowerIsBetter={false}
-                            infeasible={infeasible}
                         />
                         <BeforeAfter
                             label="Weighted delay"
                             before={originalMetrics.weightedTardiness}
                             after={optimizedMetrics.weightedTardiness}
-                            infeasible={infeasible}
                         />
                         <BeforeAfter
                             label="Total duration"
                             before={originalMetrics.makespan}
                             after={optimizedMetrics.makespan}
                             unit="d"
-                            infeasible={infeasible}
                         />
                     </div>
 
@@ -343,7 +340,7 @@ const OptimizationMetrics = ({
                         {showDetails && summary.shifted.length > 0 && (
                             <div className="mt-3 rounded-lg border border-slate-100 overflow-hidden">
                                 {/* Table header */}
-                                <div className="grid grid-cols-[1fr_120px_120px_55px_50px_80px] gap-3 px-4 py-2 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100">
+                                <div className="grid grid-cols-[1fr_120px_120px_55px_50px_130px] gap-3 px-4 py-2 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100">
                                     <span>Task</span>
                                     <span>Current</span>
                                     <span>Proposed</span>
@@ -356,7 +353,7 @@ const OptimizationMetrics = ({
                                 <div className="max-h-[220px] overflow-y-auto"
                                     style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(148,163,184,0.2) transparent' }}
                                 >
-                                    {summary.shifted
+                                    {[...summary.shifted]
                                         .sort((a, b) =>
                                             Math.abs(daysBetween(b.originalStartDate, b.suggestedStartDate)) -
                                             Math.abs(daysBetween(a.originalStartDate, a.suggestedStartDate))
@@ -365,7 +362,7 @@ const OptimizationMetrics = ({
                                             const shift = daysBetween(s.originalStartDate, s.suggestedStartDate);
                                             return (
                                                 <div key={s.taskKey}
-                                                    className="grid grid-cols-[1fr_120px_120px_55px_50px_80px] gap-3 px-4 py-2.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors items-center"
+                                                    className="grid grid-cols-[1fr_120px_120px_55px_50px_130px] gap-3 px-4 py-2.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors items-center"
                                                     style={{ animation: `optFadeUp 0.25s ${80 + i * 30}ms cubic-bezier(0.22, 1, 0.36, 1) both` }}
                                                 >
                                                     <div className="flex items-center gap-2 min-w-0">
@@ -399,7 +396,7 @@ const OptimizationMetrics = ({
                                                         {s.tardinessDays > 0 ? `+${s.tardinessDays}d` : '—'}
                                                     </span>
                                                     <span className="text-xs text-slate-500 truncate text-right" title={s.assignee || 'Unassigned'}>
-                                                        {s.assignee ? s.assignee.split('@')[0] : '—'}
+                                                        {s.assignee ? formatAssigneeName(s.assignee) : '—'}
                                                     </span>
                                                 </div>
                                             );

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { formatShortDate, daysBetween, STATUS_CONFIG, PRIORITY_CONFIG, MS_PER_DAY } from '../../util/helpers';
+import { formatShortDate, daysBetween, STATUS_CONFIG, PRIORITY_CONFIG, MS_PER_DAY, formatAssigneeName } from '../../util/helpers';
 import { EmptyState } from '../common';
 import { SortAscIcon, SortDescIcon } from '../common/Icons';
 import Avatar from '../common/Avatar';
@@ -8,8 +8,13 @@ import Avatar from '../common/Avatar';
    Helpers
    ═══════════════════════════════════════════ */
 
-const relativeDue = (dueDate) => {
+const TERMINAL_STATUSES = new Set(['DONE', 'RELEASED', 'WITHDRAWN']);
+
+const relativeDue = (dueDate, status, progress) => {
     if (!dueDate) return { text: '—', cls: 'text-slate-400' };
+    if (TERMINAL_STATUSES.has(status) || progress >= 100) {
+        return { text: formatShortDate(dueDate), cls: 'text-slate-500 dark:text-slate-400' };
+    }
     const diff = daysBetween(new Date(), dueDate);
     if (diff < -1) return { text: `${Math.abs(diff)}d overdue`, cls: 'text-red-600 dark:text-red-400 font-semibold' };
     if (diff === -1) return { text: 'Yesterday', cls: 'text-red-600 dark:text-red-400 font-semibold' };
@@ -193,7 +198,7 @@ const TaskListView = ({
                         {filteredTasks.map((task, index) => {
                             const project = projectKeyToProject?.get(task.projectKey)
                                 || processedProjects.find(p => p.projectKey === task.projectKey);
-                            const due = relativeDue(task.dueDate);
+                            const due = relativeDue(task.dueDate, task.status, task.progress);
                             const insights = taskInsights.get(task.taskKey) || {};
                             const { blocking, dependents, health } = insights;
                             const assigneeMember = project?.members?.find(m => m.email === task.assignee);
@@ -252,7 +257,7 @@ const TaskListView = ({
                                                         {task.assignee.charAt(0).toUpperCase()}
                                                     </div>
                                                 )}
-                                                <span className="text-sm text-slate-700 dark:text-slate-300 truncate">{task.assignee.split('@')[0]}</span>
+                                                <span className="text-sm text-slate-700 dark:text-slate-300 truncate">{formatAssigneeName(task.assignee)}</span>
                                             </div>
                                         ) : (
                                             <span className="text-xs text-slate-300 dark:text-slate-600">Unassigned</span>

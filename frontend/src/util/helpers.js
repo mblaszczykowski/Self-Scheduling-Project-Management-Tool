@@ -18,6 +18,16 @@ export const formatDate = (dateString) => {
     return toDateString(dateString);
 };
 
+export const formatAssigneeName = (email) => {
+    if (!email) return '';
+    const local = email.split('@')[0];
+    return local
+        .split(/[._-]/)
+        .filter(Boolean)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join(' ');
+};
+
 export const formatDateTime = (dateString) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleString();
@@ -67,9 +77,26 @@ export const getFileTypeFromPath = (path) => {
     return 'file';
 };
 
+// Cache blob URLs by File identity so we don't leak a new URL on every render.
+// WeakMap entries are garbage-collected when the File reference is dropped.
+const blobUrlCache = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+
 export const getFileInfo = (attachment) => {
     const isFile = attachment instanceof File;
-    const url = isFile ? URL.createObjectURL(attachment) : getImageUrl(attachment);
+    let url;
+    if (isFile) {
+        if (blobUrlCache) {
+            url = blobUrlCache.get(attachment);
+            if (!url) {
+                url = URL.createObjectURL(attachment);
+                blobUrlCache.set(attachment, url);
+            }
+        } else {
+            url = URL.createObjectURL(attachment);
+        }
+    } else {
+        url = getImageUrl(attachment);
+    }
     const fileName = isFile ? attachment.name : attachment.split('/').pop();
     const fileType = isFile ? attachment.type.split('/')[0] : getFileTypeFromPath(attachment);
     return { isFile, url, fileName, fileType };

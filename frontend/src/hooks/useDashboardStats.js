@@ -207,9 +207,12 @@ const computeCompletionTrend = (allTasks, today) => {
     const weeks = [];
     const MS_PER_WEEK = 7 * MS_PER_DAY;
 
-    // Build 8 week buckets ending at today
+    // Anchor at end-of-day so tasks updated "today" land in the most recent bucket
+    const anchor = new Date(today);
+    anchor.setHours(23, 59, 59, 999);
+
     for (let i = 7; i >= 0; i--) {
-        const weekEnd = new Date(today.getTime() - i * MS_PER_WEEK);
+        const weekEnd = new Date(anchor.getTime() - i * MS_PER_WEEK);
         const weekStart = new Date(weekEnd.getTime() - MS_PER_WEEK);
         weeks.push({ start: weekStart, end: weekEnd, count: 0 });
     }
@@ -220,7 +223,7 @@ const computeCompletionTrend = (allTasks, today) => {
         const updated = task.updated ? new Date(task.updated).getTime() : null;
         if (!updated) return;
         for (const week of weeks) {
-            if (updated >= week.start.getTime() && updated < week.end.getTime()) {
+            if (updated >= week.start.getTime() && updated <= week.end.getTime()) {
                 week.count++;
                 break;
             }

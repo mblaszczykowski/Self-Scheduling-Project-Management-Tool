@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { SectionHeader, ChartCard, chartOptions } from './ChartComponents';
 import { STATUS_CONFIG, PRIORITY_CONFIG } from '../../util/helpers';
-import { formatShortDate } from '../../util/helpers';
+import { formatShortDate, formatAssigneeName } from '../../util/helpers';
 import {
     CheckCircleIcon, AlertTriangleIcon, BlockedIcon,
     TrendingUpIcon, ChartBarIcon, UsersIcon, LightningIcon,
@@ -172,7 +172,7 @@ const ResourceConflictsCard = ({ stats }) => {
                     <div className="mt-2 space-y-1.5">
                         {rc.conflicts.slice(0, 4).map((c, i) => (
                             <div key={i} className="text-xs flex items-center gap-1.5">
-                                <span className="text-slate-500 truncate max-w-[80px]">{c.assignee.split('@')[0]}</span>
+                                <span className="text-slate-500 truncate max-w-[140px]">{formatAssigneeName(c.assignee)}</span>
                                 <span className="font-mono text-slate-700">{c.task1}</span>
                                 <span className="text-slate-300">/</span>
                                 <span className="font-mono text-slate-700">{c.task2}</span>
@@ -383,7 +383,7 @@ const TeamWorkloadBarCard = ({ stats }) => {
         );
     }
 
-    const labels = assignees.map(a => a.assignee.split('@')[0]);
+    const labels = assignees.map(a => formatAssigneeName(a.assignee));
     const criticalData = assignees.map(a => a.critical);
     const normalData = assignees.map(a => a.total - a.critical);
 

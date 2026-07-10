@@ -71,40 +71,29 @@ public class OptimizationService {
                 .collect(Collectors.toSet());
 
         if (horizonStart == null) {
-            // Use the earliest task start date as horizon, so past tasks are
-            // optimized in their actual time frame rather than being pushed to today
-            horizonStart = taskDTOs.stream()
-                    .filter(t -> t.startDate() != null)
-                    .map(TaskDTO::startDate)
-                    .min(LocalDate::compareTo)
-                    .orElse(LocalDate.now());
+            // T_0 = today (start of re-optimization). Tasks completed before T_0
+            // get negative offsets but their original dates are preserved as
+            // fixed precedence constraints. Active tasks satisfy S_j >= 0,
+            // i.e. they cannot be scheduled into the past.
+            horizonStart = LocalDate.now();
         }
 
-        // Run evaluation on current schedule
+        // Evaluate the current schedule, then run a single SSGS pass.
+        // SSGS is a deterministic single-pass constructive heuristic: given the priority
+        // rule the schedule is fully determined, and alpha/beta only weigh the reported
+        // objective Z (they do not influence the generated schedule), so no iterative
+        // re-optimization is required. Metrics are always scored against the original
+        // due dates so "before" and "after" are directly comparable.
         var originalResult = optimizer.evaluateOriginal(taskDTOs, horizonStart, alpha, beta);
+        var optimizedResult = optimizer.optimize(taskDTOs, horizonStart, alpha, beta);
 
-        // Run optimizer iteratively until convergence — the SSGS heuristic may not
-        // find the global optimum in a single pass because the priority ordering
-        // depends on slack/due dates which change after rescheduling.
-        var currentDTOs = taskDTOs;
-        ScheduleOptimizer.ScheduleResult optimizedResult = null;
-        for (int iteration = 0; iteration < 10; iteration++) {
-            var result = optimizer.optimize(currentDTOs, horizonStart, alpha, beta);
-            if (optimizedResult != null && result.tasksShifted() == 0) {
-                break; // converged — no more improvements
-            }
-            optimizedResult = result;
-            if (result.tasksShifted() == 0) break;
-
-            // Feed optimized dates back as input for next iteration
-            currentDTOs = applyResultToDTOs(currentDTOs, result);
-        }
-        if (optimizedResult == null) {
-            optimizedResult = optimizer.optimize(taskDTOs, horizonStart, alpha, beta);
-        }
-
-        // Build suggestions comparing original dates vs final optimized positions
+        // Build suggestions comparing original dates vs optimized positions
         var suggestions = buildSuggestions(taskDTOs, optimizedResult, criticalSet);
+
+        // Compute total tasks shifted relative to ORIGINAL dates (not last iteration)
+        int totalTasksShifted = (int) suggestions.stream()
+                .filter(TaskScheduleSuggestionDTO::wasShifted)
+                .count();
 
         // Count late tasks from results (both use original taskDTOs for consistent comparison)
         int originalTasksLate = countLateTasks(taskDTOs, originalResult);
@@ -132,7 +121,7 @@ public class OptimizationService {
         );
 
         return new OptimizationResultDTO(suggestions, originalMetrics, optimizedMetrics,
-                optimizedResult.tasksShifted());
+                totalTasksShifted);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -224,24 +213,6 @@ public class OptimizationService {
         }
 
         return suggestions;
-    }
-
-    /**
-     * Creates new TaskDTOs with optimized start/due dates from a ScheduleResult,
-     * used to feed back into the optimizer for iterative convergence.
-     */
-    private List<TaskDTO> applyResultToDTOs(List<TaskDTO> originals, ScheduleOptimizer.ScheduleResult result) {
-        return originals.stream().map(dto -> {
-            var scheduled = result.tasks().get(dto.taskKey());
-            if (scheduled == null) return dto;
-            return new TaskDTO(
-                    dto.id(), dto.taskNumber(), dto.taskKey(), dto.projectKey(),
-                    dto.summary(), dto.description(), dto.status(),
-                    scheduled.suggestedStart(), scheduled.suggestedDue(),
-                    dto.assignee(), dto.labels(), dto.dependencyKeys(), dto.isCritical(),
-                    dto.attachments(), dto.created(), dto.updated(), dto.progress(), dto.priority()
-            );
-        }).toList();
     }
 
 }

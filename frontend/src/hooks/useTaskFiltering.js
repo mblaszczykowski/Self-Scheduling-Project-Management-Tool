@@ -25,7 +25,7 @@ const taskMatchesFilter = (task, filterField, filterValue) => {
         case 'priority':
             return task.priority === filterValue;
         case 'criticality':
-            return filterValue === 'Critical' ? task.isCritical : true;
+            return filterValue === 'Critical' ? task.isCritical : !task.isCritical;
         case 'delayed':
             return matchesTimeStatus(task, filterValue);
         default:
