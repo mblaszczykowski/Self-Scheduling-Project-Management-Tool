@@ -80,15 +80,15 @@ class CsrfProtectionFilterTest {
 
             filter.doFilterInternal(request, response, filterChain);
 
-            ArgumentCaptor<Cookie> cookieCaptor = ArgumentCaptor.forClass(Cookie.class);
-            verify(response).addCookie(cookieCaptor.capture());
+            // Cookie is emitted as a Set-Cookie header (ResponseCookie) so SameSite can be set.
+            ArgumentCaptor<String> cookieHeader = ArgumentCaptor.forClass(String.class);
+            verify(response).addHeader(eq("Set-Cookie"), cookieHeader.capture());
 
-            Cookie cookie = cookieCaptor.getValue();
-            assertEquals(CSRF_COOKIE_NAME, cookie.getName());
-            assertNotNull(cookie.getValue());
-            assertFalse(cookie.isHttpOnly()); // Must be readable by JS
-            assertEquals("/", cookie.getPath());
-            assertEquals(3600, cookie.getMaxAge());
+            String setCookie = cookieHeader.getValue();
+            assertTrue(setCookie.startsWith(CSRF_COOKIE_NAME + "="));
+            assertTrue(setCookie.contains("Path=/"));
+            assertTrue(setCookie.contains("Max-Age=3600"));
+            assertFalse(setCookie.contains("HttpOnly")); // Must be readable by JS
         }
 
         @Test
@@ -100,10 +100,11 @@ class CsrfProtectionFilterTest {
 
             filter.doFilterInternal(request, response, filterChain);
 
-            ArgumentCaptor<Cookie> cookieCaptor = ArgumentCaptor.forClass(Cookie.class);
-            verify(response).addCookie(cookieCaptor.capture());
+            ArgumentCaptor<String> cookieHeader = ArgumentCaptor.forClass(String.class);
+            verify(response).addHeader(eq("Set-Cookie"), cookieHeader.capture());
 
-            String token = cookieCaptor.getValue().getValue();
+            String setCookie = cookieHeader.getValue();
+            String token = setCookie.substring((CSRF_COOKIE_NAME + "=").length(), setCookie.indexOf(';'));
             // Token should be 32 bytes = 43 Base64 URL-safe characters (no padding)
             assertTrue(token.length() >= 40);
             // Should be valid Base64 URL
@@ -258,8 +259,8 @@ class CsrfProtectionFilterTest {
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {"/files/doc.pdf", "/uploads/image.png", "/static/script.js"})
-        @DisplayName("should exempt file endpoints from CSRF")
+        @ValueSource(strings = {"/uploads/image.png", "/static/script.js"})
+        @DisplayName("should exempt static content endpoints from CSRF (/files serves via authenticated controller)")
         void shouldExemptFileEndpoints(String path) throws Exception {
             when(request.getRequestURI()).thenReturn(path);
             when(request.getMethod()).thenReturn("POST");

@@ -105,10 +105,9 @@ class JwtAuthenticationFilterTest {
         @ValueSource(strings = {
                 "/static/js/main.js",
                 "/static/css/styles.css",
-                "/uploads/image.png",
-                "/files/document.pdf"
+                "/uploads/image.png"
         })
-        @DisplayName("should bypass authentication for static and file paths")
+        @DisplayName("should bypass authentication for static content paths (/files is authenticated)")
         void shouldBypassStaticPaths(String path) throws Exception {
             when(request.getRequestURI()).thenReturn(path);
             when(request.getMethod()).thenReturn("GET");

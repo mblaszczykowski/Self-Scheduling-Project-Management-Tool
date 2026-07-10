@@ -170,26 +170,23 @@ class ProjectServiceTest {
         }
 
         @Test
-        @DisplayName("should detect circular project dependencies")
+        @DisplayName("should detect circular project dependencies on update")
         void shouldDetectCircularDependency() {
+            // A brand-new project cannot be part of a cycle (nothing references it yet),
+            // so cycle detection is exercised on update: adding DEP as a dependency of PROJ
+            // when DEP already depends on PROJ would create PROJ(10) -> DEP(20) -> PROJ(10).
             var depProject = TestEntityFactory.createProject(20, "DEP", owner);
             depProject.replaceDependencies(List.of(project));
 
-            var request = new ProjectCreateRequest("TEST", "Test Project", "desc",
+            var request = new ProjectCreateRequest("PROJ", "Updated", "desc",
                     null, List.of("DEP"), null);
 
-            when(projectRepository.existsByProjectKey("TEST")).thenReturn(false);
-            when(userService.getRequiredUserById(1)).thenReturn(owner);
-            when(projectRepository.save(any(Project.class))).thenAnswer(inv -> {
-                Project p = inv.getArgument(0);
-                p.setId(10);
-                return p;
-            });
+            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            doNothing().when(accessGuard).requireOwner(project, 1);
             when(projectRepository.findByProjectKey("DEP")).thenReturn(Optional.of(depProject));
 
-            // cycle: project(10) -> DEP(20) -> project(10)
             assertThrows(ValidationException.class, () ->
-                    projectService.createProject(request, 1, null));
+                    projectService.updateProject("PROJ", request, 1, null));
         }
     }
 

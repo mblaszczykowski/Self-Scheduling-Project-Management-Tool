@@ -229,7 +229,6 @@ class TaskServiceTest {
 
             when(projectRepository.findByProjectKeyWithLock("PROJ")).thenReturn(Optional.of(project));
             when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
-            when(projectRepository.save(any(Project.class))).thenReturn(project);
 
             assertThrows(ValidationException.class, () ->
                     taskService.createTask("PROJ", request, 1, null));
@@ -446,9 +445,7 @@ class TaskServiceTest {
                     null, null, null,
                     null, null, null, List.of("label,with,commas"), null, null);
 
-            when(projectRepository.findByProjectKeyWithLock("PROJ")).thenReturn(Optional.of(project));
-            when(projectRepository.save(any(Project.class))).thenReturn(project);
-
+            // Label validation runs first, before any repository access.
             assertThrows(ValidationException.class, () ->
                     taskService.createTask("PROJ", request, 1, null));
         }
