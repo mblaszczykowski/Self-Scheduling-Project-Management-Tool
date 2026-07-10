@@ -8,6 +8,7 @@ import com.backend.exception.ResourceNotFoundException;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class AccessGuard {
@@ -53,6 +54,9 @@ public class AccessGuard {
         return task;
     }
 
+    // Transactional so the lazy Project (and its owner/members) can be resolved for the
+    // access check even when called directly from a controller (open-in-view is disabled).
+    @Transactional(readOnly = true)
     public Task getAccessibleTaskById(Integer taskId, Integer userId) {
         var task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));

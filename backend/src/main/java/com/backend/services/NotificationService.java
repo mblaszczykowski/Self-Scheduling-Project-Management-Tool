@@ -11,6 +11,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.util.List;
@@ -42,9 +44,36 @@ public class NotificationService {
         notification.setLink(link);
         notificationRepository.save(notification);
 
-        sseEmitterManager.sendNotification(recipient.getId(), entityMapper.toNotificationDTO(notification));
+        // Snapshot everything needed for the side effects while the entities are still managed,
+        // then fire SSE + email only AFTER the surrounding transaction commits. This prevents
+        // real-time pushes / emails for actions that ultimately roll back, and avoids touching
+        // a detached User from the async email thread.
+        var dto = entityMapper.toNotificationDTO(notification);
+        Integer recipientId = recipient.getId();
+        boolean wantsEmail = recipient.wantsEmailFor(type);
+        String recipientEmail = recipient.getEmail();
+        String recipientFirstName = recipient.getFirstname();
 
-        emailService.sendNotificationEmail(recipient, message, type, link);
+        runAfterCommit(() -> {
+            sseEmitterManager.sendNotification(recipientId, dto);
+            if (wantsEmail) {
+                emailService.sendNotificationEmail(recipientEmail, recipientFirstName, message, type, link);
+            }
+        });
+    }
+
+    /** Runs the action after the current transaction commits, or immediately if none is active. */
+    private void runAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 
     @Transactional(readOnly = true)

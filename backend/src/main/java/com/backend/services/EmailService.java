@@ -1,7 +1,6 @@
 package com.backend.services;
 
 import com.backend.entities.NotificationType;
-import com.backend.entities.User;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,17 +27,16 @@ public class EmailService {
         this.mailSender = mailSender;
     }
 
+    /**
+     * Sends a notification email. Takes plain primitives (not a JPA entity) because it runs
+     * asynchronously on a separate thread and after the originating transaction has committed,
+     * where a managed/lazy entity would no longer be attached to a session. The recipient's
+     * preference check is the caller's responsibility (done while the entity is still managed).
+     */
     @Async("emailExecutor")
-    public void sendNotificationEmail(User recipient, String message, NotificationType type, String link) {
+    public void sendNotificationEmail(String toEmail, String recipientFirstName,
+                                      String message, NotificationType type, String link) {
         if (!mailEnabled) {
-            return;
-        }
-
-        if (!Boolean.TRUE.equals(recipient.getEmailNotificationsEnabled())) {
-            return;
-        }
-
-        if (!isNotificationTypeEnabled(recipient, type)) {
             return;
         }
 
@@ -47,26 +45,15 @@ public class EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
             helper.setFrom(fromAddress);
-            helper.setTo(recipient.getEmail());
+            helper.setTo(toEmail);
             helper.setSubject(getSubjectForType(type));
-            helper.setText(buildHtmlEmail(recipient, message, link), true);
+            helper.setText(buildHtmlEmail(recipientFirstName, message, link), true);
 
             mailSender.send(mimeMessage);
-            log.info("Email notification sent to {} for type {}", recipient.getEmail(), type);
+            log.info("Email notification sent to {} for type {}", toEmail, type);
         } catch (Exception e) {
-            log.error("Failed to send email notification to {}: {}", recipient.getEmail(), e.getMessage(), e);
+            log.error("Failed to send email notification to {}: {}", toEmail, e.getMessage(), e);
         }
-    }
-
-    private boolean isNotificationTypeEnabled(User user, NotificationType type) {
-        return switch (type) {
-            case TASK_ASSIGNED, TASK_UPDATED, TASK_DELETED, TASK_COMMENT ->
-                    Boolean.TRUE.equals(user.getEmailOnTaskAssigned());
-            case COMMENT_REPLY, COMMENT_REACTION ->
-                    Boolean.TRUE.equals(user.getEmailOnCommentReply());
-            case PROJECT_INVITATION, PROJECT_UPDATED, MEMBER_REMOVED ->
-                    Boolean.TRUE.equals(user.getEmailOnProjectInvitation());
-        };
     }
 
     @Async("emailExecutor")
@@ -157,7 +144,7 @@ public class EmailService {
         };
     }
 
-    private String buildHtmlEmail(User recipient, String message, String link) {
+    private String buildHtmlEmail(String recipientFirstName, String message, String link) {
         String buttonHtml = "";
         if (link != null && !link.isBlank()) {
             buttonHtml = """
@@ -226,7 +213,7 @@ public class EmailService {
                 </body>
                 </html>
                 """.formatted(
-                escapeHtml(recipient.getFirstname()),
+                escapeHtml(recipientFirstName),
                 escapeHtml(message),
                 buttonHtml
         );

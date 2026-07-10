@@ -50,14 +50,16 @@ public class TaskService {
     public TaskDTO createTask(String projectKey, TaskCreateRequest request, Integer userId, List<MultipartFile> files) {
         validateLabels(request.labels());
 
-        var attachmentUrls = (files != null && !files.isEmpty())
-                ? fileStorageService.storeFiles(files)
-                : new ArrayList<String>();
-
         var project = projectRepository.findByProjectKeyWithLock(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
         accessGuard.requireAccess(project, userId);
+
+        // Store files only after authorization: file storage is not transactional, so a
+        // later rollback would not remove them (avoids orphaned writes by unauthorized callers).
+        var attachmentUrls = (files != null && !files.isEmpty())
+                ? fileStorageService.storeFiles(files)
+                : new ArrayList<String>();
 
         var task = new Task();
         task.setSummary(request.summary());

@@ -136,4 +136,19 @@ public class User {
     public void setEmailOnProjectInvitation(Boolean emailOnProjectInvitation) {
         this.emailOnProjectInvitation = emailOnProjectInvitation;
     }
+
+    /** Whether this user wants an email for the given notification type, per their preferences. */
+    public boolean wantsEmailFor(NotificationType type) {
+        if (!Boolean.TRUE.equals(emailNotificationsEnabled)) {
+            return false;
+        }
+        return switch (type) {
+            case TASK_ASSIGNED, TASK_UPDATED, TASK_DELETED, TASK_COMMENT ->
+                    Boolean.TRUE.equals(emailOnTaskAssigned);
+            case COMMENT_REPLY, COMMENT_REACTION ->
+                    Boolean.TRUE.equals(emailOnCommentReply);
+            case PROJECT_INVITATION, PROJECT_UPDATED, MEMBER_REMOVED ->
+                    Boolean.TRUE.equals(emailOnProjectInvitation);
+        };
+    }
 }

@@ -84,15 +84,20 @@ public class CommentService {
         var user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        var attachmentUrls = (files != null && !files.isEmpty())
-                ? fileStorageService.storeFiles(files)
-                : new ArrayList<String>();
-
         Comment parentComment = null;
         if (parentCommentId != null) {
             parentComment = commentRepository.findById(parentCommentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Parent comment not found"));
+            // A reply must thread under a comment on the SAME task, otherwise a user could
+            // graft replies (and notifications) onto comments in projects they don't belong to.
+            if (!parentComment.getTask().getId().equals(taskId)) {
+                throw new ValidationException("Parent comment does not belong to this task");
+            }
         }
+
+        var attachmentUrls = (files != null && !files.isEmpty())
+                ? fileStorageService.storeFiles(files)
+                : new ArrayList<String>();
 
         var sanitizedContent = Jsoup.clean(content, Safelist.basicWithImages());
 

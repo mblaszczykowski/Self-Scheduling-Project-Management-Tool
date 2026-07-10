@@ -108,7 +108,11 @@ public class ProjectService {
 
         // Batch fetch all tasks for projects in this page
         var projectIds = projects.getContent().stream().map(Project::getId).toList();
-        var allTasks = taskRepository.findByProjectIdsWithDetails(projectIds);
+        if (projectIds.isEmpty()) {
+            return projects.map(project -> convertToDTOWithCPM(project, List.of()));
+        }
+        // distinct(): the dependencies join-fetch can return the same Task instance multiple times.
+        var allTasks = taskRepository.findByProjectIdsWithDetails(projectIds).stream().distinct().toList();
         var tasksByProjectId = allTasks.stream()
                 .collect(Collectors.groupingBy(t -> t.getProject().getId()));
 
@@ -126,7 +130,7 @@ public class ProjectService {
         }
 
         var projectIds = projects.stream().map(Project::getId).toList();
-        var allTasks = taskRepository.findByProjectIdsWithDetails(projectIds);
+        var allTasks = taskRepository.findByProjectIdsWithDetails(projectIds).stream().distinct().toList();
         var tasksByProjectId = allTasks.stream()
                 .collect(Collectors.groupingBy(t -> t.getProject().getId()));
 

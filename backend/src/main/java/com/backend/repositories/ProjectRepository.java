@@ -28,9 +28,13 @@ public interface ProjectRepository extends JpaRepository<Project, Integer> {
             "(SELECT p2.id FROM Project p2 JOIN p2.members m2 WHERE m2.id = :userId)")
     List<Project> findAllAccessibleByUser(@Param("userId") Integer userId);
 
-    @Query("SELECT DISTINCT p FROM Project p " +
-            "LEFT JOIN FETCH p.owner " +
-            "LEFT JOIN FETCH p.members " +
+    // Do NOT fetch the members collection here: a to-many JOIN FETCH combined with a Pageable
+    // forces Hibernate to load the whole result set and paginate in memory (HHH000104). Only the
+    // to-one owner is fetched (pagination-safe); members are batch-loaded lazily during mapping.
+    @Query(value = "SELECT p FROM Project p LEFT JOIN FETCH p.owner " +
+            "WHERE p.owner.id = :userId OR p.id IN " +
+            "(SELECT p2.id FROM Project p2 JOIN p2.members m2 WHERE m2.id = :userId)",
+            countQuery = "SELECT COUNT(p) FROM Project p " +
             "WHERE p.owner.id = :userId OR p.id IN " +
             "(SELECT p2.id FROM Project p2 JOIN p2.members m2 WHERE m2.id = :userId)")
     Page<Project> findAllAccessibleByUserPaged(@Param("userId") Integer userId, Pageable pageable);
