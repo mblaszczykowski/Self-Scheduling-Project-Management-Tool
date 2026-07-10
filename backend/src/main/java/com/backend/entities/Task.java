@@ -36,6 +36,9 @@ public class Task {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @Version
+    private Long version; // optimistic lock — concurrent edits surface as OptimisticLockException (409)
+
     @Column(name = "task_number", nullable = false)
     private Integer taskNumber;
 

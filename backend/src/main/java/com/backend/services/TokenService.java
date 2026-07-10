@@ -1,11 +1,10 @@
 package com.backend.services;
 
-import com.backend.config.CookieProperties;
 import com.backend.entities.RefreshToken;
 import com.backend.exception.AuthorizationException;
 import com.backend.repositories.RefreshTokenRepository;
+import com.backend.util.CookieFactory;
 import io.jsonwebtoken.*;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseCookie;
@@ -25,19 +24,19 @@ public class TokenService {
     private final Duration accessTokenExpiration;
     private final Duration refreshTokenExpiration;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final CookieProperties cookieProperties;
+    private final CookieFactory cookieFactory;
 
     @Autowired
     public TokenService(SecretKey jwtSecretKey,
                         Duration accessTokenExpiration,
                         Duration refreshTokenExpiration,
                         RefreshTokenRepository refreshTokenRepository,
-                        CookieProperties cookieProperties) {
+                        CookieFactory cookieFactory) {
         this.jwtSecretKey = jwtSecretKey;
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
         this.refreshTokenRepository = refreshTokenRepository;
-        this.cookieProperties = cookieProperties;
+        this.cookieFactory = cookieFactory;
     }
 
     public String generateAccessToken(Integer userId) {
@@ -54,8 +53,8 @@ public class TokenService {
 
     @Transactional(rollbackFor = Exception.class)
     public String generateRefreshToken(Integer userId) {
-        refreshTokenRepository.deleteByUserId(userId);
-
+        // Do NOT delete the user's other tokens here: each device/session keeps its own
+        // refresh token so signing in on one device does not log the user out elsewhere.
         var tokenValue = UUID.randomUUID().toString();
         var expiryDate = Instant.now().plus(refreshTokenExpiration);
 
@@ -73,21 +72,8 @@ public class TokenService {
         var accessToken = generateAccessToken(userId);
         var refreshToken = generateRefreshToken(userId);
 
-        var accessCookie = ResponseCookie.from("accessToken", accessToken)
-                .httpOnly(true)
-                .secure(cookieProperties.isSecure())
-                .path("/")
-                .maxAge(accessTokenExpiration)
-                .sameSite(cookieProperties.getSameSite())
-                .build();
-
-        var refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
-                .httpOnly(true)
-                .secure(cookieProperties.isSecure())
-                .path("/")
-                .maxAge(refreshTokenExpiration)
-                .sameSite(cookieProperties.getSameSite())
-                .build();
+        var accessCookie = cookieFactory.build("accessToken", accessToken, accessTokenExpiration, true);
+        var refreshCookie = cookieFactory.build("refreshToken", refreshToken, refreshTokenExpiration, true);
 
         return new AuthTokens(accessCookie, refreshCookie);
     }
@@ -154,9 +140,12 @@ public class TokenService {
         return userId;
     }
 
+    /** Revokes a single refresh token by value (per-device logout / rotation). No-op if unknown. */
     @Transactional(rollbackFor = Exception.class)
-    public void revokeRefreshToken(Integer userId) {
-        refreshTokenRepository.deleteByUserId(userId);
+    public void deleteRefreshToken(String tokenValue) {
+        if (tokenValue != null) {
+            refreshTokenRepository.findByToken(tokenValue).ifPresent(refreshTokenRepository::delete);
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)

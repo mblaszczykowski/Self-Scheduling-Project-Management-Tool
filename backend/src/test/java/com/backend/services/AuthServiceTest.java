@@ -57,7 +57,8 @@ class AuthServiceTest {
         var cookieProperties = new com.backend.config.CookieProperties();
         cookieProperties.setSecure(false);
         cookieProperties.setSameSite("Strict");
-        authService = new AuthService(userService, tokenService, rateLimitFilter, passwordEncoder, cookieProperties, "");
+        var cookieFactory = new com.backend.util.CookieFactory(cookieProperties);
+        authService = new AuthService(userService, tokenService, rateLimitFilter, passwordEncoder, cookieFactory, "");
 
         testUser = new User();
         testUser.setId(TEST_USER_ID);
@@ -286,25 +287,26 @@ class AuthServiceTest {
     class LogoutUserTests {
 
         @Test
-        @DisplayName("should revoke tokens and delete cookies")
+        @DisplayName("should revoke only the presented refresh token and delete cookies")
         void shouldRevokeTokensAndDeleteCookies() {
-            when(request.getAttribute("userId")).thenReturn(TEST_USER_ID);
+            var refreshCookie = new jakarta.servlet.http.Cookie("refreshToken", "device-token");
+            when(request.getCookies()).thenReturn(new jakarta.servlet.http.Cookie[]{refreshCookie});
 
             authService.logoutUser(request, response);
 
-            verify(tokenService).revokeRefreshToken(TEST_USER_ID);
+            verify(tokenService).deleteRefreshToken("device-token"); // per-device, not all sessions
             verify(response).setHeader(eq(HttpHeaders.SET_COOKIE), contains("accessToken"));
             verify(response).addHeader(eq(HttpHeaders.SET_COOKIE), contains("refreshToken"));
         }
 
         @Test
-        @DisplayName("should delete cookies even when userId is null")
-        void shouldDeleteCookiesWhenUserIdNull() {
-            when(request.getAttribute("userId")).thenReturn(null);
+        @DisplayName("should delete cookies even when no refresh token is present")
+        void shouldDeleteCookiesWhenNoRefreshToken() {
+            when(request.getCookies()).thenReturn(null);
 
             authService.logoutUser(request, response);
 
-            verify(tokenService, never()).revokeRefreshToken(anyInt());
+            verify(tokenService, never()).deleteRefreshToken(any());
             verify(response).setHeader(eq(HttpHeaders.SET_COOKIE), contains("accessToken"));
             verify(response).addHeader(eq(HttpHeaders.SET_COOKIE), contains("refreshToken"));
         }
@@ -312,8 +314,6 @@ class AuthServiceTest {
         @Test
         @DisplayName("should set maxAge to 0 for deleted cookies")
         void shouldSetMaxAgeToZero() {
-            when(request.getAttribute("userId")).thenReturn(TEST_USER_ID);
-
             authService.logoutUser(request, response);
 
             verify(response).setHeader(eq(HttpHeaders.SET_COOKIE), contains("Max-Age=0"));

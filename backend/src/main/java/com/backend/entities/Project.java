@@ -27,6 +27,9 @@ public class Project {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @Version
+    private Long version; // optimistic lock — concurrent edits surface as OptimisticLockException (409)
+
     @Column(name = "project_key", nullable = false, unique = true, updatable = false)
     private String projectKey;
 

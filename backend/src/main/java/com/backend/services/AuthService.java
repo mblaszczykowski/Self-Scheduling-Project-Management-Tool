@@ -1,18 +1,18 @@
 package com.backend.services;
 
-import com.backend.config.CookieProperties;
 import com.backend.entities.User;
 import com.backend.exception.AuthorizationException;
 import com.backend.exception.ValidationException;
 import com.backend.filter.RateLimitFilter;
 import com.backend.requests.LoginRequest;
+import com.backend.util.CookieFactory;
+import com.backend.util.IpUtil;
 import com.backend.util.ValidationUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +27,7 @@ public class AuthService {
     private final TokenService tokenService;
     private final RateLimitFilter rateLimitFilter;
     private final BCryptPasswordEncoder passwordEncoder;
-    private final CookieProperties cookieProperties;
+    private final CookieFactory cookieFactory;
     private final Set<String> trustedProxies;
 
     @Autowired
@@ -35,21 +35,23 @@ public class AuthService {
                        TokenService tokenService,
                        RateLimitFilter rateLimitFilter,
                        BCryptPasswordEncoder passwordEncoder,
-                       CookieProperties cookieProperties,
+                       CookieFactory cookieFactory,
                        @Value("${app.trusted-proxies:}") String trustedProxiesConfig) {
         this.userService = userService;
         this.tokenService = tokenService;
         this.rateLimitFilter = rateLimitFilter;
         this.passwordEncoder = passwordEncoder;
-        this.cookieProperties = cookieProperties;
-        this.trustedProxies = com.backend.util.IpUtil.parseTrustedProxies(trustedProxiesConfig);
+        this.cookieFactory = cookieFactory;
+        this.trustedProxies = IpUtil.parseTrustedProxies(trustedProxiesConfig);
     }
 
     private static final String TIMING_ATTACK_PREVENTION_HASH = "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYIWWwK6W6Wy";
 
     public record LoginResult(Map<String, Object> body, TokenService.AuthTokens tokens) {}
 
-    @Transactional(rollbackFor = Exception.class)
+    // Intentionally NOT @Transactional: the CPU-bound BCrypt verification must not pin a DB
+    // connection. The only write (issuing the refresh token) opens its own transaction in
+    // TokenService. The user lookup and credential check are read-only.
     public LoginResult authenticateUser(LoginRequest loginRequest, HttpServletRequest httpRequest) {
         validateLoginRequest(loginRequest);
 
@@ -75,59 +77,31 @@ public class AuthService {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        return com.backend.util.IpUtil.getClientIp(request, trustedProxies);
+        return IpUtil.getClientIp(request, trustedProxies);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public TokenService.AuthTokens refreshAccessToken(HttpServletRequest request) {
-        String refreshToken = null;
-        if (request.getCookies() != null) {
-            for (var cookie : request.getCookies()) {
-                if ("refreshToken".equals(cookie.getName())) {
-                    refreshToken = cookie.getValue();
-                    break;
-                }
-            }
-        }
-
-        if (refreshToken == null) {
-            throw new AuthorizationException("Refresh token not provided");
-        }
+        var refreshToken = CookieFactory.read(request, "refreshToken")
+                .orElseThrow(() -> new AuthorizationException("Refresh token not provided"));
 
         var userId = tokenService.validateRefreshToken(refreshToken);
         if (userId == null) {
             throw new AuthorizationException("Invalid or expired refresh token");
         }
 
+        // Rotate: invalidate the presented token and issue a fresh pair for this device only.
+        tokenService.deleteRefreshToken(refreshToken);
         return tokenService.createAuthTokens(userId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void logoutUser(HttpServletRequest request, HttpServletResponse response) {
-        var userId = (Integer) request.getAttribute("userId");
+        // Log out only this device: revoke the presented refresh token, not all of the user's.
+        CookieFactory.read(request, "refreshToken").ifPresent(tokenService::deleteRefreshToken);
 
-        if (userId != null) {
-            tokenService.revokeRefreshToken(userId);
-        }
-
-        var deleteAccessCookie = ResponseCookie.from("accessToken", "")
-                .httpOnly(true)
-                .secure(cookieProperties.isSecure())
-                .path("/")
-                .maxAge(0)
-                .sameSite(cookieProperties.getSameSite())
-                .build();
-
-        var deleteRefreshCookie = ResponseCookie.from("refreshToken", "")
-                .httpOnly(true)
-                .secure(cookieProperties.isSecure())
-                .path("/")
-                .maxAge(0)
-                .sameSite(cookieProperties.getSameSite())
-                .build();
-
-        response.setHeader(HttpHeaders.SET_COOKIE, deleteAccessCookie.toString());
-        response.addHeader(HttpHeaders.SET_COOKIE, deleteRefreshCookie.toString());
+        response.setHeader(HttpHeaders.SET_COOKIE, cookieFactory.deletion("accessToken", true).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.deletion("refreshToken", true).toString());
     }
 
     private void validateLoginRequest(LoginRequest request) {

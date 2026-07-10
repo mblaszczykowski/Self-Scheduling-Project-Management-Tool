@@ -62,7 +62,7 @@ class TokenServiceTest {
                 ACCESS_TOKEN_EXPIRATION,
                 REFRESH_TOKEN_EXPIRATION,
                 refreshTokenRepository,
-                cookieProperties
+                new com.backend.util.CookieFactory(cookieProperties)
         );
     }
 
@@ -115,11 +115,12 @@ class TokenServiceTest {
     class GenerateRefreshTokenTests {
 
         @Test
-        @DisplayName("should delete existing tokens before creating new one")
-        void shouldDeleteExistingTokens() {
+        @DisplayName("should NOT delete the user's other tokens (multi-device sessions)")
+        void shouldNotDeleteOtherTokens() {
             tokenService.generateRefreshToken(TEST_USER_ID);
 
-            verify(refreshTokenRepository).deleteByUserId(TEST_USER_ID);
+            verify(refreshTokenRepository, never()).deleteByUserId(TEST_USER_ID);
+            verify(refreshTokenRepository).save(any(RefreshToken.class));
         }
 
         @Test
@@ -449,15 +450,29 @@ class TokenServiceTest {
     }
 
     @Nested
-    @DisplayName("revokeRefreshToken")
-    class RevokeRefreshTokenTests {
+    @DisplayName("deleteRefreshToken")
+    class DeleteRefreshTokenTests {
 
         @Test
-        @DisplayName("should delete all refresh tokens for user")
-        void shouldDeleteTokensForUser() {
-            tokenService.revokeRefreshToken(TEST_USER_ID);
+        @DisplayName("should delete only the presented refresh token")
+        void shouldDeletePresentedToken() {
+            var rt = new RefreshToken();
+            rt.setToken("device-token");
+            when(refreshTokenRepository.findByToken("device-token")).thenReturn(Optional.of(rt));
 
-            verify(refreshTokenRepository).deleteByUserId(TEST_USER_ID);
+            tokenService.deleteRefreshToken("device-token");
+
+            verify(refreshTokenRepository).delete(rt);
+        }
+
+        @Test
+        @DisplayName("should be a no-op for an unknown token")
+        void shouldIgnoreUnknownToken() {
+            when(refreshTokenRepository.findByToken("unknown")).thenReturn(Optional.empty());
+
+            tokenService.deleteRefreshToken("unknown");
+
+            verify(refreshTokenRepository, never()).delete(any(RefreshToken.class));
         }
     }
 

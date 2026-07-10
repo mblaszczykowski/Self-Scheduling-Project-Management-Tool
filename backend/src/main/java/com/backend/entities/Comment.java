@@ -21,6 +21,9 @@ public class Comment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @Version
+    private Long version; // optimistic lock — concurrent edits surface as OptimisticLockException (409)
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
