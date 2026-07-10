@@ -110,54 +110,87 @@ const ProjectsPage = () => {
 
     // --- Task resize ---
 
+    // Resize is optimistic: each drag step updates a local preview only (no
+    // network), and a single updateTask is committed when the drag ends. This
+    // replaces the previous per-step write+refetch+toast (one drag = N calls).
+    const [resizePreview, setResizePreview] = useState(null);
+    const resizeRef = useRef(null);
+
     const handleTaskResize = useCallback((taskKey, projectKey, side, deltaDays) => {
-        const project = processedProjects.find(p => p.projectKey === projectKey);
-        const task = project?.tasks.find(t => t.taskKey === taskKey);
-        if (!task) return;
-
-        let newStartDate = task.startDate;
-        let newDueDate = task.dueDate;
-
-        if (side === 'left') {
-            const newStart = new Date(task.startDate);
-            newStart.setDate(newStart.getDate() + deltaDays);
-            if (newStart <= new Date(task.dueDate)) {
-                newStartDate = toDateString(newStart);
-            }
-        } else {
-            const newDue = new Date(task.dueDate);
-            newDue.setDate(newDue.getDate() + deltaDays);
-            if (newDue >= new Date(task.startDate)) {
-                newDueDate = toDateString(newDue);
-            }
+        let current = resizeRef.current;
+        if (!current || current.taskKey !== taskKey) {
+            const project = processedProjects.find(p => p.projectKey === projectKey);
+            const task = project?.tasks.find(t => t.taskKey === taskKey);
+            if (!task) return;
+            current = { taskKey, projectKey, task, startDate: task.startDate, dueDate: task.dueDate };
         }
 
-        const previousStartDate = task.startDate;
-        const previousDueDate = task.dueDate;
+        let { startDate, dueDate } = current;
+        if (side === 'left') {
+            const d = new Date(startDate);
+            d.setDate(d.getDate() + deltaDays);
+            const next = toDateString(d);
+            if (next <= dueDate) startDate = next;
+        } else {
+            const d = new Date(dueDate);
+            d.setDate(d.getDate() + deltaDays);
+            const next = toDateString(d);
+            if (next >= startDate) dueDate = next;
+        }
 
-        updateTask(projectKey, task.taskKey, {
+        current = { ...current, startDate, dueDate };
+        resizeRef.current = current;
+        setResizePreview({ taskKey, projectKey, startDate, dueDate });
+    }, [processedProjects]);
+
+    const handleTaskResizeEnd = useCallback(() => {
+        const current = resizeRef.current;
+        resizeRef.current = null;
+        if (!current) return;
+
+        const { task, projectKey, taskKey, startDate, dueDate } = current;
+        if (startDate === task.startDate && dueDate === task.dueDate) {
+            setResizePreview(null);
+            return;
+        }
+
+        updateTask(projectKey, taskKey, {
             summary: task.summary, description: task.description, status: task.status,
-            startDate: newStartDate, dueDate: newDueDate, assignee: task.assignee,
+            startDate, dueDate, assignee: task.assignee,
             labels: task.labels, dependencyKeys: task.dependencies || [],
         }).then(() => {
             showToast('Task dates updated', 'success');
         }).catch(err => {
             console.error('Error updating task:', err);
-            showToast('Failed to update task dates. Reverting changes.', 'error');
-            updateTask(projectKey, task.taskKey, {
-                summary: task.summary, description: task.description, status: task.status,
-                startDate: previousStartDate, dueDate: previousDueDate, assignee: task.assignee,
-                labels: task.labels, dependencyKeys: task.dependencies || [],
-            }).catch(() => {
-                showToast('Failed to revert changes. Please refresh the page.', 'error');
-            });
+            showToast('Failed to update task dates.', 'error');
+        }).finally(() => {
+            // Drop the preview; the refreshed store (or the unchanged server
+            // state on failure) becomes the source of truth again.
+            setResizePreview(null);
         });
-    }, [processedProjects, updateTask]);
+    }, [updateTask]);
 
     const { startResize, shouldPreventClick } = useTimelineResize({
         onResizeMove: handleTaskResize,
+        onResizeEnd: handleTaskResizeEnd,
         dayWidth: DAY_WIDTH,
     });
+
+    // Overlay the in-progress resize onto the rendered projects so the bar
+    // follows the cursor without touching the store until the drag commits.
+    const displayProjects = useMemo(() => {
+        if (!resizePreview) return processedProjects;
+        return processedProjects.map(p =>
+            p.projectKey !== resizePreview.projectKey ? p : {
+                ...p,
+                tasks: p.tasks.map(t =>
+                    t.taskKey === resizePreview.taskKey
+                        ? { ...t, startDate: resizePreview.startDate, dueDate: resizePreview.dueDate }
+                        : t
+                ),
+            }
+        );
+    }, [processedProjects, resizePreview]);
 
     // --- Filtering ---
 
@@ -363,7 +396,7 @@ const ProjectsPage = () => {
                 ) : (
                   <ErrorBoundary level="section" resetKey={viewState.mode}>
                     <TimelineView
-                        processedProjects={processedProjects}
+                        processedProjects={displayProjects}
                         allTasks={allTasks}
                         filteredTasks={filteredTasks}
                         filteredTaskIds={filteredTaskIds}
