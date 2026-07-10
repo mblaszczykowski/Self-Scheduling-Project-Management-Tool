@@ -5,9 +5,9 @@ import { SectionHeader, ChartCard, chartOptions } from './ChartComponents';
 import { STATUS_CONFIG, PRIORITY_CONFIG } from '../../util/helpers';
 import { formatShortDate, formatAssigneeName } from '../../util/helpers';
 import {
-    CheckCircleIcon, AlertTriangleIcon, BlockedIcon,
+    CheckCircleIcon, BlockedIcon,
     TrendingUpIcon, ChartBarIcon, UsersIcon, LightningIcon,
-    ClockIcon, FlagIcon,
+    ClockIcon,
 } from '../common/Icons';
 
 const SectionDivider = ({ title }) => (

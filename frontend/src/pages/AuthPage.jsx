@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import RegisterForm from '../components/auth/RegisterForm';
 import LoginForm from '../components/auth/LoginForm';
-import { useNavigate } from 'react-router-dom';
 import '../components/common/Aurora.css';
 
 /* ─────────────────────────── GANTT DATA ───────────────────────── */
@@ -327,7 +326,6 @@ const FeatureIcon = ({ children }) => (
 
 export default function AuthPage({ show }) {
     const [showForm, setShowForm] = useState(show);
-    const navigate = useNavigate();
 
     useEffect(() => {
         setShowForm(show);

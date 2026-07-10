@@ -1,14 +1,11 @@
 import React from 'react';
 import { ErrorMessage, Field } from 'formik';
 import {
-    HiOutlineChevronDown, HiOutlineFolder,
-    HiOutlineX, HiOutlineCloudUpload,
+    HiOutlineChevronDown, HiOutlineFolder, HiOutlineX,
 } from 'react-icons/hi';
 import RichTextEditor from '../common/RichTextEditor';
 import AttachmentUploader from './AttachmentUploader';
-import {
-    SectionHeader, InputLabel, inputClass, selectClass,
-} from '../common/formHelpers';
+import { inputClass, selectClass } from '../common/formHelpers';
 import Avatar from '../common/Avatar';
 
 const ProjectForm = ({

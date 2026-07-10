@@ -4,18 +4,33 @@ import Modal from 'react-modal';
 import { ErrorMessage, Field, Form, Formik } from 'formik';
 import * as Yup from 'yup';
 import { updateUser, updateEmailPreferences } from '../../util/api';
-import { getImageUrl } from '../../util/helpers';
+import { getImageUrl, getErrorMessage } from '../../util/helpers';
+import { showToast } from '../../util/toast';
 import Avatar from '../common/Avatar';
 import { CloseIcon } from '../common/Icons';
 import { inputClass } from '../common/formHelpers';
+
+// Empty password fields must be treated as "no change", not as an 8-char
+// violation (Yup's .min runs on '' too). Transform '' -> undefined so a user
+// editing only their name/email/avatar can still submit.
+const emptyToUndefined = (value) => (value === '' ? undefined : value);
 
 const validationSchema = Yup.object().shape({
     firstname: Yup.string().required('First name is required'),
     lastname: Yup.string().required('Last name is required'),
     email: Yup.string().email('Invalid email').required('Email is required'),
-    currentPassword: Yup.string(),
-    newPassword: Yup.string().min(8, 'Password must be at least 8 characters'),
-    confirmNewPassword: Yup.string().oneOf([Yup.ref('newPassword'), null], 'Passwords must match'),
+    newPassword: Yup.string()
+        .transform(emptyToUndefined)
+        .min(8, 'Password must be at least 8 characters'),
+    currentPassword: Yup.string()
+        .transform(emptyToUndefined)
+        .when('newPassword', {
+            is: (v) => !!v,
+            then: (schema) => schema.required('Enter your current password to set a new one'),
+        }),
+    confirmNewPassword: Yup.string()
+        .transform(emptyToUndefined)
+        .oneOf([Yup.ref('newPassword'), undefined], 'Passwords must match'),
 });
 
 const EmailToggle = ({ label, description, checked, onChange, disabled }) => (
@@ -83,11 +98,14 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
         try {
             const updatedUser = await updateUser(formData);
             onUpdateUser?.(updatedUser);
+            showToast('Account updated', 'success');
             handleClose();
         } catch (err) {
             console.error('Error updating user:', err);
             if (err.response?.data?.errors) {
                 setErrors(err.response.data.errors);
+            } else {
+                showToast(getErrorMessage(err, 'Failed to update account'), 'error');
             }
         } finally {
             setSubmitting(false);

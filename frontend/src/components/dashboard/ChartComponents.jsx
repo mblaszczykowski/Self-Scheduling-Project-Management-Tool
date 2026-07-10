@@ -4,8 +4,8 @@ import { useAnimateIn } from '../../hooks/useAnimateIn';
 export const SectionHeader = ({ title, subtitle }) => (
     <div className="flex items-start justify-between mb-6">
         <div>
-            <h2 className="text-lg font-semibold text-slate-900 mb-1">{title}</h2>
-            {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{title}</h2>
+            {subtitle && <p className="text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
         </div>
     </div>
 );
@@ -14,12 +14,12 @@ export const ChartCard = ({ title, subtitle, children, className = "" }) => {
     const [isVisible] = useAnimateIn();
 
     return (
-        <div className={`bg-white rounded-xl border border-slate-200 p-6 hover:border-slate-300 transition-all duration-300 ${
+        <div className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 hover:border-slate-300 dark:hover:border-slate-600 transition-all duration-300 ${
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
         } ${className}`}>
             <div className="mb-5">
-                <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-                {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3>
+                {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{subtitle}</p>}
             </div>
             {children}
         </div>

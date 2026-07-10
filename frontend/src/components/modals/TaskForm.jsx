@@ -2,15 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { ErrorMessage, Field } from 'formik';
 import {
     HiOutlineChevronDown,
-    HiOutlineLink,
     HiOutlineX,
-    HiOutlineCloudUpload,
 } from 'react-icons/hi';
 import RichTextEditor from '../common/RichTextEditor';
 import AttachmentUploader from './AttachmentUploader';
 import Comments from '../comments/Comments';
 import ActivityTab from '../comments/ActivityTab';
-import { SectionHeader } from '../common/formHelpers';
 import { STATUS_CONFIG, PRIORITY_CONFIG, daysBetween, toDateString, MS_PER_DAY } from '../../util/helpers';
 import Avatar from '../common/Avatar';
 
