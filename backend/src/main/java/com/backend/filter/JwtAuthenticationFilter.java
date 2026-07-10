@@ -8,6 +8,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -16,6 +18,7 @@ import java.io.IOException;
 import java.util.Map;
 
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE + 2) // after SecurityHeaders and RateLimit, before Csrf
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final TokenService tokenService;
@@ -34,35 +37,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        if (PublicEndpoints.isPublicForJwt(path, method)) {
+        if (PublicEndpoints.isPublicForJwt(path, method) || "OPTIONS".equalsIgnoreCase(method)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        if ("OPTIONS".equalsIgnoreCase(method)) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
+        Integer userId;
+        // Only token extraction/validation is guarded here — wrapping the downstream chain
+        // would mislabel any request-handling error as a 401 and can double-commit the response.
         try {
             String token = tokenService.extractTokenFromRequest(request);
             if (token == null) {
                 sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Missing authentication token");
                 return;
             }
-
-            Integer userId = tokenService.validateTokenAndGetUserId(token);
-            if (userId == null) {
-                sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
-                return;
-            }
-
-            request.setAttribute("userId", userId);
-            filterChain.doFilter(request, response);
-
+            userId = tokenService.validateTokenAndGetUserId(token);
         } catch (Exception e) {
             sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Authentication failed");
+            return;
         }
+
+        if (userId == null) {
+            sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
+            return;
+        }
+
+        request.setAttribute("userId", userId);
+        filterChain.doFilter(request, response);
     }
 
     private void sendErrorResponse(HttpServletResponse response,

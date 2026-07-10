@@ -22,7 +22,8 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
 
         response.setHeader("X-Content-Type-Options", "nosniff");
         response.setHeader("X-Frame-Options", "DENY");
-        response.setHeader("X-XSS-Protection", "1; mode=block");
+        // 0 disables the legacy, deprecated XSS auditor; the CSP below is the real protection.
+        response.setHeader("X-XSS-Protection", "0");
 
         response.setHeader("Content-Security-Policy",
                 "default-src 'self'; " +
