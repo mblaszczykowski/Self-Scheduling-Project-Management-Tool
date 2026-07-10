@@ -72,9 +72,6 @@ const getBlockingInfo = (task, taskKeyToTaskMap) => {
     return { blockers, worst: blockers[0], count: blockers.length };
 };
 
-const getDependentsCount = (task, allTasks) =>
-    allTasks.filter(t => t.dependencies?.includes(task.taskKey)).length;
-
 /** Mini timeline showing elapsed vs remaining */
 const ScheduleBar = ({ startDate, dueDate, progress }) => {
     if (!startDate || !dueDate) return null;
@@ -133,11 +130,20 @@ const TaskListView = ({
     const allProjectTasks = useMemo(() => processedProjects.flatMap(p => p.tasks || []), [processedProjects]);
 
     const taskInsights = useMemo(() => {
+        // One O(n) pass to count dependents per task key, instead of scanning all
+        // tasks for every row (was O(filtered × all)).
+        const dependentsCount = new Map();
+        allProjectTasks.forEach(t => {
+            t.dependencies?.forEach(depKey => {
+                dependentsCount.set(depKey, (dependentsCount.get(depKey) || 0) + 1);
+            });
+        });
+
         const map = new Map();
         filteredTasks.forEach(task => {
             map.set(task.taskKey, {
                 blocking: getBlockingInfo(task, taskKeyToTaskMap),
-                dependents: getDependentsCount(task, allProjectTasks),
+                dependents: dependentsCount.get(task.taskKey) || 0,
                 health: computeScheduleHealth(task),
             });
         });

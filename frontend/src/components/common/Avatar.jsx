@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getImageUrl, getAvatarColor, getAvatarInitials } from '../../util/helpers';
 
 const sizeMap = {
@@ -13,6 +13,10 @@ const Avatar = ({ user, profilePicture, size = 'sm', className = '', onError: ex
 
     const pic = profilePicture ?? user?.profilePicture;
     const { container, text } = sizeMap[size] || sizeMap.sm;
+
+    // A new image source should get a fresh chance to load (e.g. after a
+    // profile-picture change on an already-mounted Avatar).
+    useEffect(() => { setHasError(false); }, [pic]);
 
     const handleError = () => {
         setHasError(true);
