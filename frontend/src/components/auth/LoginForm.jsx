@@ -58,6 +58,7 @@ function LoginForm({ onToggleForm }) {
                         <Field
                             type="email"
                             name="email"
+                            autoComplete="email"
                             className={authInputClass(errors.email && touched.email)}
                             placeholder="Enter your email"
                         />
@@ -72,6 +73,7 @@ function LoginForm({ onToggleForm }) {
                             <Field
                                 type={showPassword ? 'text' : 'password'}
                                 name="password"
+                                autoComplete="current-password"
                                 className={`${authInputClass(errors.password && touched.password)} pr-12`}
                                 placeholder="Enter your password"
                             />

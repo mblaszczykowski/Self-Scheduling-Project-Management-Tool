@@ -96,6 +96,7 @@ function RegisterForm({ onToggleForm }) {
                             <Field
                                 type="text"
                                 name="firstname"
+                                autoComplete="given-name"
                                 className={authInputClass(errors.firstname && touched.firstname)}
                                 placeholder="First name"
                             />
@@ -108,6 +109,7 @@ function RegisterForm({ onToggleForm }) {
                             <Field
                                 type="text"
                                 name="lastname"
+                                autoComplete="family-name"
                                 className={authInputClass(errors.lastname && touched.lastname)}
                                 placeholder="Last name"
                             />
@@ -122,6 +124,7 @@ function RegisterForm({ onToggleForm }) {
                         <Field
                             type="email"
                             name="email"
+                            autoComplete="email"
                             className={authInputClass(errors.email && touched.email)}
                             placeholder="Email"
                         />
@@ -136,6 +139,7 @@ function RegisterForm({ onToggleForm }) {
                             <Field
                                 type={showPassword ? 'text' : 'password'}
                                 name="password"
+                                autoComplete="new-password"
                                 className={`${authInputClass(errors.password && touched.password)} pr-12`}
                                 placeholder="Password"
                             />
