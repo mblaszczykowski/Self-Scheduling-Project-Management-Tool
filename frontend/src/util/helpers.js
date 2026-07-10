@@ -5,7 +5,21 @@ export const MS_PER_DAY = 86400000;
 
 const UPCOMING_DEADLINE_DAYS = 4;
 
-export const toDateString = (date) => new Date(date).toISOString().split('T')[0];
+// Returns a YYYY-MM-DD string in the LOCAL calendar frame.
+// A date-only string is returned verbatim (no timezone shift); everything else
+// (Date, timestamp, datetime string) is formatted from local components so that
+// `new Date()` / drag-produced Dates map to the day the user actually sees.
+export const toDateString = (date) => {
+    if (typeof date === 'string') {
+        const match = date.match(/^\d{4}-\d{2}-\d{2}/);
+        if (match) return match[0];
+    }
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '';
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
+};
 
 export const getImageUrl = (path) => {
     if (!path) return null;
@@ -26,6 +40,15 @@ export const formatAssigneeName = (email) => {
         .filter(Boolean)
         .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
         .join(' ');
+};
+
+// Splits a "First Last" display name into { firstname, lastname } for <Avatar>.
+// Tolerates single-word and multi-word names (everything after the first token
+// becomes the last name).
+export const splitFullName = (name) => {
+    if (!name) return { firstname: '', lastname: '' };
+    const parts = String(name).trim().split(/\s+/);
+    return { firstname: parts[0] || '', lastname: parts.slice(1).join(' ') };
 };
 
 export const formatDateTime = (dateString) => {
@@ -70,10 +93,20 @@ export const calculateDuration = (startDate, dueDate) => {
 };
 
 export const getFileTypeFromPath = (path) => {
+    if (typeof path !== 'string') return 'file';
     const extension = path.split('.').pop().toLowerCase();
     const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
     if (imageExts.includes(extension)) return 'image';
     if (extension === 'pdf') return 'pdf';
+    return 'file';
+};
+
+// Normalise a File's MIME type into the same 'image' | 'pdf' | 'file' vocabulary
+// that getFileTypeFromPath returns, so callers can rely on a single set of values.
+const getFileTypeFromMime = (mimeType) => {
+    if (!mimeType) return 'file';
+    if (mimeType === 'application/pdf') return 'pdf';
+    if (mimeType.startsWith('image/')) return 'image';
     return 'file';
 };
 
@@ -82,6 +115,7 @@ export const getFileTypeFromPath = (path) => {
 const blobUrlCache = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
 
 export const getFileInfo = (attachment) => {
+    if (!attachment) return { isFile: false, url: null, fileName: '', fileType: 'file' };
     const isFile = attachment instanceof File;
     let url;
     if (isFile) {
@@ -97,38 +131,40 @@ export const getFileInfo = (attachment) => {
     } else {
         url = getImageUrl(attachment);
     }
-    const fileName = isFile ? attachment.name : attachment.split('/').pop();
-    const fileType = isFile ? attachment.type.split('/')[0] : getFileTypeFromPath(attachment);
+    const fileName = isFile ? attachment.name : String(attachment).split('/').pop();
+    const fileType = isFile ? getFileTypeFromMime(attachment.type) : getFileTypeFromPath(attachment);
     return { isFile, url, fileName, fileType };
 };
 
-export const getStatusConfig = () => ({
-    'BACKLOG': { label: 'Backlog', color: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400', dot: 'bg-slate-400' },
-    'TODO': { label: 'To Do', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800', dot: 'bg-blue-500' },
-    'IN_PROGRESS': { label: 'In Progress', color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-800', dot: 'bg-amber-500' },
-    'IN_TEST': { label: 'In Test', color: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:ring-sky-800', dot: 'bg-sky-500' },
-    'TO_TEST': { label: 'To Test', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800', dot: 'bg-blue-500' },
-    'TO_REVIEW': { label: 'To Review', color: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200 dark:bg-cyan-950 dark:text-cyan-300 dark:ring-cyan-800', dot: 'bg-cyan-500' },
-    'READY_TO_MERGE': { label: 'Ready to Merge', color: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300', dot: 'bg-teal-500' },
-    'READY_TO_DEPLOY': { label: 'Ready to Deploy', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300', dot: 'bg-emerald-500' },
-    'DONE': { label: 'Done', color: 'bg-green-100 text-green-800 font-medium dark:bg-green-950 dark:text-green-300', dot: 'bg-green-500' },
-    'RELEASED': { label: 'Released', color: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400', dot: 'bg-green-600' },
-    'WITHDRAWN': { label: 'Withdrawn', color: 'bg-red-50 text-red-600 line-through dark:bg-red-950 dark:text-red-400', dot: 'bg-red-500' },
-    'GATHERING_INTEREST': { label: 'Gathering Interest', color: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:ring-orange-800', dot: 'bg-orange-500' },
+// Single source of truth for status styling. `hex` is the canonical colour for
+// canvas contexts (Chart.js) that can't read Tailwind classes; `dot`/`color`
+// are the Tailwind equivalents for DOM badges.
+const getStatusConfig = () => ({
+    'BACKLOG': { label: 'Backlog', color: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400', dot: 'bg-slate-400', hex: '#94a3b8' },
+    'TODO': { label: 'To Do', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800', dot: 'bg-blue-500', hex: '#3b82f6' },
+    'IN_PROGRESS': { label: 'In Progress', color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-800', dot: 'bg-amber-500', hex: '#f59e0b' },
+    'IN_TEST': { label: 'In Test', color: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:ring-sky-800', dot: 'bg-sky-500', hex: '#0ea5e9' },
+    'TO_TEST': { label: 'To Test', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800', dot: 'bg-blue-500', hex: '#3b82f6' },
+    'TO_REVIEW': { label: 'To Review', color: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200 dark:bg-cyan-950 dark:text-cyan-300 dark:ring-cyan-800', dot: 'bg-cyan-500', hex: '#06b6d4' },
+    'READY_TO_MERGE': { label: 'Ready to Merge', color: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300', dot: 'bg-teal-500', hex: '#14b8a6' },
+    'READY_TO_DEPLOY': { label: 'Ready to Deploy', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300', dot: 'bg-emerald-500', hex: '#10b981' },
+    'DONE': { label: 'Done', color: 'bg-green-100 text-green-800 font-medium dark:bg-green-950 dark:text-green-300', dot: 'bg-green-500', hex: '#22c55e' },
+    'RELEASED': { label: 'Released', color: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400', dot: 'bg-green-600', hex: '#16a34a' },
+    'WITHDRAWN': { label: 'Withdrawn', color: 'bg-red-50 text-red-600 line-through dark:bg-red-950 dark:text-red-400', dot: 'bg-red-500', hex: '#ef4444' },
+    'GATHERING_INTEREST': { label: 'Gathering Interest', color: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:ring-orange-800', dot: 'bg-orange-500', hex: '#f97316' },
 });
 
-export const getPriorityConfig = () => ({
-    'LOWEST': { label: 'Lowest', icon: '↓↓', color: 'bg-slate-100 text-slate-600' },
-    'LOW': { label: 'Low', icon: '↓', color: 'bg-blue-50 text-blue-600' },
-    'MEDIUM': { label: 'Medium', icon: '—', color: 'bg-amber-50 text-amber-600' },
-    'HIGH': { label: 'High', icon: '↑', color: 'bg-orange-50 text-orange-600' },
-    'HIGHEST': { label: 'Highest', icon: '↑↑', color: 'bg-red-50 text-red-600' },
+const getPriorityConfig = () => ({
+    'LOWEST': { label: 'Lowest', icon: '↓↓', color: 'bg-slate-100 text-slate-600', hex: '#94a3b8' },
+    'LOW': { label: 'Low', icon: '↓', color: 'bg-blue-50 text-blue-600', hex: '#3b82f6' },
+    'MEDIUM': { label: 'Medium', icon: '—', color: 'bg-amber-50 text-amber-600', hex: '#f59e0b' },
+    'HIGH': { label: 'High', icon: '↑', color: 'bg-orange-50 text-orange-600', hex: '#f97316' },
+    'HIGHEST': { label: 'Highest', icon: '↑↑', color: 'bg-red-50 text-red-600', hex: '#ef4444' },
 });
 
 export const getAvatarColor = (user) => {
     const colors = [
         'from-slate-600 to-slate-700',
-        'from-blue-600 to-blue-700',
         'from-blue-600 to-blue-700',
         'from-sky-600 to-sky-700',
         'from-blue-500 to-blue-600',
@@ -139,7 +175,6 @@ export const getAvatarColor = (user) => {
         'from-amber-600 to-amber-700',
         'from-lime-600 to-lime-700',
         'from-fuchsia-600 to-fuchsia-700',
-        'from-sky-600 to-sky-700',
         'from-orange-600 to-orange-700',
         'from-pink-600 to-pink-700',
         'from-red-600 to-red-700',
@@ -185,11 +220,6 @@ export const calculateTaskPosition = (startDate, dueDate, timelineStart) => {
         marginLeft: daysOffset * dayWidth,
         width: durationDays * dayWidth,
     };
-};
-
-export const generateBezierPath = (startX, startY, endX, endY) => {
-    const offset = Math.abs(endX - startX) / 2;
-    return `M ${startX} ${startY} C ${startX + offset} ${startY}, ${endX - offset} ${endY}, ${endX} ${endY}`;
 };
 
 export const getErrorMessage = (err, defaultMessage = 'An unexpected error occurred') => {

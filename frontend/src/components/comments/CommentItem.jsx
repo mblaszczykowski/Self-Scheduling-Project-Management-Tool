@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 import { formatDistanceToNow } from 'date-fns';
+import { splitFullName } from '../../util/helpers';
 import Avatar from '../common/Avatar';
 import { ThumbsUpIcon, ThumbsDownIcon } from '../common/Icons';
 import CommentForm from './CommentForm';
@@ -21,26 +22,22 @@ const CommentItem = React.memo(({
     onHandleDeleteComment,
     onHandleReactToComment,
     renderAttachmentPreview,
-    openPreview,
 }) => {
     const [isVisible] = useAnimateIn();
     const commentRef = useRef(null);
     const isHighlighted = highlightCommentId === comment.id;
 
     useEffect(() => {
-        if (isHighlighted && commentRef.current) {
-            setTimeout(() => {
-                commentRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 300);
-        }
+        if (!isHighlighted || !commentRef.current) return;
+        const timer = setTimeout(() => {
+            commentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+        return () => clearTimeout(timer);
     }, [isHighlighted]);
 
     const isOwner = comment.authorId === currentUserId;
 
-    const authorParts = {
-        firstname: comment.authorName?.split(' ')[0],
-        lastname: comment.authorName?.split(' ')[1],
-    };
+    const authorParts = splitFullName(comment.authorName);
 
     const actionBtnClass = 'text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors';
 
@@ -74,7 +71,6 @@ const CommentItem = React.memo(({
                                 onCancel={() => {
                                     onSetEditingComment(null);
                                 }}
-                                renderAttachmentPreview={renderAttachmentPreview}
                             />
                         </div>
                     ) : (
@@ -104,7 +100,7 @@ const CommentItem = React.memo(({
                                 {comment.attachments?.length > 0 && (
                                     <div className="flex flex-wrap gap-1.5 mt-1.5">
                                         {comment.attachments.map((a, idx) =>
-                                            renderAttachmentPreview(a, true, idx, comment.id)
+                                            renderAttachmentPreview(a, idx)
                                         )}
                                     </div>
                                 )}
@@ -121,10 +117,7 @@ const CommentItem = React.memo(({
                                             ? 'text-slate-800 dark:text-slate-200 font-medium'
                                             : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')
                                     }
-                                    disabled={
-                                        comment.likedByCurrentUser
-                                        || comment.dislikedByCurrentUser
-                                    }
+                                    disabled={comment.dislikedByCurrentUser}
                                 >
                                     <ThumbsUpIcon filled={comment.likedByCurrentUser} />
                                     {comment.likeCount > 0 && comment.likeCount}
@@ -139,10 +132,7 @@ const CommentItem = React.memo(({
                                             ? 'text-red-500 font-medium'
                                             : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')
                                     }
-                                    disabled={
-                                        comment.likedByCurrentUser
-                                        || comment.dislikedByCurrentUser
-                                    }
+                                    disabled={comment.likedByCurrentUser}
                                 >
                                     <ThumbsDownIcon filled={comment.dislikedByCurrentUser} />
                                     {comment.dislikeCount > 0 && comment.dislikeCount}
@@ -187,7 +177,6 @@ const CommentItem = React.memo(({
                                 onCancel={() => {
                                     onSetReplyingCommentId(null);
                                 }}
-                                renderAttachmentPreview={renderAttachmentPreview}
                             />
                         </div>
                     )}
@@ -208,7 +197,6 @@ const CommentItem = React.memo(({
                             onHandleDeleteComment={onHandleDeleteComment}
                             onHandleReactToComment={onHandleReactToComment}
                             renderAttachmentPreview={renderAttachmentPreview}
-                            openPreview={openPreview}
                         />
                     ))}
                 </div>

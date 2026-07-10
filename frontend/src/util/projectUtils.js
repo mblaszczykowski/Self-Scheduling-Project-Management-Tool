@@ -1,13 +1,16 @@
-import { toDateString } from './helpers';
-
+// Task dates are ISO date-only strings (YYYY-MM-DD), which sort lexicographically.
+// Comparing the strings directly avoids parsing into Date (and the timezone
+// round-trip / NaN-on-bad-input crash that Math.min(...new Date()) caused).
 export const computeProjectDateRange = (tasks) => {
-    if (!tasks?.length) return { projectStartDate: null, projectDueDate: null };
-    const startDates = tasks.map(t => new Date(t.startDate));
-    const dueDates = tasks.map(t => new Date(t.dueDate));
-    return {
-        projectStartDate: toDateString(Math.min(...startDates)),
-        projectDueDate: toDateString(Math.max(...dueDates)),
-    };
+    const valid = (tasks || []).filter(t => t.startDate && t.dueDate);
+    if (!valid.length) return { projectStartDate: null, projectDueDate: null };
+    let projectStartDate = valid[0].startDate;
+    let projectDueDate = valid[0].dueDate;
+    for (const t of valid) {
+        if (t.startDate < projectStartDate) projectStartDate = t.startDate;
+        if (t.dueDate > projectDueDate) projectDueDate = t.dueDate;
+    }
+    return { projectStartDate, projectDueDate };
 };
 
 export const computeProjectProgress = (tasks) => {

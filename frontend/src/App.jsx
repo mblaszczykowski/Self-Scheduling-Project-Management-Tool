@@ -27,28 +27,22 @@ const LoadingSpinner = () => (
 );
 
 const ProtectedRoute = ({ children }) => {
-    const { user, loading } = useContext(AuthContext);
+    const { user } = useContext(AuthContext);
 
-    if (loading) return <LoadingSpinner />;
     if (!user) return <Navigate to="/login" replace />;
 
     return children;
 };
 
 const PublicRoute = ({ children, redirectTo = '/dashboard' }) => {
-    const { user, loading } = useContext(AuthContext);
+    const { user } = useContext(AuthContext);
 
-    if (loading) return <LoadingSpinner />;
     if (user) return <Navigate to={redirectTo} replace />;
 
     return children;
 };
 
 function AppRoutes() {
-    const { loading } = useContext(AuthContext);
-
-    if (loading) return <LoadingSpinner />;
-
     return (
         <div className="App min-h-screen bg-slate-50 dark:bg-slate-900">
             <ToastContainer

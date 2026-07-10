@@ -1,18 +1,16 @@
-import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { logout } from '../util/api';
 
 export const AuthContext = createContext();
 
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (!context) throw new Error('useAuth must be used within an AuthProvider');
+    return context;
+};
+
 export const AuthProvider = ({ children, initialUser }) => {
     const [user, setUser] = useState(initialUser);
-    const [loading, setLoading] = useState(!initialUser && initialUser !== null);
-    const [error, setError] = useState(null);
-
-    useEffect(() => {
-        setLoading(false);
-    }, []);
-
-    const clearError = useCallback(() => setError(null), []);
 
     const handleLogout = useCallback(async () => {
         try {
@@ -27,11 +25,8 @@ export const AuthProvider = ({ children, initialUser }) => {
     const value = useMemo(() => ({
         user,
         setUser,
-        loading,
-        error,
-        clearError,
         handleLogout,
-    }), [user, loading, error, clearError, handleLogout]);
+    }), [user, handleLogout]);
 
     return (
         <AuthContext.Provider value={value}>

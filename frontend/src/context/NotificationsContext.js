@@ -5,6 +5,12 @@ import { AuthContext } from './AuthContext';
 
 export const NotificationsContext = createContext();
 
+export const useNotifications = () => {
+    const context = useContext(NotificationsContext);
+    if (!context) throw new Error('useNotifications must be used within a NotificationsProvider');
+    return context;
+};
+
 export const NotificationsProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
     const [notifications, setNotifications] = useState([]);
@@ -70,7 +76,10 @@ export const NotificationsProvider = ({ children }) => {
                 errorRefreshTimerRef.current = null;
             }
         };
-    }, [user, refreshNotifications]);
+        // Keyed on the user identity, not the object reference, so a profile
+        // update (new `user` object, same id) doesn't reconnect the stream.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id, refreshNotifications]);
 
     const value = useMemo(() => ({
         notifications,

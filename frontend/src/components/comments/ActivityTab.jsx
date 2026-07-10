@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { getTaskActivities } from '../../util/api';
+import { formatAssigneeName, splitFullName } from '../../util/helpers';
 import Avatar from '../common/Avatar';
 import {
     HiOutlinePlus,
@@ -81,10 +82,13 @@ function ActivityDescription({ activity }) {
             return (
                 <span>{name} changed priority from <ValuePill value={formatValue(fieldName, oldValue)} variant="old" /> to <ValuePill value={formatValue(fieldName, newValue)} /></span>
             );
-        case 'ASSIGNEE_CHANGED':
-            if (!oldValue) return <span>{name} assigned <ValuePill value={newValue} /></span>;
-            if (!newValue) return <span>{name} unassigned <ValuePill value={oldValue} variant="old" /></span>;
-            return <span>{name} reassigned from <ValuePill value={oldValue} variant="old" /> to <ValuePill value={newValue} /></span>;
+        case 'ASSIGNEE_CHANGED': {
+            const oldName = formatAssigneeName(oldValue);
+            const newName = formatAssigneeName(newValue);
+            if (!oldValue) return <span>{name} assigned <ValuePill value={newName} /></span>;
+            if (!newValue) return <span>{name} unassigned <ValuePill value={oldName} variant="old" /></span>;
+            return <span>{name} reassigned from <ValuePill value={oldName} variant="old" /> to <ValuePill value={newName} /></span>;
+        }
         case 'PROGRESS_CHANGED':
             return (
                 <span>{name} updated progress from <ValuePill value={formatValue(fieldName, oldValue)} variant="old" /> to <ValuePill value={formatValue(fieldName, newValue)} /></span>
@@ -109,15 +113,20 @@ function ActivityDescription({ activity }) {
 export default function ActivityTab({ taskId }) {
     const [activities, setActivities] = useState([]);
     const [loading, setLoading] = useState(true);
+    const requestIdRef = useRef(0);
 
     const fetchActivities = useCallback(async () => {
+        const requestId = ++requestIdRef.current;
+        setLoading(true);
         try {
             const data = await getTaskActivities(taskId);
+            if (requestId !== requestIdRef.current) return;
             setActivities(data);
         } catch (err) {
+            if (requestId !== requestIdRef.current) return;
             console.error('Error fetching activities:', err);
         } finally {
-            setLoading(false);
+            if (requestId === requestIdRef.current) setLoading(false);
         }
     }, [taskId]);
 
@@ -151,10 +160,7 @@ export default function ActivityTab({ taskId }) {
                 {activities.map((activity) => {
                     const cfg = TYPE_CONFIG[activity.type] || FALLBACK;
                     const Icon = cfg.icon;
-                    const authorParts = {
-                        firstname: activity.authorName?.split(' ')[0],
-                        lastname: activity.authorName?.split(' ')[1],
-                    };
+                    const authorParts = splitFullName(activity.authorName);
 
                     return (
                         <div key={activity.id} className="relative flex gap-3 py-2 group">

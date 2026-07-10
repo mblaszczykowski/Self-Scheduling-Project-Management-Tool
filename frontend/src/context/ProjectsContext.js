@@ -1,16 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
-    createComment as apiCreateComment,
     createProject as apiCreateProject,
     createTask as apiCreateTask,
-    deleteComment as apiDeleteComment,
     deleteProject as apiDeleteProject,
     deleteTask as apiDeleteTask,
-    getComments as apiGetComments,
     getProjects,
     getUserByEmail,
-    reactToComment as apiReactToComment,
-    updateComment as apiUpdateComment,
     updateProject as apiUpdateProject,
     updateTask as apiUpdateTask,
 } from '../util/api';
@@ -19,6 +14,12 @@ import { getErrorMessage } from '../util/helpers';
 import { AuthContext } from './AuthContext';
 
 export const ProjectsContext = createContext();
+
+export const useProjects = () => {
+    const context = useContext(ProjectsContext);
+    if (!context) throw new Error('useProjects must be used within a ProjectsProvider');
+    return context;
+};
 
 export const ProjectsProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
@@ -89,7 +90,11 @@ export const ProjectsProvider = ({ children }) => {
     const updateProject = useCallback(async (projectKey, projectDTO, attachments = []) => {
         const updatedProject = await apiUpdateProject(projectKey, projectDTO, attachments);
         setProjects(prev => prev.map(p =>
-            p.projectKey === projectKey ? updatedProject : p
+            // Merge rather than replace: if the PUT response omits nested `tasks`,
+            // keep the ones we already have so the timeline/list don't blank out.
+            p.projectKey === projectKey
+                ? { ...p, ...updatedProject, tasks: updatedProject.tasks ?? p.tasks }
+                : p
         ));
         return updatedProject;
     }, []);
@@ -98,20 +103,6 @@ export const ProjectsProvider = ({ children }) => {
         await apiDeleteProject(projectKey);
         setProjects(prev => prev.filter(p => p.projectKey !== projectKey));
     }, []);
-
-    const getComments = useCallback((taskId) => apiGetComments(taskId), []);
-
-    const createComment = useCallback((taskId, content, attachments, parentCommentId = null) =>
-        apiCreateComment(taskId, content, attachments, parentCommentId), []);
-
-    const updateComment = useCallback((taskId, commentId, content, attachments) =>
-        apiUpdateComment(taskId, commentId, content, attachments), []);
-
-    const deleteComment = useCallback((taskId, commentId) =>
-        apiDeleteComment(taskId, commentId), []);
-
-    const reactToComment = useCallback((taskId, commentId, reactionType) =>
-        apiReactToComment(taskId, commentId, reactionType), []);
 
     const addUserToProject = useCallback(async (projectKey, userEmail) => {
         try {
@@ -144,19 +135,12 @@ export const ProjectsProvider = ({ children }) => {
         createProject,
         updateProject,
         deleteProject,
-        getComments,
-        createComment,
-        updateComment,
-        deleteComment,
-        reactToComment,
         addUserToProject,
     }), [
         projects, projectsLoading, projectsError,
         refreshProjects,
         createTask, updateTask, deleteTask,
         createProject, updateProject, deleteProject,
-        getComments, createComment, updateComment,
-        deleteComment, reactToComment,
         addUserToProject,
     ]);
 

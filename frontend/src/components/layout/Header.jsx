@@ -13,6 +13,19 @@ import MobileMenu from './MobileMenu';
 import { markNotificationsAsRead } from '../../util/api';
 import SearchBar from './SearchBar';
 
+const NavLink = ({ to, active, children }) => (
+    <Link
+        to={to}
+        className={
+            active
+                ? 'py-1.5 px-3.5 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-medium rounded-lg transition-colors'
+                : 'py-1.5 px-3.5 text-slate-500 dark:text-slate-400 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors'
+        }
+    >
+        {children}
+    </Link>
+);
+
 export default function Header({ onLogout, onCreateProject, onCreateTask }) {
     const { user, setUser } = useContext(AuthContext);
     const { notifications, setNotifications } = useContext(NotificationsContext);
@@ -36,7 +49,11 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
         if (unreadIds.length > 0) {
             try {
                 await markNotificationsAsRead(unreadIds);
-                setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+                // Only mark the ids we actually acknowledged — notifications that
+                // arrived via SSE during the await must stay unread.
+                setNotifications(prev => prev.map(n =>
+                    unreadIds.includes(n.id) ? { ...n, isRead: true } : n
+                ));
             } catch (err) {
                 console.error('Error marking notifications as read:', err);
             }
@@ -52,19 +69,6 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
         }
     };
 
-    const NavLink = ({ to, children }) => (
-        <Link
-            to={to}
-            className={
-                location.pathname === to
-                    ? 'py-1.5 px-3.5 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-medium rounded-lg transition-colors'
-                    : 'py-1.5 px-3.5 text-slate-500 dark:text-slate-400 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors'
-            }
-        >
-            {children}
-        </Link>
-    );
-
     return (
         <header className="w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-50">
             <nav className="mx-auto px-6 lg:px-10 py-2.5 flex items-center justify-between">
@@ -77,8 +81,8 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
                     </Link>
 
                     <div className="hidden xl:flex items-center gap-1">
-                        <NavLink to="/dashboard">Dashboard</NavLink>
-                        <NavLink to="/projects">Projects</NavLink>
+                        <NavLink to="/dashboard" active={location.pathname === '/dashboard'}>Dashboard</NavLink>
+                        <NavLink to="/projects" active={location.pathname === '/projects'}>Projects</NavLink>
                         <CreateMenu
                             isOpen={createDropdownOpen}
                             onToggle={() => setCreateDropdownOpen(!createDropdownOpen)}

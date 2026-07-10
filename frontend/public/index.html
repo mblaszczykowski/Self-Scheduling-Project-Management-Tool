@@ -4,11 +4,24 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#0f172a" />
     <meta
       name="description"
-      content="Web site created using create-react-app"
+      content="FlowLink — project and task management with timeline scheduling and optimization."
     />
+    <script>
+      // Apply the persisted/preferred theme before first paint to avoid a
+      // light-mode flash (FOUC). Mirrors ThemeContext's getInitialTheme().
+      (function () {
+        try {
+          var stored = localStorage.getItem('flowlink_theme');
+          var isDark = stored
+            ? stored === 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (isDark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <!--
       manifest.json provides metadata used when your web app is installed on a

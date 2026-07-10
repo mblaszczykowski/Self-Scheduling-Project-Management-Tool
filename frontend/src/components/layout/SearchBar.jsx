@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { HiOutlineSearch } from 'react-icons/hi';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { globalSearch } from '../../util/api';
+import config from '../../config';
 
 const STATUS_COLORS = {
     BACKLOG: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
@@ -24,6 +25,7 @@ export default function SearchBar() {
     const containerRef = useRef(null);
     const inputRef = useRef(null);
     const debounceRef = useRef(null);
+    const requestIdRef = useRef(0);
     const navigate = useNavigate();
 
     useClickOutside(containerRef, useCallback(() => {
@@ -37,16 +39,21 @@ export default function SearchBar() {
             setIsOpen(false);
             return;
         }
+        const requestId = ++requestIdRef.current;
         setLoading(true);
         try {
             const data = await globalSearch(searchQuery.trim());
+            // Ignore stale responses so a slow earlier query can't overwrite a
+            // newer one's results (out-of-order guard).
+            if (requestId !== requestIdRef.current) return;
             setResults(data);
             setIsOpen(true);
         } catch (err) {
+            if (requestId !== requestIdRef.current) return;
             console.error('Search failed:', err);
             setResults(null);
         } finally {
-            setLoading(false);
+            if (requestId === requestIdRef.current) setLoading(false);
         }
     }, []);
 
@@ -54,7 +61,7 @@ export default function SearchBar() {
         const value = e.target.value;
         setQuery(value);
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => performSearch(value), 300);
+        debounceRef.current = setTimeout(() => performSearch(value), config.DEBOUNCE_DELAY);
     };
 
     useEffect(() => {

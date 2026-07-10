@@ -59,10 +59,13 @@ The backend follows a layered architecture:
 
 ### Frontend Structure
 
-- **src/components/**: React components (Dashboard, UnifiedView, TaskProjectModal, etc.)
-- **src/context/**: DataContext - centralized state management for user, projects, notifications
-- **src/util/api.js**: Axios API client with automatic token refresh on 401
-- **src/config/**: Configuration (API_BASE_URL from REACT_APP_API_URL env var)
+- **src/pages/**: Route-level containers (AuthPage, DashboardPage, ProjectsPage)
+- **src/components/**: React components grouped by area (auth, comments, common, dashboard, layout, modals, projects)
+- **src/context/**: Four split React contexts — `AuthContext` (user + logout), `ProjectsContext` (projects + task mutations), `NotificationsContext` (SSE stream + list), `ThemeContext` (dark mode). Each exposes a `useX()` hook.
+- **src/hooks/**: Custom hooks (data enrichment, filtering, stats, modal/form state, dropdowns, etc.)
+- **src/util/api.js**: Axios API client with automatic token refresh on 401 and CSRF header injection
+- **src/util/**: Pure helpers (dates, status/priority config, error/toast helpers, project/task utilities)
+- **src/config/**: Configuration (API_BASE_URL from REACT_APP_API_URL env var, timeline constants)
 
 ### Authentication Flow
 
@@ -84,12 +87,12 @@ The backend follows a layered architecture:
 
 Files are stored in the `uploads/` directory. The backend serves them via `/uploads/**` and `/files/**` endpoints (public access). File uploads use multipart/form-data with JSON metadata + file attachments.
 
-### Data Context Pattern
+### State Management Pattern
 
-Frontend uses `DataContext` (React Context) to manage global state:
-- Fetches user, projects, notifications on app load
-- Provides CRUD methods that automatically refresh state after mutations
-- All mutations return updated data and trigger `refreshProjects()` or `refreshNotifications()`
+Frontend uses split React contexts for global state:
+- `ProjectsContext` fetches projects on login and exposes task/project CRUD methods. Task mutations re-fetch via `refreshProjects()`; project create/update/delete update local state optimistically.
+- `NotificationsContext` opens a Server-Sent Events (SSE) stream for real-time notifications with a debounced reconnect, and exposes `refreshNotifications()` as a fallback.
+- Comment API access lives in the `useComments` hook (not a context), since it doesn't touch project state.
 
 ## Configuration
 
@@ -146,7 +149,7 @@ Notifications are created asynchronously for:
 - Project updates
 - Task status changes
 
-Frontend polls notifications via `DataContext.refreshNotifications()`.
+Frontend receives notifications in real time via an SSE stream (`NotificationsContext`), with `refreshNotifications()` as a fallback on reconnect.
 
 
 

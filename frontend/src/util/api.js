@@ -28,17 +28,17 @@ const getCsrfToken = () => {
     }
 };
 
-api.interceptors.request.use((config) => {
-    const method = config.method?.toUpperCase();
+api.interceptors.request.use((requestConfig) => {
+    const method = requestConfig.method?.toUpperCase();
 
     if (method && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
         const csrfToken = getCsrfToken();
         if (csrfToken) {
-            config.headers['X-CSRF-Token'] = csrfToken;
+            requestConfig.headers['X-CSRF-Token'] = csrfToken;
         }
     }
 
-    return config;
+    return requestConfig;
 });
 
 let isRefreshing = false;
@@ -92,7 +92,11 @@ const createFormData = (data, attachments = [], dataKey = 'data') => {
 
 export const getUser = () => api.get('/api/users').then(res => res.data);
 
-export const checkUserAuth = getUser;
+// Initial app-load auth probe. Skips the 401 refresh+redirect interceptor so an
+// anonymous visitor doesn't pay a wasted /auth/refresh round-trip (or get hard-
+// redirected) before the router's own auth gate can run.
+export const checkUserAuth = () =>
+    api.get('/api/users', { _skipRefresh: true }).then(res => res.data);
 
 export const getUserByEmail = (email) =>
     api.get(`/api/users/${email}`).then(res => res.data);
@@ -106,9 +110,6 @@ export const updateEmailPreferences = (preferences) =>
     api.patch('/api/users/email-preferences', preferences).then(res => res.data);
 
 export const getProjects = () => api.get('/api/projects').then(res => res.data);
-
-export const getProject = (projectKey) =>
-    api.get(`/api/projects/${projectKey}`).then(res => res.data);
 
 export const createProject = (projectDTO, attachments = []) =>
     api.post('/api/projects', createFormData(projectDTO, attachments, 'projectDTO'), {
@@ -182,13 +183,6 @@ export const logout = () => api.post('/api/auth/logout');
 
 export const register = (userData) =>
     api.post('/api/users', userData).then(res => res.data);
-
-export const initCsrfToken = async () => {
-    try {
-        await api.get('/api/users/exists', { params: { email: '' }, _skipRefresh: true });
-    } catch (e) {
-    }
-};
 
 export const globalSearch = (query) =>
     api.get('/api/search', { params: { q: query } }).then(res => res.data);

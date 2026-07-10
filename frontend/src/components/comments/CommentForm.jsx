@@ -5,7 +5,7 @@ import { HiOutlinePlus, HiOutlineX, HiOutlineDocument, HiOutlineDocumentText } f
 import { getFileInfo } from '../../util/helpers';
 
 const CommentSchema = Yup.object().shape({
-    content: Yup.string().required('Comment cannot be empty'),
+    content: Yup.string().trim().required('Comment cannot be empty'),
 });
 
 const CommentForm = ({
@@ -13,7 +13,6 @@ const CommentForm = ({
     initialContent = '',
     buttonText,
     onCancel,
-    renderAttachmentPreview,
 }) => {
     const [localAttachments, setLocalAttachments] = useState([]);
 
