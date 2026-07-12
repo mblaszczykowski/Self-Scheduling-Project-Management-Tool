@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { FormikHelpers } from 'formik';
 import { useComments } from '../../hooks/useComments';
 import { getFileInfo, getErrorMessage } from '../../util/helpers';
 import { showToast } from '../../util/toast';
@@ -7,9 +8,16 @@ import PreviewModal from '../common/PreviewModal';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import ConfirmDialog from '../modals/ConfirmDialog';
 import CommentItem from './CommentItem';
-import CommentForm from './CommentForm';
+import CommentForm, { CommentFormValues } from './CommentForm';
+import { Comment, Attachment } from '../../types';
 
-export default function Comments({ taskId, currentUserId }) {
+interface PreviewData {
+    url: string | null;
+    fileName: string;
+    fileType: 'image' | 'pdf' | 'file';
+}
+
+export default function Comments({ taskId, currentUserId }: { taskId: number; currentUserId?: number }) {
     const location = useLocation();
     const highlightCommentId = new URLSearchParams(location.search).get('commentId');
     const {
@@ -17,14 +25,14 @@ export default function Comments({ taskId, currentUserId }) {
         deleteComment, reactToComment,
     } = useComments();
 
-    const [comments, setComments] = useState([]);
+    const [comments, setComments] = useState<Comment[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
-    const [editingComment, setEditingComment] = useState(null);
-    const [replyingCommentId, setReplyingCommentId] = useState(null);
+    const [editingComment, setEditingComment] = useState<Comment | null>(null);
+    const [replyingCommentId, setReplyingCommentId] = useState<number | null>(null);
     const [showCommentForm, setShowCommentForm] = useState(false);
-    const [preview, setPreview] = useState(null);
-    const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+    const [preview, setPreview] = useState<PreviewData | null>(null);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
     // Latest-request token: incremented per fetch so a slow, stale response for a
     // previous taskId can't clobber the results of a newer request.
@@ -40,7 +48,7 @@ export default function Comments({ taskId, currentUserId }) {
             const fetched = await getComments(taskId);
             if (requestId !== requestIdRef.current) return;
             const sorted = [...fetched].sort(
-                (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
+                (a, b) => new Date(b.timestamp as string).getTime() - new Date(a.timestamp as string).getTime(),
             );
             setComments(sorted);
             if (showLoading) setLoading(false);
@@ -59,7 +67,10 @@ export default function Comments({ taskId, currentUserId }) {
     }, [fetchComments]);
 
     const handleAddComment = useCallback(async (
-        values, { resetForm, setSubmitting }, parentCommentId = null, attachments = [],
+        values: CommentFormValues,
+        { resetForm, setSubmitting }: FormikHelpers<CommentFormValues>,
+        parentCommentId: number | null = null,
+        attachments: File[] = [],
     ) => {
         try {
             await createComment(
@@ -77,7 +88,7 @@ export default function Comments({ taskId, currentUserId }) {
         }
     }, [taskId, createComment, fetchComments]);
 
-    const handleUpdateComment = useCallback(async (comment, values, { setSubmitting }, attachments = []) => {
+    const handleUpdateComment = useCallback(async (comment: Comment, values: CommentFormValues, { setSubmitting }: FormikHelpers<CommentFormValues>, attachments: File[] = []) => {
         try {
             await updateComment(
                 taskId, comment.id,
@@ -92,7 +103,7 @@ export default function Comments({ taskId, currentUserId }) {
         }
     }, [taskId, updateComment, fetchComments]);
 
-    const handleDeleteComment = useCallback((commentId) => {
+    const handleDeleteComment = useCallback((commentId: number) => {
         setDeleteConfirmId(commentId);
     }, []);
 
@@ -108,7 +119,7 @@ export default function Comments({ taskId, currentUserId }) {
         }
     };
 
-    const handleReactToComment = useCallback(async (commentId, reactionType) => {
+    const handleReactToComment = useCallback(async (commentId: number, reactionType: string) => {
         try {
             await reactToComment(taskId, commentId, reactionType);
             await fetchComments();
@@ -117,7 +128,7 @@ export default function Comments({ taskId, currentUserId }) {
         }
     }, [taskId, reactToComment, fetchComments]);
 
-    const openPreview = useCallback((attachment) => {
+    const openPreview = useCallback((attachment: Attachment) => {
         const { url, fileName, fileType } = getFileInfo(attachment);
         setPreview({ url, fileName, fileType });
     }, []);
@@ -125,7 +136,7 @@ export default function Comments({ taskId, currentUserId }) {
     // Read-only preview of a comment's persisted attachments. No remove control
     // is rendered here: posted attachments can't be removed in place (that never
     // persisted), and newly-added files are managed inside CommentForm instead.
-    const renderAttachmentPreview = useCallback((attachment, idx) => (
+    const renderAttachmentPreview = useCallback((attachment: string, idx: number) => (
         <AttachmentThumbnail
             key={`${getFileInfo(attachment).fileName}-${idx}`}
             attachment={attachment}

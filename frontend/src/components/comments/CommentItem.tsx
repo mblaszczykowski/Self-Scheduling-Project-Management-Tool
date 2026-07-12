@@ -1,12 +1,30 @@
 import React, { useEffect, useRef } from 'react';
+import { FormikHelpers } from 'formik';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 import { formatDistanceToNow } from 'date-fns';
 import { splitFullName } from '../../util/helpers';
 import Avatar from '../common/Avatar';
 import { ThumbsUpIcon, ThumbsDownIcon } from '../common/Icons';
-import CommentForm from './CommentForm';
+import CommentForm, { CommentFormValues } from './CommentForm';
+import { Comment } from '../../types';
 
 const MAX_REPLY_DEPTH = 4;
+
+export interface CommentItemProps {
+    comment: Comment;
+    level?: number;
+    currentUserId?: number;
+    editingComment: Comment | null;
+    replyingCommentId: number | null;
+    highlightCommentId: number | null;
+    onSetEditingComment: (c: Comment | null) => void;
+    onSetReplyingCommentId: (id: number | null) => void;
+    onHandleUpdateComment: (comment: Comment, values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, attachments: File[]) => void;
+    onHandleAddComment: (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, parentCommentId: number | null, attachments: File[]) => void;
+    onHandleDeleteComment: (commentId: number) => void;
+    onHandleReactToComment: (commentId: number, reactionType: string) => void;
+    renderAttachmentPreview: (attachment: string, idx: number) => React.ReactNode;
+}
 
 const CommentItem = React.memo(({
     comment,
@@ -22,9 +40,9 @@ const CommentItem = React.memo(({
     onHandleDeleteComment,
     onHandleReactToComment,
     renderAttachmentPreview,
-}) => {
+}: CommentItemProps) => {
     const [isVisible] = useAnimateIn();
-    const commentRef = useRef(null);
+    const commentRef = useRef<HTMLDivElement | null>(null);
     const isHighlighted = highlightCommentId === comment.id;
 
     useEffect(() => {

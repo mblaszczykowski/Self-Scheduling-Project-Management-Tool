@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { getTaskActivities } from '../../util/api';
+import { IconType } from 'react-icons';
 import { formatAssigneeName, splitFullName } from '../../util/helpers';
 import Avatar from '../common/Avatar';
+import { Activity } from '../../types';
 import {
     HiOutlinePlus,
     HiOutlineSwitchHorizontal,
@@ -17,7 +19,7 @@ import {
     HiOutlineFlag,
 } from 'react-icons/hi';
 
-const TYPE_CONFIG = {
+const TYPE_CONFIG: Record<string, { icon: IconType; color: string; bg: string }> = {
     CREATED:              { icon: HiOutlinePlus, color: 'text-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-900/40' },
     STATUS_CHANGED:       { icon: HiOutlineSwitchHorizontal, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/40' },
     PRIORITY_CHANGED:     { icon: HiOutlineFlag, color: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/40' },
@@ -35,7 +37,7 @@ const TYPE_CONFIG = {
 
 const FALLBACK = { icon: HiOutlineSwitchHorizontal, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-700' };
 
-const STATUS_LABELS = {
+const STATUS_LABELS: Record<string, string> = {
     BACKLOG: 'Backlog', TODO: 'To Do', IN_PROGRESS: 'In Progress',
     IN_TEST: 'In Test', TO_TEST: 'To Test', TO_REVIEW: 'To Review',
     READY_TO_MERGE: 'Ready to Merge', READY_TO_DEPLOY: 'Ready to Deploy',
@@ -43,11 +45,11 @@ const STATUS_LABELS = {
     GATHERING_INTEREST: 'Gathering Interest',
 };
 
-const PRIORITY_LABELS = {
+const PRIORITY_LABELS: Record<string, string> = {
     LOWEST: 'Lowest', LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High', HIGHEST: 'Highest',
 };
 
-function formatValue(field, value) {
+function formatValue(field: string, value: string | null | undefined) {
     if (!value || value === 'null') return null;
     if (field === 'status') return STATUS_LABELS[value] || value;
     if (field === 'priority') return PRIORITY_LABELS[value] || value;
@@ -55,7 +57,7 @@ function formatValue(field, value) {
     return value;
 }
 
-function ValuePill({ value, variant = 'default' }) {
+function ValuePill({ value, variant = 'default' }: { value?: string | null; variant?: 'default' | 'old' }) {
     if (!value) return <span className="text-slate-400 dark:text-slate-500 italic">none</span>;
     const cls = variant === 'old'
         ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 line-through'
@@ -63,7 +65,7 @@ function ValuePill({ value, variant = 'default' }) {
     return <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{value}</span>;
 }
 
-function ActivityDescription({ activity }) {
+function ActivityDescription({ activity }: { activity: Activity }) {
     const { type, fieldName, oldValue, newValue, authorName } = activity;
     const name = <span className="font-medium text-slate-800 dark:text-slate-200">{authorName}</span>;
 
@@ -110,8 +112,8 @@ function ActivityDescription({ activity }) {
     }
 }
 
-export default function ActivityTab({ taskId }) {
-    const [activities, setActivities] = useState([]);
+export default function ActivityTab({ taskId }: { taskId: number }) {
+    const [activities, setActivities] = useState<Activity[]>([]);
     const [loading, setLoading] = useState(true);
     const requestIdRef = useRef(0);
 

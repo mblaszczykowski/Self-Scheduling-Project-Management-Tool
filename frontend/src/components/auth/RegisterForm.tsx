@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorMessage, Field, Form, Formik } from 'formik';
+import { ErrorMessage, Field, Form, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import EyeButton from '../common/EyeButton';
 import { register, checkUserAuth } from '../../util/api';
@@ -9,10 +9,22 @@ import { showToast } from '../../util/toast';
 import { getErrorMessage } from '../../util/helpers';
 import { authInputClass } from '../common/formHelpers';
 
+interface RegisterValues {
+    firstname: string;
+    lastname: string;
+    email: string;
+    password: string;
+}
+
+interface PasswordRule {
+    label: string;
+    test: (v: string) => boolean;
+}
+
 // Single source of truth for the password policy — used by both the Yup schema
 // and the live requirements checklist so they can't drift apart.
 const SPECIAL_CHAR = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/;
-const PASSWORD_RULES = [
+const PASSWORD_RULES: PasswordRule[] = [
     { label: '8+ characters', test: (v) => (v || '').length >= 8 },
     { label: 'Uppercase letter', test: (v) => /[A-Z]/.test(v || '') },
     { label: 'Lowercase letter', test: (v) => /[a-z]/.test(v || '') },
@@ -43,7 +55,7 @@ const validationSchema = Yup.object().shape({
         .required('Password is required.'),
 });
 
-const PasswordRequirements = ({ password }) => {
+const PasswordRequirements = ({ password }: { password: string }) => {
     const requirements = PASSWORD_RULES.map(rule => ({
         label: rule.label,
         met: rule.test(password),
@@ -68,12 +80,12 @@ const PasswordRequirements = ({ password }) => {
     );
 };
 
-function RegisterForm({ onToggleForm }) {
+function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
     const [showPassword, setShowPassword] = useState(false);
     const { setUser } = useContext(AuthContext);
     const navigate = useNavigate();
 
-    const handleSubmit = async (values, { setSubmitting }) => {
+    const handleSubmit = async (values: RegisterValues, { setSubmitting }: FormikHelpers<RegisterValues>) => {
         try {
             await register(values);
             const userData = await checkUserAuth();
@@ -105,7 +117,7 @@ function RegisterForm({ onToggleForm }) {
                                 type="text"
                                 name="firstname"
                                 autoComplete="given-name"
-                                className={authInputClass(errors.firstname && touched.firstname)}
+                                className={authInputClass(!!(errors.firstname && touched.firstname))}
                                 placeholder="First name"
                             />
                             <ErrorMessage name="firstname" component="span" className="text-red-500 text-xs mt-1 block" />
@@ -118,7 +130,7 @@ function RegisterForm({ onToggleForm }) {
                                 type="text"
                                 name="lastname"
                                 autoComplete="family-name"
-                                className={authInputClass(errors.lastname && touched.lastname)}
+                                className={authInputClass(!!(errors.lastname && touched.lastname))}
                                 placeholder="Last name"
                             />
                             <ErrorMessage name="lastname" component="span" className="text-red-500 text-xs mt-1 block" />
@@ -133,7 +145,7 @@ function RegisterForm({ onToggleForm }) {
                             type="email"
                             name="email"
                             autoComplete="email"
-                            className={authInputClass(errors.email && touched.email)}
+                            className={authInputClass(!!(errors.email && touched.email))}
                             placeholder="Email"
                         />
                         <ErrorMessage name="email" component="span" className="text-red-500 text-xs mt-1 block" />
@@ -148,7 +160,7 @@ function RegisterForm({ onToggleForm }) {
                                 type={showPassword ? 'text' : 'password'}
                                 name="password"
                                 autoComplete="new-password"
-                                className={`${authInputClass(errors.password && touched.password)} pr-12`}
+                                className={`${authInputClass(!!(errors.password && touched.password))} pr-12`}
                                 placeholder="Password"
                             />
                             <EyeButton showPassword={showPassword} setShowPassword={setShowPassword} />

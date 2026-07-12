@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect } from 'react';
-import { ErrorMessage, Field, Form, Formik } from 'formik';
+import { ErrorMessage, Field, Form, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import { useNavigate } from 'react-router-dom';
 import EyeButton from '../common/EyeButton';
@@ -9,6 +9,11 @@ import { getErrorMessage } from '../../util/helpers';
 import { AuthContext } from '../../context/AuthContext';
 import { authInputClass } from '../common/formHelpers';
 
+interface LoginValues {
+    email: string;
+    password: string;
+}
+
 const validationSchema = Yup.object().shape({
     email: Yup.string()
         .email('Invalid email address format.')
@@ -16,7 +21,7 @@ const validationSchema = Yup.object().shape({
     password: Yup.string().required('Password is required.'),
 });
 
-function LoginForm({ onToggleForm }) {
+function LoginForm({ onToggleForm }: { onToggleForm: () => void }) {
     const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
     const { setUser } = useContext(AuthContext);
@@ -29,7 +34,7 @@ function LoginForm({ onToggleForm }) {
         }
     }, []);
 
-    const handleSubmit = async (values, { setSubmitting }) => {
+    const handleSubmit = async (values: LoginValues, { setSubmitting }: FormikHelpers<LoginValues>) => {
         try {
             await login(values.email, values.password);
             const fetchedUser = await getUser();
@@ -59,7 +64,7 @@ function LoginForm({ onToggleForm }) {
                             type="email"
                             name="email"
                             autoComplete="email"
-                            className={authInputClass(errors.email && touched.email)}
+                            className={authInputClass(!!(errors.email && touched.email))}
                             placeholder="Enter your email"
                         />
                         <ErrorMessage name="email" component="span" className="text-red-500 text-xs mt-1 block" />
@@ -74,7 +79,7 @@ function LoginForm({ onToggleForm }) {
                                 type={showPassword ? 'text' : 'password'}
                                 name="password"
                                 autoComplete="current-password"
-                                className={`${authInputClass(errors.password && touched.password)} pr-12`}
+                                className={`${authInputClass(!!(errors.password && touched.password))} pr-12`}
                                 placeholder="Enter your password"
                             />
                             <EyeButton showPassword={showPassword} setShowPassword={setShowPassword} />

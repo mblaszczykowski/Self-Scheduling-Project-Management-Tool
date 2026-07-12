@@ -1,8 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ErrorMessage, Field, Formik } from 'formik';
+import { ErrorMessage, Field, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import { HiOutlinePlus, HiOutlineX, HiOutlineDocument, HiOutlineDocumentText } from 'react-icons/hi';
 import { getFileInfo, revokeFileUrl } from '../../util/helpers';
+
+export interface CommentFormValues {
+    content: string;
+}
+
+interface CommentFormProps {
+    onSubmit: (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, attachments: File[]) => void;
+    initialContent?: string;
+    buttonText: string;
+    onCancel: () => void;
+}
 
 const CommentSchema = Yup.object().shape({
     content: Yup.string().trim().required('Comment cannot be empty'),
@@ -13,8 +24,8 @@ const CommentForm = ({
     initialContent = '',
     buttonText,
     onCancel,
-}) => {
-    const [localAttachments, setLocalAttachments] = useState([]);
+}: CommentFormProps) => {
+    const [localAttachments, setLocalAttachments] = useState<File[]>([]);
 
     // Revoke any preview object URLs still held when the form unmounts.
     const localAttachmentsRef = useRef(localAttachments);
@@ -23,17 +34,17 @@ const CommentForm = ({
         localAttachmentsRef.current.forEach(revokeFileUrl);
     }, []);
 
-    const handleAddLocalAttachments = (e) => {
-        const files = Array.from(e.target.files);
+    const handleAddLocalAttachments = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
         setLocalAttachments(prev => [...prev, ...files]);
     };
 
-    const handleRemoveLocalAttachment = (attachment) => {
+    const handleRemoveLocalAttachment = (attachment: File) => {
         revokeFileUrl(attachment);
         setLocalAttachments(prev => prev.filter(f => f !== attachment));
     };
 
-    const renderLocalAttachmentPreview = (attachment, idx) => {
+    const renderLocalAttachmentPreview = (attachment: File, idx: number) => {
         const { url, fileName, fileType } = getFileInfo(attachment);
 
         return (
@@ -73,7 +84,7 @@ const CommentForm = ({
         );
     };
 
-    const handleFormSubmit = (values, actions) => {
+    const handleFormSubmit = (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>) => {
         onSubmit(values, actions, localAttachments);
         setLocalAttachments([]);
     };
@@ -102,7 +113,7 @@ const CommentForm = ({
                                 ? 'Write a reply...'
                                 : 'Write a comment...'
                         }
-                        onKeyDown={(e) => {
+                        onKeyDown={(e: React.KeyboardEvent) => {
                             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                                 e.preventDefault();
                                 formikSubmit();
@@ -145,7 +156,7 @@ const CommentForm = ({
                             <button
                                 type="button"
                                 disabled={isSubmitting}
-                                onClick={formikSubmit}
+                                onClick={() => formikSubmit()}
                                 className="px-3 py-1 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors disabled:opacity-40"
                             >
                                 {isSubmitting ? '...' : buttonText}
