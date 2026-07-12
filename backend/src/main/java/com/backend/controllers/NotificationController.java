@@ -1,6 +1,8 @@
 package com.backend.controllers;
 
 import com.backend.config.AppProperties;
+import com.backend.dtos.NotificationDTO;
+import com.backend.dtos.PagedResponse;
 import com.backend.services.NotificationService;
 import com.backend.services.SseEmitterManager;
 import com.backend.services.TokenService;
@@ -12,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/notifications")
@@ -33,35 +34,19 @@ public class NotificationController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getNotifications(
+    public ResponseEntity<PagedResponse<NotificationDTO>> getNotifications(
             HttpServletRequest request,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size
     ) {
         var userId = tokenService.getUserIdFromRequest(request);
-        var pagination = appProperties.getPagination();
-        var clampedSize = Math.min(size, pagination.getMaxSize());
+        var clampedSize = Math.min(size, appProperties.getPagination().getMaxSize());
 
         var pageable = PageRequest.of(page, clampedSize);
-        var notificationPage = notificationService.getAllNotificationsPaged(userId, pageable);
+        var dtoPage = notificationService.getAllNotificationsPaged(userId, pageable)
+                .map(notificationService::convertToDTO);
 
-        var notificationDTOs = notificationPage.getContent().stream()
-                .map(notificationService::convertToDTO)
-                .toList();
-
-        var isDefaultFirstPage = page == 0 && clampedSize == pagination.getDefaultSize() && !notificationPage.hasNext();
-        if (isDefaultFirstPage) {
-            return ResponseEntity.ok(notificationDTOs);
-        }
-
-        return ResponseEntity.ok(Map.of(
-                "content", notificationDTOs,
-                "page", notificationPage.getNumber(),
-                "size", notificationPage.getSize(),
-                "totalElements", notificationPage.getTotalElements(),
-                "totalPages", notificationPage.getTotalPages(),
-                "hasNext", notificationPage.hasNext()
-        ));
+        return ResponseEntity.ok(PagedResponse.of(dtoPage));
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

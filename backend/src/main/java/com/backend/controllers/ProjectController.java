@@ -1,6 +1,7 @@
 package com.backend.controllers;
 
 import com.backend.config.AppProperties;
+import com.backend.dtos.PagedResponse;
 import com.backend.dtos.ProjectDTO;
 import com.backend.requests.ProjectCreateRequest;
 import com.backend.services.ProjectService;
@@ -34,7 +35,7 @@ public class ProjectController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllProjects(
+    public ResponseEntity<PagedResponse<ProjectDTO>> getAllProjects(
             HttpServletRequest request,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false, defaultValue = "20") Integer size
@@ -42,9 +43,9 @@ public class ProjectController {
         var userId = tokenService.getUserIdFromRequest(request);
         if (page != null) {
             var pageable = PageRequest.of(page, Math.min(size, appProperties.getPagination().getMaxSize()));
-            return ResponseEntity.ok(projectService.getAllProjectsPaginated(userId, pageable));
+            return ResponseEntity.ok(PagedResponse.of(projectService.getAllProjectsPaginated(userId, pageable)));
         }
-        return ResponseEntity.ok(projectService.getAllProjects(userId));
+        return ResponseEntity.ok(PagedResponse.ofList(projectService.getAllProjects(userId)));
     }
 
     @GetMapping("/{projectKey}")

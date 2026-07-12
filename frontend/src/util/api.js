@@ -109,7 +109,7 @@ export const updateUser = (formData) =>
 export const updateEmailPreferences = (preferences) =>
     api.patch('/api/users/email-preferences', preferences).then(res => res.data);
 
-export const getProjects = () => api.get('/api/projects').then(res => res.data);
+export const getProjects = () => api.get('/api/projects').then(res => res.data.content);
 
 export const createProject = (projectDTO, attachments = []) =>
     api.post('/api/projects', createFormData(projectDTO, attachments, 'projectDTO'), {
@@ -171,7 +171,7 @@ export const getTaskActivities = (taskId) =>
     api.get(`/api/tasks/${taskId}/activities`).then(res => res.data);
 
 export const getNotifications = () =>
-    api.get('/api/notifications').then(res => res.data);
+    api.get('/api/notifications').then(res => res.data.content);
 
 export const markNotificationsAsRead = (notificationIds) =>
     api.post('/api/notifications/mark-as-read', notificationIds).then(res => res.data);
