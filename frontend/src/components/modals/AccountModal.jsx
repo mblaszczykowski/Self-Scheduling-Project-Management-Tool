@@ -34,10 +34,10 @@ const validationSchema = Yup.object().shape({
 });
 
 const EmailToggle = ({ label, description, checked, onChange, disabled }) => (
-    <label className={`flex items-center justify-between p-3 rounded-lg border border-slate-200 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-slate-50'}`}>
+    <label className={`flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-800/50' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
         <div className="flex-1 mr-3">
-            <span className="block text-sm font-medium text-slate-800">{label}</span>
-            {description && <span className="block text-xs text-slate-500 mt-0.5">{description}</span>}
+            <span className="block text-sm font-medium text-slate-800 dark:text-slate-200">{label}</span>
+            {description && <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{description}</span>}
         </div>
         <div className="relative inline-flex items-center">
             <input
@@ -47,7 +47,7 @@ const EmailToggle = ({ label, description, checked, onChange, disabled }) => (
                 disabled={disabled}
                 className="sr-only peer"
             />
-            <div className="w-9 h-5 bg-slate-300 peer-checked:bg-slate-900 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+            <div className="w-9 h-5 bg-slate-300 dark:bg-slate-600 peer-checked:bg-slate-900 dark:peer-checked:bg-white rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white dark:after:bg-slate-900 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
         </div>
     </label>
 );
@@ -155,7 +155,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
             onRequestClose={handleClose}
             contentLabel="Account Settings"
             className={
-                'max-w-lg mx-auto mt-10 bg-white rounded-xl shadow-2xl outline-none'
+                'max-w-lg mx-auto mt-10 bg-white dark:bg-slate-900 rounded-xl shadow-2xl outline-none'
                 + ' z-[70] max-h-[90vh] overflow-y-auto transition-all duration-300 '
                 + (isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0')
             }
@@ -165,15 +165,15 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                 + (isVisible ? 'opacity-100' : 'opacity-0')
             }
         >
-            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 rounded-t-xl">
+            <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-4 rounded-t-xl">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-slate-900">Account Settings</h2>
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Account Settings</h2>
                     <button
                         onClick={handleClose}
-                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                         title="Close"
                     >
-                        <CloseIcon className="h-5 w-5 text-slate-500" />
+                        <CloseIcon className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                     </button>
                 </div>
             </div>
@@ -186,17 +186,17 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                 >
                     {({ isSubmitting, setFieldValue }) => (
                         <Form className="space-y-5">
-                            <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                            <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl">
                                 <Avatar
                                     user={user}
                                     profilePicture={profilePreview}
                                     size="lg"
-                                    className="ring-4 ring-white shadow-lg"
+                                    className="ring-4 ring-white dark:ring-slate-800 shadow-lg"
                                 />
                                 <div className="flex-1">
                                     <label className="block">
                                         <span
-                                            className="text-xs font-medium text-slate-700 mb-1 block"
+                                            className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block"
                                         >
                                             Profile Photo
                                         </span>
@@ -204,7 +204,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                             type="file"
                                             accept="image/*"
                                             onChange={(e) => handleProfilePictureChange(e, setFieldValue)}
-                                            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4
+                                            className="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4
                                             file:rounded-lg file:border-0 file:text-sm file:font-medium
                                             file:bg-slate-900 file:text-white hover:file:bg-slate-800 file:cursor-pointer file:transition-all"
                                         />
@@ -214,7 +214,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label htmlFor="firstname" className="block text-xs font-medium text-slate-700 mb-1.5">
+                                    <label htmlFor="firstname" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                                         First Name
                                     </label>
                                     <Field
@@ -226,7 +226,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                     <ErrorMessage name="firstname" component="div" className="text-red-500 text-xs mt-1" />
                                 </div>
                                 <div>
-                                    <label htmlFor="lastname" className="block text-xs font-medium text-slate-700 mb-1.5">
+                                    <label htmlFor="lastname" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                                         Last Name
                                     </label>
                                     <Field
@@ -240,7 +240,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                             </div>
 
                             <div>
-                                <label htmlFor="email" className="block text-xs font-medium text-slate-700 mb-1.5">
+                                <label htmlFor="email" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                                     Email
                                 </label>
                                 <Field
@@ -252,11 +252,11 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                 <ErrorMessage name="email" component="div" className="text-red-500 text-xs mt-1" />
                             </div>
 
-                            <div className="pt-4 border-t border-slate-200">
-                                <h3 className="text-sm font-semibold text-slate-900 mb-4">Change Password</h3>
+                            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                                <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Change Password</h3>
                                 <div className="space-y-4">
                                     <div>
-                                        <label htmlFor="currentPassword" className="block text-xs font-medium text-slate-700 mb-1.5">
+                                        <label htmlFor="currentPassword" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                                             Current Password
                                         </label>
                                         <Field
@@ -269,7 +269,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label htmlFor="newPassword" className="block text-xs font-medium text-slate-700 mb-1.5">
+                                            <label htmlFor="newPassword" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                                                 New Password
                                             </label>
                                             <Field
@@ -281,7 +281,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                             <ErrorMessage name="newPassword" component="div" className="text-red-500 text-xs mt-1" />
                                         </div>
                                         <div>
-                                            <label htmlFor="confirmNewPassword" className="block text-xs font-medium text-slate-700 mb-1.5">
+                                            <label htmlFor="confirmNewPassword" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                                                 Confirm Password
                                             </label>
                                             <Field
@@ -296,8 +296,8 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-slate-200">
-                                <h3 className="text-sm font-semibold text-slate-900 mb-4">Email Notifications</h3>
+                            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                                <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Email Notifications</h3>
                                 <div className="space-y-3">
                                     <EmailToggle
                                         label="Email notifications enabled"
@@ -334,7 +334,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
                                 <button
                                     type="button"
                                     onClick={handleClose}
-                                    className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
+                                    className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
                                 >
                                     Cancel
                                 </button>

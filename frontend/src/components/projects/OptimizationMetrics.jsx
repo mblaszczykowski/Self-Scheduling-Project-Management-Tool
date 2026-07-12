@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { formatAssigneeName } from '../../util/helpers';
+import { formatAssigneeName, daysBetween, formatShortDate } from '../../util/helpers';
 
 const keyframes = `
 @keyframes optSlideIn {
@@ -16,15 +16,7 @@ const keyframes = `
 }
 `;
 
-const daysBetween = (a, b) => {
-    if (!a || !b) return 0;
-    return Math.round((new Date(b) - new Date(a)) / 86400000);
-};
-
-const fmtDate = (d) => {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-};
+const fmtDate = (d) => (d ? formatShortDate(d) : '—');
 
 const fmtNum = (v, decimals = 1) => {
     if (typeof v !== 'number') return v;
@@ -64,10 +56,10 @@ const BeforeAfter = ({ label, before, after, unit = '', lowerIsBetter = true, in
 /* Stat card for headline numbers */
 const StatCard = ({ value, label, sublabel, accent = 'emerald', delay = 0 }) => {
     const colors = {
-        emerald: 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 text-emerald-600',
-        blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/20 text-blue-600',
-        amber: 'from-amber-500/10 to-amber-500/5 border-amber-500/20 text-amber-600',
-        slate: 'from-slate-100 to-slate-50 border-slate-200 text-slate-600',
+        emerald: 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+        blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/20 text-blue-600 dark:text-blue-400',
+        amber: 'from-amber-500/10 to-amber-500/5 border-amber-500/20 text-amber-600 dark:text-amber-400',
+        slate: 'from-slate-100 to-slate-50 dark:from-slate-700 dark:to-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300',
     };
     return (
         <div
@@ -132,7 +124,7 @@ const OptimizationMetrics = ({
         <>
             <style>{keyframes}</style>
             <div
-                className="mb-4 rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm"
+                className="mb-4 rounded-2xl overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm"
                 style={{ animation: 'optSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}
             >
                 {/* Top accent line */}
@@ -143,16 +135,16 @@ const OptimizationMetrics = ({
                     <div className="flex items-start justify-between gap-6">
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-1">
-                                <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center flex-shrink-0">
                                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                                         <path d="M3 9.5L7 13.5L15 4.5" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-semibold text-slate-900">
+                                    <h3 className="text-base font-semibold text-slate-900 dark:text-white">
                                         Schedule Optimization Ready
                                     </h3>
-                                    <p className="text-sm text-slate-500">
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">
                                         {suggestionsCount} of {suggestions?.length || 0} tasks rescheduled
                                         {summary.affectedPeople > 0 && (
                                             <> &middot; {summary.affectedPeople} {summary.affectedPeople === 1 ? 'person' : 'people'} affected</>
@@ -163,13 +155,13 @@ const OptimizationMetrics = ({
 
                             {/* Infeasible note */}
                             {infeasible && (
-                                <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
+                                <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0 text-amber-500">
                                         <path d="M7 1L13 12H1L7 1Z" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinejoin="round"/>
                                         <circle cx="7" cy="9.5" r="0.6" fill="currentColor"/>
                                         <line x1="7" y1="5" x2="7" y2="8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                                     </svg>
-                                    <span className="text-xs text-amber-700">
+                                    <span className="text-xs text-amber-700 dark:text-amber-300">
                                         Original schedule contains {conflictsBefore} resource {conflictsBefore === 1 ? 'conflict' : 'conflicts'}; the "before" metrics below are computed naively (assuming overlapping tasks run in parallel) and serve as a lower bound for the true cost.
                                     </span>
                                 </div>
@@ -216,7 +208,7 @@ const OptimizationMetrics = ({
                             <button
                                 onClick={onReject}
                                 disabled={isApplying}
-                                className="text-sm px-4 py-2 rounded-lg font-medium transition-all text-slate-500 hover:text-slate-700 hover:bg-slate-100 border border-slate-200"
+                                className="text-sm px-4 py-2 rounded-lg font-medium transition-all text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600"
                             >
                                 Dismiss
                             </button>
@@ -266,10 +258,10 @@ const OptimizationMetrics = ({
                             style={{ animation: `optFadeUp 0.4s 350ms cubic-bezier(0.22, 1, 0.36, 1) both` }}
                         >
                             <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-xs text-slate-500">On-time delivery</span>
-                                <span className="text-xs font-semibold text-slate-700 tabular-nums">{onTimePct}%</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">On-time delivery</span>
+                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{onTimePct}%</span>
                             </div>
-                            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-2.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                                 <div
                                     className="h-full rounded-full"
                                     style={{
@@ -291,7 +283,7 @@ const OptimizationMetrics = ({
                     </div>
 
                     {/* ===== Before/After comparison row ===== */}
-                    <div className="flex items-center gap-6 mt-4 pt-3 border-t border-slate-100 flex-wrap"
+                    <div className="flex items-center gap-6 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex-wrap"
                         style={{ animation: `optFadeUp 0.4s 400ms cubic-bezier(0.22, 1, 0.36, 1) both` }}
                     >
                         <BeforeAfter
@@ -324,10 +316,10 @@ const OptimizationMetrics = ({
                     </div>
 
                     {/* ===== Expandable per-task detail ===== */}
-                    <div className="mt-3 pt-3 border-t border-slate-100">
+                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                         <button
                             onClick={() => setShowDetails(p => !p)}
-                            className="text-xs text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-1.5 px-1 py-0.5 -ml-1 rounded hover:bg-slate-50"
+                            className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors flex items-center gap-1.5 px-1 py-0.5 -ml-1 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50"
                         >
                             <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
                                 className={`transition-transform duration-200 ${showDetails ? 'rotate-90' : ''}`}
@@ -338,9 +330,9 @@ const OptimizationMetrics = ({
                         </button>
 
                         {showDetails && summary.shifted.length > 0 && (
-                            <div className="mt-3 rounded-lg border border-slate-100 overflow-hidden">
+                            <div className="mt-3 rounded-lg border border-slate-100 dark:border-slate-700 overflow-hidden">
                                 {/* Table header */}
-                                <div className="grid grid-cols-[1fr_120px_120px_55px_50px_130px] gap-3 px-4 py-2 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100">
+                                <div className="grid grid-cols-[1fr_120px_120px_55px_50px_130px] gap-3 px-4 py-2 bg-slate-50 dark:bg-slate-700/50 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-slate-700">
                                     <span>Task</span>
                                     <span>Current</span>
                                     <span>Proposed</span>
@@ -362,12 +354,12 @@ const OptimizationMetrics = ({
                                             const shift = daysBetween(s.originalStartDate, s.suggestedStartDate);
                                             return (
                                                 <div key={s.taskKey}
-                                                    className="grid grid-cols-[1fr_120px_120px_55px_50px_130px] gap-3 px-4 py-2.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors items-center"
+                                                    className="grid grid-cols-[1fr_120px_120px_55px_50px_130px] gap-3 px-4 py-2.5 border-b border-slate-50 dark:border-slate-700/50 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors items-center"
                                                     style={{ animation: `optFadeUp 0.25s ${80 + i * 30}ms cubic-bezier(0.22, 1, 0.36, 1) both` }}
                                                 >
                                                     <div className="flex items-center gap-2 min-w-0">
                                                         <span className="text-xs font-semibold text-slate-400 flex-shrink-0">{s.taskKey}</span>
-                                                        <span className="text-sm text-slate-700 truncate">{s.summary}</span>
+                                                        <span className="text-sm text-slate-700 dark:text-slate-200 truncate">{s.summary}</span>
                                                         {s.isCritical && (
                                                             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-500 font-semibold flex-shrink-0 border border-red-100">
                                                                 Critical

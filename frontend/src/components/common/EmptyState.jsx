@@ -49,15 +49,15 @@ const EmptyState = ({
                 isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
             } ${className}`}
         >
-            <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center mb-4">
-                <Icon className="w-7 h-7 text-slate-400" />
+            <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+                <Icon className="w-7 h-7 text-slate-400 dark:text-slate-500" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-1">{displayTitle}</h3>
-            <p className="text-sm text-slate-500 text-center max-w-sm mb-4">{displayDescription}</p>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{displayTitle}</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-sm mb-4">{displayDescription}</p>
             {action && actionLabel && (
                 <button
                     onClick={action}
-                    className="px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors"
+                    className="px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
                 >
                     {actionLabel}
                 </button>
