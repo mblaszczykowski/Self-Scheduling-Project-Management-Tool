@@ -1,18 +1,26 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-export const ThemeContext = createContext();
+type Theme = 'light' | 'dark';
+
+interface ThemeContextValue {
+    theme: Theme;
+    toggleTheme: () => void;
+    setTheme: (t: Theme) => void;
+}
+
+export const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export const useTheme = () => useContext(ThemeContext);
 
-const getInitialTheme = () => {
+const getInitialTheme = (): Theme => {
     const stored = localStorage.getItem('flowlink_theme');
-    if (stored) return stored;
+    if (stored === 'dark' || stored === 'light') return stored;
     if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
     return 'light';
 };
 
-export const ThemeProvider = ({ children }) => {
-    const [theme, setThemeState] = useState(getInitialTheme);
+export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
+    const [theme, setThemeState] = useState<Theme>(getInitialTheme);
 
     useEffect(() => {
         const root = document.documentElement;
@@ -31,7 +39,7 @@ export const ThemeProvider = ({ children }) => {
         setThemeState(prev => (prev === 'dark' ? 'light' : 'dark'));
     }, []);
 
-    const setTheme = useCallback((t) => setThemeState(t), []);
+    const setTheme = useCallback((t: Theme) => setThemeState(t), []);
 
     const value = useMemo(() => ({ theme, toggleTheme, setTheme }), [theme, toggleTheme, setTheme]);
 

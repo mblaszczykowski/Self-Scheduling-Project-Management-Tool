@@ -1,7 +1,14 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { logout } from '../util/api';
+import { User } from '../types';
 
-export const AuthContext = createContext();
+interface AuthContextValue {
+    user: User | null;
+    setUser: React.Dispatch<React.SetStateAction<User | null>>;
+    handleLogout: () => Promise<void>;
+}
+
+export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
@@ -9,8 +16,8 @@ export const useAuth = () => {
     return context;
 };
 
-export const AuthProvider = ({ children, initialUser }) => {
-    const [user, setUser] = useState(initialUser);
+export const AuthProvider = ({ children, initialUser }: { children: React.ReactNode; initialUser: User | null }) => {
+    const [user, setUser] = useState<User | null>(initialUser);
 
     const handleLogout = useCallback(async () => {
         try {

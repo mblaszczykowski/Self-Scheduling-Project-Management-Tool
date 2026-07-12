@@ -2,8 +2,15 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import config from '../config';
 import { getNotifications } from '../util/api';
 import { AuthContext } from './AuthContext';
+import { Notification } from '../types';
 
-export const NotificationsContext = createContext();
+interface NotificationsContextValue {
+    notifications: Notification[];
+    setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
+    refreshNotifications: () => Promise<void>;
+}
+
+export const NotificationsContext = createContext<NotificationsContextValue | undefined>(undefined);
 
 export const useNotifications = () => {
     const context = useContext(NotificationsContext);
@@ -11,11 +18,11 @@ export const useNotifications = () => {
     return context;
 };
 
-export const NotificationsProvider = ({ children }) => {
-    const { user } = useContext(AuthContext);
-    const [notifications, setNotifications] = useState([]);
-    const eventSourceRef = useRef(null);
-    const errorRefreshTimerRef = useRef(null);
+export const NotificationsProvider = ({ children }: { children: React.ReactNode }) => {
+    const user = useContext(AuthContext)?.user ?? null;
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const eventSourceRef = useRef<EventSource | null>(null);
+    const errorRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const refreshNotifications = useCallback(async () => {
         try {
@@ -48,7 +55,7 @@ export const NotificationsProvider = ({ children }) => {
         const es = new EventSource(url, { withCredentials: true });
         eventSourceRef.current = es;
 
-        es.addEventListener('notification', (event) => {
+        es.addEventListener('notification', (event: MessageEvent) => {
             try {
                 const notification = JSON.parse(event.data);
                 setNotifications(prev => [notification, ...prev]);
