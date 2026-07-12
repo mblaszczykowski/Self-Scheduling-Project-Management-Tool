@@ -544,9 +544,7 @@ public class ScheduleOptimizer {
     }
 
     private int calculateDuration(LocalDate startDate, LocalDate dueDate) {
-        if (startDate == null || dueDate == null) return 1;
-        long days = ChronoUnit.DAYS.between(startDate, dueDate);
-        return Math.max(1, (int) days + 1); // inclusive: Jan 1 to Jan 3 = 3 days
+        return SchedulingSupport.inclusiveDurationDays(startDate, dueDate);
     }
 
     private ScheduleResult emptyResult() {

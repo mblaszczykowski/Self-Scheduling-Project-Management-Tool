@@ -4,7 +4,6 @@ import com.backend.dtos.TaskDTO;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -136,11 +135,7 @@ public class CriticalPathMethodHelper {
     }
 
     private int calculateTaskDuration(LocalDate startDate, LocalDate dueDate) {
-        if (startDate == null || dueDate == null) {
-            return 1;
-        }
-        var days = ChronoUnit.DAYS.between(startDate, dueDate);
-        return Math.max(1, (int) days + 1);
+        return SchedulingSupport.inclusiveDurationDays(startDate, dueDate);
     }
 
     private TaskDTO updateTaskDTOWithIsCritical(TaskDTO taskDTO, Boolean isCritical) {
