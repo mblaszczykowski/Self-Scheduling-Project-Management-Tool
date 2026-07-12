@@ -3,7 +3,7 @@ package com.backend.controllers;
 import com.backend.config.AppProperties;
 import com.backend.dtos.PagedResponse;
 import com.backend.dtos.ProjectDTO;
-import com.backend.requests.ProjectCreateRequest;
+import com.backend.requests.ProjectRequest;
 import com.backend.services.ProjectService;
 import com.backend.services.TokenService;
 import com.backend.util.RequestValidator;
@@ -65,7 +65,7 @@ public class ProjectController {
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
         var userId = tokenService.getUserIdFromRequest(request);
-        var projectRequest = requestValidator.parseAndValidate(projectDTOStr, ProjectCreateRequest.class);
+        var projectRequest = requestValidator.parseAndValidate(projectDTOStr, ProjectRequest.class);
         var createdProject = projectService.createProject(projectRequest, userId, attachments);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdProject);
     }
@@ -78,7 +78,7 @@ public class ProjectController {
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
         var userId = tokenService.getUserIdFromRequest(request);
-        var projectRequest = requestValidator.parseAndValidate(projectDTOStr, ProjectCreateRequest.class);
+        var projectRequest = requestValidator.parseAndValidate(projectDTOStr, ProjectRequest.class);
         var updatedProject = projectService.updateProject(projectKey, projectRequest, userId, attachments);
         return ResponseEntity.ok(updatedProject);
     }

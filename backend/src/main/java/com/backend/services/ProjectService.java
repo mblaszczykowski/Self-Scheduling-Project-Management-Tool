@@ -13,7 +13,7 @@ import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
-import com.backend.requests.ProjectCreateRequest;
+import com.backend.requests.ProjectRequest;
 import com.backend.util.AccessGuard;
 import com.backend.util.CriticalPathMethodHelper;
 import com.backend.util.EntityMapper;
@@ -60,7 +60,7 @@ public class ProjectService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public ProjectDTO createProject(ProjectCreateRequest request, Integer userId, List<MultipartFile> attachments) {
+    public ProjectDTO createProject(ProjectRequest request, Integer userId, List<MultipartFile> attachments) {
         if (projectRepository.existsByProjectKey(request.projectKey())) {
             throw new ValidationException("Project key already exists: " + request.projectKey());
         }
@@ -140,7 +140,7 @@ public class ProjectService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public ProjectDTO updateProject(String projectKey, ProjectCreateRequest request, Integer userId, List<MultipartFile> attachments) {
+    public ProjectDTO updateProject(String projectKey, ProjectRequest request, Integer userId, List<MultipartFile> attachments) {
         var project = accessGuard.getOwnedProject(projectKey, userId);
 
         project.setSummary(request.summary());

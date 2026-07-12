@@ -13,7 +13,7 @@ import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
-import com.backend.requests.ProjectCreateRequest;
+import com.backend.requests.ProjectRequest;
 import com.backend.util.AccessGuard;
 import com.backend.util.CriticalPathMethodHelper;
 import com.backend.util.EntityMapper;
@@ -93,7 +93,7 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should create project with valid data")
         void shouldCreateProjectWithValidData() {
-            var request = new ProjectCreateRequest("TEST", "Test Project", "desc",
+            var request = new ProjectRequest("TEST", "Test Project", "desc",
                     null, null, null);
 
             when(projectRepository.existsByProjectKey("TEST")).thenReturn(false);
@@ -113,7 +113,7 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should throw when project key already exists")
         void shouldThrowWhenProjectKeyExists() {
-            var request = new ProjectCreateRequest("TEST", "Test Project", "desc",
+            var request = new ProjectRequest("TEST", "Test Project", "desc",
                     null, null, null);
 
             when(projectRepository.existsByProjectKey("TEST")).thenReturn(true);
@@ -126,7 +126,7 @@ class ProjectServiceTest {
         @DisplayName("should notify new members excluding owner")
         void shouldNotifyNewMembersExcludingOwner() {
             var memberDTO = new UserDTO(null, null, null, "member@example.com", null, null, null, null, null);
-            var request = new ProjectCreateRequest("TEST", "Test Project", "desc",
+            var request = new ProjectRequest("TEST", "Test Project", "desc",
                     List.of(memberDTO), null, null);
 
             when(projectRepository.existsByProjectKey("TEST")).thenReturn(false);
@@ -152,7 +152,7 @@ class ProjectServiceTest {
         @DisplayName("should send invitation email event when member email does not exist")
         void shouldSendInvitationEmailWhenMemberEmailNotFound() {
             var memberDTO = new UserDTO(null, null, null, "unknown@example.com", null, null, null, null, null);
-            var request = new ProjectCreateRequest("TEST", "Test Project", "desc",
+            var request = new ProjectRequest("TEST", "Test Project", "desc",
                     List.of(memberDTO), null, null);
 
             when(projectRepository.existsByProjectKey("TEST")).thenReturn(false);
@@ -177,7 +177,7 @@ class ProjectServiceTest {
             var depProject = TestEntityFactory.createProject(20, "DEP", owner);
             depProject.replaceDependencies(List.of(project));
 
-            var request = new ProjectCreateRequest("PROJ", "Updated", "desc",
+            var request = new ProjectRequest("PROJ", "Updated", "desc",
                     null, List.of("DEP"), null);
 
             when(accessGuard.getOwnedProject("PROJ", 1)).thenReturn(project);
@@ -234,7 +234,7 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should update project for owner")
         void shouldUpdateProjectForOwner() {
-            var request = new ProjectCreateRequest("PROJ", "Updated Summary", "Updated desc",
+            var request = new ProjectRequest("PROJ", "Updated Summary", "Updated desc",
                     null, null, null);
 
             when(accessGuard.getOwnedProject("PROJ", 1)).thenReturn(project);
@@ -249,7 +249,7 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should throw when non-owner tries to update")
         void shouldThrowWhenNonOwnerUpdates() {
-            var request = new ProjectCreateRequest("PROJ", "Updated", "desc",
+            var request = new ProjectRequest("PROJ", "Updated", "desc",
                     null, null, null);
 
             when(accessGuard.getOwnedProject("PROJ", 99))
@@ -262,7 +262,7 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should throw when project not found for update")
         void shouldThrowWhenProjectNotFoundForUpdate() {
-            var request = new ProjectCreateRequest("NOPE", "Updated", "desc",
+            var request = new ProjectRequest("NOPE", "Updated", "desc",
                     null, null, null);
 
             when(accessGuard.getOwnedProject("NOPE", 1))
@@ -278,7 +278,7 @@ class ProjectServiceTest {
             project.replaceMembers(Set.of(owner));
 
             var newMemberDTO = new UserDTO(null, null, null, "member@example.com", null, null, null, null, null);
-            var request = new ProjectCreateRequest("PROJ", "Updated", "desc",
+            var request = new ProjectRequest("PROJ", "Updated", "desc",
                     List.of(newMemberDTO), null, null);
 
             when(accessGuard.getOwnedProject("PROJ", 1)).thenReturn(project);

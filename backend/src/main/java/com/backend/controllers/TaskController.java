@@ -1,7 +1,7 @@
 package com.backend.controllers;
 
 import com.backend.dtos.TaskDTO;
-import com.backend.requests.TaskCreateRequest;
+import com.backend.requests.TaskRequest;
 import com.backend.services.TaskService;
 import com.backend.services.TokenService;
 import com.backend.util.RequestValidator;
@@ -36,7 +36,7 @@ public class TaskController {
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
         var userId = tokenService.getUserIdFromRequest(request);
-        var taskRequest = requestValidator.parseAndValidate(taskDTOStr, TaskCreateRequest.class);
+        var taskRequest = requestValidator.parseAndValidate(taskDTOStr, TaskRequest.class);
         var createdTask = taskService.createTask(projectKey, taskRequest, userId, attachments);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdTask);
     }
@@ -50,7 +50,7 @@ public class TaskController {
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
         var userId = tokenService.getUserIdFromRequest(request);
-        var taskRequest = requestValidator.parseAndValidate(taskDTOStr, TaskCreateRequest.class);
+        var taskRequest = requestValidator.parseAndValidate(taskDTOStr, TaskRequest.class);
         var updatedTask = taskService.updateTask(projectKey, taskKey, taskRequest, userId, attachments);
         return ResponseEntity.ok(updatedTask);
     }

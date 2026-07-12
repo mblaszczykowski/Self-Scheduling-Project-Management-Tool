@@ -7,7 +7,7 @@ import jakarta.validation.constraints.*;
 import java.time.LocalDate;
 import java.util.List;
 
-public record TaskCreateRequest(
+public record TaskRequest(
         @NotBlank(message = "Summary is required")
         @Size(max = 200, message = "Summary must not exceed 200 characters")
         String summary,

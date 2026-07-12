@@ -9,7 +9,7 @@ import com.backend.exception.ValidationException;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
 import com.backend.repositories.UserRepository;
-import com.backend.requests.TaskCreateRequest;
+import com.backend.requests.TaskRequest;
 import com.backend.util.AccessGuard;
 import com.backend.util.EntityMapper;
 import org.springframework.context.ApplicationEventPublisher;
@@ -47,7 +47,7 @@ public class TaskService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public TaskDTO createTask(String projectKey, TaskCreateRequest request, Integer userId, List<MultipartFile> files) {
+    public TaskDTO createTask(String projectKey, TaskRequest request, Integer userId, List<MultipartFile> files) {
         validateLabels(request.labels());
 
         var project = projectRepository.findByProjectKeyWithLock(projectKey)
@@ -107,7 +107,7 @@ public class TaskService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public TaskDTO updateTask(String projectKey, String taskKey, TaskCreateRequest request,
+    public TaskDTO updateTask(String projectKey, String taskKey, TaskRequest request,
                               Integer userId, List<MultipartFile> files) {
         validateLabels(request.labels());
 

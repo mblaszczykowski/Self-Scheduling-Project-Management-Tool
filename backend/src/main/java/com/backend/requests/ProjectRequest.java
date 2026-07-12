@@ -5,7 +5,7 @@ import jakarta.validation.constraints.*;
 
 import java.util.List;
 
-public record ProjectCreateRequest(
+public record ProjectRequest(
         @NotBlank(message = "Project key is required")
         @Size(max = 10, message = "Project key must not exceed 10 characters")
         @Pattern(regexp = "^[A-Z][A-Z0-9]*$", message = "Project key must start with a letter and contain only uppercase letters and numbers")

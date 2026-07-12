@@ -51,11 +51,12 @@ The backend follows a layered architecture:
 - **repositories/**: JPA data access layer
 - **entities/**: JPA entity models (User, Project, Task, Comment, Notification, etc.)
 - **dtos/**: Data transfer objects for API responses
-- **daos/**: Data access objects for requests
-- **filter/**: `JwtAuthenticationFilter` - validates JWT tokens on protected endpoints
-- **config/**: `JwtConfig` for JWT settings, `ScheduledTasks` for background jobs
-- **exception/**: Custom exception handlers
-- **util/**: Utility classes like `ValidationUtil`
+- **requests/**: Request payload records for incoming API calls (LoginRequest, ProjectCreateRequest, etc.)
+- **events/**: Application events + listener (async notifications/emails)
+- **filter/**: Servlet filters — `SecurityHeadersFilter`, `RateLimitFilter`, `JwtAuthenticationFilter`, `CsrfProtectionFilter`
+- **config/**: `@ConfigurationProperties` (AppProperties, JwtConfig, CookieProperties), `WebConfig`, `AsyncConfig`, `ScheduledTasks`, `SecurityConfig`, `PublicEndpoints`
+- **exception/**: Custom exceptions + `GlobalExceptionHandler`
+- **util/**: Utilities (AccessGuard, EntityMapper, CookieFactory, ScheduleOptimizer, CriticalPathMethodHelper, ValidationUtil, IpUtil)
 
 ### Frontend Structure
 

@@ -10,7 +10,7 @@ import com.backend.exception.ValidationException;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
 import com.backend.repositories.UserRepository;
-import com.backend.requests.TaskCreateRequest;
+import com.backend.requests.TaskRequest;
 import com.backend.util.AccessGuard;
 import com.backend.util.EntityMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -94,7 +94,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should create task with valid data and allocate task number")
         void shouldCreateTaskWithValidData() {
-            var request = new TaskCreateRequest("New Task", "desc",
+            var request = new TaskRequest("New Task", "desc",
                     TaskStatus.TODO, TaskPriority.HIGH, 0,
                     LocalDate.now(), LocalDate.now().plusDays(7),
                     null, null, null, null);
@@ -124,7 +124,7 @@ class TaskServiceTest {
         void shouldAllocateIncrementingTaskNumbers() {
             project.setNextTaskNumber(5);
 
-            var request = new TaskCreateRequest("Task Five", "desc",
+            var request = new TaskRequest("Task Five", "desc",
                     null, null, null,
                     null, null, null, null, null, null);
 
@@ -145,7 +145,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should throw when project not found")
         void shouldThrowWhenProjectNotFound() {
-            var request = new TaskCreateRequest("Task", "desc",
+            var request = new TaskRequest("Task", "desc",
                     null, null, null,
                     null, null, null, null, null, null);
 
@@ -158,7 +158,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should throw when user has no access to project")
         void shouldThrowWhenUserHasNoAccess() {
-            var request = new TaskCreateRequest("Task", "desc",
+            var request = new TaskRequest("Task", "desc",
                     null, null, null,
                     null, null, null, null, null, null);
 
@@ -173,7 +173,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should notify assignee when different from creator")
         void shouldNotifyAssigneeWhenDifferentFromCreator() {
-            var request = new TaskCreateRequest("Assigned Task", "desc",
+            var request = new TaskRequest("Assigned Task", "desc",
                     null, null, null,
                     null, null, "assignee@example.com", null, null, null);
 
@@ -202,7 +202,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should not notify when assignee is the creator")
         void shouldNotNotifyWhenAssigneeIsCreator() {
-            var request = new TaskCreateRequest("Self Task", "desc",
+            var request = new TaskRequest("Self Task", "desc",
                     null, null, null,
                     null, null, "owner@example.com", null, null, null);
 
@@ -223,7 +223,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should throw when assignee not found")
         void shouldThrowWhenAssigneeNotFound() {
-            var request = new TaskCreateRequest("Task", "desc",
+            var request = new TaskRequest("Task", "desc",
                     null, null, null,
                     null, null, "nobody@example.com", null, null, null);
 
@@ -237,7 +237,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should default status to BACKLOG when not specified")
         void shouldDefaultStatusToBacklog() {
-            var request = new TaskCreateRequest("Task", "desc",
+            var request = new TaskRequest("Task", "desc",
                     null, null, null,
                     null, null, null, null, null, null);
 
@@ -269,7 +269,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should update task for authorized user")
         void shouldUpdateTaskForAuthorizedUser() {
-            var request = new TaskCreateRequest("Updated Task", "new desc",
+            var request = new TaskRequest("Updated Task", "new desc",
                     TaskStatus.IN_PROGRESS, TaskPriority.HIGH, 50,
                     null, null, null, null, null, null);
 
@@ -294,7 +294,7 @@ class TaskServiceTest {
             var otherProject = TestEntityFactory.createProject(99, "OTHER", owner);
             var otherTask = TestEntityFactory.createTask(200, 1, otherProject);
 
-            var request = new TaskCreateRequest("Task", "desc",
+            var request = new TaskRequest("Task", "desc",
                     null, null, null,
                     null, null, null, null, null, null);
 
@@ -444,7 +444,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should throw when label contains comma")
         void shouldThrowWhenLabelContainsComma() {
-            var request = new TaskCreateRequest("Task", "desc",
+            var request = new TaskRequest("Task", "desc",
                     null, null, null,
                     null, null, null, List.of("label,with,commas"), null, null);
 
@@ -456,7 +456,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should accept valid labels")
         void shouldAcceptValidLabels() {
-            var request = new TaskCreateRequest("Valid Task", "desc",
+            var request = new TaskRequest("Valid Task", "desc",
                     null, null, 50,
                     null, null, null, List.of("bug", "frontend"), null, null);
 
