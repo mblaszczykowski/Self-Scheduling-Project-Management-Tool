@@ -111,13 +111,14 @@ public class CommentService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public CommentDTO updateComment(Integer commentId, Integer userId, String content,
+    public CommentDTO updateComment(Integer taskId, Integer commentId, Integer userId, String content,
                                     List<MultipartFile> files) {
         validateCommentContent(content);
 
         var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
+        requireCommentBelongsToTask(comment, taskId);
         accessGuard.requireAccess(comment.getTask().getProject(), userId);
         accessGuard.requireCommentOwnership(comment, userId);
 
@@ -136,10 +137,11 @@ public class CommentService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void deleteComment(Integer commentId, Integer userId) {
+    public void deleteComment(Integer taskId, Integer commentId, Integer userId) {
         var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
+        requireCommentBelongsToTask(comment, taskId);
         accessGuard.requireAccess(comment.getTask().getProject(), userId);
         accessGuard.requireCommentOwnership(comment, userId);
 
@@ -151,10 +153,11 @@ public class CommentService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public CommentDTO reactToComment(Integer commentId, Integer userId, ReactionType reactionType) {
+    public CommentDTO reactToComment(Integer taskId, Integer commentId, Integer userId, ReactionType reactionType) {
         var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
+        requireCommentBelongsToTask(comment, taskId);
         accessGuard.requireAccess(comment.getTask().getProject(), userId);
 
         var user = userRepository.findById(userId)
@@ -170,9 +173,8 @@ public class CommentService {
         return entityMapper.toCommentDTO(comment, userId);
     }
 
-    public void verifyCommentBelongsToTask(Integer commentId, Integer taskId) {
-        var comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+    // In-transaction check using the already-loaded comment (no separate query, no TOCTOU gap).
+    private void requireCommentBelongsToTask(Comment comment, Integer taskId) {
         if (!comment.getTask().getId().equals(taskId)) {
             throw new ValidationException("Comment does not belong to the specified task");
         }

@@ -216,7 +216,7 @@ class CommentServiceTest {
                     new CommentDTO(1, 100, 1, "Author", null, "Updated content",
                             null, null, List.of(), 0, 0, List.of(), List.of(), false, false, List.of()));
 
-            var result = commentService.updateComment(1, 1, "Updated content", null);
+            var result = commentService.updateComment(100, 1, 1, "Updated content", null);
 
             assertNotNull(result);
             assertNotNull(comment.getEditedAt());
@@ -232,7 +232,7 @@ class CommentServiceTest {
                     .when(accessGuard).requireCommentOwnership(comment, 2);
 
             assertThrows(AuthorizationException.class, () ->
-                    commentService.updateComment(1, 2, "Hacked content", null));
+                    commentService.updateComment(100, 1, 2, "Hacked content", null));
         }
 
         @Test
@@ -246,7 +246,7 @@ class CommentServiceTest {
                     new CommentDTO(1, 100, 1, "Author", null, "<b>Bold</b>",
                             null, null, List.of(), 0, 0, List.of(), List.of(), false, false, List.of()));
 
-            commentService.updateComment(1, 1, "<b>Bold</b><script>evil()</script>", null);
+            commentService.updateComment(100, 1, 1, "<b>Bold</b><script>evil()</script>", null);
 
             assertFalse(comment.getContent().contains("<script>"));
             assertTrue(comment.getContent().contains("<b>Bold</b>"));
@@ -265,7 +265,7 @@ class CommentServiceTest {
             when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
             when(userRepository.findById(1)).thenReturn(Optional.of(author));
 
-            commentService.deleteComment(1, 1);
+            commentService.deleteComment(100, 1, 1);
 
             verify(commentRepository).delete(comment);
         }
@@ -280,7 +280,7 @@ class CommentServiceTest {
                     .when(accessGuard).requireCommentOwnership(comment, 2);
 
             assertThrows(AuthorizationException.class, () ->
-                    commentService.deleteComment(1, 2));
+                    commentService.deleteComment(100, 1, 2));
             verify(commentRepository, never()).delete(any());
         }
 
@@ -290,7 +290,7 @@ class CommentServiceTest {
             when(commentRepository.findByIdWithTaskAndProject(999)).thenReturn(Optional.empty());
 
             assertThrows(ResourceNotFoundException.class, () ->
-                    commentService.deleteComment(999, 1));
+                    commentService.deleteComment(100, 999, 1));
         }
     }
 
@@ -315,7 +315,7 @@ class CommentServiceTest {
                     new CommentDTO(1, 100, 1, "Author", null, "content",
                             null, null, List.of(), 1, 0, List.of("Other User"), List.of(), false, false, List.of()));
 
-            commentService.reactToComment(1, 2, ReactionType.LIKE);
+            commentService.reactToComment(100, 1, 2, ReactionType.LIKE);
 
             verify(commentReactionRepository).save(any(CommentReaction.class));
             var captor = ArgumentCaptor.forClass(NotificationEvent.class);
@@ -335,7 +335,7 @@ class CommentServiceTest {
                     new CommentDTO(1, 100, 1, "Author", null, "content",
                             null, null, List.of(), 1, 0, List.of("Author"), List.of(), false, false, List.of()));
 
-            commentService.reactToComment(1, 1, ReactionType.LIKE);
+            commentService.reactToComment(100, 1, 1, ReactionType.LIKE);
 
             verify(commentReactionRepository).save(any(CommentReaction.class));
             verify(applicationEventPublisher, never()).publishEvent(any(NotificationEvent.class));
@@ -355,7 +355,7 @@ class CommentServiceTest {
                     new CommentDTO(1, 100, 1, "Author", null, "content",
                             null, null, List.of(), 0, 0, List.of(), List.of(), false, false, List.of()));
 
-            commentService.reactToComment(1, 2, ReactionType.LIKE);
+            commentService.reactToComment(100, 1, 2, ReactionType.LIKE);
 
             verify(commentReactionRepository).delete(existingReaction);
             verify(commentReactionRepository, never()).save(any());
@@ -375,7 +375,7 @@ class CommentServiceTest {
                     new CommentDTO(1, 100, 1, "Author", null, "content",
                             null, null, List.of(), 0, 1, List.of(), List.of("Other User"), false, true, List.of()));
 
-            commentService.reactToComment(1, 2, ReactionType.DISLIKE);
+            commentService.reactToComment(100, 1, 2, ReactionType.DISLIKE);
 
             verify(commentReactionRepository).save(existingReaction);
             assertEquals(ReactionType.DISLIKE, existingReaction.getType());

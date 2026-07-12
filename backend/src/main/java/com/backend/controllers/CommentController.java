@@ -57,8 +57,7 @@ public class CommentController {
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) {
         var userId = tokenService.getUserIdFromRequest(request);
-        commentService.verifyCommentBelongsToTask(commentId, taskId);
-        var updatedComment = commentService.updateComment(commentId, userId, content, attachments);
+        var updatedComment = commentService.updateComment(taskId, commentId, userId, content, attachments);
         return ResponseEntity.ok(updatedComment);
     }
 
@@ -69,8 +68,7 @@ public class CommentController {
             @PathVariable Integer commentId
     ) {
         var userId = tokenService.getUserIdFromRequest(request);
-        commentService.verifyCommentBelongsToTask(commentId, taskId);
-        commentService.deleteComment(commentId, userId);
+        commentService.deleteComment(taskId, commentId, userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -82,8 +80,7 @@ public class CommentController {
             @RequestParam("type") ReactionType reactionType
     ) {
         var userId = tokenService.getUserIdFromRequest(request);
-        commentService.verifyCommentBelongsToTask(commentId, taskId);
-        var updatedComment = commentService.reactToComment(commentId, userId, reactionType);
+        var updatedComment = commentService.reactToComment(taskId, commentId, userId, reactionType);
         return ResponseEntity.ok(updatedComment);
     }
 }
