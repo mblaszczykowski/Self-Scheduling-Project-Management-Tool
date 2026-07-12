@@ -125,7 +125,7 @@ const ScheduleHealthCard = ({ stats }) => {
                     <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">Most behind</p>
                     {h.worstBehind.slice(0, 3).map(task => (
                         <Link key={task.taskKey} to={`/projects?selectedIssue=${task.taskKey}`}
-                            className="block text-xs text-slate-600 hover:text-slate-900 truncate transition-colors mb-0.5">
+                            className="block text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white truncate transition-colors mb-0.5">
                             <span className="font-mono font-medium">{task.taskKey}</span>
                             <span className="text-red-500 ml-1">{task.gap}% behind</span>
                             <span className="text-slate-400 ml-1">({task.progress}% vs {task.expected}% expected)</span>
@@ -242,7 +242,7 @@ const DependencyChainCard = ({ stats }) => {
         <ChartCard title="Dependency Analysis" subtitle="Chain depth & bottleneck tasks">
             <div className="flex items-start justify-between mb-4">
                 <div>
-                    <div className="text-4xl font-bold text-slate-900 mb-1">
+                    <div className="text-4xl font-bold text-slate-900 dark:text-white mb-1">
                         {da.longestChainLength}
                     </div>
                     <div className="text-xs text-slate-500">
@@ -545,14 +545,14 @@ const CriticalPathTimelineCard = ({ stats }) => (
                     <div key={project.projectKey} className="space-y-1">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <span className="text-sm font-semibold text-slate-900">
+                                <span className="text-sm font-semibold text-slate-900 dark:text-white">
                                     {project.projectKey}
                                 </span>
                                 {project.status === 'delayed' && (
                                     <span className="w-2 h-2 bg-red-500 rounded-full"></span>
                                 )}
                             </div>
-                            <span className="text-sm font-bold text-slate-900">
+                            <span className="text-sm font-bold text-slate-900 dark:text-white">
                                 {project.criticalPathDays}d
                             </span>
                         </div>
@@ -629,7 +629,7 @@ const BlockedTasksCard = ({ stats }) => {
     <ChartCard title="Blocked Tasks" subtitle="Waiting on dependencies">
         <div className="flex items-start justify-between mb-4">
             <div>
-                <div className="text-4xl font-bold text-slate-900 mb-1">
+                <div className="text-4xl font-bold text-slate-900 dark:text-white mb-1">
                     {stats.blockedTasks.length}
                 </div>
                 <div className="text-xs text-slate-500">
@@ -646,7 +646,7 @@ const BlockedTasksCard = ({ stats }) => {
                     {stats.blockedTasks.slice(0, 4).map(task => (
                         <Link key={task.id} to={`/projects?selectedIssue=${task.taskKey}`} className="block">
                             <div className="flex items-center gap-2">
-                                <div className="text-xs text-slate-900 font-medium truncate">
+                                <div className="text-xs text-slate-900 dark:text-white font-medium truncate">
                                     {task.taskKey}
                                 </div>
                                 {task.isCritical && (
@@ -671,7 +671,7 @@ const CrossProjectDepsCard = ({ stats }) => (
             {stats.crossProjectDeps.length > 0 ? (
                 stats.crossProjectDeps.map(project => (
                     <div key={project.projectKey} className="space-y-1">
-                        <div className="text-sm font-semibold text-slate-900">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
                             {project.projectKey}
                         </div>
                         <div className="text-xs text-slate-500">
@@ -706,7 +706,7 @@ const UpcomingDeadlinesCard = ({ stats }) => (
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-xs font-medium text-slate-900">{task.taskKey}</span>
+                                    <span className="text-xs font-medium text-slate-900 dark:text-white">{task.taskKey}</span>
                                     <span className="text-xs text-red-600 bg-red-100 px-1.5 py-0.5 rounded font-semibold">
                                         Critical
                                     </span>
