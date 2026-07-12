@@ -223,7 +223,7 @@ const ProjectVelocityCard = ({ stats }) => (
                             <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <span>{pv.activeTasks} active</span>
                                 {pv.urgentCount > 0 && (
-                                    <span className="text-amber-600">{pv.urgentCount} need >15%/day</span>
+                                    <span className="text-amber-600">{pv.urgentCount} need &gt;15%/day</span>
                                 )}
                             </div>
                         </div>
