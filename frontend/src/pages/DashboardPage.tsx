@@ -68,7 +68,7 @@ const DashboardPage = () => {
         () => new Map(stats.projectCompletion.map(p => [p.projectKey, p.completionPercentage])),
         [stats.projectCompletion]
     );
-    const getProjectCompletion = (projectKey) => completionByProject.get(projectKey) || 0;
+    const getProjectCompletion = (projectKey: string) => completionByProject.get(projectKey) || 0;
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -152,7 +152,7 @@ const DashboardPage = () => {
     );
 };
 
-const EmptyProjectsState = ({ onCreateProject }) => (
+const EmptyProjectsState = ({ onCreateProject }: { onCreateProject: () => void }) => (
     <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700">
         <div className="w-14 h-14 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center mx-auto mb-4">
             <BoxIcon className="w-7 h-7 text-slate-400" />

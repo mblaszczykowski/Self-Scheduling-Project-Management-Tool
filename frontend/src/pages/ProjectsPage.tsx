@@ -23,6 +23,23 @@ import { toDateString, MS_PER_DAY } from '../util/helpers';
 import { showToast } from '../util/toast';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 import { getSidebarWidth, TIMELINE_CONSTANTS } from '../config/timelineConstants';
+import { Project, Task, EnrichedTask } from '../types';
+import { TooltipState, FilterTooltipState, TimelineTooltipContent, ResizeSide } from '../components/projects/types';
+
+interface ResizeState {
+    taskKey: string;
+    projectKey: string;
+    task: EnrichedTask;
+    startDate: string;
+    dueDate: string;
+}
+
+interface ResizePreview {
+    taskKey: string;
+    projectKey: string;
+    startDate: string;
+    dueDate: string;
+}
 
 // Lazy so TipTap (loaded by the modal's rich-text editor) stays out of the page bundle.
 const TaskProjectModal = React.lazy(() => import('../components/modals/TaskProjectModal'));
@@ -50,7 +67,12 @@ const ProjectsPage = () => {
     const { allTasks, processedProjects, taskKeyToTaskMap, projectKeyToProject, projectRowOffsets } =
         useEnrichedProjects(projects);
 
-    const openModal = useCallback((type, mode, project = null, task = null) => {
+    const openModal = useCallback((
+        type: 'task' | 'project',
+        mode: 'create' | 'edit' | 'view',
+        project: Project | null = null,
+        task: Task | null = null,
+    ) => {
         baseOpenModal(type, mode, project, task);
         if (type === 'task' && task) {
             navigate(`?selectedIssue=${task.taskKey}`, { replace: true });
@@ -69,7 +91,7 @@ const ProjectsPage = () => {
         handleFilterChange, handleProjectFilterChange, handleAssignedToMeChange,
         handleSort, clearAllFilters, projectKeyFilter, closeFilterDropdown,
     } = useUrlSyncedFilters({
-        filterState, setFilterState, viewState, setViewState,
+        filterState, setFilterState, setViewState,
         processedProjects, navigate, location, openModal, setSortState,
     });
 
@@ -79,7 +101,7 @@ const ProjectsPage = () => {
     useKeyboardShortcuts([
         { key: 'n', handler: () => openModal('task', 'create') },
         { key: 'p', handler: () => openModal('project', 'create') },
-        { key: '/', handler: () => document.querySelector('[data-search-input]')?.focus() },
+        { key: '/', handler: () => document.querySelector<HTMLElement>('[data-search-input]')?.focus() },
         { key: '1', handler: () => setViewState(prev => ({ ...prev, mode: 'timeline' })) },
         { key: '2', handler: () => setViewState(prev => ({ ...prev, mode: 'list' })) },
         { key: 'Escape', handler: () => { if (modalOpen) closeModal(); } },
@@ -99,8 +121,8 @@ const ProjectsPage = () => {
 
     // --- Local UI state ---
 
-    const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, content: null });
-    const [filterTooltip, setFilterTooltip] = useState({ visible: false, x: 0, y: 0, text: '' });
+    const [tooltip, setTooltip] = useState<TooltipState>({ visible: false, x: 0, y: 0, content: null });
+    const [filterTooltip, setFilterTooltip] = useState<FilterTooltipState>({ visible: false, x: 0, y: 0, text: '' });
 
     const sidebarWidth = getSidebarWidth(viewState.sidebarCollapsed);
 
@@ -115,10 +137,10 @@ const ProjectsPage = () => {
     // Resize is optimistic: each drag step updates a local preview only (no
     // network), and a single updateTask is committed when the drag ends. This
     // replaces the previous per-step write+refetch+toast (one drag = N calls).
-    const [resizePreview, setResizePreview] = useState(null);
-    const resizeRef = useRef(null);
+    const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
+    const resizeRef = useRef<ResizeState | null>(null);
 
-    const handleTaskResize = useCallback((taskKey, projectKey, side, deltaDays) => {
+    const handleTaskResize = useCallback((taskKey: string, projectKey: string, side: ResizeSide, deltaDays: number) => {
         let current = resizeRef.current;
         if (!current || current.taskKey !== taskKey) {
             const project = processedProjects.find(p => p.projectKey === projectKey);
@@ -258,7 +280,7 @@ const ProjectsPage = () => {
         }
 
         const timelineWidth =
-            Math.round((timelineEnd - timelineStart) / MS_PER_DAY) * DAY_WIDTH
+            Math.round((timelineEnd.getTime() - timelineStart.getTime()) / MS_PER_DAY) * DAY_WIDTH
             + TIMELINE_END_PADDING;
 
         return { timelineStart, timelineEnd, timelineWidth };
@@ -269,31 +291,31 @@ const ProjectsPage = () => {
     const scrollToToday = useCallback(() => {
         if (!timelineRef.current) return;
         const today = new Date();
-        const daysFromStart = Math.round((today - timelineStart) / MS_PER_DAY);
+        const daysFromStart = Math.round((today.getTime() - timelineStart.getTime()) / MS_PER_DAY);
         const scrollLeft = Math.max(0, daysFromStart * DAY_WIDTH - timelineRef.current.clientWidth / 2);
         timelineRef.current.scrollTo({ left: scrollLeft, behavior: 'smooth' });
     }, [timelineStart]);
 
     // --- Event handlers ---
 
-    const toggleExpand = (key) => setViewState(prev => ({
+    const toggleExpand = (key: string) => setViewState(prev => ({
         ...prev,
         expandedProjects: { ...prev.expandedProjects, [key]: !prev.expandedProjects[key] },
     }));
 
-    const handleMouseDown = (e, taskKey, projectKey, side) => startResize(e, taskKey, projectKey, side);
+    const handleMouseDown = (e: React.MouseEvent, taskKey: string, projectKey: string, side: ResizeSide) => startResize(e, taskKey, projectKey, side);
 
-    const handleTooltipShow = (e, content) => {
+    const handleTooltipShow = (e: React.MouseEvent, content: TimelineTooltipContent) => {
         setTooltip({ visible: true, x: e.clientX, y: e.clientY, content });
     };
-    const handleTooltipMove = (e) => {
+    const handleTooltipMove = (e: React.MouseEvent) => {
         setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }));
     };
     const handleTooltipHide = () => {
         setTooltip({ visible: false, x: 0, y: 0, content: null });
     };
 
-    const handleFilterTooltipShow = (tooltipData) => setFilterTooltip(tooltipData);
+    const handleFilterTooltipShow = (tooltipData: FilterTooltipState) => setFilterTooltip(tooltipData);
     const handleFilterTooltipHide = () => {
         setFilterTooltip({ visible: false, x: 0, y: 0, text: '' });
     };
@@ -357,7 +379,7 @@ const ProjectsPage = () => {
                     />
 
                         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg shrink-0 ml-auto">
-                            {['timeline', 'list'].map(mode => (
+                            {(['timeline', 'list'] as const).map(mode => (
                                 <button
                                     key={mode}
                                     onClick={() => setViewState(prev => ({ ...prev, mode }))}
@@ -463,8 +485,6 @@ const ProjectsPage = () => {
                             modalMode={modalMode}
                             project={currentProject}
                             task={currentTask}
-                            projects={projects}
-                            projectKey={currentTask?.projectKey}
                             onClose={closeModal}
                         />
                     </Suspense>

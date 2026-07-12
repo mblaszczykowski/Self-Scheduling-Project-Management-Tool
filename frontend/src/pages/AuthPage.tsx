@@ -4,8 +4,10 @@ import LoginForm from '../components/auth/LoginForm';
 import { GanttChart, FEATURES, FeatureIcon } from '../components/auth/GanttPreview';
 import '../components/common/Aurora.css';
 
-export default function AuthPage({ show }) {
-    const [showForm, setShowForm] = useState(show);
+type AuthFormMode = 'login' | 'register';
+
+export default function AuthPage({ show }: { show: AuthFormMode }) {
+    const [showForm, setShowForm] = useState<AuthFormMode>(show);
 
     useEffect(() => {
         setShowForm(show);
