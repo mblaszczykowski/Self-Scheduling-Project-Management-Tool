@@ -34,7 +34,7 @@ class AuthServiceTest {
     private TokenService tokenService;
 
     @Mock
-    private com.backend.filter.RateLimitFilter rateLimitFilter;
+    private com.backend.services.RateLimitService rateLimitService;
 
     @Mock
     private HttpServletRequest request;
@@ -58,7 +58,7 @@ class AuthServiceTest {
         cookieProperties.setSecure(false);
         cookieProperties.setSameSite("Strict");
         var cookieFactory = new com.backend.util.CookieFactory(cookieProperties);
-        authService = new AuthService(userService, tokenService, rateLimitFilter, passwordEncoder, cookieFactory, "");
+        authService = new AuthService(userService, tokenService, rateLimitService, passwordEncoder, cookieFactory, "");
 
         testUser = new User();
         testUser.setId(TEST_USER_ID);

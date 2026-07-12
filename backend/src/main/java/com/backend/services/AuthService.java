@@ -3,7 +3,6 @@ package com.backend.services;
 import com.backend.entities.User;
 import com.backend.exception.AuthorizationException;
 import com.backend.exception.ValidationException;
-import com.backend.filter.RateLimitFilter;
 import com.backend.requests.LoginRequest;
 import com.backend.util.CookieFactory;
 import com.backend.util.IpUtil;
@@ -25,7 +24,7 @@ public class AuthService {
 
     private final UserService userService;
     private final TokenService tokenService;
-    private final RateLimitFilter rateLimitFilter;
+    private final RateLimitService rateLimitService;
     private final BCryptPasswordEncoder passwordEncoder;
     private final CookieFactory cookieFactory;
     private final Set<String> trustedProxies;
@@ -33,13 +32,13 @@ public class AuthService {
     @Autowired
     public AuthService(UserService userService,
                        TokenService tokenService,
-                       RateLimitFilter rateLimitFilter,
+                       RateLimitService rateLimitService,
                        BCryptPasswordEncoder passwordEncoder,
                        CookieFactory cookieFactory,
                        @Value("${app.trusted-proxies:}") String trustedProxiesConfig) {
         this.userService = userService;
         this.tokenService = tokenService;
-        this.rateLimitFilter = rateLimitFilter;
+        this.rateLimitService = rateLimitService;
         this.passwordEncoder = passwordEncoder;
         this.cookieFactory = cookieFactory;
         this.trustedProxies = IpUtil.parseTrustedProxies(trustedProxiesConfig);
@@ -62,7 +61,7 @@ public class AuthService {
             throw new ValidationException("Invalid email or password");
         }
 
-        rateLimitFilter.resetLoginAttempts(getClientIp(httpRequest));
+        rateLimitService.resetLoginAttempts(getClientIp(httpRequest));
 
         var tokens = tokenService.createAuthTokens(user.getId());
 
