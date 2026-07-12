@@ -11,10 +11,12 @@ import {
     HiOutlineCog,
     HiOutlineUserRemove,
 } from 'react-icons/hi';
+import { IconType } from 'react-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { useClickOutside } from '../../hooks/useClickOutside';
+import { Notification } from '../../types';
 
-const TYPE_CONFIG = {
+const TYPE_CONFIG: Record<string, { icon: IconType; color: string; bg: string; label: string }> = {
     PROJECT_INVITATION: { icon: HiOutlineUserAdd, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/30', label: 'Invitation' },
     PROJECT_UPDATED:    { icon: HiOutlineCog, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30', label: 'Project' },
     MEMBER_REMOVED:     { icon: HiOutlineUserRemove, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/30', label: 'Removed' },
@@ -28,8 +30,8 @@ const TYPE_CONFIG = {
 
 const FALLBACK_CONFIG = { icon: HiOutlineBell, color: 'text-slate-500', bg: 'bg-slate-50 dark:bg-slate-800', label: 'Notification' };
 
-function NotificationItem({ notification, onClose, onMarkSingleRead }) {
-    const cfg = TYPE_CONFIG[notification.type] || FALLBACK_CONFIG;
+function NotificationItem({ notification, onClose, onMarkSingleRead }: { notification: Notification; onClose: () => void; onMarkSingleRead: (id: number) => void }) {
+    const cfg = TYPE_CONFIG[notification.type ?? ''] || FALLBACK_CONFIG;
     const Icon = cfg.icon;
     const isUnread = !notification.isRead;
 
@@ -84,6 +86,15 @@ function NotificationItem({ notification, onClose, onMarkSingleRead }) {
     );
 }
 
+interface NotificationDropdownProps {
+    notifications: Notification[];
+    isOpen: boolean;
+    onToggle: () => void;
+    onClose: () => void;
+    onMarkAsRead: () => void;
+    onMarkSingleRead: (id: number) => void;
+}
+
 export default function NotificationDropdown({
     notifications,
     isOpen,
@@ -91,13 +102,13 @@ export default function NotificationDropdown({
     onClose,
     onMarkAsRead,
     onMarkSingleRead,
-}) {
-    const dropdownRef = useRef(null);
+}: NotificationDropdownProps) {
+    const dropdownRef = useRef<HTMLDivElement | null>(null);
     useClickOutside(dropdownRef, onClose);
 
     const { unreadNotifications, readNotifications } = useMemo(() => {
-        const unread = [];
-        const read = [];
+        const unread: Notification[] = [];
+        const read: Notification[] = [];
         for (const n of notifications) {
             (n.isRead ? read : unread).push(n);
         }

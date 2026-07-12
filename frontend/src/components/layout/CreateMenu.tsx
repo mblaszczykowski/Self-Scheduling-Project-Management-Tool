@@ -2,14 +2,22 @@ import React, { useRef } from 'react';
 import { HiOutlineChevronDown, HiOutlineFolderOpen, HiOutlineClipboardList } from 'react-icons/hi';
 import { useClickOutside } from '../../hooks/useClickOutside';
 
+interface CreateMenuProps {
+    isOpen: boolean;
+    onToggle: () => void;
+    onClose: () => void;
+    onCreateProject: () => void;
+    onCreateTask: () => void;
+}
+
 export default function CreateMenu({
     isOpen,
     onToggle,
     onClose,
     onCreateProject,
     onCreateTask
-}) {
-    const dropdownRef = useRef(null);
+}: CreateMenuProps) {
+    const dropdownRef = useRef<HTMLDivElement | null>(null);
     useClickOutside(dropdownRef, onClose);
 
     const handleCreateProject = () => {

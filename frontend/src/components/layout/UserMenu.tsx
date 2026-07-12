@@ -1,12 +1,19 @@
 import React from 'react';
 import { HiOutlineLogout } from 'react-icons/hi';
 import Avatar from '../common/Avatar';
+import { User } from '../../types';
+
+interface UserMenuProps {
+    user: User | null;
+    onOpenAccountModal: () => void;
+    onLogoutClick: () => void;
+}
 
 export default function UserMenu({
     user,
     onOpenAccountModal,
     onLogoutClick
-}) {
+}: UserMenuProps) {
     return (
         <div className="flex items-center gap-1">
             <button

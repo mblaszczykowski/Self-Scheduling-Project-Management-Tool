@@ -13,7 +13,7 @@ import MobileMenu from './MobileMenu';
 import { markNotificationsAsRead } from '../../util/api';
 import SearchBar from './SearchBar';
 
-const NavLink = ({ to, active, children }) => (
+const NavLink = ({ to, active, children }: { to: string; active: boolean; children: React.ReactNode }) => (
     <Link
         to={to}
         className={
@@ -26,7 +26,13 @@ const NavLink = ({ to, active, children }) => (
     </Link>
 );
 
-export default function Header({ onLogout, onCreateProject, onCreateTask }) {
+interface HeaderProps {
+    onLogout: () => void;
+    onCreateProject: () => void;
+    onCreateTask: () => void;
+}
+
+export default function Header({ onLogout, onCreateProject, onCreateTask }: HeaderProps) {
     const { user, setUser } = useContext(AuthContext);
     const { notifications, setNotifications } = useContext(NotificationsContext);
     const { theme, toggleTheme } = useTheme();
@@ -60,7 +66,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }) {
         }
     };
 
-    const handleMarkSingleRead = async (notificationId) => {
+    const handleMarkSingleRead = async (notificationId: number) => {
         try {
             await markNotificationsAsRead([notificationId]);
             setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n));

@@ -4,8 +4,9 @@ import { HiOutlineSearch } from 'react-icons/hi';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { globalSearch } from '../../util/api';
 import config from '../../config';
+import { Project, Task } from '../../types';
 
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<string, string> = {
     BACKLOG: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
     TODO: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
     IN_PROGRESS: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
@@ -13,18 +14,32 @@ const STATUS_COLORS = {
     DONE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
 };
 
-const formatStatus = (status) =>
+interface SearchCommentResult {
+    commentId: number;
+    taskKey: string;
+    authorName?: string;
+    content?: string;
+    snippet?: string;
+}
+
+interface SearchResults {
+    projects?: Project[];
+    tasks?: Task[];
+    comments?: SearchCommentResult[];
+}
+
+const formatStatus = (status?: string) =>
     status ? status.replace(/_/g, ' ') : '';
 
 export default function SearchBar() {
     const [query, setQuery] = useState('');
-    const [results, setResults] = useState(null);
+    const [results, setResults] = useState<SearchResults | null>(null);
     const [loading, setLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
-    const containerRef = useRef(null);
-    const inputRef = useRef(null);
-    const debounceRef = useRef(null);
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const inputRef = useRef<HTMLInputElement | null>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const requestIdRef = useRef(0);
     const navigate = useNavigate();
 
@@ -33,7 +48,7 @@ export default function SearchBar() {
         setIsFocused(false);
     }, []));
 
-    const performSearch = useCallback(async (searchQuery) => {
+    const performSearch = useCallback(async (searchQuery: string) => {
         if (searchQuery.trim().length < 2) {
             setResults(null);
             setIsOpen(false);
@@ -57,7 +72,7 @@ export default function SearchBar() {
         }
     }, []);
 
-    const handleChange = (e) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         setQuery(value);
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -70,7 +85,7 @@ export default function SearchBar() {
         };
     }, []);
 
-    const navigateTo = (path) => {
+    const navigateTo = (path: string) => {
         setIsOpen(false);
         setQuery('');
         setResults(null);
@@ -79,7 +94,7 @@ export default function SearchBar() {
         navigate(path);
     };
 
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Escape') {
             setIsOpen(false);
             setIsFocused(false);

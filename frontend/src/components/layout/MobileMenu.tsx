@@ -1,6 +1,15 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Location } from 'react-router-dom';
 import { BoxIcon, ClipboardIcon, UserIcon, LogoutIcon } from '../common/Icons';
+
+interface MobileMenuProps {
+    location: Location;
+    onClose: () => void;
+    onCreateProject: () => void;
+    onCreateTask: () => void;
+    onOpenAccountModal: () => void;
+    onLogoutClick: () => void;
+}
 
 export default function MobileMenu({
     location,
@@ -9,8 +18,8 @@ export default function MobileMenu({
     onCreateTask,
     onOpenAccountModal,
     onLogoutClick
-}) {
-    const MobileNavLink = ({ to, children }) => (
+}: MobileMenuProps) {
+    const MobileNavLink = ({ to, children }: { to: string; children: React.ReactNode }) => (
         <Link
             to={to}
             className={`block py-2.5 px-3 text-sm font-medium rounded-lg transition-colors ${
@@ -44,7 +53,7 @@ export default function MobileMenu({
     );
 }
 
-function MobileMenuButton({ onClick, icon, variant, children }) {
+function MobileMenuButton({ onClick, icon, variant, children }: { onClick: () => void; icon: React.ReactNode; variant?: 'danger'; children: React.ReactNode }) {
     const baseClass = variant === 'danger'
         ? 'w-full flex items-center gap-3 py-2.5 px-3 text-red-600 dark:text-red-400 text-sm font-medium rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors'
         : 'w-full flex items-center gap-3 py-2.5 px-3 text-slate-700 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors';
