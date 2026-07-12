@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 export function useUrlSyncedFilters({
-    filterState, setFilterState, viewState, setViewState,
+    filterState, setFilterState, setViewState,
     processedProjects, navigate, location, openModal, setSortState,
 }) {
     const handledIssueRef = useRef(null);

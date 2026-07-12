@@ -29,7 +29,12 @@ export function useProjectsPageState() {
 
     useEffect(() => {
         const { openFilterDropdown, searchQuery, ...toSave } = filterState;
-        localStorage.setItem('flowlink_filters', JSON.stringify(toSave));
+        // Debounced so typing in the search box doesn't write to localStorage on
+        // every keystroke.
+        const timer = setTimeout(() => {
+            localStorage.setItem('flowlink_filters', JSON.stringify(toSave));
+        }, 400);
+        return () => clearTimeout(timer);
     }, [filterState]);
 
     useEffect(() => {

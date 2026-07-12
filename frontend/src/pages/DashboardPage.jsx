@@ -62,9 +62,11 @@ const DashboardPage = () => {
         if (didSave) refreshProjects();
     }, [baseCloseModal, refreshProjects]);
 
-    const getProjectCompletion = (projectKey) => {
-        return stats.projectCompletion.find(p => p.projectKey === projectKey)?.completionPercentage || 0;
-    };
+    const completionByProject = useMemo(
+        () => new Map(stats.projectCompletion.map(p => [p.projectKey, p.completionPercentage])),
+        [stats.projectCompletion]
+    );
+    const getProjectCompletion = (projectKey) => completionByProject.get(projectKey) || 0;
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900">

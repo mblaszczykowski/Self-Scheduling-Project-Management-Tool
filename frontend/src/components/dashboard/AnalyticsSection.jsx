@@ -195,10 +195,10 @@ const ResourceConflictsCard = ({ stats }) => {
 };
 
 const velocityStatusConfig = {
-    comfortable: { color: 'bg-green-500', label: 'Comfortable', textColor: 'text-green-600' },
-    moderate: { color: 'bg-blue-500', label: 'Moderate', textColor: 'text-blue-600' },
-    tight: { color: 'bg-amber-500', label: 'Tight', textColor: 'text-amber-600' },
-    critical: { color: 'bg-red-500', label: 'Critical', textColor: 'text-red-600' },
+    comfortable: { color: 'bg-green-500', bgClass: 'bg-green-500/10', label: 'Comfortable', textColor: 'text-green-600 dark:text-green-400' },
+    moderate: { color: 'bg-blue-500', bgClass: 'bg-blue-500/10', label: 'Moderate', textColor: 'text-blue-600 dark:text-blue-400' },
+    tight: { color: 'bg-amber-500', bgClass: 'bg-amber-500/10', label: 'Tight', textColor: 'text-amber-600 dark:text-amber-400' },
+    critical: { color: 'bg-red-500', bgClass: 'bg-red-500/10', label: 'Critical', textColor: 'text-red-600 dark:text-red-400' },
 };
 
 const ProjectVelocityCard = ({ stats }) => (
@@ -211,8 +211,8 @@ const ProjectVelocityCard = ({ stats }) => (
                         <div key={pv.projectKey} className="space-y-1">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm font-semibold text-slate-900">{pv.projectKey}</span>
-                                    <span className={`text-[10px] font-medium ${cfg.textColor} px-1.5 py-0.5 rounded-full bg-opacity-10 ${cfg.color.replace('bg-', 'bg-')}/10`}>
+                                    <span className="text-sm font-semibold text-slate-900 dark:text-white">{pv.projectKey}</span>
+                                    <span className={`text-[10px] font-medium ${cfg.textColor} px-1.5 py-0.5 rounded-full ${cfg.bgClass}`}>
                                         {cfg.label}
                                     </span>
                                 </div>
@@ -295,29 +295,14 @@ const DependencyChainCard = ({ stats }) => {
     );
 };
 
-/* ── Status distribution color map (hex values matching STATUS_CONFIG dot colors) ── */
-const STATUS_CHART_COLORS = {
-    BACKLOG: '#94a3b8',
-    TODO: '#3b82f6',
-    IN_PROGRESS: '#f59e0b',
-    IN_TEST: '#0ea5e9',
-    TO_TEST: '#3b82f6',
-    TO_REVIEW: '#06b6d4',
-    READY_TO_MERGE: '#14b8a6',
-    READY_TO_DEPLOY: '#10b981',
-    DONE: '#22c55e',
-    RELEASED: '#16a34a',
-    WITHDRAWN: '#ef4444',
-    GATHERING_INTEREST: '#f97316',
-};
+/* ── Chart colours derived from the single source of truth in helpers ── */
+const STATUS_CHART_COLORS = Object.fromEntries(
+    Object.entries(STATUS_CONFIG).map(([key, cfg]) => [key, cfg.hex])
+);
 
-const PRIORITY_CHART_COLORS = {
-    LOWEST: '#94a3b8',
-    LOW: '#3b82f6',
-    MEDIUM: '#f59e0b',
-    HIGH: '#f97316',
-    HIGHEST: '#ef4444',
-};
+const PRIORITY_CHART_COLORS = Object.fromEntries(
+    Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => [key, cfg.hex])
+);
 
 const doughnutOptions = {
     plugins: {
@@ -893,4 +878,6 @@ const OptimizationOpportunityCard = ({ stats }) => {
     );
 };
 
-export default AnalyticsSection;
+// Memoized: it depends only on the stable `stats` object, so unrelated
+// DashboardPage re-renders (e.g. opening a modal) no longer re-render every card.
+export default React.memo(AnalyticsSection);

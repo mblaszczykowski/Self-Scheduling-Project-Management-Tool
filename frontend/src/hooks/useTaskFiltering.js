@@ -61,7 +61,7 @@ const getSortValue = (task, field) => {
     return value;
 };
 
-const applyUrlFilters = (tasks, urlParams, userEmail) => {
+const applyUrlFilters = (tasks, urlParams) => {
     const params = new URLSearchParams(urlParams);
     let filtered = [...tasks];
 
@@ -130,7 +130,7 @@ export const useTaskFiltering = ({
     const filteredTasks = useMemo(() => {
         let result = tasks;
 
-        result = applyUrlFilters(result, urlParams, currentUser?.email);
+        result = applyUrlFilters(result, urlParams);
         result = applyStateFilters(result, filters);
         result = applyAssignedToMeFilter(result, assignedToMe, currentUser);
         result = applySearchFilter(result, searchQuery);
