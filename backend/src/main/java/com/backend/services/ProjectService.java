@@ -141,10 +141,7 @@ public class ProjectService {
 
     @Transactional(rollbackFor = Exception.class)
     public ProjectDTO updateProject(String projectKey, ProjectCreateRequest request, Integer userId, List<MultipartFile> attachments) {
-        var project = projectRepository.findByProjectKey(projectKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-
-        accessGuard.requireOwner(project, userId);
+        var project = accessGuard.getOwnedProject(projectKey, userId);
 
         project.setSummary(request.summary());
         project.setDescription(request.description());
@@ -174,10 +171,7 @@ public class ProjectService {
 
     @Transactional(rollbackFor = Exception.class)
     public void deleteProject(String projectKey, Integer userId) {
-        var project = projectRepository.findByProjectKey(projectKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-
-        accessGuard.requireOwner(project, userId);
+        var project = accessGuard.getOwnedProject(projectKey, userId);
 
         deleteAllProjectAttachmentsSilently(project);
         projectRepository.delete(project);

@@ -111,17 +111,12 @@ public class TaskService {
                               Integer userId, List<MultipartFile> files) {
         validateLabels(request.labels());
 
-        var project = projectRepository.findByProjectKey(projectKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-
-        accessGuard.requireAccess(project, userId);
+        var project = accessGuard.getAccessibleProject(projectKey, userId);
 
         var task = taskRepository.findByTaskKey(taskKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
 
-        if (!task.getProject().getId().equals(project.getId())) {
-            throw new ValidationException("Task does not belong to the specified project");
-        }
+        accessGuard.verifyTaskInProject(task, project);
 
         // Snapshot old values for activity logging
         var oldStatus = task.getStatus();
@@ -275,17 +270,12 @@ public class TaskService {
 
     @Transactional(rollbackFor = Exception.class)
     public void deleteTask(String projectKey, String taskKey, Integer userId) {
-        var project = projectRepository.findByProjectKey(projectKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-
-        accessGuard.requireOwner(project, userId);
+        var project = accessGuard.getOwnedProject(projectKey, userId);
 
         var task = taskRepository.findByTaskKey(taskKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
 
-        if (!task.getProject().getId().equals(project.getId())) {
-            throw new ValidationException("Task does not belong to the specified project");
-        }
+        accessGuard.verifyTaskInProject(task, project);
 
         if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
             var message = "Task '" + task.getSummary() + "' has been deleted";

@@ -273,7 +273,7 @@ class TaskServiceTest {
                     TaskStatus.IN_PROGRESS, TaskPriority.HIGH, 50,
                     null, null, null, null, null, null);
 
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            when(accessGuard.getAccessibleProject("PROJ", 1)).thenReturn(project);
             when(taskRepository.findByTaskKey("PROJ-1")).thenReturn(Optional.of(existingTask));
             when(taskRepository.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
             when(entityMapper.toTaskDTO(any(Task.class))).thenAnswer(inv -> {
@@ -298,8 +298,10 @@ class TaskServiceTest {
                     null, null, null,
                     null, null, null, null, null, null);
 
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            when(accessGuard.getAccessibleProject("PROJ", 1)).thenReturn(project);
             when(taskRepository.findByTaskKey("OTHER-1")).thenReturn(Optional.of(otherTask));
+            doThrow(new ValidationException("Task does not belong to the specified project"))
+                    .when(accessGuard).verifyTaskInProject(otherTask, project);
 
             assertThrows(ValidationException.class, () ->
                     taskService.updateTask("PROJ", "OTHER-1", request, 1, null));
@@ -320,7 +322,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should delete task for project owner")
         void shouldDeleteTaskForProjectOwner() {
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            when(accessGuard.getOwnedProject("PROJ", 1)).thenReturn(project);
             when(taskRepository.findByTaskKey("PROJ-1")).thenReturn(Optional.of(existingTask));
 
             taskService.deleteTask("PROJ", "PROJ-1", 1);
@@ -332,9 +334,8 @@ class TaskServiceTest {
         @Test
         @DisplayName("should throw when non-owner tries to delete task")
         void shouldThrowWhenNonOwnerDeletesTask() {
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
-            doThrow(new AuthorizationException("Only project owner can perform this action"))
-                    .when(accessGuard).requireOwner(project, 2);
+            when(accessGuard.getOwnedProject("PROJ", 2))
+                    .thenThrow(new AuthorizationException("Only project owner can perform this action"));
 
             assertThrows(AuthorizationException.class, () ->
                     taskService.deleteTask("PROJ", "PROJ-1", 2));
@@ -344,7 +345,7 @@ class TaskServiceTest {
         @Test
         @DisplayName("should throw when task not found")
         void shouldThrowWhenTaskNotFound() {
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            when(accessGuard.getOwnedProject("PROJ", 1)).thenReturn(project);
             when(taskRepository.findByTaskKey("PROJ-999")).thenReturn(Optional.empty());
 
             assertThrows(ResourceNotFoundException.class, () ->
@@ -357,8 +358,10 @@ class TaskServiceTest {
             var otherProject = TestEntityFactory.createProject(99, "OTHER", owner);
             var otherTask = TestEntityFactory.createTask(200, 1, otherProject);
 
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
+            when(accessGuard.getOwnedProject("PROJ", 1)).thenReturn(project);
             when(taskRepository.findByTaskKey("OTHER-1")).thenReturn(Optional.of(otherTask));
+            doThrow(new ValidationException("Task does not belong to the specified project"))
+                    .when(accessGuard).verifyTaskInProject(otherTask, project);
 
             assertThrows(ValidationException.class, () ->
                     taskService.deleteTask("PROJ", "OTHER-1", 1));

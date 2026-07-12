@@ -23,15 +23,14 @@ import java.util.Set;
                 @Index(name = "idx_task_priority", columnList = "priority")
         }
 )
+// Only to-one associations are fetch-joined. The `dependencies` collection is loaded lazily
+// and batched (hibernate.default_batch_fetch_size): fetch-joining it here produced a cartesian
+// product / duplicate root rows and forced in-memory pagination on the paged search query.
 @NamedEntityGraph(
         name = "Task.withDetails",
         attributeNodes = {
                 @NamedAttributeNode("assignee"),
-                @NamedAttributeNode("project"),
-                @NamedAttributeNode(value = "dependencies", subgraph = "dependency-project")
-        },
-        subgraphs = {
-                @NamedSubgraph(name = "dependency-project", attributeNodes = @NamedAttributeNode("project"))
+                @NamedAttributeNode("project")
         }
 )
 public class Task {

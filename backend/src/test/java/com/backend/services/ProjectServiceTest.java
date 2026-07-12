@@ -180,8 +180,7 @@ class ProjectServiceTest {
             var request = new ProjectCreateRequest("PROJ", "Updated", "desc",
                     null, List.of("DEP"), null);
 
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
-            doNothing().when(accessGuard).requireOwner(project, 1);
+            when(accessGuard.getOwnedProject("PROJ", 1)).thenReturn(project);
             when(projectRepository.findByProjectKey("DEP")).thenReturn(Optional.of(depProject));
 
             assertThrows(ValidationException.class, () ->
@@ -238,8 +237,7 @@ class ProjectServiceTest {
             var request = new ProjectCreateRequest("PROJ", "Updated Summary", "Updated desc",
                     null, null, null);
 
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
-            doNothing().when(accessGuard).requireOwner(project, 1);
+            when(accessGuard.getOwnedProject("PROJ", 1)).thenReturn(project);
             when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
 
             var result = projectService.updateProject("PROJ", request, 1, null);
@@ -254,9 +252,8 @@ class ProjectServiceTest {
             var request = new ProjectCreateRequest("PROJ", "Updated", "desc",
                     null, null, null);
 
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
-            doThrow(new AuthorizationException("Only project owner can perform this action"))
-                    .when(accessGuard).requireOwner(project, 99);
+            when(accessGuard.getOwnedProject("PROJ", 99))
+                    .thenThrow(new AuthorizationException("Only project owner can perform this action"));
 
             assertThrows(AuthorizationException.class, () ->
                     projectService.updateProject("PROJ", request, 99, null));
@@ -268,7 +265,8 @@ class ProjectServiceTest {
             var request = new ProjectCreateRequest("NOPE", "Updated", "desc",
                     null, null, null);
 
-            when(projectRepository.findByProjectKey("NOPE")).thenReturn(Optional.empty());
+            when(accessGuard.getOwnedProject("NOPE", 1))
+                    .thenThrow(new ResourceNotFoundException("Project not found"));
 
             assertThrows(ResourceNotFoundException.class, () ->
                     projectService.updateProject("NOPE", request, 1, null));
@@ -283,8 +281,7 @@ class ProjectServiceTest {
             var request = new ProjectCreateRequest("PROJ", "Updated", "desc",
                     List.of(newMemberDTO), null, null);
 
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
-            doNothing().when(accessGuard).requireOwner(project, 1);
+            when(accessGuard.getOwnedProject("PROJ", 1)).thenReturn(project);
             when(userService.findByEmailsAsMap(Set.of("member@example.com")))
                     .thenReturn(Map.of("member@example.com", member));
             when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -312,8 +309,7 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should delete project for owner")
         void shouldDeleteProjectForOwner() {
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
-            doNothing().when(accessGuard).requireOwner(project, 1);
+            when(accessGuard.getOwnedProject("PROJ", 1)).thenReturn(project);
 
             projectService.deleteProject("PROJ", 1);
 
@@ -323,9 +319,8 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should throw when non-owner tries to delete")
         void shouldThrowWhenNonOwnerDeletes() {
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
-            doThrow(new AuthorizationException("Only project owner can perform this action"))
-                    .when(accessGuard).requireOwner(project, 99);
+            when(accessGuard.getOwnedProject("PROJ", 99))
+                    .thenThrow(new AuthorizationException("Only project owner can perform this action"));
 
             assertThrows(AuthorizationException.class, () ->
                     projectService.deleteProject("PROJ", 99));
@@ -335,7 +330,8 @@ class ProjectServiceTest {
         @Test
         @DisplayName("should throw when project not found for delete")
         void shouldThrowWhenProjectNotFoundForDelete() {
-            when(projectRepository.findByProjectKey("NOPE")).thenReturn(Optional.empty());
+            when(accessGuard.getOwnedProject("NOPE", 1))
+                    .thenThrow(new ResourceNotFoundException("Project not found"));
 
             assertThrows(ResourceNotFoundException.class, () ->
                     projectService.deleteProject("NOPE", 1));
@@ -345,8 +341,7 @@ class ProjectServiceTest {
         @DisplayName("should delete attachments before deleting project")
         void shouldDeleteAttachmentsBeforeDeleting() {
             project.replaceAttachments(List.of("file1.png", "file2.png"));
-            when(projectRepository.findByProjectKey("PROJ")).thenReturn(Optional.of(project));
-            doNothing().when(accessGuard).requireOwner(project, 1);
+            when(accessGuard.getOwnedProject("PROJ", 1)).thenReturn(project);
 
             projectService.deleteProject("PROJ", 1);
 

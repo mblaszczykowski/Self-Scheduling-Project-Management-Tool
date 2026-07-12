@@ -5,6 +5,7 @@ import com.backend.entities.Project;
 import com.backend.entities.Task;
 import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
+import com.backend.exception.ValidationException;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
 import org.springframework.stereotype.Component;
@@ -37,6 +38,21 @@ public class AccessGuard {
     public void requireOwner(Project project, Integer userId) {
         if (!project.isOwner(userId)) {
             throw new AuthorizationException("Only project owner can perform this action");
+        }
+    }
+
+    /** Fetch a project (with owner + members) and require the caller to be its owner. */
+    public Project getOwnedProject(String projectKey, Integer userId) {
+        var project = projectRepository.findByProjectKeyWithOwnerAndMembers(projectKey)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        requireOwner(project, userId);
+        return project;
+    }
+
+    /** Assert a task belongs to the given project (guards against cross-project task keys). */
+    public void verifyTaskInProject(Task task, Project project) {
+        if (!task.getProject().getId().equals(project.getId())) {
+            throw new ValidationException("Task does not belong to the specified project");
         }
     }
 
