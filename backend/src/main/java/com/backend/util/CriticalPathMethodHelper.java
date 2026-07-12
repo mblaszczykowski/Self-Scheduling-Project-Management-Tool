@@ -144,26 +144,7 @@ public class CriticalPathMethodHelper {
     }
 
     private TaskDTO updateTaskDTOWithIsCritical(TaskDTO taskDTO, Boolean isCritical) {
-        return new TaskDTO(
-                taskDTO.id(),
-                taskDTO.taskNumber(),
-                taskDTO.taskKey(),
-                taskDTO.projectKey(),
-                taskDTO.summary(),
-                taskDTO.description(),
-                taskDTO.status(),
-                taskDTO.startDate(),
-                taskDTO.dueDate(),
-                taskDTO.assignee(),
-                taskDTO.labels(),
-                taskDTO.dependencyKeys(),
-                isCritical,
-                taskDTO.attachments(),
-                taskDTO.created(),
-                taskDTO.updated(),
-                taskDTO.progress(),
-                taskDTO.priority()
-        );
+        return taskDTO.withIsCritical(isCritical);
     }
 
     private static class TaskCPM {

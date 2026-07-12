@@ -157,7 +157,7 @@ public class EntityMapper {
 
     // --- Helpers ---
 
-    private List<String> extractDependencyKeys(Task task) {
+    public static List<String> extractDependencyKeys(Task task) {
         if (task.getDependencies() == null || task.getDependencies().isEmpty()) {
             return null;
         }

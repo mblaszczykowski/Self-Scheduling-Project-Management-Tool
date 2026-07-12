@@ -132,7 +132,7 @@ public class TaskService {
         var oldDueDate = task.getDueDate() != null ? task.getDueDate().toString() : null;
         var oldSummary = task.getSummary();
         var oldLabels = task.getLabels();
-        var oldDeps = String.join(",", extractDependencyKeys(task) != null ? extractDependencyKeys(task) : List.of());
+        var oldDeps = String.join(",", Objects.requireNonNullElse(EntityMapper.extractDependencyKeys(task), List.<String>of()));
 
         task.setSummary(request.summary());
         task.setDescription(request.description());
@@ -173,7 +173,7 @@ public class TaskService {
             var newAssignee = task.getAssignee() != null ? task.getAssignee().getFullName() : null;
             var newStartDate = task.getStartDate() != null ? task.getStartDate().toString() : null;
             var newDueDate = task.getDueDate() != null ? task.getDueDate().toString() : null;
-            var newDeps = String.join(",", extractDependencyKeys(task) != null ? extractDependencyKeys(task) : List.of());
+            var newDeps = String.join(",", Objects.requireNonNullElse(EntityMapper.extractDependencyKeys(task), List.<String>of()));
             taskActivityService.logFieldChanges(updatedTask, author,
                     oldStatus, task.getStatus(),
                     oldPriority, task.getPriority(),
@@ -208,15 +208,6 @@ public class TaskService {
                 }
             }
         }
-    }
-
-    private List<String> extractDependencyKeys(Task task) {
-        if (task.getDependencies() == null || task.getDependencies().isEmpty()) {
-            return null;
-        }
-        return task.getDependencies().stream()
-                .map(Task::getTaskKey)
-                .toList();
     }
 
     private void updateTaskDependencies(Task task, List<String> dependencyKeys, Integer userId) {

@@ -29,4 +29,11 @@ public record TaskDTO(
         Instant updated,
         Integer progress,
         TaskPriority priority
-) {}
+) {
+    /** Returns a copy with the critical-path flag set (avoids fragile full-field rebuilds). */
+    public TaskDTO withIsCritical(Boolean isCritical) {
+        return new TaskDTO(id, taskNumber, taskKey, projectKey, summary, description, status,
+                startDate, dueDate, assignee, labels, dependencyKeys, isCritical, attachments,
+                created, updated, progress, priority);
+    }
+}
