@@ -1,6 +1,17 @@
 import React from 'react';
 import { HiOutlineExclamation } from 'react-icons/hi';
 
+interface ConfirmDialogProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    title: React.ReactNode;
+    message: React.ReactNode;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning';
+}
+
 const ConfirmDialog = ({
     isOpen,
     onClose,
@@ -10,7 +21,7 @@ const ConfirmDialog = ({
     confirmText = 'Confirm',
     cancelText = 'Cancel',
     variant = 'danger'
-}) => {
+}: ConfirmDialogProps) => {
     if (!isOpen) return null;
 
     const variantStyles = {

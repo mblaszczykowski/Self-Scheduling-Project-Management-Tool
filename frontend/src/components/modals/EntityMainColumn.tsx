@@ -2,6 +2,20 @@ import React from 'react';
 import { ErrorMessage, Field } from 'formik';
 import RichTextEditor from '../common/RichTextEditor';
 import AttachmentUploader from './AttachmentUploader';
+import { Attachment } from '../../types';
+
+interface EntityMainColumnProps {
+    values: { summary?: string; description?: string };
+    setFieldValue: (field: string, value: unknown, shouldValidate?: boolean) => void;
+    entityKey?: string;
+    namePlaceholder?: string;
+    descPlaceholder?: string;
+    attachmentInputId?: string;
+    existingAttachments?: string[];
+    newAttachments?: File[];
+    onAddAttachments?: (files: File[]) => void;
+    onRemoveAttachment?: (attachment: Attachment) => void;
+}
 
 // Shared left column for the task and project forms: entity-key chip + name
 // field + character counter + description editor + attachment uploader.
@@ -16,7 +30,7 @@ const EntityMainColumn = ({
     newAttachments,
     onAddAttachments,
     onRemoveAttachment,
-}) => (
+}: EntityMainColumnProps) => (
     <>
         <div className="mb-6">
             <div className="flex items-center gap-2.5">

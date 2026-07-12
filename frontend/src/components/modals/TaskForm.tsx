@@ -9,13 +9,18 @@ import Comments from '../comments/Comments';
 import ActivityTab from '../comments/ActivityTab';
 import { STATUS_CONFIG, PRIORITY_CONFIG, daysBetween, toDateString, MS_PER_DAY } from '../../util/helpers';
 import Avatar from '../common/Avatar';
+import { Project, Task, User, ModalFormValues, Attachment } from '../../types';
+import { FormikHelpers, FormikProps } from 'formik';
+
+type SetFieldValue = FormikHelpers<ModalFormValues>['setFieldValue'];
+type FormikChange = FormikProps<ModalFormValues>['handleChange'];
 
 /* ═══════════════════════════════════════════════════════════
    Sidebar building blocks
    ═══════════════════════════════════════════════════════════ */
 
 /* ── Row with hover highlight + reveal chevron ── */
-const PropRow = ({ label, children }) => (
+const PropRow = ({ label, children }: { label: React.ReactNode; children: React.ReactNode }) => (
     <div className="group/row flex items-center gap-3 min-h-[40px] -mx-2.5 px-2.5 rounded-lg hover:bg-white dark:hover:bg-slate-800/50 transition-colors hover:shadow-sm">
         <span className="w-24 shrink-0 text-sm font-medium text-slate-600 dark:text-slate-300">{label}</span>
         <div className="flex-1 min-w-0">{children}</div>
@@ -23,7 +28,7 @@ const PropRow = ({ label, children }) => (
 );
 
 /* ── Section card ── */
-const SidebarSection = ({ title, children }) => (
+const SidebarSection = ({ title, children }: { title?: React.ReactNode; children: React.ReactNode }) => (
     <div className="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 transition-colors hover:border-slate-300 dark:hover:border-slate-600">
         {title && (
             <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">{title}</div>
@@ -33,7 +38,7 @@ const SidebarSection = ({ title, children }) => (
 );
 
 /* ── Pill-style status/priority chips with invisible select overlay ── */
-const STATUS_PILL_BG = {
+const STATUS_PILL_BG: Record<string, string> = {
     'BACKLOG':           'bg-slate-100 dark:bg-slate-800',
     'TODO':              'bg-blue-50 dark:bg-blue-950/60',
     'IN_PROGRESS':       'bg-amber-50 dark:bg-amber-950/60',
@@ -48,7 +53,7 @@ const STATUS_PILL_BG = {
     'GATHERING_INTEREST':'bg-orange-50 dark:bg-orange-950/60',
 };
 
-const STATUS_PILL_TEXT = {
+const STATUS_PILL_TEXT: Record<string, string> = {
     'BACKLOG':           'text-slate-600 dark:text-slate-400',
     'TODO':              'text-blue-700 dark:text-blue-300',
     'IN_PROGRESS':       'text-amber-700 dark:text-amber-300',
@@ -63,7 +68,7 @@ const STATUS_PILL_TEXT = {
     'GATHERING_INTEREST':'text-orange-700 dark:text-orange-300',
 };
 
-const PRIORITY_PILL_BG = {
+const PRIORITY_PILL_BG: Record<string, string> = {
     'LOWEST':  'bg-slate-100 dark:bg-slate-800',
     'LOW':     'bg-blue-50 dark:bg-blue-950/60',
     'MEDIUM':  'bg-amber-50 dark:bg-amber-950/60',
@@ -71,7 +76,7 @@ const PRIORITY_PILL_BG = {
     'HIGHEST': 'bg-red-50 dark:bg-red-950/60',
 };
 
-const PRIORITY_PILL_TEXT = {
+const PRIORITY_PILL_TEXT: Record<string, string> = {
     'LOWEST':  'text-slate-600 dark:text-slate-400',
     'LOW':     'text-blue-700 dark:text-blue-300',
     'MEDIUM':  'text-amber-700 dark:text-amber-300',
@@ -79,7 +84,7 @@ const PRIORITY_PILL_TEXT = {
     'HIGHEST': 'text-red-700 dark:text-red-300',
 };
 
-const DEP_DOT_COLOR = {
+const DEP_DOT_COLOR: Record<string, string> = {
     'DONE': 'bg-green-500', 'RELEASED': 'bg-green-500',
     'IN_PROGRESS': 'bg-blue-500', 'IN_TEST': 'bg-sky-500',
     'TO_REVIEW': 'bg-amber-500', 'TO_TEST': 'bg-blue-500',
@@ -107,7 +112,7 @@ const SelectChevron = () => (
 );
 
 /* ── Progress ring ── */
-const ProgressRing = ({ value, size = 38, stroke = 3.5 }) => {
+const ProgressRing = ({ value, size = 38, stroke = 3.5 }: { value: number; size?: number; stroke?: number }) => {
     const r = (size - stroke) / 2;
     const c = 2 * Math.PI * r;
     const done = value === 100;
@@ -128,10 +133,10 @@ const ProgressRing = ({ value, size = 38, stroke = 3.5 }) => {
 };
 
 /* ── Due urgency badge ── */
-const DueBadge = ({ date }) => {
+const DueBadge = ({ date }: { date?: string }) => {
     if (!date) return null;
-    const diff = Math.round((new Date(date) - new Date()) / MS_PER_DAY);
-    let text, cls;
+    const diff = Math.round((new Date(date).getTime() - new Date().getTime()) / MS_PER_DAY);
+    let text: string, cls: string;
     if (diff < 0)        { text = `${Math.abs(diff)}d overdue`; cls = 'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/50'; }
     else if (diff === 0)  { text = 'due today';  cls = 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/50'; }
     else if (diff <= 3)   { text = `in ${diff}d`; cls = 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/50'; }
@@ -148,13 +153,31 @@ const ACTIVITY_TABS = [
     { key: 'history', label: 'History' },
 ];
 
+interface TaskFormProps {
+    values: ModalFormValues;
+    setFieldValue: SetFieldValue;
+    handleChange: FormikChange;
+    modalMode: 'create' | 'edit' | 'view';
+    task?: Task | null;
+    project?: Project | null;
+    projects: Project[];
+    currentUser: User | null;
+    dependencies: string[];
+    setDependencies: React.Dispatch<React.SetStateAction<string[]>>;
+    existingAttachments: string[];
+    newAttachments: File[];
+    onAddAttachments: (files: File[]) => void;
+    onRemoveAttachment: (attachment: Attachment) => void;
+    entityKey?: string | null;
+}
+
 const TaskForm = ({
     values, setFieldValue, handleChange,
     modalMode, task, project, projects, currentUser,
     dependencies, setDependencies,
     existingAttachments, newAttachments, onAddAttachments, onRemoveAttachment,
     entityKey,
-}) => {
+}: TaskFormProps) => {
     const [activeActivityTab, setActiveActivityTab] = useState('comments');
     const allTasks = projects.flatMap(p => p.tasks || []);
 
@@ -236,8 +259,8 @@ const TaskForm = ({
                     <PropRow label="Status">
                         <div className="relative cursor-pointer group/pill">
                             <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${STATUS_PILL_BG[values.status] || 'bg-slate-100'} ${STATUS_PILL_TEXT[values.status] || 'text-slate-600'}`}>
-                                <span className={`w-[7px] h-[7px] rounded-full ring-1 ring-current/20 ${STATUS_CONFIG[values.status]?.dot || 'bg-slate-400'}`} />
-                                {STATUS_CONFIG[values.status]?.label || values.status}
+                                <span className={`w-[7px] h-[7px] rounded-full ring-1 ring-current/20 ${STATUS_CONFIG[values.status as keyof typeof STATUS_CONFIG]?.dot || 'bg-slate-400'}`} />
+                                {STATUS_CONFIG[values.status as keyof typeof STATUS_CONFIG]?.label || values.status}
                             </div>
                             <Field as="select" id="status" name="status"
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
@@ -252,8 +275,8 @@ const TaskForm = ({
                     <PropRow label="Priority">
                         <div className="relative cursor-pointer group/pill">
                             <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${PRIORITY_PILL_BG[values.priority] || 'bg-slate-100'} ${PRIORITY_PILL_TEXT[values.priority] || 'text-slate-600'}`}>
-                                <span className="text-xs leading-none">{PRIORITY_CONFIG[values.priority]?.icon}</span>
-                                {PRIORITY_CONFIG[values.priority]?.label || values.priority}
+                                <span className="text-xs leading-none">{PRIORITY_CONFIG[values.priority as keyof typeof PRIORITY_CONFIG]?.icon}</span>
+                                {PRIORITY_CONFIG[values.priority as keyof typeof PRIORITY_CONFIG]?.label || values.priority}
                             </div>
                             <Field as="select" id="priority" name="priority"
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
@@ -296,7 +319,7 @@ const TaskForm = ({
                             <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide block mb-1">Start</span>
                             <Field type="date" id="startDate" name="startDate"
                                 className="text-sm font-medium text-slate-800 dark:text-slate-200 bg-transparent focus:outline-none w-full cursor-pointer"
-                                onChange={(e) => {
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                     handleChange(e);
                                     if (e.target.value && values.dueDate)
                                         setFieldValue('duration', Math.max(daysBetween(e.target.value, values.dueDate) + 1, 1));
@@ -311,7 +334,7 @@ const TaskForm = ({
                             </div>
                             <Field type="date" id="dueDate" name="dueDate"
                                 className="text-sm font-medium text-slate-800 dark:text-slate-200 bg-transparent focus:outline-none w-full cursor-pointer"
-                                onChange={(e) => {
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                     handleChange(e);
                                     if (values.startDate && e.target.value)
                                         setFieldValue('duration', Math.max(daysBetween(values.startDate, e.target.value) + 1, 1));
@@ -325,7 +348,7 @@ const TaskForm = ({
                         <div className="flex items-center gap-1.5">
                             <Field type="number" id="duration" name="duration" min="1"
                                 className={`${sidebarInputClass} w-16 tabular-nums text-center`}
-                                onChange={(e) => {
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                     const dur = Math.max(1, parseInt(e.target.value, 10) || 1);
                                     setFieldValue('duration', dur);
                                     if (values.startDate) {

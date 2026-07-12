@@ -161,6 +161,7 @@ export interface TaskDTO {
     dependencyKeys?: string[];
     priority?: string;
     progress?: number;
+    attachments?: string[];
 }
 
 export interface ProjectDTO {
@@ -168,6 +169,8 @@ export interface ProjectDTO {
     summary: string;
     description?: string;
     members?: User[];
+    dependencies?: ProjectDependency[];
+    attachments?: string[];
 }
 
 // A project dependency edge is either an id/key string or an object carrying one.

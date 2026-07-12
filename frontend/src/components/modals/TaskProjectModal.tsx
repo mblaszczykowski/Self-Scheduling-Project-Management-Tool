@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState, useCallback } from 'react';
-import { Form, Formik } from 'formik';
+import { Form, Formik, FormikHelpers, FormikProps } from 'formik';
 import { HiOutlineTrash } from 'react-icons/hi';
 import { AuthContext } from '../../context/AuthContext';
 import { ProjectsContext } from '../../context/ProjectsContext';
@@ -11,8 +11,20 @@ import useAttachments from '../../hooks/useAttachments';
 import useModalFormInit from '../../hooks/useModalFormInit';
 import { getErrorMessage } from '../../util/helpers';
 import { showToast } from '../../util/toast';
+import { Project, Task, ModalFormValues, Attachment, TaskDTO, ProjectDTO } from '../../types';
 
-const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
+type ModalType = 'task' | 'project';
+type ModalMode = 'create' | 'edit' | 'view';
+
+interface TaskProjectModalProps {
+    modalType: ModalType;
+    modalMode: ModalMode;
+    project?: Project | null;
+    task?: Task | null;
+    onClose: (didSave?: boolean) => void;
+}
+
+const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: TaskProjectModalProps) => {
     const { user } = useContext(AuthContext);
     const {
         projects,
@@ -29,8 +41,8 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
         modalType, modalMode, project, task, user, setAttachments,
     });
 
-    const modalRef = useRef(null);
-    const formikRef = useRef(null);
+    const modalRef = useRef<HTMLDivElement>(null);
+    const formikRef = useRef<FormikProps<ModalFormValues>>(null);
     const [emailState, setEmailState] = useState({ loading: false, error: '' });
     const [isSaving, setIsSaving] = useState(false);
     const [uiState, setUiState] = useState({
@@ -69,12 +81,12 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
 
     // Close on Escape (parity with the react-modal based AccountModal).
     useEffect(() => {
-        const onKeyDown = (e) => { if (e.key === 'Escape') handleCloseAttempt(); };
+        const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') handleCloseAttempt(); };
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
     }, [handleCloseAttempt]);
 
-    const handleSubmit = async (values, { setSubmitting }) => {
+    const handleSubmit = async (values: ModalFormValues, { setSubmitting }: FormikHelpers<ModalFormValues>) => {
         if (isSaving) return;
         setIsSaving(true);
         try {
@@ -86,7 +98,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                     setSubmitting(false);
                     return;
                 }
-                const taskDTO = {
+                const taskDTO: TaskDTO = {
                     summary: values.summary,
                     description: values.description,
                     status: values.status,
@@ -107,7 +119,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                     showToast('Task updated', 'success');
                 }
             } else {
-                const projectDTO = {
+                const projectDTO: ProjectDTO = {
                     projectKey: values.projectKey.toUpperCase(),
                     summary: values.summary,
                     description: values.description,
@@ -148,17 +160,21 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
         }
     };
 
-    const onAddAttachments = useCallback((files) => {
+    const onAddAttachments = useCallback((files: File[]) => {
         handleAddAttachments(files);
         setUiState(prev => ({ ...prev, isDirty: true }));
     }, [handleAddAttachments]);
 
-    const onRemoveAttachment = useCallback((attachment) => {
+    const onRemoveAttachment = useCallback((attachment: Attachment) => {
         handleRemoveAttachment(attachment);
         setUiState(prev => ({ ...prev, isDirty: true }));
     }, [handleRemoveAttachment]);
 
-    const handleAddMember = (email, values, setFieldValue) => {
+    const handleAddMember = (
+        email: string,
+        values: ModalFormValues,
+        setFieldValue: FormikHelpers<ModalFormValues>['setFieldValue'],
+    ) => {
         if (!email) return;
         const normalizedEmail = email.toLowerCase().trim();
         if (!normalizedEmail) return;

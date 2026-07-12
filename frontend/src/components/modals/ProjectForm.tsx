@@ -1,11 +1,33 @@
 import React from 'react';
-import { ErrorMessage, Field } from 'formik';
+import { ErrorMessage, Field, FormikHelpers } from 'formik';
 import {
     HiOutlineChevronDown, HiOutlineFolder, HiOutlineX,
 } from 'react-icons/hi';
 import EntityMainColumn from './EntityMainColumn';
 import { inputClass, selectClass } from '../common/formHelpers';
 import Avatar from '../common/Avatar';
+import { Project, User, ModalFormValues, Attachment } from '../../types';
+
+type SetFieldValue = FormikHelpers<ModalFormValues>['setFieldValue'];
+
+interface ProjectFormProps {
+    values: ModalFormValues;
+    setFieldValue: SetFieldValue;
+    modalMode: 'create' | 'edit' | 'view';
+    project?: Project | null;
+    projects: Project[];
+    entityKey?: string | null;
+    currentUser: User | null;
+    dependencies: string[];
+    setDependencies: React.Dispatch<React.SetStateAction<string[]>>;
+    existingAttachments: string[];
+    newAttachments: File[];
+    onAddAttachments: (files: File[]) => void;
+    onRemoveAttachment: (attachment: Attachment) => void;
+    onAddMember: (email: string, values: ModalFormValues, setFieldValue: SetFieldValue) => void;
+    emailLoading: boolean;
+    emailError: string;
+}
 
 const ProjectForm = ({
     values,
@@ -24,7 +46,7 @@ const ProjectForm = ({
     onAddMember,
     emailLoading,
     emailError
-}) => {
+}: ProjectFormProps) => {
     const isOwner = modalMode === 'create'
         || (currentUser && project?.owner?.id === currentUser.id);
 

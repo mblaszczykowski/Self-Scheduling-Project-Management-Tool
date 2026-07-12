@@ -1,12 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HiOutlineCloudUpload } from 'react-icons/hi';
-import { getFileInfo, revokeFileUrl } from '../../util/helpers';
+import { getFileInfo, revokeFileUrl, FileInfo } from '../../util/helpers';
 import { showToast } from '../../util/toast';
 import PreviewModal from '../common/PreviewModal';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
+import { Attachment } from '../../types';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'zip', 'rar', '7z'];
+
+interface AttachmentUploaderProps {
+    existingAttachments?: string[];
+    newAttachments?: File[];
+    onAddAttachments?: (files: File[]) => void;
+    onRemoveAttachment?: (attachment: Attachment) => void;
+    inputId?: string;
+    label?: string;
+}
 
 const AttachmentUploader = ({
     existingAttachments = [],
@@ -15,9 +25,9 @@ const AttachmentUploader = ({
     onRemoveAttachment,
     inputId = 'attachment-upload',
     label = 'Drop files or click to upload'
-}) => {
+}: AttachmentUploaderProps) => {
     const [isDragging, setIsDragging] = useState(false);
-    const [preview, setPreview] = useState(null);
+    const [preview, setPreview] = useState<FileInfo | null>(null);
 
     // Revoke object URLs created for the newly-added File previews on unmount so
     // their blobs are released (the File objects are discarded with the form).
@@ -27,8 +37,8 @@ const AttachmentUploader = ({
         newAttachmentsRef.current.forEach(revokeFileUrl);
     }, []);
 
-    const validateAndAdd = (files) => {
-        const valid = [];
+    const validateAndAdd = (files: File[]) => {
+        const valid: File[] = [];
         for (const file of files) {
             const ext = file.name.split('.').pop()?.toLowerCase();
             if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
@@ -44,22 +54,21 @@ const AttachmentUploader = ({
         }
     };
 
-    const handleDrop = (e) => {
+    const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
         validateAndAdd(Array.from(e.dataTransfer.files));
     };
 
-    const handleFileChange = (e) => {
-        validateAndAdd(Array.from(e.target.files));
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        validateAndAdd(Array.from(e.target.files ?? []));
     };
 
-    const openPreview = (attachment) => {
-        const { url, fileName, fileType } = getFileInfo(attachment);
-        setPreview({ url, fileName, fileType });
+    const openPreview = (attachment: Attachment) => {
+        setPreview(getFileInfo(attachment));
     };
 
-    const renderAttachmentPreview = (attachment) => (
+    const renderAttachmentPreview = (attachment: Attachment) => (
         <AttachmentThumbnail
             key={getFileInfo(attachment).url}
             attachment={attachment}

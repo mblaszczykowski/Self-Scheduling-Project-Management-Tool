@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 import Modal from 'react-modal';
-import { ErrorMessage, Field, Form, Formik } from 'formik';
+import { ErrorMessage, Field, Form, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import { updateUser, updateEmailPreferences } from '../../util/api';
 import { getImageUrl, getErrorMessage } from '../../util/helpers';
@@ -9,11 +9,29 @@ import { showToast } from '../../util/toast';
 import Avatar from '../common/Avatar';
 import { CloseIcon } from '../common/Icons';
 import { inputClass } from '../common/formHelpers';
+import { User, ErrorLike } from '../../types';
+
+interface AccountFormValues {
+    firstname: string;
+    lastname: string;
+    email: string;
+    currentPassword: string;
+    newPassword: string;
+    confirmNewPassword: string;
+    profilePicture: File | null;
+}
+
+interface EmailPrefs {
+    emailNotificationsEnabled: boolean;
+    emailOnTaskAssigned: boolean;
+    emailOnCommentReply: boolean;
+    emailOnProjectInvitation: boolean;
+}
 
 // Empty password fields must be treated as "no change", not as an 8-char
 // violation (Yup's .min runs on '' too). Transform '' -> undefined so a user
 // editing only their name/email/avatar can still submit.
-const emptyToUndefined = (value) => (value === '' ? undefined : value);
+const emptyToUndefined = (value: string) => (value === '' ? undefined : value);
 
 const validationSchema = Yup.object().shape({
     firstname: Yup.string().required('First name is required'),
@@ -25,15 +43,23 @@ const validationSchema = Yup.object().shape({
     currentPassword: Yup.string()
         .transform(emptyToUndefined)
         .when('newPassword', {
-            is: (v) => !!v,
-            then: (schema) => schema.required('Enter your current password to set a new one'),
+            is: (v: unknown) => !!v,
+            then: (schema: Yup.StringSchema) => schema.required('Enter your current password to set a new one'),
         }),
     confirmNewPassword: Yup.string()
         .transform(emptyToUndefined)
         .oneOf([Yup.ref('newPassword'), undefined], 'Passwords must match'),
 });
 
-const EmailToggle = ({ label, description, checked, onChange, disabled }) => (
+interface EmailToggleProps {
+    label: string;
+    description?: string;
+    checked: boolean;
+    onChange: () => void;
+    disabled?: boolean;
+}
+
+const EmailToggle = ({ label, description, checked, onChange, disabled }: EmailToggleProps) => (
     <label className={`flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-800/50' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
         <div className="flex-1 mr-3">
             <span className="block text-sm font-medium text-slate-800 dark:text-slate-200">{label}</span>
@@ -52,12 +78,18 @@ const EmailToggle = ({ label, description, checked, onChange, disabled }) => (
     </label>
 );
 
-const AccountModal = ({ user, onClose, onUpdateUser }) => {
-    const [profilePreview, setProfilePreview] = useState(
+interface AccountModalProps {
+    user: User;
+    onClose: () => void;
+    onUpdateUser?: (user: User) => void;
+}
+
+const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
+    const [profilePreview, setProfilePreview] = useState<string | null>(
         user.profilePicture ? getImageUrl(user.profilePicture) : null
     );
     const [isVisible, setIsVisible] = useAnimateIn();
-    const [emailPrefs, setEmailPrefs] = useState({
+    const [emailPrefs, setEmailPrefs] = useState<EmailPrefs>({
         emailNotificationsEnabled: user.emailNotificationsEnabled ?? true,
         emailOnTaskAssigned: user.emailOnTaskAssigned ?? true,
         emailOnCommentReply: user.emailOnCommentReply ?? true,
@@ -77,10 +109,10 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
         currentPassword: '',
         newPassword: '',
         confirmNewPassword: '',
-        profilePicture: null,
+        profilePicture: null as File | null,
     };
 
-    const handleSubmit = async (values, { setSubmitting, setErrors }) => {
+    const handleSubmit = async (values: AccountFormValues, { setSubmitting, setErrors }: FormikHelpers<AccountFormValues>) => {
         const formData = new FormData();
         formData.append('firstname', values.firstname);
         formData.append('lastname', values.lastname);
@@ -102,8 +134,9 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
             handleClose();
         } catch (err) {
             console.error('Error updating user:', err);
-            if (err.response?.data?.errors) {
-                setErrors(err.response.data.errors);
+            const errors = (err as ErrorLike).response?.data?.errors;
+            if (errors) {
+                setErrors(errors);
             } else {
                 showToast(getErrorMessage(err, 'Failed to update account'), 'error');
             }
@@ -112,7 +145,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
         }
     };
 
-    const handleEmailPrefToggle = async (key) => {
+    const handleEmailPrefToggle = async (key: keyof EmailPrefs) => {
         const updated = { ...emailPrefs, [key]: !emailPrefs[key] };
         setEmailPrefs(updated);
         setEmailPrefsSaving(true);
@@ -127,8 +160,11 @@ const AccountModal = ({ user, onClose, onUpdateUser }) => {
         }
     };
 
-    const handleProfilePictureChange = (event, setFieldValue) => {
-        const file = event.currentTarget.files[0];
+    const handleProfilePictureChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+        setFieldValue: FormikHelpers<AccountFormValues>['setFieldValue'],
+    ) => {
+        const file = event.currentTarget.files?.[0];
         if (file) {
             if (profilePreview && profilePreview.startsWith('blob:')) {
                 URL.revokeObjectURL(profilePreview);
