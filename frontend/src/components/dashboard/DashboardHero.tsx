@@ -1,12 +1,23 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { IconType } from 'react-icons';
 import { formatLongDate } from '../../util/helpers';
 import { CalendarIcon, AlertTriangleIcon, ClockIcon, TrendingUpIcon } from '../common/Icons';
+import { User } from '../../types';
+import { DashboardStats } from '../../hooks/useDashboardStats';
 import '../common/Aurora.css';
 
 const quickActionClass = "inline-flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors border border-slate-200 hover:border-slate-300";
 
-const QuickActionButton = ({ onClick, icon: Icon, iconColor, label, count }) => (
+interface QuickActionButtonProps {
+    onClick: () => void;
+    icon: IconType;
+    iconColor: string;
+    label: string;
+    count: number;
+}
+
+const QuickActionButton = ({ onClick, icon: Icon, iconColor, label, count }: QuickActionButtonProps) => (
     <button onClick={onClick} className={quickActionClass}>
         <Icon className={`w-4 h-4 ${iconColor}`} />
         {label}
@@ -14,7 +25,7 @@ const QuickActionButton = ({ onClick, icon: Icon, iconColor, label, count }) => 
     </button>
 );
 
-const DashboardHero = ({ user, stats }) => {
+const DashboardHero = ({ user, stats }: { user: User | null; stats: DashboardStats }) => {
     const navigate = useNavigate();
     const todayFormatted = useMemo(() => formatLongDate(new Date()), []);
 

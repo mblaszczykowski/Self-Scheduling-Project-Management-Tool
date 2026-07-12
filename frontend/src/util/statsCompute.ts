@@ -218,7 +218,7 @@ export const computeCrossProjectDependencies = (projects: Project[]) => {
                 const depKey = typeof dep === 'object' ? dep.projectKey : dep;
                 const depId = typeof dep === 'object' ? dep.id : dep;
                 return {
-                    key: depKey ?? dep,
+                    key: depKey ?? (typeof dep === 'string' ? dep : String(dep.id ?? '')),
                     summary: projects.find(pr => pr.projectKey === depKey || pr.id === depId)?.summary,
                 };
             }),

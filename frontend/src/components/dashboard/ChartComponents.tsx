@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 
-export const SectionHeader = ({ title, subtitle }) => (
+export const SectionHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => (
     <div className="flex items-start justify-between mb-6">
         <div>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{title}</h2>
@@ -10,7 +10,7 @@ export const SectionHeader = ({ title, subtitle }) => (
     </div>
 );
 
-export const ChartCard = ({ title, subtitle, children, className = "" }) => {
+export const ChartCard = ({ title, subtitle, children, className = "" }: { title: string; subtitle?: string; children: React.ReactNode; className?: string }) => {
     const [isVisible] = useAnimateIn();
 
     return (
@@ -31,7 +31,7 @@ export const chartOptions = {
         legend: { display: false },
         tooltip: {
             backgroundColor: 'rgba(15, 23, 42, 0.96)',
-            titleFont: { size: 12, weight: '600', family: 'system-ui' },
+            titleFont: { size: 12, weight: 600, family: 'system-ui' },
             bodyFont: { size: 11, family: 'system-ui' },
             padding: 12,
             cornerRadius: 8,

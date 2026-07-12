@@ -2,13 +2,21 @@ import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatShortDate, isOverdue, isUpcomingDeadline } from '../../util/helpers';
 import Avatar from '../common/Avatar';
+import { Project } from '../../types';
+
+interface ProjectCardProps {
+    project: Project;
+    completionPercentage: number;
+    animationDelay?: number;
+    onEditProject: (project: Project) => void;
+}
 
 const ProjectCard = ({
     project,
     completionPercentage,
     animationDelay = 0,
     onEditProject
-}) => {
+}: ProjectCardProps) => {
     const navigate = useNavigate();
 
     const health = useMemo(() => {
@@ -34,7 +42,7 @@ const ProjectCard = ({
         if (!project.tasks?.length) return null;
         const upcoming = project.tasks
             .filter(t => t.dueDate && new Date(t.dueDate) >= new Date() && t.progress < 100)
-            .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+            .sort((a, b) => new Date(a.dueDate as string).getTime() - new Date(b.dueDate as string).getTime());
         return upcoming[0] || null;
     }, [project.tasks]);
 

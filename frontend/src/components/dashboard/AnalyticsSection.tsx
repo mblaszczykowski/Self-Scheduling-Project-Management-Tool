@@ -9,14 +9,19 @@ import {
     TrendingUpIcon, ChartBarIcon, UsersIcon, LightningIcon,
     ClockIcon,
 } from '../common/Icons';
+import { ChartOptions } from 'chart.js';
+import { IconType } from 'react-icons';
+import { DashboardStats } from '../../hooks/useDashboardStats';
 
-const SectionDivider = ({ title }) => (
+type StatsProps = { stats: DashboardStats };
+
+const SectionDivider = ({ title }: { title: string }) => (
     <div className="col-span-full pt-6 pb-2 first:pt-0">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3>
     </div>
 );
 
-const AnalyticsSection = ({ stats }) => {
+const AnalyticsSection = ({ stats }: StatsProps) => {
     return (
         <section>
             <SectionHeader title="Analytics" subtitle="Critical path optimization & schedule intelligence" />
@@ -89,7 +94,7 @@ const AnalyticsSection = ({ stats }) => {
    NEW CARDS
    ══════════════════════════════════════════════════════════ */
 
-const ScheduleHealthCard = ({ stats }) => {
+const ScheduleHealthCard = ({ stats }: StatsProps) => {
     const h = stats.scheduleHealth;
     const scoreColor = h.scheduleHealthScore >= 75 ? 'text-green-600'
         : h.scheduleHealthScore >= 50 ? 'text-amber-600' : 'text-red-600';
@@ -137,14 +142,14 @@ const ScheduleHealthCard = ({ stats }) => {
     );
 };
 
-const HealthRow = ({ label, value, color }) => (
+const HealthRow = ({ label, value, color }: { label: string; value: number; color: string }) => (
     <div className="flex justify-between text-xs">
         <span className="text-slate-600">{label}</span>
         <span className={`font-semibold ${color}`}>{value}</span>
     </div>
 );
 
-const ResourceConflictsCard = ({ stats }) => {
+const ResourceConflictsCard = ({ stats }: StatsProps) => {
     const rc = stats.resourceConflicts;
     const hasConflicts = rc.totalConflicts > 0;
 
@@ -194,14 +199,14 @@ const ResourceConflictsCard = ({ stats }) => {
     );
 };
 
-const velocityStatusConfig = {
+const velocityStatusConfig: Record<string, { color: string; bgClass: string; label: string; textColor: string }> = {
     comfortable: { color: 'bg-green-500', bgClass: 'bg-green-500/10', label: 'Comfortable', textColor: 'text-green-600 dark:text-green-400' },
     moderate: { color: 'bg-blue-500', bgClass: 'bg-blue-500/10', label: 'Moderate', textColor: 'text-blue-600 dark:text-blue-400' },
     tight: { color: 'bg-amber-500', bgClass: 'bg-amber-500/10', label: 'Tight', textColor: 'text-amber-600 dark:text-amber-400' },
     critical: { color: 'bg-red-500', bgClass: 'bg-red-500/10', label: 'Critical', textColor: 'text-red-600 dark:text-red-400' },
 };
 
-const ProjectVelocityCard = ({ stats }) => (
+const ProjectVelocityCard = ({ stats }: StatsProps) => (
     <ChartCard title="Required Velocity" subtitle="Daily progress needed to meet deadlines">
         <div className="space-y-3">
             {stats.projectVelocity.length > 0 ? (
@@ -236,7 +241,7 @@ const ProjectVelocityCard = ({ stats }) => (
     </ChartCard>
 );
 
-const DependencyChainCard = ({ stats }) => {
+const DependencyChainCard = ({ stats }: StatsProps) => {
     const da = stats.dependencyAnalysis;
     return (
         <ChartCard title="Dependency Analysis" subtitle="Chain depth & bottleneck tasks">
@@ -304,7 +309,7 @@ const PRIORITY_CHART_COLORS = Object.fromEntries(
     Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => [key, cfg.hex])
 );
 
-const doughnutOptions = {
+const doughnutOptions: ChartOptions<'doughnut'> = {
     plugins: {
         legend: { display: false },
         tooltip: {
@@ -316,7 +321,7 @@ const doughnutOptions = {
     cutout: '65%',
 };
 
-const StatusDistributionCard = ({ stats }) => {
+const StatusDistributionCard = ({ stats }: StatsProps) => {
     const distribution = stats.statusDistribution || {};
     const statuses = Object.keys(distribution).filter(s => distribution[s] > 0);
 
@@ -329,7 +334,7 @@ const StatusDistributionCard = ({ stats }) => {
     }
 
     const data = {
-        labels: statuses.map(s => STATUS_CONFIG[s]?.label || s),
+        labels: statuses.map(s => STATUS_CONFIG[s as keyof typeof STATUS_CONFIG]?.label || s),
         datasets: [{
             data: statuses.map(s => distribution[s]),
             backgroundColor: statuses.map(s => STATUS_CHART_COLORS[s] || '#94a3b8'),
@@ -348,7 +353,7 @@ const StatusDistributionCard = ({ stats }) => {
                 {statuses.map(s => (
                     <div key={s} className="flex items-center gap-1.5 text-xs">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_CHART_COLORS[s] }} />
-                        <span className="text-slate-600 truncate">{STATUS_CONFIG[s]?.label || s}</span>
+                        <span className="text-slate-600 truncate">{STATUS_CONFIG[s as keyof typeof STATUS_CONFIG]?.label || s}</span>
                         <span className="font-semibold text-slate-800 ml-auto">{distribution[s]}</span>
                     </div>
                 ))}
@@ -357,7 +362,7 @@ const StatusDistributionCard = ({ stats }) => {
     );
 };
 
-const TeamWorkloadBarCard = ({ stats }) => {
+const TeamWorkloadBarCard = ({ stats }: StatsProps) => {
     const assignees = stats.assigneeLoad || [];
 
     if (assignees.length === 0) {
@@ -394,7 +399,7 @@ const TeamWorkloadBarCard = ({ stats }) => {
         ],
     };
 
-    const options = {
+    const options: ChartOptions<'bar'> = {
         ...chartOptions,
         indexAxis: 'y',
         plugins: {
@@ -438,7 +443,7 @@ const TeamWorkloadBarCard = ({ stats }) => {
     );
 };
 
-const PriorityDistributionCard = ({ stats }) => {
+const PriorityDistributionCard = ({ stats }: StatsProps) => {
     const distribution = stats.priorityDistribution || {};
     const priorities = ['LOWEST', 'LOW', 'MEDIUM', 'HIGH', 'HIGHEST'].filter(p => distribution[p] > 0);
 
@@ -451,7 +456,7 @@ const PriorityDistributionCard = ({ stats }) => {
     }
 
     const data = {
-        labels: priorities.map(p => PRIORITY_CONFIG[p]?.label || p),
+        labels: priorities.map(p => PRIORITY_CONFIG[p as keyof typeof PRIORITY_CONFIG]?.label || p),
         datasets: [{
             data: priorities.map(p => distribution[p]),
             backgroundColor: priorities.map(p => PRIORITY_CHART_COLORS[p] || '#94a3b8'),
@@ -470,7 +475,7 @@ const PriorityDistributionCard = ({ stats }) => {
                 {priorities.map(p => (
                     <div key={p} className="flex items-center gap-1.5 text-xs">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: PRIORITY_CHART_COLORS[p] }} />
-                        <span className="text-slate-600">{PRIORITY_CONFIG[p]?.label || p}</span>
+                        <span className="text-slate-600">{PRIORITY_CONFIG[p as keyof typeof PRIORITY_CONFIG]?.label || p}</span>
                         <span className="font-semibold text-slate-800">{distribution[p]}</span>
                     </div>
                 ))}
@@ -479,7 +484,7 @@ const PriorityDistributionCard = ({ stats }) => {
     );
 };
 
-const CompletionTrendCard = ({ stats }) => {
+const CompletionTrendCard = ({ stats }: StatsProps) => {
     const trend = stats.completionTrend || [];
     const hasData = trend.some(w => w.count > 0);
 
@@ -508,7 +513,7 @@ const CompletionTrendCard = ({ stats }) => {
         }],
     };
 
-    const options = {
+    const options: ChartOptions<'line'> = {
         ...chartOptions,
         plugins: {
             ...chartOptions.plugins,
@@ -537,7 +542,7 @@ const CompletionTrendCard = ({ stats }) => {
    EXISTING CARDS (preserved)
    ══════════════════════════════════════════════════════════ */
 
-const CriticalPathTimelineCard = ({ stats }) => (
+const CriticalPathTimelineCard = ({ stats }: StatsProps) => (
     <ChartCard title="Critical Path Duration" subtitle="Timeline by project">
         <div className="space-y-3">
             {stats.criticalPathTimeline.length > 0 ? (
@@ -581,7 +586,7 @@ const CriticalPathTimelineCard = ({ stats }) => (
     </ChartCard>
 );
 
-const ProjectProgressCard = ({ stats }) => (
+const ProjectProgressCard = ({ stats }: StatsProps) => (
     <ChartCard title="Project Progress" subtitle="Overall completion">
         <div className="h-56">
             {stats.projectCompletion?.length > 0 ? (
@@ -608,7 +613,7 @@ const ProjectProgressCard = ({ stats }) => (
                                 grid: { display: true, color: 'rgba(148, 163, 184, 0.1)' }
                             }
                         }
-                    }}
+                    } as ChartOptions<'bar'>}
                 />
             ) : (
                 <EmptyState icon="chart" message="No data" fullHeight />
@@ -617,7 +622,7 @@ const ProjectProgressCard = ({ stats }) => (
     </ChartCard>
 );
 
-const BlockedTasksCard = ({ stats }) => {
+const BlockedTasksCard = ({ stats }: StatsProps) => {
     const hasBlocked = stats.blockedTasks.length > 0;
     const blockedIconWrapCls = 'w-14 h-14 rounded-xl'
         + ' flex items-center justify-center shrink-0 '
@@ -665,7 +670,7 @@ const BlockedTasksCard = ({ stats }) => {
     );
 };
 
-const CrossProjectDepsCard = ({ stats }) => (
+const CrossProjectDepsCard = ({ stats }: StatsProps) => (
     <ChartCard title="Cross-Project Dependencies" subtitle="Inter-project links">
         <div className="space-y-3">
             {stats.crossProjectDeps.length > 0 ? (
@@ -693,7 +698,7 @@ const CrossProjectDepsCard = ({ stats }) => (
     </ChartCard>
 );
 
-const UpcomingDeadlinesCard = ({ stats }) => (
+const UpcomingDeadlinesCard = ({ stats }: StatsProps) => (
     <ChartCard title="Upcoming Critical Deadlines" subtitle="Next 7 days" className="xl:col-span-2">
         <div className="h-56 overflow-y-auto pr-2 space-y-2">
             {stats.upcomingCriticalDeadlines?.length > 0 ? (
@@ -734,7 +739,7 @@ const UpcomingDeadlinesCard = ({ stats }) => (
 
 /* ── Shared Empty State ── */
 
-const iconMap = {
+const iconMap: Record<string, IconType> = {
     trend: TrendingUpIcon,
     chart: ChartBarIcon,
     check: CheckCircleIcon,
@@ -742,7 +747,7 @@ const iconMap = {
     lightning: LightningIcon,
 };
 
-const EmptyState = ({ icon, message, fullHeight = false }) => {
+const EmptyState = ({ icon, message, fullHeight = false }: { icon: string; message: string; fullHeight?: boolean }) => {
     const IconComponent = iconMap[icon];
 
     return (
@@ -757,7 +762,7 @@ const EmptyState = ({ icon, message, fullHeight = false }) => {
 
 /* ── Slack Distribution ── */
 
-const SlackDistributionCard = ({ stats }) => {
+const SlackDistributionCard = ({ stats }: StatsProps) => {
     const sd = stats.slackDistribution;
     if (!sd || sd.totalScheduled === 0) {
         return (
@@ -816,13 +821,13 @@ const SlackDistributionCard = ({ stats }) => {
 
 /* ── Optimization Opportunity ── */
 
-const IMPACT_COLORS = {
+const IMPACT_COLORS: Record<string, string> = {
     high: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
     medium: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
     low: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20',
 };
 
-const OptimizationOpportunityCard = ({ stats }) => {
+const OptimizationOpportunityCard = ({ stats }: StatsProps) => {
     const oo = stats.optimizationOpportunity;
     if (!oo) return null;
 
