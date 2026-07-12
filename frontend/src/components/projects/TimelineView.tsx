@@ -3,6 +3,8 @@ import { EmptyState } from '../common';
 import TimelineHeader from './TimelineHeader';
 import TimelineProjectRow from './TimelineProjectRow';
 import DependencyOverlay from './DependencyOverlay';
+import { EnrichedTask, ProcessedProject } from '../../types';
+import { TimelineViewProps } from './types';
 
 const TimelineView = ({
     processedProjects,
@@ -36,21 +38,21 @@ const TimelineView = ({
     onScrollToToday,
     onAcceptOptimization,
     onRejectOptimization,
-}) => {
+}: TimelineViewProps) => {
     const projectIndexMap = useMemo(() => {
-        const map = new Map();
+        const map = new Map<string, number>();
         processedProjects.forEach((p, i) => map.set(p.projectKey, i));
         return map;
     }, [processedProjects]);
 
     const projectKeyToProject = useMemo(() => {
-        const map = new Map();
+        const map = new Map<string, ProcessedProject>();
         for (const p of processedProjects) map.set(p.projectKey, p);
         return map;
     }, [processedProjects]);
 
     const taskKeyMap = useMemo(() => {
-        const map = new Map();
+        const map = new Map<string, EnrichedTask>();
         for (const t of allTasks) map.set(t.taskKey, t);
         return map;
     }, [allTasks]);

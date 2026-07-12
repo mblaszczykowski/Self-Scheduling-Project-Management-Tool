@@ -5,6 +5,7 @@ import {
     ClockIcon, CalendarIcon, CalendarDotIcon, FolderIcon, SearchIcon,
     UserCircleIcon, CloseIcon,
 } from '../common/Icons';
+import { FilterBarProps } from './types';
 
 const iconClass = "w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0";
 
@@ -26,8 +27,8 @@ const FilterBar = ({
     onFilterTooltipShow,
     onFilterTooltipHide,
     filterRef,
-}) => {
-    const handleButtonMouseEnter = (e, text) => {
+}: FilterBarProps) => {
+    const handleButtonMouseEnter = (e: React.MouseEvent, text: string) => {
         const rect = e.currentTarget.getBoundingClientRect();
         onFilterTooltipShow({
             visible: true,
@@ -43,16 +44,16 @@ const FilterBar = ({
     [allTasks]);
 
     const labelOptions = useMemo(() =>
-        [...new Set(allTasks.flatMap(t => t.labels))]
+        [...new Set(allTasks.flatMap(t => t.labels ?? []))]
             .filter(Boolean)
             .map(v => ({ value: v, label: v })),
     [allTasks]);
 
     const statusOptions = Object.keys(STATUS_CONFIG)
-        .map(k => ({ value: k, label: STATUS_CONFIG[k].label }));
+        .map(k => ({ value: k, label: STATUS_CONFIG[k as keyof typeof STATUS_CONFIG].label }));
 
     const priorityOptions = Object.keys(PRIORITY_CONFIG)
-        .map(k => ({ value: k, label: PRIORITY_CONFIG[k].label }));
+        .map(k => ({ value: k, label: PRIORITY_CONFIG[k as keyof typeof PRIORITY_CONFIG].label }));
 
     const dynamicFilters = [
         { field: 'status', label: 'Status', icon: <CheckCircleIcon className={iconClass} />, options: statusOptions },
@@ -76,13 +77,13 @@ const FilterBar = ({
         { field: 'dueDate', label: 'Due Date', icon: <CalendarDotIcon className={iconClass} /> },
     ];
 
-    const filterButtonClass = (isActive) =>
+    const filterButtonClass = (isActive: boolean) =>
         'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-colors '
         + (isActive
             ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-medium'
             : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200');
 
-    const dropdownOptionClass = (isActive) =>
+    const dropdownOptionClass = (isActive: boolean) =>
         'w-full px-3.5 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors '
         + (isActive ? 'bg-slate-50 dark:bg-slate-700/50 font-medium' : '');
 
@@ -135,7 +136,7 @@ const FilterBar = ({
                             onClick={() => onFilterDropdownToggle(field)}
                             onMouseEnter={(e) => handleButtonMouseEnter(e, label)}
                             onMouseLeave={onFilterTooltipHide}
-                            className={filterButtonClass(filters[field] && filters[field] !== 'All')}
+                            className={filterButtonClass(!!filters[field] && filters[field] !== 'All')}
                         >
                             {icon}
                             {(filters[field] && filters[field] !== 'All') && (

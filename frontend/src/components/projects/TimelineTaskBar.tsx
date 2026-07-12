@@ -5,8 +5,22 @@ import {
     calculateTaskPosition,
 } from '../../util/helpers';
 import { AlertTriangleFilledIcon } from '../common/Icons';
+import { EnrichedTask, OptimizationSuggestion } from '../../types';
+import { TimelineTaskBarProps, TooltipShowHandler, TooltipMoveHandler, TooltipHideHandler } from './types';
 
-const GhostTaskBar = ({ task, taskPosition, suggestion, timelineStart, onTooltipShow, onTooltipMove, onTooltipHide }) => {
+type TaskPosition = ReturnType<typeof calculateTaskPosition>;
+
+interface GhostTaskBarProps {
+    task: EnrichedTask;
+    taskPosition: TaskPosition;
+    suggestion: OptimizationSuggestion;
+    timelineStart: Date;
+    onTooltipShow: TooltipShowHandler;
+    onTooltipMove: TooltipMoveHandler;
+    onTooltipHide: TooltipHideHandler;
+}
+
+const GhostTaskBar = ({ task, taskPosition, suggestion, timelineStart, onTooltipShow, onTooltipMove, onTooltipHide }: GhostTaskBarProps) => {
     const ghostPos = calculateTaskPosition(
         suggestion.suggestedStartDate,
         suggestion.suggestedDueDate,
@@ -91,7 +105,7 @@ const TimelineTaskBar = ({
     shouldPreventClick,
     onOpenTaskModal,
     optimization,
-}) => {
+}: TimelineTaskBarProps) => {
     const taskPosition = calculateTaskPosition(
         task.startDate,
         task.dueDate,
@@ -150,11 +164,11 @@ const TimelineTaskBar = ({
                             {task.status && (
                                 <span
                                     className={`text-[10px] py-0.5 px-1.5 rounded-md font-medium ${
-                                        STATUS_CONFIG[task.status]?.color ||
+                                        STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.color ||
                                         'bg-slate-100 text-slate-600'
                                     }`}
                                 >
-                                    {STATUS_CONFIG[task.status]?.label ||
+                                    {STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.label ||
                                         task.status}
                                 </span>
                             )}
@@ -200,7 +214,7 @@ const TimelineTaskBar = ({
                         type: 'task',
                         title: task.summary,
                         subtitle: task.taskKey,
-                        status: STATUS_CONFIG[task.status]?.label ||
+                        status: STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.label ||
                             task.status,
                         isCritical: task.isCritical,
                         dates: `${formatShortDate(task.startDate)} -> ${

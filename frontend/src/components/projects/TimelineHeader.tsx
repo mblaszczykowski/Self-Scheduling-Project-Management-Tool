@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { TIMELINE_CONSTANTS } from '../../config/timelineConstants';
 import { ChevronsLeftIcon } from '../common/Icons';
+import { TimelineHeaderProps } from './types';
 
 const { DAY_WIDTH } = TIMELINE_CONSTANTS;
 
@@ -16,9 +17,9 @@ const TimelineHeader = ({
     onSidebarToggle,
     headerRef,
     syncScroll,
-}) => {
+}: TimelineHeaderProps) => {
     const monthElements = useMemo(() => {
-        const months = [];
+        const months: React.ReactNode[] = [];
         let year = timelineStart.getFullYear(), month = timelineStart.getMonth();
         const endYear = timelineEnd.getFullYear(), endMonth = timelineEnd.getMonth();
         const today = new Date();

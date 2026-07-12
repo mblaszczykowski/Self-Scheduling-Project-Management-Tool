@@ -3,6 +3,8 @@ import { formatShortDate, daysBetween, STATUS_CONFIG, PRIORITY_CONFIG, MS_PER_DA
 import { EmptyState } from '../common';
 import { SortAscIcon, SortDescIcon } from '../common/Icons';
 import Avatar from '../common/Avatar';
+import { EnrichedTask } from '../../types';
+import { TaskKeyMap, TaskListViewProps } from './types';
 
 /* ═══════════════════════════════════════════
    Helpers
@@ -10,7 +12,7 @@ import Avatar from '../common/Avatar';
 
 const TERMINAL_STATUSES = new Set(['DONE', 'RELEASED', 'WITHDRAWN']);
 
-const relativeDue = (dueDate, status, progress) => {
+const relativeDue = (dueDate?: string, status?: string, progress = 0) => {
     if (!dueDate) return { text: '—', cls: 'text-slate-400' };
     if (TERMINAL_STATUSES.has(status) || progress >= 100) {
         return { text: formatShortDate(dueDate), cls: 'text-slate-500 dark:text-slate-400' };
@@ -25,7 +27,7 @@ const relativeDue = (dueDate, status, progress) => {
     return { text: formatShortDate(dueDate), cls: 'text-slate-500 dark:text-slate-400' };
 };
 
-const getProgressColor = (task) => {
+const getProgressColor = (task: EnrichedTask) => {
     if (task.progress >= 100) return 'bg-green-500';
     if (task.isDelayed) return 'bg-red-400';
     if (task.isUpcomingDeadline && task.progress < 80) return 'bg-amber-400';
@@ -33,14 +35,14 @@ const getProgressColor = (task) => {
     return 'bg-slate-300 dark:bg-slate-600';
 };
 
-const computeScheduleHealth = (task) => {
+const computeScheduleHealth = (task: EnrichedTask) => {
     if (!task.startDate || !task.dueDate || task.progress >= 100) return null;
     const now = new Date();
     const start = new Date(task.startDate);
     const due = new Date(task.dueDate);
     if (now < start) return { status: 'not-started', label: 'Not started', expected: 0 };
-    const totalDays = Math.max((due - start) / MS_PER_DAY, 1);
-    const elapsed = (now - start) / MS_PER_DAY;
+    const totalDays = Math.max((due.getTime() - start.getTime()) / MS_PER_DAY, 1);
+    const elapsed = (now.getTime() - start.getTime()) / MS_PER_DAY;
     const expected = Math.min(Math.round((elapsed / totalDays) * 100), 100);
     const gap = expected - task.progress;
     if (gap > 30) return { status: 'critical', label: `${gap}% behind`, expected };
@@ -49,7 +51,7 @@ const computeScheduleHealth = (task) => {
     return { status: 'on-track', label: 'On track', expected };
 };
 
-const healthColor = {
+const healthColor: Record<string, string> = {
     'critical': 'text-red-600 dark:text-red-400',
     'behind': 'text-amber-600 dark:text-amber-400',
     'slight': 'text-slate-500 dark:text-slate-400',
@@ -57,11 +59,11 @@ const healthColor = {
     'not-started': 'text-slate-400 dark:text-slate-500',
 };
 
-const getBlockingInfo = (task, taskKeyToTaskMap) => {
+const getBlockingInfo = (task: EnrichedTask, taskKeyToTaskMap: TaskKeyMap) => {
     if (!task.dependencies?.length) return null;
     const blockers = task.dependencies
         .map(depKey => taskKeyToTaskMap?.get(depKey))
-        .filter(dep => dep && dep.progress < 100);
+        .filter((dep): dep is EnrichedTask => !!dep && dep.progress < 100);
     if (blockers.length === 0) return null;
     blockers.sort((a, b) => {
         const aOverdue = a.dueDate ? daysBetween(new Date(), a.dueDate) : 999;
@@ -73,14 +75,14 @@ const getBlockingInfo = (task, taskKeyToTaskMap) => {
 };
 
 /** Mini timeline showing elapsed vs remaining */
-const ScheduleBar = ({ startDate, dueDate, progress }) => {
+const ScheduleBar = ({ startDate, dueDate, progress }: { startDate?: string; dueDate?: string; progress: number }) => {
     if (!startDate || !dueDate) return null;
     const now = new Date();
     const start = new Date(startDate);
     const due = new Date(dueDate);
-    const total = due - start;
+    const total = due.getTime() - start.getTime();
     if (total <= 0) return null;
-    const elapsed = Math.max(0, Math.min(1, (now - start) / total));
+    const elapsed = Math.max(0, Math.min(1, (now.getTime() - start.getTime()) / total));
     const overdue = now > due;
     return (
         <div className="h-[3px] rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden mt-1.5" title={`${Math.round(elapsed * 100)}% of time elapsed, ${progress}% done`}>
@@ -95,7 +97,7 @@ const ScheduleBar = ({ startDate, dueDate, progress }) => {
 /* ═══════════════════════════════════════════
    Clickable dependency chip
    ═══════════════════════════════════════════ */
-const DepChip = ({ dep, onClick, overdue }) => (
+const DepChip = ({ dep, onClick, overdue }: { dep: EnrichedTask; onClick: (dep: EnrichedTask) => void; overdue?: boolean }) => (
     <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onClick(dep); }}
@@ -116,6 +118,12 @@ const DepChip = ({ dep, onClick, overdue }) => (
    TaskListView
    ═══════════════════════════════════════════ */
 
+interface TaskInsight {
+    blocking: ReturnType<typeof getBlockingInfo>;
+    dependents: number;
+    health: ReturnType<typeof computeScheduleHealth>;
+}
+
 const TaskListView = ({
     filteredTasks,
     processedProjects,
@@ -126,20 +134,20 @@ const TaskListView = ({
     hasActiveFilters,
     onSort,
     onTaskClick,
-}) => {
+}: TaskListViewProps) => {
     const allProjectTasks = useMemo(() => processedProjects.flatMap(p => p.tasks || []), [processedProjects]);
 
     const taskInsights = useMemo(() => {
         // One O(n) pass to count dependents per task key, instead of scanning all
         // tasks for every row (was O(filtered × all)).
-        const dependentsCount = new Map();
+        const dependentsCount = new Map<string, number>();
         allProjectTasks.forEach(t => {
             t.dependencies?.forEach(depKey => {
                 dependentsCount.set(depKey, (dependentsCount.get(depKey) || 0) + 1);
             });
         });
 
-        const map = new Map();
+        const map = new Map<string, TaskInsight>();
         filteredTasks.forEach(task => {
             map.set(task.taskKey, {
                 blocking: getBlockingInfo(task, taskKeyToTaskMap),
@@ -151,7 +159,7 @@ const TaskListView = ({
     }, [filteredTasks, taskKeyToTaskMap, allProjectTasks]);
 
     /** Navigate to a dependency task (find its project, open modal) */
-    const handleDepClick = (dep) => {
+    const handleDepClick = (dep: EnrichedTask) => {
         const depProject = projectKeyToProject?.get(dep.projectKey)
             || processedProjects.find(p => p.tasks?.some(t => t.taskKey === dep.taskKey));
         if (depProject) onTaskClick(depProject, dep);
@@ -205,7 +213,8 @@ const TaskListView = ({
                             const project = projectKeyToProject?.get(task.projectKey)
                                 || processedProjects.find(p => p.projectKey === task.projectKey);
                             const due = relativeDue(task.dueDate, task.status, task.progress);
-                            const insights = taskInsights.get(task.taskKey) || {};
+                            const insights = taskInsights.get(task.taskKey)
+                                ?? { blocking: null, dependents: 0, health: null };
                             const { blocking, dependents, health } = insights;
                             const assigneeMember = project?.members?.find(m => m.email === task.assignee);
 
@@ -238,17 +247,17 @@ const TaskListView = ({
 
                                     {/* ── Status ── */}
                                     <td className="px-4 py-3">
-                                        <span className={`inline-flex items-center gap-1.5 py-[3px] px-2 rounded-md text-[11px] font-semibold ${STATUS_CONFIG[task.status]?.color || 'bg-slate-100 text-slate-600'}`}>
-                                            <span className={`w-[6px] h-[6px] rounded-full ${STATUS_CONFIG[task.status]?.dot || 'bg-slate-400'}`} />
-                                            {STATUS_CONFIG[task.status]?.label || task.status}
+                                        <span className={`inline-flex items-center gap-1.5 py-[3px] px-2 rounded-md text-[11px] font-semibold ${STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.color || 'bg-slate-100 text-slate-600'}`}>
+                                            <span className={`w-[6px] h-[6px] rounded-full ${STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.dot || 'bg-slate-400'}`} />
+                                            {STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.label || task.status}
                                         </span>
                                     </td>
 
                                     {/* ── Priority ── */}
                                     <td className="px-4 py-3">
-                                        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-xs font-bold ${PRIORITY_CONFIG[task.priority]?.color || 'bg-slate-100 text-slate-600'}`}
-                                            title={PRIORITY_CONFIG[task.priority]?.label || task.priority}>
-                                            {PRIORITY_CONFIG[task.priority]?.icon}
+                                        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-xs font-bold ${PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG]?.color || 'bg-slate-100 text-slate-600'}`}
+                                            title={PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG]?.label || task.priority}>
+                                            {PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG]?.icon}
                                         </span>
                                     </td>
 
@@ -335,7 +344,7 @@ const TaskListView = ({
                                                                 key={dep.taskKey}
                                                                 dep={dep}
                                                                 onClick={handleDepClick}
-                                                                overdue={dep.dueDate && daysBetween(new Date(), dep.dueDate) < 0}
+                                                                overdue={!!dep.dueDate && daysBetween(new Date(), dep.dueDate) < 0}
                                                             />
                                                         ))}
                                                         {blocking.count > 3 && (
@@ -410,7 +419,7 @@ const TaskListView = ({
     );
 };
 
-const FooterStats = React.memo(({ tasks }) => {
+const FooterStats = React.memo(({ tasks }: { tasks: EnrichedTask[] }) => {
     const stats = useMemo(() => {
         const critical = tasks.filter(t => t.isCritical).length;
         const overdue = tasks.filter(t => t.isDelayed).length;
@@ -430,7 +439,7 @@ const FooterStats = React.memo(({ tasks }) => {
         stats.done > 0 && { label: `${stats.done} done`, cls: 'text-green-600 dark:text-green-400' },
         stats.unassigned > 0 && { label: `${stats.unassigned} unassigned`, cls: 'text-slate-400' },
         { label: `${stats.avgProgress}% avg`, cls: 'text-slate-500 dark:text-slate-400' },
-    ].filter(Boolean);
+    ].filter(Boolean) as { label: string; cls: string }[];
 
     return (
         <>

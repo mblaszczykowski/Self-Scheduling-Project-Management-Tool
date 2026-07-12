@@ -1,6 +1,7 @@
 import React from 'react';
+import { TooltipState, FilterTooltipState } from './types';
 
-export const TaskTooltip = ({ tooltip }) => {
+export const TaskTooltip = ({ tooltip }: { tooltip: TooltipState }) => {
     if (!tooltip.visible || !tooltip.content) return null;
 
     const { content } = tooltip;
@@ -42,7 +43,7 @@ export const TaskTooltip = ({ tooltip }) => {
     );
 };
 
-export const FilterTooltip = ({ filterTooltip }) => {
+export const FilterTooltip = ({ filterTooltip }: { filterTooltip: FilterTooltipState }) => {
     if (!filterTooltip.visible || !filterTooltip.text) return null;
 
     return (

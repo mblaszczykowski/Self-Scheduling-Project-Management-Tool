@@ -8,6 +8,7 @@ import {
     PlusIcon,
 } from '../common/Icons';
 import TimelineTaskBar from './TimelineTaskBar';
+import { TimelineProjectRowProps } from './types';
 
 const TimelineProjectRow = ({
     project,
@@ -35,7 +36,7 @@ const TimelineProjectRow = ({
     onMouseDown,
     shouldPreventClick,
     optimization,
-}) => {
+}: TimelineProjectRowProps) => {
     const projectFilteredTasks = project.tasks.filter(
         t => filteredTaskIds.has(t.id)
     );

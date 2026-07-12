@@ -4,7 +4,7 @@ import { showToast } from '../util/toast';
 import { getErrorMessage } from '../util/helpers';
 import { Project, OptimizationResult, OptimizationSuggestion } from '../types';
 
-interface OptimizationState {
+export interface OptimizationState {
     loading: boolean;
     applying: boolean;
     result: OptimizationResult | null;

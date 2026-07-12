@@ -1,5 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { formatAssigneeName, daysBetween, formatShortDate } from '../../util/helpers';
+import {
+    OptimizationMetrics as OptimizationMetricsData,
+    OptimizationSuggestion,
+} from '../../types';
+
+type StatAccent = 'emerald' | 'blue' | 'amber' | 'slate';
 
 const keyframes = `
 @keyframes optSlideIn {
@@ -16,10 +22,10 @@ const keyframes = `
 }
 `;
 
-const fmtDate = (d) => (d ? formatShortDate(d) : '—');
+const fmtDate = (d?: string) => (d ? formatShortDate(d) : '—');
 
-const fmtNum = (v, decimals = 1) => {
-    if (typeof v !== 'number') return v;
+const fmtNum = (v: number, decimals = 1): string => {
+    if (typeof v !== 'number') return String(v);
     return v % 1 === 0 ? v.toString() : v.toFixed(decimals);
 };
 
@@ -31,7 +37,16 @@ const Arrow = () => (
 );
 
 /* Before → After metric used in the comparison row */
-const BeforeAfter = ({ label, before, after, unit = '', lowerIsBetter = true, infeasible = false }) => {
+interface BeforeAfterProps {
+    label: string;
+    before: number;
+    after: number;
+    unit?: string;
+    lowerIsBetter?: boolean;
+    infeasible?: boolean;
+}
+
+const BeforeAfter = ({ label, before, after, unit = '', lowerIsBetter = true, infeasible = false }: BeforeAfterProps) => {
     const improved = lowerIsBetter ? after < before : after > before;
     const unchanged = Math.abs(after - before) < 0.01;
     const afterColor = unchanged ? 'text-slate-500'
@@ -54,8 +69,16 @@ const BeforeAfter = ({ label, before, after, unit = '', lowerIsBetter = true, in
 };
 
 /* Stat card for headline numbers */
-const StatCard = ({ value, label, sublabel, accent = 'emerald', delay = 0 }) => {
-    const colors = {
+interface StatCardProps {
+    value: string | number;
+    label: string;
+    sublabel?: string;
+    accent?: StatAccent;
+    delay?: number;
+}
+
+const StatCard = ({ value, label, sublabel, accent = 'emerald', delay = 0 }: StatCardProps) => {
+    const colors: Record<StatAccent, string> = {
         emerald: 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400',
         blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/20 text-blue-600 dark:text-blue-400',
         amber: 'from-amber-500/10 to-amber-500/5 border-amber-500/20 text-amber-600 dark:text-amber-400',
@@ -73,10 +96,20 @@ const StatCard = ({ value, label, sublabel, accent = 'emerald', delay = 0 }) => 
     );
 };
 
+interface OptimizationMetricsProps {
+    originalMetrics?: OptimizationMetricsData;
+    optimizedMetrics?: OptimizationMetricsData;
+    suggestions?: OptimizationSuggestion[];
+    suggestionsCount: number;
+    onAccept: () => void;
+    onReject: () => void;
+    isApplying: boolean;
+}
+
 const OptimizationMetrics = ({
     originalMetrics, optimizedMetrics, suggestions,
     suggestionsCount, onAccept, onReject, isApplying,
-}) => {
+}: OptimizationMetricsProps) => {
     const [mounted, setMounted] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
 
@@ -86,7 +119,7 @@ const OptimizationMetrics = ({
         if (!suggestions) return null;
         const shifted = suggestions.filter(s => s.wasShifted);
 
-        const byAssignee = {};
+        const byAssignee: Record<string, OptimizationSuggestion[]> = {};
         let totalShiftDays = 0, maxShift = 0;
 
         shifted.forEach(s => {
@@ -271,7 +304,7 @@ const OptimizationMetrics = ({
                                             ? 'linear-gradient(90deg, #059669, #10b981)'
                                             : 'linear-gradient(90deg, #3b82f6, #60a5fa)',
                                         animation: 'optProgressFill 0.8s 450ms cubic-bezier(0.22, 1, 0.36, 1) both',
-                                    }}
+                                    } as React.CSSProperties}
                                 />
                             </div>
                             {lateAfter > 0 && (
