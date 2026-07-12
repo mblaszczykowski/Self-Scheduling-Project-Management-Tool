@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ErrorMessage, Field, Formik } from 'formik';
 import * as Yup from 'yup';
 import { HiOutlinePlus, HiOutlineX, HiOutlineDocument, HiOutlineDocumentText } from 'react-icons/hi';
-import { getFileInfo } from '../../util/helpers';
+import { getFileInfo, revokeFileUrl } from '../../util/helpers';
 
 const CommentSchema = Yup.object().shape({
     content: Yup.string().trim().required('Comment cannot be empty'),
@@ -16,12 +16,20 @@ const CommentForm = ({
 }) => {
     const [localAttachments, setLocalAttachments] = useState([]);
 
+    // Revoke any preview object URLs still held when the form unmounts.
+    const localAttachmentsRef = useRef(localAttachments);
+    localAttachmentsRef.current = localAttachments;
+    useEffect(() => () => {
+        localAttachmentsRef.current.forEach(revokeFileUrl);
+    }, []);
+
     const handleAddLocalAttachments = (e) => {
         const files = Array.from(e.target.files);
         setLocalAttachments(prev => [...prev, ...files]);
     };
 
     const handleRemoveLocalAttachment = (attachment) => {
+        revokeFileUrl(attachment);
         setLocalAttachments(prev => prev.filter(f => f !== attachment));
     };
 
