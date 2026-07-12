@@ -1,6 +1,14 @@
 import React from 'react';
 
-export const MenuButton = ({ onClick, isActive, disabled, children, title }) => (
+interface MenuButtonProps {
+    onClick?: () => void;
+    isActive?: boolean;
+    disabled?: boolean;
+    children: React.ReactNode;
+    title?: string;
+}
+
+export const MenuButton = ({ onClick, isActive, disabled, children, title }: MenuButtonProps) => (
     <button
         type="button"
         onClick={onClick}

@@ -22,6 +22,20 @@ import BubbleMenuBar from './BubbleMenuBar';
 import FloatingMenuBar from './FloatingMenuBar';
 import TableMenu from './TableMenu';
 
+interface RichTextEditorProps {
+    value?: string;
+    onChange?: (html: string) => void;
+    placeholder?: string;
+    className?: string;
+    minHeight?: string;
+    maxHeight?: string;
+    showMenuBar?: boolean;
+    showBubbleMenu?: boolean;
+    showFloatingMenu?: boolean;
+    showCharacterCount?: boolean;
+    characterLimit?: number | null;
+}
+
 const RichTextEditor = ({
     value = '',
     onChange,
@@ -34,7 +48,7 @@ const RichTextEditor = ({
     showFloatingMenu = true,
     showCharacterCount = false,
     characterLimit = null,
-}) => {
+}: RichTextEditorProps) => {
     const extensions = useMemo(() => [
         StarterKit.configure({
             heading: { levels: [1, 2, 3, 4] },

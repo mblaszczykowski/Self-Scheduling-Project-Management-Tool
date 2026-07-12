@@ -1,4 +1,5 @@
 import React from 'react';
+import { Editor, ChainedCommands } from '@tiptap/react';
 
 const btnBase = [
     'px-3 py-1.5 text-xs font-medium bg-white dark:bg-slate-800 border rounded-lg',
@@ -8,10 +9,13 @@ const btnBase = [
 const normalBtn = `${btnBase} text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-600`;
 const dangerBtn = `${btnBase} text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800`;
 
-const TableMenu = ({ editor }) => {
+const TableMenu = ({ editor }: { editor: Editor | null }) => {
     if (!editor || !editor.isActive('table')) return null;
 
-    const chain = (cmd) => () => editor.chain().focus()[cmd]().run();
+    const chain = (cmd: string) => () => {
+        const commands = editor.chain().focus() as unknown as Record<string, () => ChainedCommands>;
+        commands[cmd]().run();
+    };
 
     return (
         <div

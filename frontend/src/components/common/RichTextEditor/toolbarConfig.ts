@@ -1,3 +1,4 @@
+import { IconType } from 'react-icons';
 import {
     FaBold, FaItalic, FaUnderline, FaStrikethrough, FaCode,
     FaListUl, FaListOl, FaQuoteRight, FaLink,
@@ -6,7 +7,27 @@ import {
     FaCheckSquare, FaHeading
 } from 'react-icons/fa';
 
-export const TOOLBAR_GROUPS = [
+export interface ToolbarItem {
+    id?: string;
+    command?: string;
+    args?: unknown;
+    icon?: IconType;
+    label?: string;
+    title: string;
+    activeKey?: string | Record<string, unknown>;
+    activeArgs?: Record<string, unknown>;
+    isCustom?: string;
+    activeClass?: string;
+    canKey?: string;
+    className?: string;
+}
+
+export interface ToolbarGroup {
+    id: string;
+    items: ToolbarItem[];
+}
+
+export const TOOLBAR_GROUPS: ToolbarGroup[] = [
     {
         id: 'formatting',
         items: [
@@ -73,7 +94,7 @@ export const TOOLBAR_GROUPS = [
     },
 ];
 
-export const INSERT_ITEMS = [
+export const INSERT_ITEMS: ToolbarItem[] = [
     { id: 'link', icon: FaLink, title: 'Insert Link', activeKey: 'link', isCustom: 'setLink' },
     { id: 'image', icon: FaImage, title: 'Insert Image', isCustom: 'addImage' },
     { id: 'table', icon: FaTable, title: 'Insert Table', isCustom: 'insertTable' },
@@ -87,19 +108,19 @@ export const INSERT_ITEMS = [
     },
 ];
 
-export const UNDO_REDO = [
+export const UNDO_REDO: ToolbarItem[] = [
     { command: 'undo', icon: FaUndo, title: 'Undo (\u2318Z)', canKey: 'undo' },
     { command: 'redo', icon: FaRedo, title: 'Redo (\u2318\u21E7Z)', canKey: 'redo' },
 ];
 
-export const BUBBLE_MENU_ITEMS = [
+export const BUBBLE_MENU_ITEMS: ToolbarItem[] = [
     { command: 'toggleBold', icon: FaBold, title: 'Bold', activeKey: 'bold' },
     { command: 'toggleItalic', icon: FaItalic, title: 'Italic', activeKey: 'italic' },
     { command: 'toggleUnderline', icon: FaUnderline, title: 'Underline', activeKey: 'underline' },
     { command: 'toggleStrike', icon: FaStrikethrough, title: 'Strikethrough', activeKey: 'strike' },
 ];
 
-export const BUBBLE_MENU_EXTRAS = [
+export const BUBBLE_MENU_EXTRAS: ToolbarItem[] = [
     {
         command: 'toggleHighlight', icon: FaHighlighter,
         title: 'Highlight', activeKey: 'highlight', activeClass: 'bg-yellow-500/30',
@@ -114,7 +135,7 @@ const floatingBtnClass =
     'p-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100'
     + ' hover:text-slate-900 transition-all duration-150 active:scale-95';
 
-export const FLOATING_MENU_ITEMS = [
+export const FLOATING_MENU_ITEMS: ToolbarItem[] = [
     {
         command: 'toggleHeading', args: { level: 1 }, icon: FaHeading,
         title: 'Heading 1',
