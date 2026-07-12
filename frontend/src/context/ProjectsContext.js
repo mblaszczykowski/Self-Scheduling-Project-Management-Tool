@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     createProject as apiCreateProject,
     createTask as apiCreateTask,
@@ -21,75 +22,73 @@ export const useProjects = () => {
     return context;
 };
 
+const PROJECTS_KEY = ['projects'];
+
 export const ProjectsProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
-    const [projects, setProjects] = useState([]);
-    const [projectsLoading, setProjectsLoading] = useState(true);
-    const [projectsError, setProjectsError] = useState(null);
+    const queryClient = useQueryClient();
 
+    // Server state is owned by react-query: caching, request dedup, and background
+    // refetch replace the previous manual useState/useEffect fetch. The context's
+    // public shape is unchanged so consumers don't need to know.
+    const { data: projects = [], isLoading: projectsLoading, error } = useQuery({
+        queryKey: PROJECTS_KEY,
+        queryFn: getProjects,
+        enabled: !!user,
+    });
+
+    const projectsError = error ? getErrorMessage(error, 'Failed to load projects') : null;
+
+    // Drop cached projects on logout so a different account can't briefly see them.
     useEffect(() => {
-        if (!user) {
-            setProjects([]);
-            setProjectsLoading(false);
-            setProjectsError(null);
-            return;
-        }
+        if (!user) queryClient.removeQueries({ queryKey: PROJECTS_KEY });
+    }, [user, queryClient]);
 
-        let cancelled = false;
-        const fetchProjects = async () => {
-            try {
-                setProjectsError(null);
-                const data = await getProjects();
-                if (!cancelled) setProjects(data);
-            } catch (err) {
-                if (!cancelled) {
-                    console.error('Error fetching projects:', err);
-                    setProjectsError(getErrorMessage(err, 'Failed to load projects'));
-                }
-            } finally {
-                if (!cancelled) setProjectsLoading(false);
-            }
-        };
-        fetchProjects();
-        return () => { cancelled = true; };
-    }, [user]);
+    const setProjectsData = useCallback(
+        (updater) => queryClient.setQueryData(PROJECTS_KEY, (old = []) => updater(old)),
+        [queryClient]
+    );
+
+    const invalidateProjects = useCallback(
+        () => queryClient.invalidateQueries({ queryKey: PROJECTS_KEY }),
+        [queryClient]
+    );
 
     const refreshProjects = useCallback(async () => {
         try {
-            const fetchedProjects = await getProjects();
-            setProjects(fetchedProjects);
+            await queryClient.refetchQueries({ queryKey: PROJECTS_KEY });
         } catch (err) {
             console.error('Error refreshing projects:', err);
             showToast(getErrorMessage(err));
         }
-    }, []);
+    }, [queryClient]);
 
     const createTask = useCallback(async (projectKey, taskDTO, attachments = []) => {
         const newTask = await apiCreateTask(projectKey, taskDTO, attachments);
-        await refreshProjects();
+        await invalidateProjects();
         return newTask;
-    }, [refreshProjects]);
+    }, [invalidateProjects]);
 
     const updateTask = useCallback(async (projectKey, taskKey, taskDTO, attachments = []) => {
         const updatedTask = await apiUpdateTask(projectKey, taskKey, taskDTO, attachments);
-        await refreshProjects();
+        await invalidateProjects();
         return updatedTask;
-    }, [refreshProjects]);
+    }, [invalidateProjects]);
 
     const deleteTask = useCallback(async (projectKey, taskKey) => {
         await apiDeleteTask(projectKey, taskKey);
-        await refreshProjects();
-    }, [refreshProjects]);
+        await invalidateProjects();
+    }, [invalidateProjects]);
 
     const createProject = useCallback(async (projectDTO, attachments = []) => {
         const newProject = await apiCreateProject(projectDTO, attachments);
-        setProjects(prev => [...prev, newProject]);
+        setProjectsData(prev => [...prev, newProject]);
         return newProject;
-    }, []);
+    }, [setProjectsData]);
 
     const updateProject = useCallback(async (projectKey, projectDTO, attachments = []) => {
         const updatedProject = await apiUpdateProject(projectKey, projectDTO, attachments);
-        setProjects(prev => prev.map(p =>
+        setProjectsData(prev => prev.map(p =>
             // Merge rather than replace: if the PUT response omits nested `tasks`,
             // keep the ones we already have so the timeline/list don't blank out.
             p.projectKey === projectKey
@@ -97,12 +96,12 @@ export const ProjectsProvider = ({ children }) => {
                 : p
         ));
         return updatedProject;
-    }, []);
+    }, [setProjectsData]);
 
     const deleteProject = useCallback(async (projectKey) => {
         await apiDeleteProject(projectKey);
-        setProjects(prev => prev.filter(p => p.projectKey !== projectKey));
-    }, []);
+        setProjectsData(prev => prev.filter(p => p.projectKey !== projectKey));
+    }, [setProjectsData]);
 
     const addUserToProject = useCallback(async (projectKey, userEmail) => {
         try {

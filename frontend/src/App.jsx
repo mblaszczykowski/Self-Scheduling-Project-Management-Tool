@@ -1,5 +1,6 @@
 import React, { Suspense, useContext, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AuthPage from './pages/AuthPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -13,6 +14,12 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = React.lazy(() => import('./pages/ProjectsPage'));
+
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: { refetchOnWindowFocus: false, retry: 1, staleTime: 30_000 },
+    },
+});
 
 const LoadingSpinner = () => (
     <div className="flex justify-center items-center h-screen bg-slate-50 dark:bg-slate-900">
@@ -146,17 +153,19 @@ function App() {
     if (!authChecked) return <LoadingSpinner />;
 
     return (
-        <ThemeProvider>
-            <ErrorBoundary>
-                <AuthProvider initialUser={initialUser}>
-                    <ProjectsProvider>
-                        <NotificationsProvider>
-                            <AppRoutes />
-                        </NotificationsProvider>
-                    </ProjectsProvider>
-                </AuthProvider>
-            </ErrorBoundary>
-        </ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+            <ThemeProvider>
+                <ErrorBoundary>
+                    <AuthProvider initialUser={initialUser}>
+                        <ProjectsProvider>
+                            <NotificationsProvider>
+                                <AppRoutes />
+                            </NotificationsProvider>
+                        </ProjectsProvider>
+                    </AuthProvider>
+                </ErrorBoundary>
+            </ThemeProvider>
+        </QueryClientProvider>
     );
 }
 
