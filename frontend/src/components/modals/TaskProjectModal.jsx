@@ -67,6 +67,13 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
 
     useClickOutside(modalRef, handleCloseAttempt);
 
+    // Close on Escape (parity with the react-modal based AccountModal).
+    useEffect(() => {
+        const onKeyDown = (e) => { if (e.key === 'Escape') handleCloseAttempt(); };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [handleCloseAttempt]);
+
     const handleSubmit = async (values, { setSubmitting }) => {
         if (isSaving) return;
         setIsSaving(true);
@@ -198,7 +205,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
                 ref={modalRef}
                 role="dialog"
                 aria-modal="true"
-                aria-labelledby="modal-title"
+                aria-label={`${modalMode === 'create' ? 'Create' : modalMode === 'edit' ? 'Edit' : 'View'} ${modalType}`}
                 className={
                     'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'
                     + ' w-[92vw] max-w-[1200px] max-h-[88vh]'
@@ -326,7 +333,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }) => {
             <ConfirmDialog
                 isOpen={uiState.closeConfirmOpen}
                 onClose={() => setUiState(prev => ({ ...prev, closeConfirmOpen: false }))}
-                onConfirm={handleForceClose}
+                onConfirm={() => handleForceClose(false)}
                 title="Discard unsaved changes?"
                 message="Your changes haven't been saved. If you close now, all edits will be lost."
                 confirmText="Discard"

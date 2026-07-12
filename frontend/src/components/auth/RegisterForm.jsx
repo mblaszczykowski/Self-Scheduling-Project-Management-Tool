@@ -9,6 +9,17 @@ import { showToast } from '../../util/toast';
 import { getErrorMessage } from '../../util/helpers';
 import { authInputClass } from '../common/formHelpers';
 
+// Single source of truth for the password policy — used by both the Yup schema
+// and the live requirements checklist so they can't drift apart.
+const SPECIAL_CHAR = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/;
+const PASSWORD_RULES = [
+    { label: '8+ characters', test: (v) => (v || '').length >= 8 },
+    { label: 'Uppercase letter', test: (v) => /[A-Z]/.test(v || '') },
+    { label: 'Lowercase letter', test: (v) => /[a-z]/.test(v || '') },
+    { label: 'Number', test: (v) => /\d/.test(v || '') },
+    { label: 'Special character', test: (v) => SPECIAL_CHAR.test(v || '') },
+];
+
 const validationSchema = Yup.object().shape({
     firstname: Yup.string()
         .min(2, 'First name must be at least 2 characters.')
@@ -27,19 +38,16 @@ const validationSchema = Yup.object().shape({
         .matches(/[A-Z]/, 'Password must contain at least one uppercase letter.')
         .matches(/[a-z]/, 'Password must contain at least one lowercase letter.')
         .matches(/\d/, 'Password must contain at least one number.')
-        .matches(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, 'Password must contain at least one special character.')
+        .matches(SPECIAL_CHAR, 'Password must contain at least one special character.')
         .test('no-spaces', 'Password must not contain spaces.', value => !value?.includes(' '))
         .required('Password is required.'),
 });
 
 const PasswordRequirements = ({ password }) => {
-    const requirements = [
-        { label: '8+ characters', met: password?.length >= 8 },
-        { label: 'Uppercase letter', met: /[A-Z]/.test(password || '') },
-        { label: 'Lowercase letter', met: /[a-z]/.test(password || '') },
-        { label: 'Number', met: /\d/.test(password || '') },
-        { label: 'Special character', met: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password || '') },
-    ];
+    const requirements = PASSWORD_RULES.map(rule => ({
+        label: rule.label,
+        met: rule.test(password),
+    }));
 
     return (
         <div className="mt-2 p-2.5 bg-slate-50/80 rounded-lg border border-slate-100">

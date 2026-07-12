@@ -7,8 +7,6 @@ const AttachmentThumbnail = ({
     onRemove,
     onClick,
     variant = 'default',
-    idx,
-    keyPrefix,
 }) => {
     const { url, fileName, fileType } = getFileInfo(attachment);
 
@@ -20,7 +18,6 @@ const AttachmentThumbnail = ({
     if (variant === 'compact') {
         return (
             <div
-                key={keyPrefix ? `${keyPrefix}-${idx}` : `${fileName}-${idx}`}
                 className="relative group cursor-pointer"
                 onClick={() => onClick?.(attachment)}
             >
@@ -30,32 +27,21 @@ const AttachmentThumbnail = ({
                         alt={fileName}
                         className={
                             'h-10 w-10 object-cover rounded border'
-                            + ' border-slate-200 hover:border-slate-300 transition-colors'
+                            + ' border-slate-200 dark:border-slate-700 hover:border-slate-300 transition-colors'
                         }
                     />
-                ) : fileType === 'pdf' ? (
-                    <div
-                        className={
-                            'flex items-center gap-1.5 px-2 py-1 bg-white rounded'
-                            + ' border border-slate-200 hover:border-slate-300'
-                            + ' transition-colors'
-                        }
-                    >
-                        <HiOutlineDocumentText className="w-3 h-3 text-red-500" />
-                        <span className="text-[10px] text-slate-600 truncate max-w-[60px]">
-                            {fileName}
-                        </span>
-                    </div>
                 ) : (
                     <div
                         className={
-                            'flex items-center gap-1.5 px-2 py-1 bg-white rounded'
-                            + ' border border-slate-200 hover:border-slate-300'
+                            'flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 rounded'
+                            + ' border border-slate-200 dark:border-slate-700 hover:border-slate-300'
                             + ' transition-colors'
                         }
                     >
-                        <HiOutlineDocument className="w-3 h-3 text-slate-400" />
-                        <span className="text-[10px] text-slate-600 truncate max-w-[60px]">
+                        {fileType === 'pdf'
+                            ? <HiOutlineDocumentText className="w-3 h-3 text-red-500" />
+                            : <HiOutlineDocument className="w-3 h-3 text-slate-400" />}
+                        <span className="text-[10px] text-slate-600 dark:text-slate-300 truncate max-w-[60px]">
                             {fileName}
                         </span>
                     </div>
@@ -80,29 +66,29 @@ const AttachmentThumbnail = ({
 
     // default variant (used in AttachmentUploader)
     return (
-        <div key={url} className="relative group">
+        <div className="relative group">
             {fileType === 'image' ? (
                 <div
-                    className="relative overflow-hidden rounded-lg border border-slate-200 hover:border-slate-400 transition-all hover:shadow-md cursor-pointer"
+                    className="relative overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 hover:border-slate-400 transition-all hover:shadow-md cursor-pointer"
                     onClick={() => onClick?.(attachment)}
                 >
                     <img src={url} alt={fileName} className="h-16 w-16 object-cover" />
                 </div>
-            ) : fileName.toLowerCase().endsWith('.pdf') ? (
+            ) : fileType === 'pdf' ? (
                 <div
-                    className="flex items-center gap-2 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg cursor-pointer hover:shadow-md hover:border-red-300 transition-all"
+                    className="flex items-center gap-2 px-3 py-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg cursor-pointer hover:shadow-md hover:border-red-300 transition-all"
                     onClick={() => onClick?.(attachment)}
                 >
                     <HiOutlineDocumentText className="w-4 h-4 text-red-500" />
-                    <span className="text-xs text-slate-700 truncate max-w-[90px] font-medium">{fileName}</span>
+                    <span className="text-xs text-slate-700 dark:text-slate-200 truncate max-w-[90px] font-medium">{fileName}</span>
                 </div>
             ) : (
                 <div
-                    className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:shadow-md hover:border-slate-300 transition-all"
+                    className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer hover:shadow-md hover:border-slate-300 transition-all"
                     onClick={() => onClick?.(attachment)}
                 >
                     <HiOutlineDocument className="w-4 h-4 text-slate-500" />
-                    <span className="text-xs text-slate-700 truncate max-w-[90px] font-medium">{fileName}</span>
+                    <span className="text-xs text-slate-700 dark:text-slate-200 truncate max-w-[90px] font-medium">{fileName}</span>
                 </div>
             )}
             {onRemove && (

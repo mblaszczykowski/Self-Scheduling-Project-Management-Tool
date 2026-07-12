@@ -130,7 +130,6 @@ export default function Comments({ taskId, currentUserId }) {
             key={`${getFileInfo(attachment).fileName}-${idx}`}
             attachment={attachment}
             variant="compact"
-            idx={idx}
             onClick={openPreview}
         />
     ), [openPreview]);
