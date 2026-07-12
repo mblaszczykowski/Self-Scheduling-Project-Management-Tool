@@ -1,20 +1,18 @@
 import { useMemo } from 'react';
 import { MS_PER_DAY } from '../util/helpers';
 import { flattenProjectTasks } from '../util/taskFlattening';
-import { computeTaskCounts } from './useTaskCounts';
 import {
+    computeTaskCounts,
     computeCriticalPathHealth,
     computeCriticalPathTimeline,
     computeOverdueCriticalByProject,
     computeUpcomingCriticalDeadlines,
     computeNearCriticalTasks,
     computeCriticalWorkload,
-} from './useCriticalPathStats';
-import {
     computeBlockedTasks,
     computeCrossProjectDependencies,
     computeProjectCompletion,
-} from './useBlockedTaskStats';
+} from '../util/statsCompute';
 
 /* ── New scheduling-focused computations ── */
 
@@ -41,19 +39,20 @@ const computeResourceConflicts = (allTasks) => {
         tasks.sort((a, b) => a.start - b.start);
         for (let i = 0; i < tasks.length; i++) {
             for (let j = i + 1; j < tasks.length; j++) {
-                if (tasks[j].start < tasks[i].end) {
-                    const overlapDays = Math.ceil(
-                        (Math.min(tasks[i].end, tasks[j].end) - tasks[j].start) / MS_PER_DAY
-                    );
-                    if (overlapDays > 0) {
-                        conflicts.push({
-                            assignee,
-                            task1: tasks[i].taskKey,
-                            task2: tasks[j].taskKey,
-                            overlapDays,
-                            involvesCritical: tasks[i].isCritical || tasks[j].isCritical,
-                        });
-                    }
+                // Sorted by start: once task j starts at/after task i ends, no
+                // later task can overlap i either.
+                if (tasks[j].start >= tasks[i].end) break;
+                const overlapDays = Math.ceil(
+                    (Math.min(tasks[i].end, tasks[j].end) - tasks[j].start) / MS_PER_DAY
+                );
+                if (overlapDays > 0) {
+                    conflicts.push({
+                        assignee,
+                        task1: tasks[i].taskKey,
+                        task2: tasks[j].taskKey,
+                        overlapDays,
+                        involvesCritical: tasks[i].isCritical || tasks[j].isCritical,
+                    });
                 }
             }
         }
@@ -246,13 +245,14 @@ const computeSlackDistribution = (allTasks, taskKeyMap) => {
     const epoch = Math.min(...dates);
     const dayOf = (d) => Math.round((new Date(d).getTime() - epoch) / MS_PER_DAY);
 
+    const scheduledKeys = new Set(scheduled.map(t => t.taskKey));
     const nodes = {};
     for (const t of scheduled) {
         const start = dayOf(t.startDate);
         const due = dayOf(t.dueDate);
         nodes[t.taskKey] = {
             duration: Math.max(due - start + 1, 1),
-            deps: (t.dependencies || []).filter(d => nodes[d] !== undefined || scheduled.some(s => s.taskKey === d)),
+            deps: (t.dependencies || []).filter(d => scheduledKeys.has(d)),
             successors: [],
             es: 0, ef: 0, ls: 0, lf: 0, slack: 0,
         };
