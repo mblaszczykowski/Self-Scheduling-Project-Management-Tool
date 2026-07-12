@@ -1,9 +1,8 @@
-import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { Suspense, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ProjectsContext } from '../context/ProjectsContext';
 import Header from '../components/layout/Header';
-import TaskProjectModal from '../components/modals/TaskProjectModal';
 import { ChartBarIcon, ListIcon } from '../components/common/Icons';
 import FilterBar from '../components/projects/FilterBar';
 import TaskListView from '../components/projects/TaskListView';
@@ -24,6 +23,9 @@ import { toDateString, MS_PER_DAY } from '../util/helpers';
 import { showToast } from '../util/toast';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 import { getSidebarWidth, TIMELINE_CONSTANTS } from '../config/timelineConstants';
+
+// Lazy so TipTap (loaded by the modal's rich-text editor) stays out of the page bundle.
+const TaskProjectModal = React.lazy(() => import('../components/modals/TaskProjectModal'));
 
 const { DAY_WIDTH, TIMELINE_END_PADDING } = TIMELINE_CONSTANTS;
 
@@ -443,15 +445,17 @@ const ProjectsPage = () => {
                 <FilterTooltip filterTooltip={filterTooltip} />
 
                 {modalOpen && (
-                    <TaskProjectModal
-                        modalType={modalType}
-                        modalMode={modalMode}
-                        project={currentProject}
-                        task={currentTask}
-                        projects={projects}
-                        projectKey={currentTask?.projectKey}
-                        onClose={closeModal}
-                    />
+                    <Suspense fallback={null}>
+                        <TaskProjectModal
+                            modalType={modalType}
+                            modalMode={modalMode}
+                            project={currentProject}
+                            task={currentTask}
+                            projects={projects}
+                            projectKey={currentTask?.projectKey}
+                            onClose={closeModal}
+                        />
+                    </Suspense>
                 )}
             </div>
         </div>

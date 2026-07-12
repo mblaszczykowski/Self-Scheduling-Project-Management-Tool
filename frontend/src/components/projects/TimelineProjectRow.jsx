@@ -156,9 +156,6 @@ const TimelineProjectRow = ({
                 <div className="flex flex-col">
                     {tasksToRender.map((task, taskIndex, arr) => {
                         const isLastTask = taskIndex === arr.length - 1;
-                        const taskGlobalIndex = projectRowOffsets[projectIndex] +
-                            project.tasks.findIndex(t => t.id === task.id);
-                        const enrichedTask = taskKeyMap.get(task.taskKey);
 
                         return (
                             <TimelineTaskBar
@@ -170,18 +167,6 @@ const TimelineProjectRow = ({
                                 sidebarWidth={sidebarWidth}
                                 timelineStart={timelineStart}
                                 timelineWidth={timelineWidth}
-                                taskGlobalIndex={taskGlobalIndex}
-                                enrichedTask={enrichedTask}
-                                filteredTaskIds={filteredTaskIds}
-                                filteredProjectKeys={filteredProjectKeys}
-                                hasActiveFilters={hasActiveFilters}
-                                expandedProjects={expandedProjects}
-                                projectKeyFilter={projectKeyFilter}
-                                projectIndex={projectIndex}
-                                projectIndexMap={projectIndexMap}
-                                projectKeyToProject={projectKeyToProject}
-                                taskKeyMap={taskKeyMap}
-                                projectRowOffsets={projectRowOffsets}
                                 onTooltipShow={onTooltipShow}
                                 onTooltipMove={onTooltipMove}
                                 onTooltipHide={onTooltipHide}

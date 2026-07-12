@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useCallback } from 'react';
+import React, { Suspense, useContext, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLogout } from '../hooks/useLogout';
 import {
@@ -9,7 +9,6 @@ import 'chartjs-adapter-date-fns';
 import { AuthContext } from '../context/AuthContext';
 import { ProjectsContext } from '../context/ProjectsContext';
 import Header from '../components/layout/Header';
-import TaskProjectModal from '../components/modals/TaskProjectModal';
 import { DashboardSkeleton } from '../components/common/Skeleton';
 import { BoxIcon, PlusIcon, AlertTriangleIcon } from '../components/common/Icons';
 import { SectionHeader } from '../components/dashboard/ChartComponents';
@@ -21,6 +20,9 @@ import { useModal } from '../hooks/useModal';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import { computeProjectDateRange } from '../util/projectUtils';
+
+// Lazy so TipTap (loaded by the modal's rich-text editor) stays out of the page bundle.
+const TaskProjectModal = React.lazy(() => import('../components/modals/TaskProjectModal'));
 
 ChartJS.register(
     TimeScale, CategoryScale, LinearScale, BarElement,
@@ -136,13 +138,15 @@ const DashboardPage = () => {
             )}
 
             {modalOpen && (
-                <TaskProjectModal
-                    modalType={modalType}
-                    modalMode={modalMode}
-                    project={currentProject}
-                    task={currentTask}
-                    onClose={closeModal}
-                />
+                <Suspense fallback={null}>
+                    <TaskProjectModal
+                        modalType={modalType}
+                        modalMode={modalMode}
+                        project={currentProject}
+                        task={currentTask}
+                        onClose={closeModal}
+                    />
+                </Suspense>
             )}
         </div>
     );

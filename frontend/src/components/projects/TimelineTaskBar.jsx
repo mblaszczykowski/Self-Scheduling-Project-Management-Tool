@@ -84,18 +84,6 @@ const TimelineTaskBar = ({
     sidebarWidth,
     timelineStart,
     timelineWidth,
-    taskGlobalIndex,
-    enrichedTask,
-    filteredTaskIds,
-    filteredProjectKeys,
-    hasActiveFilters,
-    expandedProjects,
-    projectKeyFilter,
-    projectIndex,
-    projectIndexMap,
-    projectKeyToProject,
-    taskKeyMap,
-    projectRowOffsets,
     onTooltipShow,
     onTooltipMove,
     onTooltipHide,
@@ -264,7 +252,7 @@ const TimelineTaskBar = ({
                         />
                     );
                 })()}
-                {enrichedTask?.isDelayed && (
+                {task.isDelayed && (
                     <div
                         className="absolute flex items-center gap-1"
                         style={{
