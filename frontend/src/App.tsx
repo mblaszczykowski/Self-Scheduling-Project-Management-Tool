@@ -11,6 +11,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { checkUserAuth } from './util/api';
 import PageTransition from './components/common/PageTransition';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import { User } from './types';
 
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = React.lazy(() => import('./pages/ProjectsPage'));
@@ -33,7 +34,7 @@ const LoadingSpinner = () => (
     </div>
 );
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
     const { user } = useContext(AuthContext);
 
     if (!user) return <Navigate to="/login" replace />;
@@ -41,7 +42,7 @@ const ProtectedRoute = ({ children }) => {
     return children;
 };
 
-const PublicRoute = ({ children, redirectTo = '/dashboard' }) => {
+const PublicRoute = ({ children, redirectTo = '/dashboard' }: { children: React.ReactElement; redirectTo?: string }) => {
     const { user } = useContext(AuthContext);
 
     if (user) return <Navigate to={redirectTo} replace />;
@@ -128,7 +129,7 @@ function AppRoutes() {
 }
 
 function App() {
-    const [initialUser, setInitialUser] = useState(null);
+    const [initialUser, setInitialUser] = useState<User | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
     const authCheckInitiated = useRef(false);
 

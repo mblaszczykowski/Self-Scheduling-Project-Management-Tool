@@ -519,4 +519,6 @@ export const useDashboardStats = (projects: Project[]) => {
     }, [projects, todayStr]);
 };
 
+export type DashboardStats = ReturnType<typeof useDashboardStats>;
+
 export default useDashboardStats;
