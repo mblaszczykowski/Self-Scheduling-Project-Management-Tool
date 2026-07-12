@@ -24,13 +24,6 @@ public interface TaskRepository extends JpaRepository<Task, Integer> {
             @Param("taskNumber") Integer taskNumber
     );
 
-    @EntityGraph(value = "Task.withDetails", type = EntityGraph.EntityGraphType.FETCH)
-    @Query("SELECT t FROM Task t WHERE t.project.projectKey = :projectKey AND t.taskNumber = :taskNumber")
-    Optional<Task> findByProjectKeyAndTaskNumberWithDetails(
-            @Param("projectKey") String projectKey,
-            @Param("taskNumber") Integer taskNumber
-    );
-
     default Optional<Task> findByTaskKey(String taskKey) {
         if (taskKey == null || !taskKey.contains("-")) {
             return Optional.empty();

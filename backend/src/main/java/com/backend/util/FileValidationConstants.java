@@ -16,10 +16,6 @@ public final class FileValidationConstants {
             "txt", "csv", "json", "xml"
     );
 
-    public static final Set<String> IMAGE_EXTENSIONS = Set.of(
-            "jpg", "jpeg", "png", "gif", "webp"
-    );
-
     public static final byte[] JPEG_MAGIC = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
     public static final byte[] PNG_MAGIC = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
     public static final byte[] GIF_MAGIC = new byte[]{0x47, 0x49, 0x46};

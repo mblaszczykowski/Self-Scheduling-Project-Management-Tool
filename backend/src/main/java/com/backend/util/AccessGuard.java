@@ -28,13 +28,6 @@ public class AccessGuard {
         return project;
     }
 
-    public Project getAccessibleProjectWithLock(String projectKey, Integer userId) {
-        var project = projectRepository.findByProjectKeyWithLock(projectKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-        requireAccess(project, userId);
-        return project;
-    }
-
     public void requireAccess(Project project, Integer userId) {
         if (!project.hasAccess(userId)) {
             throw new ResourceNotFoundException("Project not found");
@@ -45,13 +38,6 @@ public class AccessGuard {
         if (!project.isOwner(userId)) {
             throw new AuthorizationException("Only project owner can perform this action");
         }
-    }
-
-    public Task getAccessibleTask(String taskKey, Integer userId) {
-        var task = taskRepository.findByTaskKey(taskKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
-        requireAccess(task.getProject(), userId);
-        return task;
     }
 
     // Transactional so the lazy Project (and its owner/members) can be resolved for the

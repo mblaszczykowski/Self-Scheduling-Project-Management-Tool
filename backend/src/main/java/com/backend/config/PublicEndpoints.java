@@ -14,7 +14,6 @@ public final class PublicEndpoints {
     public static final String USERS = "/api/users";
     public static final String USER_EXISTS = "/api/users/exists";
 
-    public static final String FILES_PREFIX = "/files/";
     public static final String UPLOADS_PREFIX = "/uploads/";
     public static final String STATIC_PREFIX = "/static/";
 

@@ -190,7 +190,8 @@ public class ProjectService {
 
         var emailsToFetch = memberDTOs.stream()
                 .map(UserDTO::email)
-                .filter(email -> !email.equals(owner.getEmail()))
+                .filter(email -> email != null && !email.isBlank())
+                .filter(email -> !email.equalsIgnoreCase(owner.getEmail()))
                 .collect(Collectors.toSet());
 
         if (emailsToFetch.isEmpty()) return members;

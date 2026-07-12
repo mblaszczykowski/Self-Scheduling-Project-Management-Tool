@@ -12,11 +12,13 @@ import java.util.Optional;
 
 public interface CommentRepository extends JpaRepository<Comment, Integer> {
 
+    // Fetch only ONE collection (reactions + their users) here. The attachments collection is
+    // loaded lazily and batched (default_batch_fetch_size); fetching both collections in one
+    // query would produce a comments x reactions x attachments cartesian product.
     @Query("SELECT DISTINCT c FROM Comment c " +
             "LEFT JOIN FETCH c.author " +
             "LEFT JOIN FETCH c.reactions r " +
             "LEFT JOIN FETCH r.user " +
-            "LEFT JOIN FETCH c.attachments " +
             "WHERE c.task.id = :taskId AND c.parentComment IS NULL " +
             "ORDER BY c.timestamp")
     List<Comment> findTopLevelCommentsByTaskIdWithDetails(@Param("taskId") Integer taskId);
@@ -25,7 +27,6 @@ public interface CommentRepository extends JpaRepository<Comment, Integer> {
             "LEFT JOIN FETCH c.author " +
             "LEFT JOIN FETCH c.reactions r " +
             "LEFT JOIN FETCH r.user " +
-            "LEFT JOIN FETCH c.attachments " +
             "WHERE c.parentComment.id IN :parentIds " +
             "ORDER BY c.timestamp")
     List<Comment> findRepliesByParentIdsWithDetails(@Param("parentIds") List<Integer> parentIds);

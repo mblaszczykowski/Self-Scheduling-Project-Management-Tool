@@ -49,7 +49,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(FileStorageException.class)
     public ResponseEntity<ApiError> handleFileStorage(FileStorageException ex) {
-        return buildResponse(HttpStatus.BAD_REQUEST, "File Error", ex.getMessage());
+        // FileStorageException now signals a server-side storage/IO failure; client-input file
+        // problems (bad type/size/name) are thrown as ValidationException (400).
+        log.error("File storage failure", ex);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "File Error",
+                "Could not process the file. Please try again.");
     }
 
     @ExceptionHandler(JsonProcessingException.class)

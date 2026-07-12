@@ -77,11 +77,6 @@ public class NotificationService {
     }
 
     @Transactional(readOnly = true)
-    public List<Notification> getAllNotifications(Integer userId) {
-        return notificationRepository.findByUserIdOrderByTimestampDesc(userId);
-    }
-
-    @Transactional(readOnly = true)
     public Page<Notification> getAllNotificationsPaged(Integer userId, Pageable pageable) {
         return notificationRepository.findByUserIdOrderByTimestampDesc(userId, pageable);
     }

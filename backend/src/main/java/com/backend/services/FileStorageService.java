@@ -1,6 +1,7 @@
 package com.backend.services;
 
 import com.backend.exception.FileStorageException;
+import com.backend.exception.ValidationException;
 import com.backend.util.FileValidationConstants;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -32,7 +33,7 @@ public class FileStorageService {
 
     public List<String> storeFiles(List<MultipartFile> files) {
         if (files.size() > FileValidationConstants.MAX_ATTACHMENTS_PER_REQUEST) {
-            throw new FileStorageException("Too many files. Maximum " +
+            throw new ValidationException("Too many files. Maximum " +
                     FileValidationConstants.MAX_ATTACHMENTS_PER_REQUEST + " files per request");
         }
         return files.stream()
@@ -42,21 +43,21 @@ public class FileStorageService {
 
     public String storeFile(MultipartFile file) {
         if (file.isEmpty()) {
-            throw new FileStorageException("Cannot store empty file");
+            throw new ValidationException("Cannot store empty file");
         }
 
         var originalFileName = file.getOriginalFilename();
         if (originalFileName == null || originalFileName.isBlank()) {
-            throw new FileStorageException("Invalid filename");
+            throw new ValidationException("Invalid filename");
         }
 
         var extension = getExtension(originalFileName).toLowerCase();
         if (!FileValidationConstants.ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new FileStorageException("File type not allowed: " + extension);
+            throw new ValidationException("File type not allowed: " + extension);
         }
 
         if (file.getSize() > FileValidationConstants.MAX_FILE_SIZE) {
-            throw new FileStorageException("File size exceeds maximum allowed size of 5 MB");
+            throw new ValidationException("File size exceeds maximum allowed size of 5 MB");
         }
 
         if (FileValidationConstants.MAGIC_BYTES_BY_EXTENSION.containsKey(extension)) {
@@ -116,14 +117,14 @@ public class FileStorageService {
 
     private void rejectPathTraversalAttempts(String fileName) {
         if (fileName.contains("/") || fileName.contains("\\") || fileName.contains("..")) {
-            throw new FileStorageException("Invalid filename");
+            throw new ValidationException("Invalid filename");
         }
     }
 
     private Path resolveAndValidatePath(String fileName) {
         var resolvedPath = this.fileStorageLocation.resolve(fileName).normalize();
         if (!resolvedPath.startsWith(this.fileStorageLocation)) {
-            throw new FileStorageException("Invalid file path");
+            throw new ValidationException("Invalid file path");
         }
         return resolvedPath;
     }
@@ -131,7 +132,7 @@ public class FileStorageService {
     private String getExtension(String filename) {
         var lastDot = filename.lastIndexOf('.');
         if (lastDot == -1 || lastDot == filename.length() - 1) {
-            throw new FileStorageException("File must have an extension");
+            throw new ValidationException("File must have an extension");
         }
         return filename.substring(lastDot + 1);
     }
@@ -142,7 +143,7 @@ public class FileStorageService {
             var expectedMagicBytes = FileValidationConstants.MAGIC_BYTES_BY_EXTENSION.get(extension);
 
             if (!FileValidationConstants.startsWithMagicBytes(fileBytes, expectedMagicBytes)) {
-                throw new FileStorageException("File content doesn't match declared type");
+                throw new ValidationException("File content doesn't match declared type");
             }
         } catch (IOException e) {
             throw new FileStorageException("Could not validate file content");

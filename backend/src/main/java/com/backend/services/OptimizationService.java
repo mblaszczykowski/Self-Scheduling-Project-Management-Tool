@@ -164,6 +164,11 @@ public class OptimizationService {
             if (!task.getProject().hasAccess(userId)) {
                 throw new AuthorizationException("No access to task: " + s.taskKey());
             }
+            // Suggestions come from the client; never persist an inverted/empty date range.
+            if (s.suggestedStartDate() == null || s.suggestedDueDate() == null
+                    || s.suggestedStartDate().isAfter(s.suggestedDueDate())) {
+                throw new ValidationException("Invalid suggested dates for task: " + s.taskKey());
+            }
             task.setStartDate(s.suggestedStartDate());
             task.setDueDate(s.suggestedDueDate());
             tasksToSave.add(task);
