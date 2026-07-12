@@ -1,16 +1,19 @@
 import { MS_PER_DAY } from './helpers';
 import { computeProjectProgress } from './projectUtils';
+import { Project, Task } from '../types';
 
 // Pure, presentation-agnostic scheduling/statistics computations used by the
 // dashboard. Kept out of the hook layer so they're plain, unit-testable
 // functions rather than React state.
 
+type TaskMap = Record<string, Task>;
+
 /* ── Task counts / distributions ── */
 
-export const computeTaskCounts = (allTasks, taskKeyMap, today) => {
-    const tasksPerStatus = {};
-    const tasksPerAssignee = {};
-    const tasksByPriority = {};
+export const computeTaskCounts = (allTasks: Task[], taskKeyMap: TaskMap, today: Date) => {
+    const tasksPerStatus: Record<string, number> = {};
+    const tasksPerAssignee: Record<string, number> = {};
+    const tasksByPriority: Record<string, number> = {};
 
     allTasks.forEach(task => {
         const status = task.status || 'Unspecified';
@@ -24,7 +27,7 @@ export const computeTaskCounts = (allTasks, taskKeyMap, today) => {
 
     const criticalTasks = allTasks.filter(t => t.isCritical).length;
     const delayedTasks = allTasks.filter(t => {
-        const dueDate = new Date(t.dueDate);
+        const dueDate = new Date(t.dueDate as string);
         return dueDate < today && t.progress < 100;
     }).length;
 
@@ -32,7 +35,7 @@ export const computeTaskCounts = (allTasks, taskKeyMap, today) => {
         if (!task.dependencies?.length) return false;
         return task.dependencies.some(depKey => {
             const dep = taskKeyMap[depKey];
-            return dep && new Date(dep.dueDate) < today && dep.progress < 100;
+            return dep && new Date(dep.dueDate as string) < today && dep.progress < 100;
         });
     });
 
@@ -48,25 +51,25 @@ export const computeTaskCounts = (allTasks, taskKeyMap, today) => {
 
 /* ── Critical path ── */
 
-export const computeCriticalPathHealth = (allTasks, today) => {
+export const computeCriticalPathHealth = (allTasks: Task[], today: Date) => {
     const criticalTasksList = allTasks.filter(t => t.isCritical);
     const activeCriticalTasks = criticalTasksList.filter(t => t.progress < 100);
 
     const criticalOnTime = criticalTasksList.filter(t => {
-        const dueDate = new Date(t.dueDate);
+        const dueDate = new Date(t.dueDate as string);
         return t.progress === 100 || dueDate >= today;
     }).length;
 
     const criticalDelayed = criticalTasksList.filter(t => {
-        const dueDate = new Date(t.dueDate);
+        const dueDate = new Date(t.dueDate as string);
         return dueDate < today && t.progress < 100;
     });
 
     const criticalAtRisk = criticalTasksList.filter(t => {
-        const dueDate = new Date(t.dueDate);
-        const daysUntilDue = Math.ceil((dueDate - today) / MS_PER_DAY);
+        const dueDate = new Date(t.dueDate as string);
+        const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / MS_PER_DAY);
         const expectedProgress = t.startDate
-            ? ((today - new Date(t.startDate)) / (dueDate - new Date(t.startDate))) * 100
+            ? ((today.getTime() - new Date(t.startDate).getTime()) / (dueDate.getTime() - new Date(t.startDate).getTime())) * 100
             : 50;
         return daysUntilDue <= 3 && daysUntilDue > 0 && t.progress < expectedProgress && t.progress < 100;
     });
@@ -85,19 +88,19 @@ export const computeCriticalPathHealth = (allTasks, today) => {
     };
 };
 
-export const computeCriticalPathTimeline = (projects, today) => {
+export const computeCriticalPathTimeline = (projects: Project[], today: Date) => {
     return projects.map(project => {
         const projectCriticalTasks = project.tasks?.filter(t => t.isCritical) || [];
         if (projectCriticalTasks.length === 0) return null;
 
-        const dueDates = projectCriticalTasks.map(t => new Date(t.dueDate));
-        const startDates = projectCriticalTasks.map(t => new Date(t.startDate));
+        const dueDates = projectCriticalTasks.map(t => new Date(t.dueDate as string).getTime());
+        const startDates = projectCriticalTasks.map(t => new Date(t.startDate as string).getTime());
         const earliestStart = new Date(Math.min(...startDates));
         const latestDue = new Date(Math.max(...dueDates));
-        const criticalPathDays = Math.ceil((latestDue - earliestStart) / MS_PER_DAY);
+        const criticalPathDays = Math.ceil((latestDue.getTime() - earliestStart.getTime()) / MS_PER_DAY);
 
         const delayedCritical = projectCriticalTasks.filter(t => {
-            const dueDate = new Date(t.dueDate);
+            const dueDate = new Date(t.dueDate as string);
             return dueDate < today && t.progress < 100;
         }).length;
 
@@ -111,13 +114,15 @@ export const computeCriticalPathTimeline = (projects, today) => {
             latestDue,
             status: delayedCritical > 0 ? 'delayed' : 'ontrack',
         };
-    }).filter(Boolean).sort((a, b) => b.criticalPathDays - a.criticalPathDays);
+    })
+        .filter((p): p is NonNullable<typeof p> => p != null)
+        .sort((a, b) => b.criticalPathDays - a.criticalPathDays);
 };
 
-export const computeOverdueCriticalByProject = (projects, today) => {
+export const computeOverdueCriticalByProject = (projects: Project[], today: Date) => {
     return projects.map(project => {
         const overdueCritical = project.tasks?.filter(task => {
-            const dueDate = new Date(task.dueDate);
+            const dueDate = new Date(task.dueDate as string);
             return task.isCritical && dueDate < today && task.progress < 100;
         }) || [];
 
@@ -130,20 +135,20 @@ export const computeOverdueCriticalByProject = (projects, today) => {
     }).filter(p => p.overdueCount > 0).sort((a, b) => b.overdueCount - a.overdueCount);
 };
 
-export const computeUpcomingCriticalDeadlines = (criticalTasksList, today) => {
+export const computeUpcomingCriticalDeadlines = (criticalTasksList: Task[], today: Date) => {
     const nextWeek = new Date();
     nextWeek.setDate(today.getDate() + 7);
 
     return criticalTasksList.filter(task => {
-        const dueDate = new Date(task.dueDate);
+        const dueDate = new Date(task.dueDate as string);
         return dueDate >= today && dueDate <= nextWeek && task.progress < 100;
-    }).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+    }).sort((a, b) => new Date(a.dueDate as string).getTime() - new Date(b.dueDate as string).getTime());
 };
 
-export const computeNearCriticalTasks = (allTasks, today) => {
+export const computeNearCriticalTasks = (allTasks: Task[], today: Date) => {
     // Task keys that a critical task depends on — built once (O(n)) instead of a
     // nested scan per task (O(n^2)).
-    const blocksCritical = new Set();
+    const blocksCritical = new Set<string>();
     allTasks.forEach(t => {
         if (t.isCritical) t.dependencies?.forEach(depKey => blocksCritical.add(depKey));
     });
@@ -151,14 +156,18 @@ export const computeNearCriticalTasks = (allTasks, today) => {
     return allTasks.filter(task => {
         if (task.isCritical || task.progress === 100) return false;
 
-        const dueDate = new Date(task.dueDate);
-        const daysUntilDue = Math.ceil((dueDate - today) / MS_PER_DAY);
+        const dueDate = new Date(task.dueDate as string);
+        const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / MS_PER_DAY);
 
         return (daysUntilDue <= 5 && daysUntilDue > 0) || blocksCritical.has(task.taskKey);
     });
 };
 
-export const computeCriticalWorkload = (criticalTasksList, tasksPerAssignee, today) => {
+export const computeCriticalWorkload = (
+    criticalTasksList: Task[],
+    tasksPerAssignee: Record<string, number>,
+    today: Date,
+) => {
     return Object.entries(tasksPerAssignee)
         .filter(([assignee]) => assignee !== 'Unassigned')
         .map(([assignee]) => {
@@ -166,7 +175,7 @@ export const computeCriticalWorkload = (criticalTasksList, tasksPerAssignee, tod
                 t.assignee === assignee && t.progress < 100
             );
             const criticalOverdue = criticalAssigned.filter(t => {
-                const dueDate = new Date(t.dueDate);
+                const dueDate = new Date(t.dueDate as string);
                 return dueDate < today;
             });
 
@@ -183,7 +192,7 @@ export const computeCriticalWorkload = (criticalTasksList, tasksPerAssignee, tod
 
 /* ── Blocked tasks / cross-project deps / completion ── */
 
-export const computeBlockedTasks = (allTasks, taskKeyMap) => {
+export const computeBlockedTasks = (allTasks: Task[], taskKeyMap: TaskMap) => {
     const blockedTasks = allTasks.filter(task => {
         if (!task.dependencies?.length) return false;
         if (task.progress === 100) return false;
@@ -199,21 +208,21 @@ export const computeBlockedTasks = (allTasks, taskKeyMap) => {
     return { blockedTasks, blockedCriticalTasks };
 };
 
-export const computeCrossProjectDependencies = (projects) => {
+export const computeCrossProjectDependencies = (projects: Project[]) => {
     return projects
         .filter(p => p.dependencies && p.dependencies.length > 0)
         .map(project => ({
             projectKey: project.projectKey,
             summary: project.summary,
-            dependsOn: project.dependencies?.map(dep => ({
+            dependsOn: project.dependencies?.map((dep: any) => ({
                 key: dep.projectKey || dep,
                 summary: projects.find(pr => pr.projectKey === dep.projectKey || pr.id === dep)?.summary,
             })) || [],
-            dependencyCount: project.dependencies.length,
+            dependencyCount: project.dependencies!.length,
         }));
 };
 
-export const computeProjectCompletion = (projects) => {
+export const computeProjectCompletion = (projects: Project[]) => {
     return projects.map(project => ({
         projectKey: project.projectKey,
         summary: project.summary,

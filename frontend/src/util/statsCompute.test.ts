@@ -5,12 +5,13 @@ import {
     computeBlockedTasks,
     computeProjectCompletion,
 } from './statsCompute';
+import { Task, Project } from '../types';
 
 const TODAY = new Date('2024-06-01T00:00:00');
 
 describe('computeTaskCounts', () => {
-    const A = { taskKey: 'A', status: 'DONE', assignee: 'x@y.com', priority: 'HIGH', isCritical: true, progress: 100, dueDate: '2024-05-01', dependencies: [] };
-    const B = { taskKey: 'B', status: 'TODO', assignee: null, priority: 'MEDIUM', isCritical: false, progress: 0, dueDate: '2024-05-01', dependencies: ['A'] };
+    const A: Task = { taskKey: 'A', status: 'DONE', assignee: 'x@y.com', priority: 'HIGH', isCritical: true, progress: 100, dueDate: '2024-05-01', dependencies: [] };
+    const B: Task = { taskKey: 'B', status: 'TODO', assignee: null, priority: 'MEDIUM', isCritical: false, progress: 0, dueDate: '2024-05-01', dependencies: ['A'] };
     const result = computeTaskCounts([A, B], { A, B }, TODAY);
 
     test('counts per status / assignee', () => {
@@ -25,8 +26,8 @@ describe('computeTaskCounts', () => {
 });
 
 describe('computeBlockedTasks', () => {
-    const C = { taskKey: 'C', isCritical: false, progress: 50, dependencies: [] };
-    const D = { taskKey: 'D', isCritical: true, progress: 0, dependencies: ['C'] };
+    const C: Task = { taskKey: 'C', isCritical: false, progress: 50, dependencies: [] };
+    const D: Task = { taskKey: 'D', isCritical: true, progress: 0, dependencies: ['C'] };
     const { blockedTasks, blockedCriticalTasks } = computeBlockedTasks([C, D], { C, D });
 
     test('a task waiting on an incomplete dependency is blocked', () => {
@@ -36,8 +37,8 @@ describe('computeBlockedTasks', () => {
 });
 
 describe('computeNearCriticalTasks', () => {
-    const C = { taskKey: 'C', isCritical: false, progress: 50, dependencies: [] };
-    const D = { taskKey: 'D', isCritical: true, progress: 0, dependencies: ['C'] };
+    const C: Task = { taskKey: 'C', isCritical: false, progress: 50, dependencies: [] };
+    const D: Task = { taskKey: 'D', isCritical: true, progress: 0, dependencies: ['C'] };
     const near = computeNearCriticalTasks([C, D], TODAY);
 
     test('a non-critical task blocking a critical one is near-critical', () => {
@@ -50,7 +51,7 @@ describe('computeNearCriticalTasks', () => {
 
 describe('computeCriticalPathHealth', () => {
     test('all critical work on time => 100', () => {
-        const A = { taskKey: 'A', isCritical: true, progress: 100, dueDate: '2024-05-01', startDate: '2024-04-01' };
+        const A: Task = { taskKey: 'A', isCritical: true, progress: 100, dueDate: '2024-05-01', startDate: '2024-04-01' };
         expect(computeCriticalPathHealth([A], TODAY).criticalHealthScore).toBe(100);
     });
     test('no critical tasks => 100 (vacuously healthy)', () => {
@@ -60,8 +61,8 @@ describe('computeCriticalPathHealth', () => {
 
 describe('computeProjectCompletion', () => {
     test('averages task progress per project', () => {
-        const projects = [
-            { projectKey: 'P', summary: 'P', tasks: [{ progress: 100 }, { progress: 0 }] },
+        const projects: Project[] = [
+            { projectKey: 'P', summary: 'P', tasks: [{ taskKey: 'a', progress: 100 }, { taskKey: 'b', progress: 0 }] },
             { projectKey: 'Q', summary: 'Q', tasks: [] },
         ];
         const result = computeProjectCompletion(projects);

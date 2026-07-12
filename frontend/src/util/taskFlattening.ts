@@ -1,11 +1,11 @@
+import { Project, Task } from '../types';
+
 /**
  * Flattens tasks from all projects into a single array and builds a lookup map.
- * @param {Array} projects - Array of project objects, each with a `tasks` array.
- * @returns {{ allTasks: Array, taskKeyMap: Object }}
  */
-export const flattenProjectTasks = (projects) => {
-    const taskKeyMap = {};
-    const allTasks = [];
+export const flattenProjectTasks = (projects: Project[]) => {
+    const taskKeyMap: Record<string, Task> = {};
+    const allTasks: Task[] = [];
 
     projects.forEach(project => {
         project.tasks?.forEach(task => {

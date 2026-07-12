@@ -1,5 +1,8 @@
 import config from '../config';
 import { TIMELINE_CONSTANTS } from '../config/timelineConstants';
+import { User, Attachment } from '../types';
+
+type DateInput = string | number | Date;
 
 export const MS_PER_DAY = 86400000;
 
@@ -9,7 +12,7 @@ const UPCOMING_DEADLINE_DAYS = 4;
 // A date-only string is returned verbatim (no timezone shift); everything else
 // (Date, timestamp, datetime string) is formatted from local components so that
 // `new Date()` / drag-produced Dates map to the day the user actually sees.
-export const toDateString = (date) => {
+export const toDateString = (date: DateInput): string => {
     if (typeof date === 'string') {
         const match = date.match(/^\d{4}-\d{2}-\d{2}/);
         if (match) return match[0];
@@ -21,18 +24,18 @@ export const toDateString = (date) => {
     return `${d.getFullYear()}-${month}-${day}`;
 };
 
-export const getImageUrl = (path) => {
+export const getImageUrl = (path?: string | null): string | null => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
     return `${config.API_BASE_URL}${path}`;
 };
 
-export const formatDate = (dateString) => {
+export const formatDate = (dateString?: string): string => {
     if (!dateString) return '';
     return toDateString(dateString);
 };
 
-export const formatAssigneeName = (email) => {
+export const formatAssigneeName = (email?: string | null): string => {
     if (!email) return '';
     const local = email.split('@')[0];
     return local
@@ -45,25 +48,25 @@ export const formatAssigneeName = (email) => {
 // Splits a "First Last" display name into { firstname, lastname } for <Avatar>.
 // Tolerates single-word and multi-word names (everything after the first token
 // becomes the last name).
-export const splitFullName = (name) => {
+export const splitFullName = (name?: string): { firstname: string; lastname: string } => {
     if (!name) return { firstname: '', lastname: '' };
     const parts = String(name).trim().split(/\s+/);
     return { firstname: parts[0] || '', lastname: parts.slice(1).join(' ') };
 };
 
-export const formatDateTime = (dateString) => {
+export const formatDateTime = (dateString?: string): string => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleString();
 };
 
-export const formatShortDate = (date) => {
+export const formatShortDate = (date: DateInput): string => {
     return new Date(date).toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
     });
 };
 
-export const formatLongDate = (date) => {
+export const formatLongDate = (date: DateInput): string => {
     return new Date(date).toLocaleDateString(undefined, {
         weekday: 'long',
         month: 'long',
@@ -71,39 +74,39 @@ export const formatLongDate = (date) => {
     });
 };
 
-export const isOverdue = (dueDate, progress = 0) => {
+export const isOverdue = (dueDate?: string | Date | null, progress = 0): boolean => {
     if (!dueDate) return false;
     return new Date(dueDate) < new Date() && progress < 100;
 };
 
-export const isUpcomingDeadline = (dueDate, daysThreshold = UPCOMING_DEADLINE_DAYS) => {
+export const isUpcomingDeadline = (dueDate?: DateInput | null, daysThreshold = UPCOMING_DEADLINE_DAYS): boolean => {
     if (!dueDate) return false;
     const due = new Date(dueDate);
     const today = new Date();
-    const diffDays = Math.ceil((due - today) / MS_PER_DAY);
+    const diffDays = Math.ceil((due.getTime() - today.getTime()) / MS_PER_DAY);
     return diffDays <= daysThreshold && diffDays >= 0;
 };
 
-export const calculateDuration = (startDate, dueDate) => {
+export const calculateDuration = (startDate?: string, dueDate?: string): number | string => {
     if (!startDate || !dueDate) return 'N/A';
     const start = new Date(startDate);
     const due = new Date(dueDate);
-    const diffDays = Math.ceil((due - start) / MS_PER_DAY);
+    const diffDays = Math.ceil((due.getTime() - start.getTime()) / MS_PER_DAY);
     return diffDays >= 0 ? diffDays : 'N/A';
 };
 
-export const getFileTypeFromPath = (path) => {
+export const getFileTypeFromPath = (path: unknown): 'image' | 'pdf' | 'file' => {
     if (typeof path !== 'string') return 'file';
-    const extension = path.split('.').pop().toLowerCase();
+    const extension = path.split('.').pop()?.toLowerCase();
     const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
-    if (imageExts.includes(extension)) return 'image';
+    if (extension && imageExts.includes(extension)) return 'image';
     if (extension === 'pdf') return 'pdf';
     return 'file';
 };
 
 // Normalise a File's MIME type into the same 'image' | 'pdf' | 'file' vocabulary
 // that getFileTypeFromPath returns, so callers can rely on a single set of values.
-const getFileTypeFromMime = (mimeType) => {
+const getFileTypeFromMime = (mimeType?: string): 'image' | 'pdf' | 'file' => {
     if (!mimeType) return 'file';
     if (mimeType === 'application/pdf') return 'pdf';
     if (mimeType.startsWith('image/')) return 'image';
@@ -112,15 +115,23 @@ const getFileTypeFromMime = (mimeType) => {
 
 // Cache blob URLs by File identity so we don't leak a new URL on every render.
 // WeakMap entries are garbage-collected when the File reference is dropped.
-const blobUrlCache = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+const blobUrlCache: WeakMap<File, string> | null =
+    typeof WeakMap !== 'undefined' ? new WeakMap() : null;
 
-export const getFileInfo = (attachment) => {
+export interface FileInfo {
+    isFile: boolean;
+    url: string | null;
+    fileName: string;
+    fileType: 'image' | 'pdf' | 'file';
+}
+
+export const getFileInfo = (attachment?: Attachment | null): FileInfo => {
     if (!attachment) return { isFile: false, url: null, fileName: '', fileType: 'file' };
     const isFile = attachment instanceof File;
-    let url;
+    let url: string | null = null;
     if (isFile) {
         if (blobUrlCache) {
-            url = blobUrlCache.get(attachment);
+            url = blobUrlCache.get(attachment) ?? null;
             if (!url) {
                 url = URL.createObjectURL(attachment);
                 blobUrlCache.set(attachment, url);
@@ -131,7 +142,7 @@ export const getFileInfo = (attachment) => {
     } else {
         url = getImageUrl(attachment);
     }
-    const fileName = isFile ? attachment.name : String(attachment).split('/').pop();
+    const fileName = isFile ? attachment.name : String(attachment).split('/').pop() || '';
     const fileType = isFile ? getFileTypeFromMime(attachment.type) : getFileTypeFromPath(attachment);
     return { isFile, url, fileName, fileType };
 };
@@ -139,7 +150,7 @@ export const getFileInfo = (attachment) => {
 // Release the object URL created for a File preview. Call this when the owning
 // component unmounts / the file is removed so blob URLs don't accumulate for the
 // lifetime of the page.
-export const revokeFileUrl = (file) => {
+export const revokeFileUrl = (file: unknown): void => {
     if (!blobUrlCache || !(file instanceof File)) return;
     const url = blobUrlCache.get(file);
     if (url) {
@@ -174,7 +185,7 @@ const getPriorityConfig = () => ({
     'HIGHEST': { label: 'Highest', icon: '↑↑', color: 'bg-red-50 text-red-600', hex: '#ef4444' },
 });
 
-export const getAvatarColor = (user) => {
+export const getAvatarColor = (user?: User | string | null): string => {
     const colors = [
         'from-slate-600 to-slate-700',
         'from-blue-600 to-blue-700',
@@ -201,7 +212,7 @@ export const getAvatarColor = (user) => {
     return colors[Math.abs(hash) % colors.length];
 };
 
-export const getAvatarInitials = (user) => {
+export const getAvatarInitials = (user?: User | null): string => {
     if (!user) return 'U';
 
     if (user.firstname && user.lastname) {
@@ -219,14 +230,14 @@ export const getAvatarInitials = (user) => {
     return 'U';
 };
 
-export const calculateTaskPosition = (startDate, dueDate, timelineStart) => {
+export const calculateTaskPosition = (startDate: DateInput, dueDate: DateInput, timelineStart: DateInput) => {
     const start = new Date(startDate);
     const due = new Date(dueDate);
     const tlStart = new Date(timelineStart);
     const dayWidth = TIMELINE_CONSTANTS.DAY_WIDTH;
 
-    const daysOffset = Math.round((start - tlStart) / MS_PER_DAY);
-    const durationDays = Math.round((due - start) / MS_PER_DAY) + 1;
+    const daysOffset = Math.round((start.getTime() - tlStart.getTime()) / MS_PER_DAY);
+    const durationDays = Math.round((due.getTime() - start.getTime()) / MS_PER_DAY) + 1;
 
     return {
         marginLeft: daysOffset * dayWidth,
@@ -234,15 +245,15 @@ export const calculateTaskPosition = (startDate, dueDate, timelineStart) => {
     };
 };
 
-export const getErrorMessage = (err, defaultMessage = 'An unexpected error occurred') => {
-    if (err.response?.data?.message) return err.response.data.message;
-    if (err.response?.data?.error) return err.response.data.error;
-    if (err.message === 'Network Error') return 'Unable to connect to server';
-    if (err.code === 'ECONNABORTED') return 'Request timed out';
-    return err.message || defaultMessage;
+export const getErrorMessage = (err: any, defaultMessage = 'An unexpected error occurred'): string => {
+    if (err?.response?.data?.message) return err.response.data.message;
+    if (err?.response?.data?.error) return err.response.data.error;
+    if (err?.message === 'Network Error') return 'Unable to connect to server';
+    if (err?.code === 'ECONNABORTED') return 'Request timed out';
+    return err?.message || defaultMessage;
 };
 
-export const daysBetween = (date1, date2) => {
+export const daysBetween = (date1: DateInput, date2: DateInput): number => {
     const d1 = new Date(date1);
     const d2 = new Date(date2);
     const utc1 = Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate());

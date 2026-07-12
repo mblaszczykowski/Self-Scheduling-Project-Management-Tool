@@ -5,7 +5,7 @@ export const TIMELINE_CONSTANTS = {
     TIMELINE_END_PADDING: 300,
 };
 
-export const getSidebarWidth = (isCollapsed) =>
+export const getSidebarWidth = (isCollapsed: boolean) =>
     isCollapsed
         ? TIMELINE_CONSTANTS.SIDEBAR_COLLAPSED_WIDTH
         : TIMELINE_CONSTANTS.SIDEBAR_EXPANDED_WIDTH;
