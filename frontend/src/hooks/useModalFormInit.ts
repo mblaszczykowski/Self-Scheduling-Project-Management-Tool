@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import * as Yup from 'yup';
 import { formatDateTime, formatDate, MS_PER_DAY, toDateString } from '../util/helpers';
+import { Project, Task, User, ModalFormValues, AttachmentsState, ProjectDependency } from '../types';
 
-const defaultValues = {
+const defaultValues: ModalFormValues = {
     projectKey: '', summary: '', description: '', status: 'TODO',
     startDate: '', dueDate: '', assignee: '', duration: 1, progress: 0,
     priority: 'MEDIUM', labels: '', created: '', updated: '',
@@ -18,7 +19,7 @@ const taskValidationSchema = Yup.object().shape({
         .min(Yup.ref('startDate'), 'Due date cannot be before start date.'),
 });
 
-const buildProjectValidationSchema = (modalMode) =>
+const buildProjectValidationSchema = (modalMode: string | null) =>
     Yup.object().shape(
         modalMode === 'create'
             ? {
@@ -28,16 +29,22 @@ const buildProjectValidationSchema = (modalMode) =>
             : { summary: Yup.string().required('Project name is required.') }
     );
 
+interface UseModalFormInitOptions {
+    modalType: 'task' | 'project' | null;
+    modalMode: 'create' | 'edit' | 'view' | null;
+    project: Project | null;
+    task: Task | null;
+    user: User | null;
+    setAttachments: (a: AttachmentsState) => void;
+}
+
 /**
  * Builds initialValues, validationSchema, and dependencies state
  * based on modalType / modalMode / project / task.
- *
- * @param {{ modalType, modalMode, project, task, user, setAttachments }} opts
- * @returns {{ initialValues, validationSchema, dependencies, setDependencies }}
  */
-const useModalFormInit = ({ modalType, modalMode, project, task, user, setAttachments }) => {
-    const [dependencies, setDependencies] = useState([]);
-    const [initialValues, setInitialValues] = useState(defaultValues);
+const useModalFormInit = ({ modalType, modalMode, project, task, user, setAttachments }: UseModalFormInitOptions) => {
+    const [dependencies, setDependencies] = useState<string[]>([]);
+    const [initialValues, setInitialValues] = useState<ModalFormValues>(defaultValues);
 
     useEffect(() => {
         const today = toDateString(new Date());
@@ -49,8 +56,8 @@ const useModalFormInit = ({ modalType, modalMode, project, task, user, setAttach
 
                 let duration = 1;
                 if (task.startDate && task.dueDate) {
-                    const startMs = new Date(task.startDate);
-                    const dueMs = new Date(task.dueDate);
+                    const startMs = new Date(task.startDate).getTime();
+                    const dueMs = new Date(task.dueDate).getTime();
                     const diff = Math.floor((dueMs - startMs) / MS_PER_DAY) + 1;
                     duration = Math.max(diff, 1);
                 }
@@ -90,7 +97,9 @@ const useModalFormInit = ({ modalType, modalMode, project, task, user, setAttach
             }
         } else if (modalType === 'project') {
             if (modalMode === 'edit' && project) {
-                setDependencies(project.dependencies || []);
+                setDependencies((project.dependencies || []).map(
+                    (d: ProjectDependency) => (typeof d === 'string' ? d : d.projectKey ?? '')
+                ));
                 setInitialValues({
                     projectKey: project.projectKey || '',
                     summary: project.summary || '',

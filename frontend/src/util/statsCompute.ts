@@ -214,11 +214,15 @@ export const computeCrossProjectDependencies = (projects: Project[]) => {
         .map(project => ({
             projectKey: project.projectKey,
             summary: project.summary,
-            dependsOn: project.dependencies?.map((dep: any) => ({
-                key: dep.projectKey || dep,
-                summary: projects.find(pr => pr.projectKey === dep.projectKey || pr.id === dep)?.summary,
-            })) || [],
-            dependencyCount: project.dependencies!.length,
+            dependsOn: (project.dependencies ?? []).map(dep => {
+                const depKey = typeof dep === 'object' ? dep.projectKey : dep;
+                const depId = typeof dep === 'object' ? dep.id : dep;
+                return {
+                    key: depKey ?? dep,
+                    summary: projects.find(pr => pr.projectKey === depKey || pr.id === depId)?.summary,
+                };
+            }),
+            dependencyCount: (project.dependencies ?? []).length,
         }));
 };
 

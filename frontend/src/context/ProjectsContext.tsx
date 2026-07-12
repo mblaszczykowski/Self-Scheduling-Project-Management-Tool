@@ -13,18 +13,18 @@ import {
 import { showToast } from '../util/toast';
 import { getErrorMessage } from '../util/helpers';
 import { AuthContext } from './AuthContext';
-import { Project } from '../types';
+import { Project, Task, TaskDTO, ProjectDTO } from '../types';
 
 interface ProjectsContextValue {
     projects: Project[];
     projectsLoading: boolean;
     projectsError: string | null;
     refreshProjects: () => Promise<void>;
-    createTask: (projectKey: string, taskDTO: any, attachments?: File[]) => Promise<any>;
-    updateTask: (projectKey: string, taskKey: string, taskDTO: any, attachments?: File[]) => Promise<any>;
+    createTask: (projectKey: string, taskDTO: TaskDTO, attachments?: File[]) => Promise<Task>;
+    updateTask: (projectKey: string, taskKey: string, taskDTO: TaskDTO, attachments?: File[]) => Promise<Task>;
     deleteTask: (projectKey: string, taskKey: string) => Promise<void>;
-    createProject: (projectDTO: any, attachments?: File[]) => Promise<Project>;
-    updateProject: (projectKey: string, projectDTO: any, attachments?: File[]) => Promise<Project>;
+    createProject: (projectDTO: ProjectDTO, attachments?: File[]) => Promise<Project>;
+    updateProject: (projectKey: string, projectDTO: ProjectDTO, attachments?: File[]) => Promise<Project>;
     deleteProject: (projectKey: string) => Promise<void>;
     addUserToProject: (projectKey: string, userEmail: string) => Promise<Project>;
 }
@@ -79,13 +79,13 @@ export const ProjectsProvider = ({ children }: { children: React.ReactNode }) =>
         }
     }, [queryClient]);
 
-    const createTask = useCallback(async (projectKey: string, taskDTO: any, attachments: File[] = []) => {
+    const createTask = useCallback(async (projectKey: string, taskDTO: TaskDTO, attachments: File[] = []) => {
         const newTask = await apiCreateTask(projectKey, taskDTO, attachments);
         await invalidateProjects();
         return newTask;
     }, [invalidateProjects]);
 
-    const updateTask = useCallback(async (projectKey: string, taskKey: string, taskDTO: any, attachments: File[] = []) => {
+    const updateTask = useCallback(async (projectKey: string, taskKey: string, taskDTO: TaskDTO, attachments: File[] = []) => {
         const updatedTask = await apiUpdateTask(projectKey, taskKey, taskDTO, attachments);
         await invalidateProjects();
         return updatedTask;
@@ -96,13 +96,13 @@ export const ProjectsProvider = ({ children }: { children: React.ReactNode }) =>
         await invalidateProjects();
     }, [invalidateProjects]);
 
-    const createProject = useCallback(async (projectDTO: any, attachments: File[] = []) => {
+    const createProject = useCallback(async (projectDTO: ProjectDTO, attachments: File[] = []) => {
         const newProject = await apiCreateProject(projectDTO, attachments);
         setProjectsData(prev => [...prev, newProject]);
         return newProject;
     }, [setProjectsData]);
 
-    const updateProject = useCallback(async (projectKey: string, projectDTO: any, attachments: File[] = []) => {
+    const updateProject = useCallback(async (projectKey: string, projectDTO: ProjectDTO, attachments: File[] = []) => {
         const updatedProject = await apiUpdateProject(projectKey, projectDTO, attachments);
         setProjectsData(prev => prev.map(p =>
             // Merge rather than replace: if the PUT response omits nested `tasks`,

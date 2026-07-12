@@ -1,14 +1,23 @@
 import { useEffect, useRef } from 'react';
 
-const useKeyboardShortcuts = (shortcuts) => {
+interface Shortcut {
+    key?: string;
+    code?: string;
+    ctrl?: boolean;
+    shift?: boolean;
+    alt?: boolean;
+    handler: () => void;
+}
+
+const useKeyboardShortcuts = (shortcuts: Shortcut[]) => {
     // Callers pass a fresh array literal each render; keep it in a ref so the
     // document listener is added once and always sees the current shortcuts.
     const shortcutsRef = useRef(shortcuts);
     shortcutsRef.current = shortcuts;
 
     useEffect(() => {
-        const handleKeyDown = (e) => {
-            const target = e.target;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
             if (
                 target.tagName === 'INPUT' ||
                 target.tagName === 'TEXTAREA' ||

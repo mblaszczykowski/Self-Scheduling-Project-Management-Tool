@@ -1,6 +1,6 @@
 import config from '../config';
 import { TIMELINE_CONSTANTS } from '../config/timelineConstants';
-import { User, Attachment } from '../types';
+import { User, Attachment, ErrorLike } from '../types';
 
 type DateInput = string | number | Date;
 
@@ -245,12 +245,13 @@ export const calculateTaskPosition = (startDate: DateInput, dueDate: DateInput, 
     };
 };
 
-export const getErrorMessage = (err: any, defaultMessage = 'An unexpected error occurred'): string => {
-    if (err?.response?.data?.message) return err.response.data.message;
-    if (err?.response?.data?.error) return err.response.data.error;
-    if (err?.message === 'Network Error') return 'Unable to connect to server';
-    if (err?.code === 'ECONNABORTED') return 'Request timed out';
-    return err?.message || defaultMessage;
+export const getErrorMessage = (err: unknown, defaultMessage = 'An unexpected error occurred'): string => {
+    const e = (err ?? {}) as ErrorLike;
+    if (e.response?.data?.message) return e.response.data.message;
+    if (e.response?.data?.error) return e.response.data.error;
+    if (e.message === 'Network Error') return 'Unable to connect to server';
+    if (e.code === 'ECONNABORTED') return 'Request timed out';
+    return e.message || defaultMessage;
 };
 
 export const daysBetween = (date1: DateInput, date2: DateInput): number => {

@@ -1,10 +1,23 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
+import { NavigateFunction, Location } from 'react-router-dom';
+import { FilterState, ViewState, SortState, ProcessedProject, EnrichedTask } from '../types';
+
+interface UseUrlSyncedFiltersOptions {
+    filterState: FilterState;
+    setFilterState: Dispatch<SetStateAction<FilterState>>;
+    setViewState: Dispatch<SetStateAction<ViewState>>;
+    processedProjects: ProcessedProject[];
+    navigate: NavigateFunction;
+    location: Location;
+    openModal: (type: string, mode: string, project: ProcessedProject, task: EnrichedTask) => void;
+    setSortState: Dispatch<SetStateAction<SortState>>;
+}
 
 export function useUrlSyncedFilters({
     filterState, setFilterState, setViewState,
     processedProjects, navigate, location, openModal, setSortState,
-}) {
-    const handledIssueRef = useRef(null);
+}: UseUrlSyncedFiltersOptions) {
+    const handledIssueRef = useRef<string | null>(null);
 
     // Expand new projects; collapse others if a projectKey filter is active
     useEffect(() => {
@@ -90,7 +103,7 @@ export function useUrlSyncedFilters({
         navigate('/projects');
     }, [setFilterState, navigate]);
 
-    const handleFilterChange = useCallback((field, value) => {
+    const handleFilterChange = useCallback((field: string, value: string) => {
         setFilterState(prev => ({
             ...prev, filters: { ...prev.filters, [field]: value },
         }));
@@ -107,7 +120,7 @@ export function useUrlSyncedFilters({
         navigate(`?${params.toString()}`);
     }, [setFilterState, navigate, location.search]);
 
-    const handleProjectFilterChange = useCallback((value) => {
+    const handleProjectFilterChange = useCallback((value: string) => {
         const params = new URLSearchParams(location.search);
         value === 'All' ? params.delete('projectKey') : params.set('projectKey', value);
         navigate(`?${params.toString()}`);
@@ -121,10 +134,10 @@ export function useUrlSyncedFilters({
         navigate(`?${params.toString()}`);
     }, [filterState.assignedToMe, setFilterState, navigate, location.search]);
 
-    const handleSort = useCallback((field) => {
+    const handleSort = useCallback((field: string) => {
         setSortState(prev => ({
             field,
-            order: prev.field === field && prev.order === 'asc' ? 'desc' : 'asc',
+            order: (prev.field === field && prev.order === 'asc' ? 'desc' : 'asc') as SortState['order'],
         }));
     }, [setSortState]);
 

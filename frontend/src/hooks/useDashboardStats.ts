@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { MS_PER_DAY } from '../util/helpers';
 import { flattenProjectTasks } from '../util/taskFlattening';
+import { Project, Task } from '../types';
 import {
     computeTaskCounts,
     computeCriticalPathHealth,
@@ -14,26 +15,68 @@ import {
     computeProjectCompletion,
 } from '../util/statsCompute';
 
+type TaskMap = Record<string, Task>;
+
+interface ScheduleEntry {
+    taskKey: string;
+    start: number;
+    end: number;
+    isCritical?: boolean;
+    priority?: string;
+}
+interface ResourceConflict {
+    assignee: string;
+    task1: string;
+    task2: string;
+    overlapDays: number;
+    involvesCritical: boolean;
+}
+interface CpmNode {
+    duration: number;
+    deps: string[];
+    successors: string[];
+    es: number;
+    ef: number;
+    ls: number;
+    lf: number;
+    slack: number;
+}
+interface OptimizationFactor {
+    label: string;
+    value: number;
+    impact: string;
+}
+interface AssigneeLoad {
+    assignee: string;
+    total: number;
+    critical: number;
+    overdue: number;
+    blocked: number;
+    totalRemaining: number;
+    conflicts?: number;
+}
+type BehindTask = Task & { gap: number; expected: number };
+
 /* ── New scheduling-focused computations ── */
 
 /** Detect resource conflicts: days where an assignee has overlapping tasks */
-const computeResourceConflicts = (allTasks) => {
-    const assigneeSchedule = {};
+const computeResourceConflicts = (allTasks: Task[]) => {
+    const assigneeSchedule: Record<string, ScheduleEntry[]> = {};
     const activeTasks = allTasks.filter(t => t.startDate && t.dueDate && t.progress < 100 && t.assignee);
 
     activeTasks.forEach(task => {
-        const key = task.assignee;
+        const key = task.assignee as string;
         if (!assigneeSchedule[key]) assigneeSchedule[key] = [];
         assigneeSchedule[key].push({
             taskKey: task.taskKey,
-            start: new Date(task.startDate).getTime(),
-            end: new Date(task.dueDate).getTime(),
+            start: new Date(task.startDate as string).getTime(),
+            end: new Date(task.dueDate as string).getTime(),
             isCritical: task.isCritical,
             priority: task.priority,
         });
     });
 
-    const conflicts = [];
+    const conflicts: ResourceConflict[] = [];
     Object.entries(assigneeSchedule).forEach(([assignee, tasks]) => {
         if (tasks.length < 2) return;
         tasks.sort((a, b) => a.start - b.start);
@@ -67,19 +110,19 @@ const computeResourceConflicts = (allTasks) => {
 };
 
 /** Schedule health: for each active task, how far behind expected progress */
-const computeScheduleHealth = (allTasks, today) => {
+const computeScheduleHealth = (allTasks: Task[], today: Date) => {
     const active = allTasks.filter(t => t.startDate && t.dueDate && t.progress < 100);
     let onTrack = 0, slightlyBehind = 0, behind = 0, criticallyBehind = 0, notStarted = 0;
-    const behindTasks = [];
+    const behindTasks: BehindTask[] = [];
 
     active.forEach(task => {
-        const start = new Date(task.startDate);
-        const due = new Date(task.dueDate);
+        const start = new Date(task.startDate as string);
+        const due = new Date(task.dueDate as string);
         if (today < start) { notStarted++; return; }
-        const totalDays = Math.max((due - start) / MS_PER_DAY, 1);
-        const elapsed = (today - start) / MS_PER_DAY;
+        const totalDays = Math.max((due.getTime() - start.getTime()) / MS_PER_DAY, 1);
+        const elapsed = (today.getTime() - start.getTime()) / MS_PER_DAY;
         const expected = Math.min(Math.round((elapsed / totalDays) * 100), 100);
-        const gap = expected - task.progress;
+        const gap = expected - (task.progress ?? 0);
 
         if (gap <= 0) onTrack++;
         else if (gap <= 15) slightlyBehind++;
@@ -99,9 +142,9 @@ const computeScheduleHealth = (allTasks, today) => {
 };
 
 /** Longest dependency chain and bottleneck tasks (most dependents) */
-const computeDependencyChainAnalysis = (allTasks, taskKeyMap) => {
+const computeDependencyChainAnalysis = (allTasks: Task[], taskKeyMap: TaskMap) => {
     // Build dependency graph
-    const dependents = {}; // taskKey -> tasks that depend on it
+    const dependents: Record<string, string[]> = {}; // taskKey -> tasks that depend on it
     allTasks.forEach(task => {
         task.dependencies?.forEach(depKey => {
             if (!dependents[depKey]) dependents[depKey] = [];
@@ -110,8 +153,8 @@ const computeDependencyChainAnalysis = (allTasks, taskKeyMap) => {
     });
 
     // Find longest chain via DFS with memoization
-    const chainMemo = {};
-    const getChainLength = (taskKey, visited = new Set()) => {
+    const chainMemo: Record<string, number> = {};
+    const getChainLength = (taskKey: string, visited: Set<string> = new Set()): number => {
         if (chainMemo[taskKey] !== undefined) return chainMemo[taskKey];
         if (visited.has(taskKey)) return 0; // cycle guard
         visited.add(taskKey);
@@ -136,7 +179,7 @@ const computeDependencyChainAnalysis = (allTasks, taskKeyMap) => {
             isCritical: taskKeyMap[taskKey]?.isCritical,
             progress: taskKeyMap[taskKey]?.progress ?? 0,
         }))
-        .filter(b => b.task && b.task.progress < 100)
+        .filter(b => b.task && (b.task.progress ?? 0) < 100)
         .sort((a, b) => b.dependentCount - a.dependentCount)
         .slice(0, 5);
 
@@ -144,7 +187,7 @@ const computeDependencyChainAnalysis = (allTasks, taskKeyMap) => {
 };
 
 /** Required velocity per project: how much daily progress is needed to finish on time */
-const computeProjectVelocity = (projects, today) => {
+const computeProjectVelocity = (projects: Project[], today: Date) => {
     return projects.map(project => {
         const activeTasks = (project.tasks || []).filter(t =>
             t.startDate && t.dueDate && t.progress < 100
@@ -156,9 +199,9 @@ const computeProjectVelocity = (projects, today) => {
         let urgentCount = 0;
 
         activeTasks.forEach(task => {
-            const due = new Date(task.dueDate);
-            const daysLeft = Math.max(0, (due - today) / MS_PER_DAY);
-            const remaining = 100 - task.progress;
+            const due = new Date(task.dueDate as string);
+            const daysLeft = Math.max(0, (due.getTime() - today.getTime()) / MS_PER_DAY);
+            const remaining = 100 - (task.progress ?? 0);
             totalRemaining += remaining;
             totalDaysLeft += daysLeft;
             if (daysLeft > 0 && (remaining / daysLeft) > 15) urgentCount++;
@@ -178,12 +221,14 @@ const computeProjectVelocity = (projects, today) => {
                 : avgVelocityNeeded <= 20 ? 'tight'
                 : 'critical',
         };
-    }).filter(Boolean).sort((a, b) => b.avgVelocityNeeded - a.avgVelocityNeeded);
+    })
+        .filter((p): p is NonNullable<typeof p> => p != null)
+        .sort((a, b) => b.avgVelocityNeeded - a.avgVelocityNeeded);
 };
 
 /** Status distribution: count tasks per status */
-const computeStatusDistribution = (allTasks) => {
-    const counts = {};
+const computeStatusDistribution = (allTasks: Task[]) => {
+    const counts: Record<string, number> = {};
     allTasks.forEach(task => {
         const status = task.status || 'BACKLOG';
         counts[status] = (counts[status] || 0) + 1;
@@ -192,8 +237,8 @@ const computeStatusDistribution = (allTasks) => {
 };
 
 /** Priority distribution: count tasks per priority */
-const computePriorityDistribution = (allTasks) => {
-    const counts = {};
+const computePriorityDistribution = (allTasks: Task[]) => {
+    const counts: Record<string, number> = {};
     allTasks.forEach(task => {
         const priority = task.priority || 'MEDIUM';
         counts[priority] = (counts[priority] || 0) + 1;
@@ -202,8 +247,8 @@ const computePriorityDistribution = (allTasks) => {
 };
 
 /** Completion trend: weekly completed tasks over the past 8 weeks */
-const computeCompletionTrend = (allTasks, today) => {
-    const weeks = [];
+const computeCompletionTrend = (allTasks: Task[], today: Date) => {
+    const weeks: Array<{ start: Date; end: Date; count: number }> = [];
     const MS_PER_WEEK = 7 * MS_PER_DAY;
 
     // Anchor at end-of-day so tasks updated "today" land in the most recent bucket
@@ -218,7 +263,7 @@ const computeCompletionTrend = (allTasks, today) => {
 
     const completedStatuses = new Set(['DONE', 'RELEASED']);
     allTasks.forEach(task => {
-        if (!completedStatuses.has(task.status)) return;
+        if (!completedStatuses.has(task.status as string)) return;
         const updated = task.updated ? new Date(task.updated).getTime() : null;
         if (!updated) return;
         for (const week of weeks) {
@@ -236,24 +281,24 @@ const computeCompletionTrend = (allTasks, today) => {
 };
 
 /** Slack distribution: run CPM forward/backward pass to compute totalFloat per task */
-const computeSlackDistribution = (allTasks, taskKeyMap) => {
+const computeSlackDistribution = (allTasks: Task[], _taskKeyMap: TaskMap) => {
     const scheduled = allTasks.filter(t => t.startDate && t.dueDate && t.progress < 100);
     if (scheduled.length === 0) return { buckets: [], avgSlack: 0, zeroSlackCount: 0, totalScheduled: 0 };
 
     // Build graph with day offsets from earliest start
-    const dates = scheduled.map(t => new Date(t.startDate).getTime());
+    const dates = scheduled.map(t => new Date(t.startDate as string).getTime());
     const epoch = Math.min(...dates);
-    const dayOf = (d) => Math.round((new Date(d).getTime() - epoch) / MS_PER_DAY);
+    const dayOf = (d: string) => Math.round((new Date(d).getTime() - epoch) / MS_PER_DAY);
 
     const scheduledKeys = new Set(scheduled.map(t => t.taskKey));
-    const nodes = {};
+    const nodes: Record<string, CpmNode> = {};
     for (const t of scheduled) {
-        const start = dayOf(t.startDate);
-        const due = dayOf(t.dueDate);
+        const start = dayOf(t.startDate as string);
+        const due = dayOf(t.dueDate as string);
         nodes[t.taskKey] = {
             duration: Math.max(due - start + 1, 1),
             deps: (t.dependencies || []).filter(d => scheduledKeys.has(d)),
-            successors: [],
+            successors: [] as string[],
             es: 0, ef: 0, ls: 0, lf: 0, slack: 0,
         };
     }
@@ -266,12 +311,12 @@ const computeSlackDistribution = (allTasks, taskKeyMap) => {
     }
 
     // Forward pass (topological via Kahn's)
-    const inDeg = {};
-    for (const [k, n] of Object.entries(nodes)) inDeg[k] = n.deps.filter(d => nodes[d]).length;
+    const inDeg: Record<string, number> = {};
+    for (const [k, n] of Object.entries(nodes)) inDeg[k] = n.deps.filter((d: string) => nodes[d]).length;
     const queue = Object.keys(nodes).filter(k => inDeg[k] === 0);
-    const order = [];
+    const order: string[] = [];
     while (queue.length > 0) {
-        const k = queue.shift();
+        const k = queue.shift() as string;
         order.push(k);
         for (const s of nodes[k].successors) {
             inDeg[s]--;
@@ -296,7 +341,7 @@ const computeSlackDistribution = (allTasks, taskKeyMap) => {
         if (n.successors.length === 0) {
             n.lf = projectFinish;
         } else {
-            n.lf = Math.min(...n.successors.map(s => nodes[s].ls));
+            n.lf = Math.min(...n.successors.map((s: string) => nodes[s].ls));
         }
         n.ls = n.lf - n.duration;
         n.slack = Math.max(0, n.ls - n.es);
@@ -324,11 +369,18 @@ const computeSlackDistribution = (allTasks, taskKeyMap) => {
 };
 
 /** Optimization opportunity score: how much could the optimizer improve things */
-const computeOptimizationOpportunity = (resourceConflicts, scheduleHealth, allTasks, today) => {
+const computeOptimizationOpportunity = (
+    resourceConflicts: ReturnType<typeof computeResourceConflicts>,
+    scheduleHealth: ReturnType<typeof computeScheduleHealth>,
+    allTasks: Task[],
+    today: Date,
+) => {
     const active = allTasks.filter(t => t.startDate && t.dueDate && t.progress < 100);
-    if (active.length === 0) return { score: 0, factors: [], recommendation: 'No active tasks to optimize' };
+    if (active.length === 0) {
+        return { score: 0, factors: [] as OptimizationFactor[], recommendation: 'No active tasks to optimize' };
+    }
 
-    const factors = [];
+    const factors: OptimizationFactor[] = [];
     let rawScore = 0;
 
     // Factor 1: Resource conflicts (big opportunity)
@@ -348,7 +400,7 @@ const computeOptimizationOpportunity = (resourceConflicts, scheduleHealth, allTa
     }
 
     // Factor 3: Overdue tasks
-    const overdue = active.filter(t => new Date(t.dueDate) < today).length;
+    const overdue = active.filter(t => new Date(t.dueDate as string) < today).length;
     if (overdue > 0) {
         const overdueScore = Math.min(overdue * 10, 25);
         rawScore += overdueScore;
@@ -374,15 +426,19 @@ const computeOptimizationOpportunity = (resourceConflicts, scheduleHealth, allTa
 };
 
 /** Assignee load: total active tasks, critical tasks, overdue, and conflict count */
-const computeAssigneeLoad = (allTasks, resourceConflicts, today) => {
-    const load = {};
+const computeAssigneeLoad = (
+    allTasks: Task[],
+    resourceConflicts: ReturnType<typeof computeResourceConflicts>,
+    today: Date,
+) => {
+    const load: Record<string, AssigneeLoad> = {};
     allTasks.filter(t => t.assignee && t.progress < 100).forEach(task => {
-        const key = task.assignee;
+        const key = task.assignee as string;
         if (!load[key]) load[key] = { assignee: key, total: 0, critical: 0, overdue: 0, blocked: 0, totalRemaining: 0 };
         load[key].total++;
         if (task.isCritical) load[key].critical++;
         if (task.dueDate && new Date(task.dueDate) < today) load[key].overdue++;
-        load[key].totalRemaining += (100 - task.progress);
+        load[key].totalRemaining += (100 - (task.progress ?? 0));
     });
 
     // Add conflict counts
@@ -397,7 +453,7 @@ const computeAssigneeLoad = (allTasks, resourceConflicts, today) => {
         .slice(0, 8);
 };
 
-export const useDashboardStats = (projects) => {
+export const useDashboardStats = (projects: Project[]) => {
     const todayStr = new Date().toDateString();
     return useMemo(() => {
         const { allTasks, taskKeyMap } = flattenProjectTasks(projects);

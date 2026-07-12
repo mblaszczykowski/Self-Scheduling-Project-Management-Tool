@@ -1,28 +1,29 @@
 import { useState, useEffect } from 'react';
+import { FilterState, SortState, ViewState } from '../types';
 
-const DEFAULT_FILTER_STATE = {
+const DEFAULT_FILTER_STATE: FilterState = {
     filters: {}, searchInput: '', searchQuery: '', assignedToMe: false, openFilterDropdown: null,
 };
-const DEFAULT_SORT_STATE = { field: 'id', order: 'asc' };
-const DEFAULT_VIEW_STATE = { mode: 'timeline', sidebarCollapsed: false, expandedProjects: {} };
+const DEFAULT_SORT_STATE: SortState = { field: 'id', order: 'asc' };
+const DEFAULT_VIEW_STATE: ViewState = { mode: 'timeline', sidebarCollapsed: false, expandedProjects: {} };
 
-function loadJson(key) {
-    try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
+function loadJson<T>(key: string): T | null {
+    try { return JSON.parse(localStorage.getItem(key) as string) as T; } catch { return null; }
 }
 
 export function useProjectsPageState() {
-    const [filterState, setFilterState] = useState(() => {
-        const saved = loadJson('flowlink_filters');
+    const [filterState, setFilterState] = useState<FilterState>(() => {
+        const saved = loadJson<FilterState>('flowlink_filters');
         if (saved) return { ...saved, openFilterDropdown: null, searchQuery: saved.searchInput || '' };
         return DEFAULT_FILTER_STATE;
     });
 
-    const [sortState, setSortState] = useState(() => {
-        return loadJson('flowlink_sort') || DEFAULT_SORT_STATE;
+    const [sortState, setSortState] = useState<SortState>(() => {
+        return loadJson<SortState>('flowlink_sort') || DEFAULT_SORT_STATE;
     });
 
-    const [viewState, setViewState] = useState(() => {
-        const saved = loadJson('flowlink_view');
+    const [viewState, setViewState] = useState<ViewState>(() => {
+        const saved = loadJson<ViewState>('flowlink_view');
         if (saved) return { ...saved, expandedProjects: saved.expandedProjects || {} };
         return DEFAULT_VIEW_STATE;
     });

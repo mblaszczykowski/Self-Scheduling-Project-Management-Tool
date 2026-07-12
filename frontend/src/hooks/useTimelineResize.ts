@@ -1,11 +1,25 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, MouseEvent as ReactMouseEvent } from 'react';
 
-export const useTimelineResize = ({ onResizeMove, onResizeEnd, dayWidth = 25 }) => {
-    const [resizeState, setResizeState] = useState(null);
+type ResizeSide = 'left' | 'right';
+interface ResizeState {
+    taskKey: string;
+    projectKey: string;
+    side: ResizeSide;
+    startX: number;
+}
+
+interface UseTimelineResizeOptions {
+    onResizeMove?: (taskKey: string, projectKey: string, side: ResizeSide, deltaDays: number) => void;
+    onResizeEnd?: () => void;
+    dayWidth?: number;
+}
+
+export const useTimelineResize = ({ onResizeMove, onResizeEnd, dayWidth = 25 }: UseTimelineResizeOptions) => {
+    const [resizeState, setResizeState] = useState<ResizeState | null>(null);
     const isResizingRef = useRef(false);
     const wasResizingRef = useRef(false);
 
-    const startResize = useCallback((event, taskKey, projectKey, side) => {
+    const startResize = useCallback((event: ReactMouseEvent, taskKey: string, projectKey: string, side: ResizeSide) => {
         event.preventDefault();
         event.stopPropagation();
         isResizingRef.current = true;
@@ -25,7 +39,7 @@ export const useTimelineResize = ({ onResizeMove, onResizeEnd, dayWidth = 25 }) 
     useEffect(() => {
         if (!resizeState) return;
 
-        const handleMouseMove = (event) => {
+        const handleMouseMove = (event: MouseEvent) => {
             const { taskKey, projectKey, side, startX } = resizeState;
             const deltaDays = Math.round((event.clientX - startX) / dayWidth);
 

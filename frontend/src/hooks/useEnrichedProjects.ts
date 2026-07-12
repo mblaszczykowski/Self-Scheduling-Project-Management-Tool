@@ -1,26 +1,27 @@
 import { useMemo } from 'react';
 import { isOverdue, isUpcomingDeadline, calculateDuration } from '../util/helpers';
 import { computeProjectDateRange, computeProjectProgress } from '../util/projectUtils';
+import { Project, Task, EnrichedTask, ProcessedProject } from '../types';
 
-export function useEnrichedProjects(projects) {
+export function useEnrichedProjects(projects: Project[]) {
     const enriched = useMemo(() => {
-        const allTasks = [];
-        const taskKeyToTaskMap = new Map();
-        const projectKeyToProject = new Map();
+        const allTasks: EnrichedTask[] = [];
+        const taskKeyToTaskMap = new Map<string, EnrichedTask>();
+        const projectKeyToProject = new Map<string, ProcessedProject>();
 
         // First pass: build enriched tasks per project
-        const processedProjects = projects.map(project => {
-            const enrichedTasks = (project.tasks || []).map(task => {
+        const processedProjects: ProcessedProject[] = projects.map(project => {
+            const enrichedTasks: EnrichedTask[] = (project.tasks || []).map((task: Task) => {
                 const progress = task.progress ?? 0;
                 const delayed = isOverdue(task.dueDate, progress);
                 const upcoming = !delayed && isUpcomingDeadline(task.dueDate);
 
-                const enriched = {
+                const enriched: EnrichedTask = {
                     ...task,
                     projectKey: project.projectKey,
                     projectSummary: project.summary,
                     taskKey: task.taskKey,
-                    reporter: task.reporter?.email || 'N/A',
+                    reporter: (typeof task.reporter === 'string' ? task.reporter : task.reporter?.email) || 'N/A',
                     duration: calculateDuration(task.startDate, task.dueDate),
                     labels: Array.isArray(task.labels) ? task.labels : [],
                     dependencies: task.dependencyKeys || [],
@@ -34,7 +35,7 @@ export function useEnrichedProjects(projects) {
                 return enriched;
             });
 
-            const sortedTasks = [...enrichedTasks].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+            const sortedTasks = [...enrichedTasks].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
             const { projectStartDate, projectDueDate } = computeProjectDateRange(sortedTasks);
             const projectProgress = computeProjectProgress(sortedTasks);

@@ -1,6 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, RefObject } from 'react';
 
-export const useClickOutside = (ref, onClickOutside) => {
+export const useClickOutside = (
+    ref: RefObject<HTMLElement | null>,
+    onClickOutside: (e: MouseEvent) => void,
+) => {
     // Keep the latest callback in a ref so the listener subscribes exactly once
     // (deps: [ref]) instead of re-adding whenever the caller passes a new
     // callback identity.
@@ -8,8 +11,8 @@ export const useClickOutside = (ref, onClickOutside) => {
     callbackRef.current = onClickOutside;
 
     useEffect(() => {
-        const handler = (e) => {
-            if (ref.current && !ref.current.contains(e.target)) {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
                 callbackRef.current(e);
             }
         };
