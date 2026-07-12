@@ -37,6 +37,9 @@ class TokenServiceTest {
     private RefreshTokenRepository refreshTokenRepository;
 
     @Mock
+    private com.backend.repositories.UserRepository userRepository;
+
+    @Mock
     private HttpServletRequest request;
 
     private TokenService tokenService;
@@ -62,8 +65,14 @@ class TokenServiceTest {
                 ACCESS_TOKEN_EXPIRATION,
                 REFRESH_TOKEN_EXPIRATION,
                 refreshTokenRepository,
+                userRepository,
                 new com.backend.util.CookieFactory(cookieProperties)
         );
+
+        // generateRefreshToken attaches the owning user via a JPA reference proxy.
+        var userRef = new com.backend.entities.User();
+        userRef.setId(TEST_USER_ID);
+        lenient().when(userRepository.getReferenceById(TEST_USER_ID)).thenReturn(userRef);
     }
 
     @Nested
@@ -119,7 +128,7 @@ class TokenServiceTest {
         void shouldNotDeleteOtherTokens() {
             tokenService.generateRefreshToken(TEST_USER_ID);
 
-            verify(refreshTokenRepository, never()).deleteByUserId(TEST_USER_ID);
+            // No bulk-delete method exists any more; a new token is simply added for this device.
             verify(refreshTokenRepository).save(any(RefreshToken.class));
         }
 
@@ -272,9 +281,11 @@ class TokenServiceTest {
         @Test
         @DisplayName("should return user ID for valid refresh token")
         void shouldReturnUserIdForValidToken() {
+            var user = new com.backend.entities.User();
+            user.setId(TEST_USER_ID);
             RefreshToken refreshToken = new RefreshToken();
             refreshToken.setToken("valid-token");
-            refreshToken.setUserId(TEST_USER_ID);
+            refreshToken.setUser(user);
             refreshToken.setExpiryDate(Instant.now().plusSeconds(3600));
 
             when(refreshTokenRepository.findByToken("valid-token"))
@@ -301,7 +312,6 @@ class TokenServiceTest {
         void shouldReturnNullAndDeleteExpiredToken() {
             RefreshToken expiredToken = new RefreshToken();
             expiredToken.setToken("expired-token");
-            expiredToken.setUserId(TEST_USER_ID);
             expiredToken.setExpiryDate(Instant.now().minusSeconds(3600));
 
             when(refreshTokenRepository.findByToken("expired-token"))

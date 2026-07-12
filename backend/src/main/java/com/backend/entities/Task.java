@@ -4,8 +4,11 @@ import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "tasks",
@@ -79,7 +82,7 @@ public class Task {
             inverseJoinColumns = @JoinColumn(name = "dependency_id",
                     foreignKey = @ForeignKey(foreignKeyDefinition = "FOREIGN KEY (dependency_id) REFERENCES tasks(id) ON DELETE CASCADE"))
     )
-    private List<Task> dependencies = new ArrayList<>();
+    private Set<Task> dependencies = new HashSet<>();
 
     @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Comment> comments = new ArrayList<>();
@@ -96,7 +99,7 @@ public class Task {
     private Instant updated;
 
     @Enumerated(EnumType.STRING)
-    @Column
+    @Column(nullable = false)
     private TaskPriority priority = TaskPriority.MEDIUM;
 
     public Task() {
@@ -146,9 +149,9 @@ public class Task {
     public Project getProject() { return project; }
     public void setProject(Project project) { this.project = project; }
 
-    public List<Task> getDependencies() { return Collections.unmodifiableList(dependencies); }
+    public Set<Task> getDependencies() { return Collections.unmodifiableSet(dependencies); }
 
-    public void replaceDependencies(List<Task> dependencies) {
+    public void replaceDependencies(Collection<Task> dependencies) {
         this.dependencies.clear();
         if (dependencies != null) {
             this.dependencies.addAll(dependencies);

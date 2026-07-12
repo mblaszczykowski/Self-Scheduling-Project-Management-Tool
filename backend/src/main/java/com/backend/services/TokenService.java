@@ -3,6 +3,7 @@ package com.backend.services;
 import com.backend.entities.RefreshToken;
 import com.backend.exception.AuthorizationException;
 import com.backend.repositories.RefreshTokenRepository;
+import com.backend.repositories.UserRepository;
 import com.backend.util.CookieFactory;
 import io.jsonwebtoken.*;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +25,7 @@ public class TokenService {
     private final Duration accessTokenExpiration;
     private final Duration refreshTokenExpiration;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserRepository userRepository;
     private final CookieFactory cookieFactory;
 
     @Autowired
@@ -31,11 +33,13 @@ public class TokenService {
                         Duration accessTokenExpiration,
                         Duration refreshTokenExpiration,
                         RefreshTokenRepository refreshTokenRepository,
+                        UserRepository userRepository,
                         CookieFactory cookieFactory) {
         this.jwtSecretKey = jwtSecretKey;
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.userRepository = userRepository;
         this.cookieFactory = cookieFactory;
     }
 
@@ -60,7 +64,7 @@ public class TokenService {
 
         var refreshToken = new RefreshToken();
         refreshToken.setToken(tokenValue);
-        refreshToken.setUserId(userId);
+        refreshToken.setUser(userRepository.getReferenceById(userId));
         refreshToken.setExpiryDate(expiryDate);
 
         refreshTokenRepository.save(refreshToken);

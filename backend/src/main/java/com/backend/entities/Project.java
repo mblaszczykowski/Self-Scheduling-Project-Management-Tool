@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "projects",
@@ -57,7 +59,7 @@ public class Project {
             joinColumns = @JoinColumn(name = "project_id"),
             inverseJoinColumns = @JoinColumn(name = "user_id")
     )
-    private List<User> members = new ArrayList<>();
+    private Set<User> members = new HashSet<>();
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Task> tasks = new ArrayList<>();
@@ -70,7 +72,7 @@ public class Project {
             inverseJoinColumns = @JoinColumn(name = "dependency_id",
                     foreignKey = @ForeignKey(foreignKeyDefinition = "FOREIGN KEY (dependency_id) REFERENCES projects(id) ON DELETE CASCADE"))
     )
-    private List<Project> dependencies = new ArrayList<>();
+    private Set<Project> dependencies = new HashSet<>();
 
     public Project() {}
 
@@ -127,7 +129,7 @@ public class Project {
         }
     }
 
-    public List<User> getMembers() { return Collections.unmodifiableList(members); }
+    public Set<User> getMembers() { return Collections.unmodifiableSet(members); }
 
     public void replaceMembers(Collection<? extends User> members) {
         this.members.clear();
@@ -136,9 +138,9 @@ public class Project {
         }
     }
 
-    public List<Project> getDependencies() { return Collections.unmodifiableList(dependencies); }
+    public Set<Project> getDependencies() { return Collections.unmodifiableSet(dependencies); }
 
-    public void replaceDependencies(List<Project> dependencies) {
+    public void replaceDependencies(Collection<Project> dependencies) {
         this.dependencies.clear();
         if (dependencies != null) {
             this.dependencies.addAll(dependencies);
