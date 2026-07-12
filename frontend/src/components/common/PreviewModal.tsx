@@ -2,7 +2,18 @@ import React, { useCallback, useEffect } from 'react';
 import { HiOutlineDownload, HiOutlineX } from 'react-icons/hi';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 
-const PreviewModal = ({ preview, onClose }) => {
+interface PreviewData {
+    url: string | null;
+    fileName: string;
+    fileType: 'image' | 'pdf' | 'file';
+}
+
+interface PreviewModalProps {
+    preview: PreviewData | null;
+    onClose: () => void;
+}
+
+const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
     const [isVisible, setIsVisible] = useAnimateIn();
 
     const handleClose = useCallback(() => {
@@ -11,7 +22,7 @@ const PreviewModal = ({ preview, onClose }) => {
     }, [onClose, setIsVisible]);
 
     useEffect(() => {
-        const onKeyDown = (e) => { if (e.key === 'Escape') handleClose(); };
+        const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(); };
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
     }, [handleClose]);

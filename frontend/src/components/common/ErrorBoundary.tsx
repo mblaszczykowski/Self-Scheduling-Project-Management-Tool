@@ -1,24 +1,38 @@
 import React from 'react';
 import { AlertTriangleIcon } from './Icons';
 
-class ErrorBoundary extends React.Component {
-    constructor(props) {
+interface ErrorBoundaryProps {
+    children: React.ReactNode;
+    resetKey?: unknown;
+    fallback?: React.ReactNode;
+    level?: 'page' | 'section';
+    onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+}
+
+interface ErrorBoundaryState {
+    hasError: boolean;
+    error: Error | null;
+    prevResetKey: unknown;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+    constructor(props: ErrorBoundaryProps) {
         super(props);
         this.state = { hasError: false, error: null, prevResetKey: props.resetKey };
     }
 
-    static getDerivedStateFromError(error) {
+    static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
         return { hasError: true, error };
     }
 
-    static getDerivedStateFromProps(props, state) {
+    static getDerivedStateFromProps(props: ErrorBoundaryProps, state: ErrorBoundaryState): Partial<ErrorBoundaryState> | null {
         if (props.resetKey !== state.prevResetKey) {
             return { hasError: false, error: null, prevResetKey: props.resetKey };
         }
         return null;
     }
 
-    componentDidCatch(error, errorInfo) {
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
         console.error('ErrorBoundary caught an error:', error, errorInfo);
         this.props.onError?.(error, errorInfo);
     }

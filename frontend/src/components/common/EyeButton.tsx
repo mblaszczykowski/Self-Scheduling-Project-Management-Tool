@@ -1,7 +1,12 @@
 import React from 'react';
 import { HiOutlineEye, HiOutlineEyeOff } from "react-icons/hi";
 
-function EyeButton({showPassword, setShowPassword}) {
+interface EyeButtonProps {
+    showPassword: boolean;
+    setShowPassword: (v: boolean) => void;
+}
+
+function EyeButton({ showPassword, setShowPassword }: EyeButtonProps) {
     return (
         <button
             type="button"

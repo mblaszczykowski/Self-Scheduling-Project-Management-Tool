@@ -1,17 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { getImageUrl, getAvatarColor, getAvatarInitials } from '../../util/helpers';
+import { User } from '../../types';
 
-const sizeMap = {
+type AvatarSize = 'xs' | 'sm' | 'md' | 'lg';
+
+const sizeMap: Record<AvatarSize, { container: string; text: string }> = {
     xs: { container: 'h-5 w-5', text: 'text-[10px]' },
     sm: { container: 'h-7 w-7', text: 'text-[10px]' },
     md: { container: 'h-7 w-7', text: 'text-xs' },
     lg: { container: 'h-20 w-20', text: 'text-2xl' },
 };
 
-const Avatar = ({ user, profilePicture, size = 'sm', className = '', onError: externalOnError }) => {
+interface AvatarProps {
+    user?: User | { firstname?: string; lastname?: string } | null;
+    profilePicture?: string | null;
+    size?: AvatarSize;
+    className?: string;
+    onError?: () => void;
+}
+
+const Avatar = ({ user, profilePicture, size = 'sm', className = '', onError: externalOnError }: AvatarProps) => {
     const [hasError, setHasError] = useState(false);
 
-    const pic = profilePicture ?? user?.profilePicture;
+    const pic = profilePicture ?? (user as User)?.profilePicture;
     const { container, text } = sizeMap[size] || sizeMap.sm;
 
     // A new image source should get a fresh chance to load (e.g. after a

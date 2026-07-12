@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 
-export const useAnimateIn = () => {
+export const useAnimateIn = (): [boolean, Dispatch<SetStateAction<boolean>>] => {
     const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {

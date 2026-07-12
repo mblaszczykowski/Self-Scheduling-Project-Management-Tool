@@ -1,16 +1,24 @@
 import React from 'react';
 import { HiOutlineDocument, HiOutlineDocumentText, HiOutlineX } from 'react-icons/hi';
 import { getFileInfo } from '../../util/helpers';
+import { Attachment } from '../../types';
+
+interface AttachmentThumbnailProps {
+    attachment: Attachment;
+    onRemove?: (attachment: Attachment) => void;
+    onClick?: (attachment: Attachment) => void;
+    variant?: 'default' | 'compact';
+}
 
 const AttachmentThumbnail = ({
     attachment,
     onRemove,
     onClick,
     variant = 'default',
-}) => {
+}: AttachmentThumbnailProps) => {
     const { url, fileName, fileType } = getFileInfo(attachment);
 
-    const handleRemove = (e) => {
+    const handleRemove = (e: React.MouseEvent) => {
         e.stopPropagation();
         onRemove?.(attachment);
     };

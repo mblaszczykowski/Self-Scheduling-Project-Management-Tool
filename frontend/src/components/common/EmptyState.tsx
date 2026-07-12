@@ -1,15 +1,18 @@
 import React from 'react';
+import { IconType } from 'react-icons';
 import { HiOutlineClipboardList, HiOutlineCalendar, HiOutlineCollection, HiOutlineSearch } from 'react-icons/hi';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 
-const iconMap = {
+type EmptyStateVariant = 'table' | 'timeline' | 'list' | 'search';
+
+const iconMap: Record<EmptyStateVariant, IconType> = {
     table: HiOutlineClipboardList,
     timeline: HiOutlineCalendar,
     list: HiOutlineCollection,
     search: HiOutlineSearch,
 };
 
-const defaultMessages = {
+const defaultMessages: Record<EmptyStateVariant, { title: string; description: string }> = {
     table: {
         title: 'No tasks yet',
         description: 'Create your first task to get started with tracking your work.',
@@ -28,6 +31,16 @@ const defaultMessages = {
     },
 };
 
+interface EmptyStateProps {
+    variant?: EmptyStateVariant;
+    title?: string;
+    description?: string;
+    icon?: IconType;
+    action?: () => void;
+    actionLabel?: string;
+    className?: string;
+}
+
 const EmptyState = ({
     variant = 'list',
     title,
@@ -36,7 +49,7 @@ const EmptyState = ({
     action,
     actionLabel,
     className = '',
-}) => {
+}: EmptyStateProps) => {
     const [isVisible] = useAnimateIn();
 
     const Icon = CustomIcon || iconMap[variant] || iconMap.list;
