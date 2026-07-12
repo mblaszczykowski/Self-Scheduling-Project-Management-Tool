@@ -33,7 +33,7 @@ const ProjectsPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useContext(AuthContext);
-    const { projects, updateTask, refreshProjects } = useContext(ProjectsContext);
+    const { projects, projectsError, updateTask, refreshProjects } = useContext(ProjectsContext);
     const handleLogout = useLogout();
 
     const {
@@ -309,6 +309,18 @@ const ProjectsPage = () => {
             />
 
             <div className="flex-grow flex flex-col">
+                {projectsError && (
+                    <div className="mx-6 lg:mx-10 mt-3 flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                        <span className="text-sm text-red-700 dark:text-red-300">{projectsError}</span>
+                        <button
+                            type="button"
+                            onClick={refreshProjects}
+                            className="text-xs font-medium text-red-700 dark:text-red-300 hover:underline shrink-0"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                )}
                 {/* Toolbar */}
                 <div className="px-6 lg:px-10 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-[fadeInSlide_0.3s_ease-out_both]">
                     <div className="flex items-center gap-3">
