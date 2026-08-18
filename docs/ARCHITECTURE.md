@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Architecture notes
 
-Guidance for Claude Code (claude.ai/code) when working in this repository.
+Internal reference for anyone working in this repository.
 
 ## Project overview
 
@@ -164,7 +164,9 @@ thin façades over it, not hand-rolled stores:
 ### Public vs protected endpoints
 
 `config/PublicEndpoints` is the whole policy. Matching is **exact on the raw request URI**, which is
-fail-closed: an encoding trick makes a path *less* likely to match an exemption, never more.
+fail-closed: an encoding trick makes a path *less* likely to match an exemption, never more. The
+one exception is the API docs subtree (`/swagger-ui/*`, `/v3/api-docs*`), which is a deliberate
+prefix match.
 
 Reachable without an access token:
 
@@ -173,6 +175,7 @@ Reachable without an access token:
 - `POST /api/auth/refresh`
 - `/error`
 - `/actuator/health`
+- `/swagger-ui/*`, `/v3/api-docs*`
 
 Everything else requires a valid access token. Exempt from the CSRF check: `POST /api/auth/login`,
 `POST /api/users`, `/error`, `/actuator/health`.
@@ -231,7 +234,7 @@ without it.
 
 28 environment variables are read by `application.properties`; the compose file adds
 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `HTTP_PORT` and `REACT_APP_API_URL`. The full
-table with defaults is in [README.md](README.md#configuration); the annotated template is
+table with defaults is in [README.md](../README.md#configuration); the annotated template is
 `.env.example`. Do not duplicate that table here — verify against `application.properties`.
 
 Two that are easy to get wrong:
