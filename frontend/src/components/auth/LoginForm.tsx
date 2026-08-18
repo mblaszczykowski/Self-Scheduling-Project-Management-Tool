@@ -1,13 +1,13 @@
 import React, { useEffect, useId, useState } from 'react';
-import { ErrorMessage, Field, Form, Formik, FormikHelpers } from 'formik';
+import { Form, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import { useNavigate } from 'react-router-dom';
 import EyeButton from '../common/EyeButton';
+import FormField from '../common/FormField';
 import { getCurrentUser, login } from '../../util/api';
 import { showToast } from '../../util/toast';
 import { getErrorMessage, safeNextPath } from '../../util/helpers';
 import { useAuth } from '../../context/AuthContext';
-import { authInputClass } from '../common/formHelpers';
 
 interface LoginValues {
     email: string;
@@ -66,42 +66,29 @@ function LoginForm({ onToggleForm }: { onToggleForm: () => void }) {
         >
             {({ errors, touched, isSubmitting }) => (
                 <Form className="space-y-4">
-                    <div>
-                        <label htmlFor={`${uid}-email`} className="block text-xs font-semibold text-slate-600 mb-1.5">
-                            Email
-                        </label>
-                        <Field
-                            id={`${uid}-email`}
-                            type="email"
-                            name="email"
-                            autoComplete="email"
-                            aria-invalid={!!(errors.email && touched.email)}
-                            aria-describedby={errors.email && touched.email ? `${uid}-email-error` : undefined}
-                            className={authInputClass(!!(errors.email && touched.email))}
-                            placeholder="Enter your email"
-                        />
-                        <ErrorMessage name="email" component="span" id={`${uid}-email-error`} className="text-red-500 text-xs mt-1 block" />
-                    </div>
+                    <FormField
+                        id={`${uid}-email`}
+                        name="email"
+                        label="Email"
+                        type="email"
+                        autoComplete="email"
+                        hasError={!!(errors.email && touched.email)}
+                        describedBy={errors.email && touched.email ? `${uid}-email-error` : undefined}
+                        placeholder="Enter your email"
+                    />
 
-                    <div>
-                        <label htmlFor={`${uid}-password`} className="block text-xs font-semibold text-slate-600 mb-1.5">
-                            Password
-                        </label>
-                        <div className="relative">
-                            <Field
-                                id={`${uid}-password`}
-                                type={showPassword ? 'text' : 'password'}
-                                name="password"
-                                autoComplete="current-password"
-                                aria-invalid={!!(errors.password && touched.password)}
-                                aria-describedby={errors.password && touched.password ? `${uid}-password-error` : undefined}
-                                className={`${authInputClass(!!(errors.password && touched.password))} pr-12`}
-                                placeholder="Enter your password"
-                            />
-                            <EyeButton showPassword={showPassword} setShowPassword={setShowPassword} />
-                        </div>
-                        <ErrorMessage name="password" component="span" id={`${uid}-password-error`} className="text-red-500 text-xs mt-1 block" />
-                    </div>
+                    <FormField
+                        id={`${uid}-password`}
+                        name="password"
+                        label="Password"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="current-password"
+                        hasError={!!(errors.password && touched.password)}
+                        describedBy={errors.password && touched.password ? `${uid}-password-error` : undefined}
+                        placeholder="Enter your password"
+                        inputClassName="pr-12"
+                        rightElement={<EyeButton showPassword={showPassword} setShowPassword={setShowPassword} />}
+                    />
 
                     <button
                         type="submit"

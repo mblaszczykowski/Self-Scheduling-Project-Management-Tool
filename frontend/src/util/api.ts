@@ -18,7 +18,6 @@ import {
     SearchResults,
     Task,
     TaskPayload,
-    User,
 } from '../types';
 
 /**
@@ -163,10 +162,6 @@ export const updateProfile = (payload: ProfilePayload, profilePicture?: File | n
 
 export const updateEmailPreferences = (preferences: EmailPreferencesPayload) =>
     api.patch<CurrentUser>('/api/users/me/email-preferences', preferences).then(body);
-
-/** Looks a colleague up by address. A query parameter, so an address can never shadow a route. */
-export const lookupUserByEmail = (email: string) =>
-    api.get<User>('/api/users/lookup', { params: { email } }).then(body);
 
 export const getProjects = (page = 0, size = 100) =>
     api.get<Paged<Project>>('/api/projects', { params: { page, size } }).then(body);

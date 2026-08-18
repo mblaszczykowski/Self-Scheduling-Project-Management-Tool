@@ -7,7 +7,7 @@ import {
 import EntityMainColumn from './EntityMainColumn';
 import Comments from '../comments/Comments';
 import ActivityTab from '../comments/ActivityTab';
-import { STATUS_CONFIG, PRIORITY_CONFIG, daysBetween, toDateString, MS_PER_DAY } from '../../util/helpers';
+import { STATUS_CONFIG, PRIORITY_CONFIG, daysBetween, addDays, MS_PER_DAY } from '../../util/helpers';
 import Avatar from '../common/Avatar';
 import { Project, Task, User, ModalFormValues, Attachment } from '../../types';
 import { FormikHelpers, FormikProps } from 'formik';
@@ -298,8 +298,7 @@ const TaskForm = ({
                                     const dur = Math.max(1, parseInt(e.target.value, 10) || 1);
                                     setFieldValue('duration', dur);
                                     if (values.startDate) {
-                                        const start = new Date(values.startDate);
-                                        setFieldValue('dueDate', toDateString(new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate() + (dur - 1)))));
+                                        setFieldValue('dueDate', addDays(values.startDate, dur - 1));
                                     }
                                 }}
                             />

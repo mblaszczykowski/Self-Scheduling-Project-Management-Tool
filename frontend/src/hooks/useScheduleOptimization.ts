@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { applyOptimization, simulateOptimization } from '../util/api';
 import { getErrorMessage } from '../util/helpers';
 import { showToast } from '../util/toast';
@@ -24,6 +24,13 @@ interface Options {
     /** Invalidates the project cache after an applied schedule. */
     onApplied: () => void | Promise<unknown>;
 }
+
+const scheduleFingerprint = (projects: ProcessedProject[]): string =>
+    projects
+        .flatMap((project) => project.tasks)
+        .map((task) => `${task.taskKey}:${task.updated ?? ''}`)
+        .sort()
+        .join('|');
 
 export function useScheduleOptimization({ processedProjects, onApplied }: Options) {
     const [optimization, setOptimization] = useState<OptimizationState>(INITIAL_STATE);
@@ -84,7 +91,13 @@ export function useScheduleOptimization({ processedProjects, onApplied }: Option
     const handleRejectOptimization = useCallback(() => setOptimization(INITIAL_STATE), []);
 
     // A proposal describes one particular arrangement of tasks; once that changes it is stale.
+    const previousFingerprintRef = useRef<string | null>(null);
     useEffect(() => {
+        const fingerprint = scheduleFingerprint(processedProjects);
+        const changed = previousFingerprintRef.current !== null
+            && previousFingerprintRef.current !== fingerprint;
+        previousFingerprintRef.current = fingerprint;
+        if (!changed) return;
         setOptimization((previous) => (previous.result
             ? { ...previous, result: null, showGhostBars: false, suggestionMap: null }
             : previous));

@@ -1,12 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { HiOutlineDownload, HiOutlineX } from 'react-icons/hi';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
-
-interface PreviewData {
-    url: string | null;
-    fileName: string;
-    fileType: 'image' | 'pdf' | 'file';
-}
+import { PreviewData } from '../../util/helpers';
 
 interface PreviewModalProps {
     preview: PreviewData | null;

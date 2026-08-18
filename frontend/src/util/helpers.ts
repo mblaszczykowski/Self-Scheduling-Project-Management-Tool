@@ -159,10 +159,6 @@ export const calculateDuration = (startDate?: string | null, dueDate?: string | 
     return diffDays > 0 ? diffDays : 0;
 };
 
-/** How a duration reads in the UI, where "no dates set" is a legitimate state. */
-export const formatDuration = (days: number): string =>
-    days > 0 ? `${days}d` : 'N/A';
-
 export const getFileTypeFromPath = (path: unknown): 'image' | 'pdf' | 'file' => {
     if (typeof path !== 'string') return 'file';
     const extension = path.split('.').pop()?.toLowerCase();
@@ -192,6 +188,8 @@ export interface FileInfo {
     fileName: string;
     fileType: 'image' | 'pdf' | 'file';
 }
+
+export type PreviewData = Omit<FileInfo, 'isFile'>;
 
 export const getFileInfo = (attachment?: Attachment | null): FileInfo => {
     if (!attachment) return { isFile: false, url: null, fileName: '', fileType: 'file' };
@@ -365,13 +363,10 @@ export const getErrorMessage = (err: unknown, defaultMessage = 'An unexpected er
 export const daysBetween = (date1: MaybeDate, date2: MaybeDate): number => {
     // No known dates, no known distance. Callers sum and compare these, so a NaN here would
     // silently poison every total it reached.
-    if (date1 === null || date1 === undefined || date2 === null || date2 === undefined) return 0;
-    const d1 = new Date(date1);
-    const d2 = new Date(date2);
-    if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return 0;
-    const utc1 = Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate());
-    const utc2 = Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
-    return Math.round((utc2 - utc1) / MS_PER_DAY);
+    const d1 = dayIndex(date1);
+    const d2 = dayIndex(date2);
+    if (d1 === null || d2 === null) return 0;
+    return d2 - d1;
 };
 
 /**

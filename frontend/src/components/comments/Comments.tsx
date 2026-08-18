@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { FormikHelpers } from 'formik';
 import { useComments } from '../../hooks/useComments';
-import { getFileInfo, getErrorMessage } from '../../util/helpers';
+import { getFileInfo, getErrorMessage, PreviewData } from '../../util/helpers';
 import { showToast } from '../../util/toast';
 import PreviewModal from '../common/PreviewModal';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
@@ -10,12 +10,6 @@ import ConfirmDialog from '../modals/ConfirmDialog';
 import CommentItem from './CommentItem';
 import CommentForm, { CommentFormValues } from './CommentForm';
 import { Attachment, Comment, ReactionType } from '../../types';
-
-interface PreviewData {
-    url: string | null;
-    fileName: string;
-    fileType: 'image' | 'pdf' | 'file';
-}
 
 export default function Comments({ taskId, currentUserId }: { taskId: number; currentUserId?: number }) {
     const location = useLocation();

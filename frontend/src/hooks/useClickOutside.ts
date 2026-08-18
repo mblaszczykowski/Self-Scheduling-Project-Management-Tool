@@ -12,6 +12,9 @@ export const useClickOutside = (
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
+            if (e.target instanceof Element && e.target.closest('[role="dialog"], [role="alertdialog"]')) {
+                return;
+            }
             if (ref.current && !ref.current.contains(e.target as Node)) {
                 callbackRef.current(e);
             }

@@ -5,13 +5,13 @@ import {
     isOverdue,
     isUpcomingDeadline,
     calculateDuration,
-    formatDuration,
     formatShortDate,
     formatLongDate,
     calculateTaskPosition,
     NO_DATE,
     safeNextPath,
     daysBetween,
+    addDays,
     getFileTypeFromPath,
     getAvatarInitials,
     getErrorMessage,
@@ -101,21 +101,33 @@ describe('calculateDuration', () => {
     });
 });
 
-describe('formatDuration', () => {
-    test('renders a known span in days', () => {
-        expect(formatDuration(5)).toBe('5d');
-    });
-    test('renders an unknown span as N/A', () => {
-        expect(formatDuration(0)).toBe('N/A');
-    });
-});
-
 describe('daysBetween', () => {
     test('counts whole days', () => {
         expect(daysBetween('2024-01-01', '2024-01-08')).toBe(7);
     });
     test('is signed', () => {
         expect(daysBetween('2024-01-08', '2024-01-01')).toBe(-7);
+    });
+    test('mixing a live instant with a date-only string stays correct in a UTC-negative timezone', () => {
+        const originalTz = process.env.TZ;
+        process.env.TZ = 'America/New_York';
+        try {
+            expect(daysBetween(new Date('2024-06-20T03:30:00Z'), '2024-06-20')).toBe(0);
+        } finally {
+            process.env.TZ = originalTz;
+        }
+    });
+});
+
+describe('addDays', () => {
+    test('advances by whole days, staying in string/UTC space', () => {
+        expect(addDays('2024-06-15', 4)).toBe('2024-06-19');
+    });
+    test('crosses a month boundary', () => {
+        expect(addDays('2024-06-28', 5)).toBe('2024-07-03');
+    });
+    test('a negative count moves the date backwards', () => {
+        expect(addDays('2024-06-15', -1)).toBe('2024-06-14');
     });
 });
 

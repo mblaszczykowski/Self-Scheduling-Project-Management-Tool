@@ -1,13 +1,13 @@
 import React, { useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorMessage, Field, Form, Formik, FormikHelpers } from 'formik';
+import { Form, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import EyeButton from '../common/EyeButton';
+import FormField from '../common/FormField';
 import { register, checkUserAuth } from '../../util/api';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../util/toast';
 import { getErrorMessage } from '../../util/helpers';
-import { authInputClass } from '../common/formHelpers';
 
 interface RegisterValues {
     firstname: string;
@@ -112,80 +112,53 @@ function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
             {({ errors, touched, isSubmitting, values }) => (
                 <Form className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor={`${uid}-firstname`} className="block text-xs font-semibold text-slate-600 mb-1.5">
-                                First name
-                            </label>
-                            <Field
-                                id={`${uid}-firstname`}
-                                type="text"
-                                name="firstname"
-                                autoComplete="given-name"
-                                aria-invalid={!!(errors.firstname && touched.firstname)}
-                                aria-describedby={errors.firstname && touched.firstname ? `${uid}-firstname-error` : undefined}
-                                className={authInputClass(!!(errors.firstname && touched.firstname))}
-                                placeholder="First name"
-                            />
-                            <ErrorMessage name="firstname" component="span" id={`${uid}-firstname-error`} className="text-red-500 text-xs mt-1 block" />
-                        </div>
-                        <div>
-                            <label htmlFor={`${uid}-lastname`} className="block text-xs font-semibold text-slate-600 mb-1.5">
-                                Last name
-                            </label>
-                            <Field
-                                id={`${uid}-lastname`}
-                                type="text"
-                                name="lastname"
-                                autoComplete="family-name"
-                                aria-invalid={!!(errors.lastname && touched.lastname)}
-                                aria-describedby={errors.lastname && touched.lastname ? `${uid}-lastname-error` : undefined}
-                                className={authInputClass(!!(errors.lastname && touched.lastname))}
-                                placeholder="Last name"
-                            />
-                            <ErrorMessage name="lastname" component="span" id={`${uid}-lastname-error`} className="text-red-500 text-xs mt-1 block" />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label htmlFor={`${uid}-email`} className="block text-xs font-semibold text-slate-600 mb-1.5">
-                            Email
-                        </label>
-                        <Field
-                            id={`${uid}-email`}
-                            type="email"
-                            name="email"
-                            autoComplete="email"
-                            aria-invalid={!!(errors.email && touched.email)}
-                            aria-describedby={errors.email && touched.email ? `${uid}-email-error` : undefined}
-                            className={authInputClass(!!(errors.email && touched.email))}
-                            placeholder="Email"
+                        <FormField
+                            id={`${uid}-firstname`}
+                            name="firstname"
+                            label="First name"
+                            autoComplete="given-name"
+                            hasError={!!(errors.firstname && touched.firstname)}
+                            describedBy={errors.firstname && touched.firstname ? `${uid}-firstname-error` : undefined}
+                            placeholder="First name"
                         />
-                        <ErrorMessage name="email" component="span" id={`${uid}-email-error`} className="text-red-500 text-xs mt-1 block" />
+                        <FormField
+                            id={`${uid}-lastname`}
+                            name="lastname"
+                            label="Last name"
+                            autoComplete="family-name"
+                            hasError={!!(errors.lastname && touched.lastname)}
+                            describedBy={errors.lastname && touched.lastname ? `${uid}-lastname-error` : undefined}
+                            placeholder="Last name"
+                        />
                     </div>
 
+                    <FormField
+                        id={`${uid}-email`}
+                        name="email"
+                        label="Email"
+                        type="email"
+                        autoComplete="email"
+                        hasError={!!(errors.email && touched.email)}
+                        describedBy={errors.email && touched.email ? `${uid}-email-error` : undefined}
+                        placeholder="Email"
+                    />
+
                     <div>
-                        <label htmlFor={`${uid}-password`} className="block text-xs font-semibold text-slate-600 mb-1.5">
-                            Password
-                        </label>
-                        <div className="relative">
-                            {/* The live requirements checklist spells out what a valid password looks
-                                like, so it describes the field alongside any validation error. */}
-                            <Field
-                                id={`${uid}-password`}
-                                type={showPassword ? 'text' : 'password'}
-                                name="password"
-                                autoComplete="new-password"
-                                aria-invalid={!!(errors.password && touched.password)}
-                                aria-describedby={[
-                                    errors.password && touched.password ? `${uid}-password-error` : '',
-                                    `${uid}-password-requirements`,
-                                ].filter(Boolean).join(' ')}
-                                className={`${authInputClass(!!(errors.password && touched.password))} pr-12`}
-                                placeholder="Password"
-                            />
-                            <EyeButton showPassword={showPassword} setShowPassword={setShowPassword} />
-                        </div>
-                        <ErrorMessage name="password" component="span" id={`${uid}-password-error`} className="text-red-500 text-xs mt-1 block" />
+                        <FormField
+                            id={`${uid}-password`}
+                            name="password"
+                            label="Password"
+                            type={showPassword ? 'text' : 'password'}
+                            autoComplete="new-password"
+                            hasError={!!(errors.password && touched.password)}
+                            describedBy={[
+                                errors.password && touched.password ? `${uid}-password-error` : '',
+                                `${uid}-password-requirements`,
+                            ].filter(Boolean).join(' ')}
+                            inputClassName="pr-12"
+                            rightElement={<EyeButton showPassword={showPassword} setShowPassword={setShowPassword} />}
+                            placeholder="Password"
+                        />
                         <PasswordRequirements id={`${uid}-password-requirements`} password={values.password} />
                     </div>
 

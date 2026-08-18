@@ -10,6 +10,37 @@ import { Comment, ReactionType } from '../../types';
 
 const MAX_REPLY_DEPTH = 4;
 
+interface ReactionButtonProps {
+    type: ReactionType;
+    active: boolean;
+    disabled: boolean;
+    activeClass: string;
+    count: number;
+    icon: React.ComponentType<{ filled: boolean }>;
+    onClick: () => void;
+}
+
+const ReactionButton = ({ type, active, disabled, activeClass, count, icon: Icon, onClick }: ReactionButtonProps) => {
+    const label = type === 'LIKE' ? 'Like' : 'Dislike';
+
+    return (
+        <button
+            onClick={onClick}
+            aria-label={active ? `Remove ${label.toLowerCase()}` : label}
+            className={
+                'flex items-center gap-0.5 text-xs transition-colors '
+                + (active
+                    ? activeClass
+                    : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')
+            }
+            disabled={disabled}
+        >
+            <Icon filled={active} />
+            {count > 0 && count}
+        </button>
+    );
+};
+
 export interface CommentItemProps {
     comment: Comment;
     level?: number;
@@ -125,38 +156,24 @@ const CommentItem = React.memo(({
                             </div>
 
                             <div className="flex items-center gap-2.5 mt-1">
-                                <button
-                                    onClick={() =>
-                                        onHandleReactToComment(comment.id, 'LIKE')
-                                    }
-                                    aria-label={comment.likedByCurrentUser ? 'Remove like' : 'Like'}
-                                    className={
-                                        'flex items-center gap-0.5 text-xs transition-colors '
-                                        + (comment.likedByCurrentUser
-                                            ? 'text-slate-800 dark:text-slate-200 font-medium'
-                                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')
-                                    }
+                                <ReactionButton
+                                    type="LIKE"
+                                    active={comment.likedByCurrentUser}
                                     disabled={comment.dislikedByCurrentUser}
-                                >
-                                    <ThumbsUpIcon filled={comment.likedByCurrentUser} />
-                                    {comment.likeCount > 0 && comment.likeCount}
-                                </button>
-                                <button
-                                    onClick={() =>
-                                        onHandleReactToComment(comment.id, 'DISLIKE')
-                                    }
-                                    aria-label={comment.dislikedByCurrentUser ? 'Remove dislike' : 'Dislike'}
-                                    className={
-                                        'flex items-center gap-0.5 text-xs transition-colors '
-                                        + (comment.dislikedByCurrentUser
-                                            ? 'text-red-500 font-medium'
-                                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')
-                                    }
+                                    activeClass="text-slate-800 dark:text-slate-200 font-medium"
+                                    count={comment.likeCount}
+                                    icon={ThumbsUpIcon}
+                                    onClick={() => onHandleReactToComment(comment.id, 'LIKE')}
+                                />
+                                <ReactionButton
+                                    type="DISLIKE"
+                                    active={comment.dislikedByCurrentUser}
                                     disabled={comment.likedByCurrentUser}
-                                >
-                                    <ThumbsDownIcon filled={comment.dislikedByCurrentUser} />
-                                    {comment.dislikeCount > 0 && comment.dislikeCount}
-                                </button>
+                                    activeClass="text-red-500 font-medium"
+                                    count={comment.dislikeCount}
+                                    icon={ThumbsDownIcon}
+                                    onClick={() => onHandleReactToComment(comment.id, 'DISLIKE')}
+                                />
                                 {level < MAX_REPLY_DEPTH ? (
                                     <button
                                         onClick={() => onSetReplyingCommentId(comment.id)}

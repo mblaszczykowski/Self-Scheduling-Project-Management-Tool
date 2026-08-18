@@ -5,6 +5,7 @@ import { HiOutlinePlus } from 'react-icons/hi';
 import { revokeFileUrl } from '../../util/helpers';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import { Attachment } from '../../types';
+import { inputClass } from '../common/formHelpers';
 
 export interface CommentFormValues {
     content: string;
@@ -68,13 +69,7 @@ const CommentForm = ({
                         id={textareaId}
                         name="content"
                         rows={2}
-                        className={
-                            'w-full px-3 py-2 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700'
-                            + ' rounded-lg text-sm text-slate-700 dark:text-slate-200'
-                            + ' focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500'
-                            + ' focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none'
-                            + ' transition-colors resize-none placeholder-slate-400 dark:placeholder-slate-500'
-                        }
+                        className={`${inputClass} resize-none`}
                         placeholder={
                             buttonText === 'Reply'
                                 ? 'Write a reply...'
