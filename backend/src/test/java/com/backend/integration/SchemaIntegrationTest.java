@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Exercises the real schema: that the migrations apply, that Hibernate's {@code validate} agrees
@@ -83,7 +84,13 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
                 new TaskActivity(task, owner, TaskActivityType.CREATED, null, null, null));
 
         commentRepository.save(new Comment(task, member, null, "A comment", List.of("/files/c.png")));
+
+        // Detach everything before the tests run. A delete in production happens in its own
+        // transaction, with only the entity being deleted loaded — child rows go via the database
+        // cascade, which Hibernate has no way to know about. Holding them in the same session would
+        // test a situation the application never creates.
         entityManager.flush();
+        entityManager.clear();
     }
 
     // ======================== The delete paths ========================
@@ -92,8 +99,15 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
     @DisplayName("a task with audit rows and comments can be deleted")
     void taskWithActivitiesCanBeDeleted() {
         var taskId = task.getId();
+        assertThat(taskActivityRepository.findByTaskIdWithAuthor(taskId, PageRequest.of(0, 10)))
+                .isNotEmpty();
 
-        taskRepository.delete(task);
+        // Before the foreign key gained ON DELETE CASCADE this failed outright: every task carries
+        // a CREATED activity row, so deleting any task at all violated the constraint.
+        // Deliberately the repository call the service makes, not entityManager.remove: reading
+        // the activity rows first puts a lazy Task proxy in the session, and Spring Data used to
+        // mistake that proxy for an unsaved entity and skip the delete entirely.
+        taskRepository.delete(taskRepository.findById(taskId).orElseThrow());
         entityManager.flush();
         entityManager.clear();
 
@@ -107,32 +121,45 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
     void projectCascadeDeleteWorks() {
         var projectId = project.getId();
 
-        projectRepository.delete(project);
+        projectRepository.delete(projectRepository.findById(projectId).orElseThrow());
         entityManager.flush();
         entityManager.clear();
 
         assertThat(projectRepository.findById(projectId)).isEmpty();
         assertThat(taskRepository.findByProjectIdWithDetails(projectId)).isEmpty();
-        // The owner survives: projects reference users, not the other way round.
+        // The owner survives: a project references its owner, not the other way round.
         assertThat(userRepository.findById(owner.getId())).isPresent();
     }
 
     @Test
-    @DisplayName("deleting a user unassigns their tasks instead of failing or deleting them")
+    @DisplayName("deleting a user unassigns their tasks rather than failing or deleting them")
     void deletingAssigneeUnassignsTasks() {
         var taskId = task.getId();
+        var memberId = member.getId();
 
-        // The member's comment goes with them; the task they were assigned to does not.
-        commentRepository.deleteAll(commentRepository.findRepliesByParentIdsWithDetails(List.of(-1)));
-        entityManager.flush();
-
-        userRepository.delete(member);
+        // Their comments go with them (comments.author_id cascades); the task they happened to be
+        // assigned to does not (tasks.assignee_id is SET NULL).
+        userRepository.delete(userRepository.findById(memberId).orElseThrow());
         entityManager.flush();
         entityManager.clear();
 
+        assertThat(userRepository.findById(memberId)).isEmpty();
         var reloaded = taskRepository.findById(taskId);
         assertThat(reloaded).isPresent();
         assertThat(reloaded.get().getAssignee()).isNull();
+    }
+
+    @Test
+    @DisplayName("a project owner cannot be deleted while they still own projects")
+    void projectOwnerCannotBeDeleted() {
+        // RESTRICT rather than CASCADE: silently deleting someone's projects because their account
+        // was removed would be the wrong kind of tidy.
+        var ownerId = owner.getId();
+
+        assertThatThrownBy(() -> {
+            userRepository.delete(userRepository.findById(ownerId).orElseThrow());
+            entityManager.flush();
+        }).isInstanceOf(Exception.class);
     }
 
     // ======================== Every hand-written query ========================

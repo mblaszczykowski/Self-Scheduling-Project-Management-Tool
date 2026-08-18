@@ -30,7 +30,7 @@ class TaskKeyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "-", "WEB", "WEB-", "-1", "WEB-abc", "WEB-0", "WEB--1", "WEB-1.5"})
+    @ValueSource(strings = {"", "-", "WEB", "WEB-", "-1", "WEB-abc", "WEB-0", "WEB--", "WEB-1.5", "WEB- 1"})
     @DisplayName("rejects anything that is not a task key")
     void rejectsMalformedKeys(String candidate) {
         assertThat(TaskKey.parse(candidate)).isEmpty();

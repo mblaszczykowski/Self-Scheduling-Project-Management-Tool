@@ -113,6 +113,19 @@ public class Project {
     }
 
     public Integer getId() { return id; }
+
+    /**
+     * Exposed deliberately, and not only for completeness.
+     *
+     * <p>Spring Data decides whether an entity is new by reading its version property, and with no
+     * getter it falls back to reading the field directly. On an uninitialized Hibernate proxy that
+     * field is null, so {@code repository.delete(proxy)} concluded the entity was unsaved and
+     * silently did nothing. Going through a getter initializes the proxy and returns the real value.
+     */
+    public Long getVersion() {
+        return version;
+    }
+
     public void setId(Integer id) { this.id = id; }
 
     public String getProjectKey() { return projectKey; }

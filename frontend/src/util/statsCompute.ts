@@ -11,17 +11,30 @@ import { EnrichedTask, ProcessedProject } from '../types';
 
 /* ── Task counts ── */
 
-export const computeTaskCounts = (allTasks: EnrichedTask[]) => ({
+export interface TaskCounts {
+    criticalTasks: number;
+    delayedTasks: number;
+}
+
+export const computeTaskCounts = (allTasks: EnrichedTask[]): TaskCounts => ({
     criticalTasks: allTasks.filter(t => t.isCritical).length,
     delayedTasks: allTasks.filter(t => t.isDelayed).length,
 });
 
 /* ── Critical path ── */
 
+export interface CriticalPathHealth {
+    criticalTasksList: EnrichedTask[];
+    criticalOnTime: number;
+    criticalDelayed: EnrichedTask[];
+    criticalAtRisk: EnrichedTask[];
+    criticalHealthScore: number;
+}
+
 /** Progress a task with no start date is assumed to be expected at, for want of anything better. */
 const ASSUMED_EXPECTED_PROGRESS = 50;
 
-export const computeCriticalPathHealth = (allTasks: EnrichedTask[], today: Date) => {
+export const computeCriticalPathHealth = (allTasks: EnrichedTask[], today: Date): CriticalPathHealth => {
     const criticalTasksList = allTasks.filter(t => t.isCritical);
     const criticalDelayed = criticalTasksList.filter(t => t.isDelayed);
 
@@ -46,8 +59,17 @@ export const computeCriticalPathHealth = (allTasks: EnrichedTask[], today: Date)
     };
 };
 
-export const computeCriticalPathTimeline = (projects: ProcessedProject[]) => {
-    return projects.map(project => {
+export interface CriticalPathProject {
+    projectKey: string;
+    summary: string;
+    criticalPathDays: number;
+    criticalTaskCount: number;
+    delayedCritical: number;
+    status: 'delayed' | 'ontrack';
+}
+
+export const computeCriticalPathTimeline = (projects: ProcessedProject[]): CriticalPathProject[] => {
+    return projects.map((project): CriticalPathProject | null => {
         const criticalTasks = project.tasks.filter(t => t.isCritical);
         if (criticalTasks.length === 0) return null;
 
@@ -67,13 +89,13 @@ export const computeCriticalPathTimeline = (projects: ProcessedProject[]) => {
             status: delayedCritical > 0 ? 'delayed' : 'ontrack',
         };
     })
-        .filter((p): p is NonNullable<typeof p> => p != null)
+        .filter((p): p is CriticalPathProject => p !== null)
         .sort((a, b) => b.criticalPathDays - a.criticalPathDays);
 };
 
 const DEADLINE_HORIZON_DAYS = 7;
 
-export const computeUpcomingCriticalDeadlines = (criticalTasksList: EnrichedTask[], today: Date) => {
+export const computeUpcomingCriticalDeadlines = (criticalTasksList: EnrichedTask[], today: Date): EnrichedTask[] => {
     const horizon = today.getTime() + DEADLINE_HORIZON_DAYS * MS_PER_DAY;
 
     return criticalTasksList
@@ -86,7 +108,12 @@ export const computeUpcomingCriticalDeadlines = (criticalTasksList: EnrichedTask
 
 /* ── Blocked tasks / cross-project deps / completion ── */
 
-export const computeBlockedTasks = (allTasks: EnrichedTask[], taskByKey: Map<string, EnrichedTask>) => {
+export interface BlockedTasks {
+    blockedTasks: EnrichedTask[];
+    blockedCriticalTasks: EnrichedTask[];
+}
+
+export const computeBlockedTasks = (allTasks: EnrichedTask[], taskByKey: Map<string, EnrichedTask>): BlockedTasks => {
     const blockedTasks = allTasks.filter(task => {
         if (task.progress >= 100) return false;
         return task.dependencies.some(depKey => {
@@ -98,7 +125,14 @@ export const computeBlockedTasks = (allTasks: EnrichedTask[], taskByKey: Map<str
     return { blockedTasks, blockedCriticalTasks: blockedTasks.filter(t => t.isCritical) };
 };
 
-export const computeCrossProjectDependencies = (projects: ProcessedProject[]) => {
+export interface CrossProjectDependency {
+    projectKey: string;
+    summary: string;
+    dependsOn: Array<{ key: string; summary?: string }>;
+    dependencyCount: number;
+}
+
+export const computeCrossProjectDependencies = (projects: ProcessedProject[]): CrossProjectDependency[] => {
     const summaryByKey = new Map(projects.map(p => [p.projectKey, p.summary]));
 
     return projects
@@ -111,7 +145,13 @@ export const computeCrossProjectDependencies = (projects: ProcessedProject[]) =>
         }));
 };
 
-export const computeProjectCompletion = (projects: ProcessedProject[]) => {
+export interface ProjectCompletion {
+    projectKey: string;
+    summary: string;
+    completionPercentage: number;
+}
+
+export const computeProjectCompletion = (projects: ProcessedProject[]): ProjectCompletion[] => {
     return projects.map(project => ({
         projectKey: project.projectKey,
         summary: project.summary,

@@ -186,12 +186,16 @@ public class ProjectService {
                     NotificationType.MEMBER_REMOVED, null));
         }
         if (detailsChanged) {
+            var justInvited = addedMembers.stream().map(User::getId).collect(Collectors.toSet());
             for (var member : updated.getMembers()) {
-                if (!member.getId().equals(userId)) {
-                    pending.add(new NotificationService.Pending(member,
-                            "Project '" + updated.getSummary() + "' has been updated",
-                            NotificationType.PROJECT_UPDATED, link));
+                // Skip the actor, and skip anyone who is being invited in this same request: their
+                // invitation already tells them everything "the project was updated" would.
+                if (member.getId().equals(userId) || justInvited.contains(member.getId())) {
+                    continue;
                 }
+                pending.add(new NotificationService.Pending(member,
+                        "Project '" + updated.getSummary() + "' has been updated",
+                        NotificationType.PROJECT_UPDATED, link));
             }
         }
         notificationService.notifyAll(pending);

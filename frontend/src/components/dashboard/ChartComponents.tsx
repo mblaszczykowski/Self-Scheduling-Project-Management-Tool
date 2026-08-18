@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
+import { useTheme } from '../../context/ThemeContext';
 
 export const SectionHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => (
     <div className="flex items-start justify-between mb-6">
@@ -10,6 +11,8 @@ export const SectionHeader = ({ title, subtitle }: { title: string; subtitle?: s
     </div>
 );
 
+// A card title sits under the analytics grid's own <h3> dividers, so it is an <h4>: the outline
+// should read Analytics → Overview → Status Distribution, not two sibling h3s.
 export const ChartCard = ({ title, subtitle, children, className = "" }: { title: string; subtitle?: string; children: React.ReactNode; className?: string }) => {
     const [isVisible] = useAnimateIn();
 
@@ -18,13 +21,20 @@ export const ChartCard = ({ title, subtitle, children, className = "" }: { title
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
         } ${className}`}>
             <div className="mb-5">
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3>
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h4>
                 {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{subtitle}</p>}
             </div>
             {children}
         </div>
     );
 };
+
+/**
+ * The card's own background colour, for chart marks that have to punch through the surface they
+ * sit on (doughnut segment borders). Canvas cannot read a Tailwind class, so the theme has to be
+ * resolved to a literal here — matching `ChartCard`'s `bg-white dark:bg-slate-800`.
+ */
+export const useChartSurfaceColor = (): string => (useTheme()?.theme === 'dark' ? '#1e293b' : '#ffffff');
 
 export const chartOptions = {
     plugins: {

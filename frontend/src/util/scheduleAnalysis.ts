@@ -415,10 +415,6 @@ export const computeSlackDistribution = (allTasks: EnrichedTask[]): SlackDistrib
     const scheduled = allTasks.filter(t => t.startDate && t.dueDate && t.progress < 100);
     if (scheduled.length === 0) return EMPTY_SLACK;
 
-    const starts = scheduled.map(t => timeOf(t.startDate)).filter((t): t is number => t !== null);
-    if (starts.length === 0) return EMPTY_SLACK;
-    const epoch = Math.min(...starts);
-
     const scheduledKeys = new Set(scheduled.map(t => t.taskKey));
     const nodes = new Map<string, CpmNode>();
     for (const task of scheduled) {
