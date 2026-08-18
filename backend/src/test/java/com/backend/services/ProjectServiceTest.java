@@ -279,7 +279,7 @@ class ProjectServiceTest {
         }
 
         @Test
-        @DisplayName("deletes the files that were removed, and only those")
+        @DisplayName("delegates removal of detached files to FileStorageService")
         void deletesDetachedAttachments() {
             project.replaceAttachments(List.of("/files/old.pdf", "/files/keep.pdf"));
 
@@ -287,9 +287,10 @@ class ProjectServiceTest {
                     request("WEB", "Project WEB", null, null, null, List.of("/files/keep.pdf")),
                     OWNER_ID, List.of());
 
-            var deleted = ArgumentCaptor.forClass(java.util.Collection.class);
-            verify(fileStorageService).deleteFilesSilently(deleted.capture());
-            assertThat(deleted.getValue()).containsExactly("/files/old.pdf");
+            verify(fileStorageService).deleteRemovedAfterCommit(
+                    List.of("/files/old.pdf", "/files/keep.pdf"),
+                    List.of("/files/keep.pdf"),
+                    "delete detached project attachments");
         }
 
         @Test

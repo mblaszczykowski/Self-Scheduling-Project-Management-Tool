@@ -155,7 +155,8 @@ public class TaskService {
 
         var updatedTask = taskRepository.save(task);
         taskActivityService.logFieldChanges(updatedTask, author, before, TaskSnapshot.of(updatedTask));
-        deleteRemovedAttachmentsAfterCommit(previousAttachments, attachments);
+        fileStorageService.deleteRemovedAfterCommit(previousAttachments, attachments,
+                "delete detached task attachments");
         notifyAssignee(updatedTask, userId,
                 "Task '" + updatedTask.getSummary() + "' has been updated", NotificationType.TASK_UPDATED);
 
@@ -372,18 +373,6 @@ public class TaskService {
         }
         notificationService.createNotification(assignee, message, type,
                 "/projects?selectedIssue=" + task.getTaskKey());
-    }
-
-    private void deleteRemovedAttachmentsAfterCommit(List<String> before, List<String> after) {
-        var removed = new ArrayList<>(before);
-        removed.removeAll(new HashSet<>(after));
-        if (removed.isEmpty()) {
-            return;
-        }
-        // Detaching an attachment used to leave the file on disk forever with nothing referencing
-        // it; deleting it before commit would have lost it on a rollback.
-        AfterCommit.run("delete detached attachments",
-                () -> fileStorageService.deleteFilesSilently(removed));
     }
 
     /**

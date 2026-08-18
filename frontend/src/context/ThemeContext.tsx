@@ -8,9 +8,20 @@ interface ThemeContextValue {
     setTheme: (t: Theme) => void;
 }
 
-export const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-export const useTheme = () => useContext(ThemeContext);
+/**
+ * The only way to read theme state.
+ *
+ * The raw context is deliberately not exported: consumers used to destructure a possibly-undefined
+ * value directly, which made this guard — and the clear error it produces outside a provider —
+ * dead code.
+ */
+export const useTheme = (): ThemeContextValue => {
+    const context = useContext(ThemeContext);
+    if (!context) throw new Error('useTheme must be used within a ThemeProvider');
+    return context;
+};
 
 const getInitialTheme = (): Theme => {
     const stored = localStorage.getItem('flowlink_theme');

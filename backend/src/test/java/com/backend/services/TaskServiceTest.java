@@ -26,8 +26,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
@@ -649,7 +647,7 @@ class TaskServiceTest {
         }
 
         @Test
-        @DisplayName("unlinks and then deletes the files the update dropped")
+        @DisplayName("requests deletion of the files the update dropped")
         void shouldDeleteDetachedAttachments() {
             var task = givenExistingTask();
             task.replaceAttachments(List.of("/files/keep.pdf", "/files/drop.pdf"));
@@ -660,39 +658,31 @@ class TaskServiceTest {
                     request().attachments(List.of("/files/keep.pdf")).build(), 1, null);
 
             assertThat(task.getAttachments()).containsExactly("/files/keep.pdf");
-            // AfterCommit runs inline without a transaction, so the deletion is observable here;
-            // in production it happens only once the row really lost the reference.
-            verify(fileStorageService, times(1)).deleteFilesSilently(anyCollection());
-            var order = inOrder(taskRepository, fileStorageService);
-            order.verify(taskRepository).save(task);
-            order.verify(fileStorageService).deleteFilesSilently(List.of("/files/drop.pdf"));
+            verify(fileStorageService).deleteRemovedAfterCommit(
+                    List.of("/files/keep.pdf", "/files/drop.pdf"),
+                    List.of("/files/keep.pdf"),
+                    "delete detached task attachments");
         }
 
         @Test
-        @DisplayName("waits for the commit before unlinking a detached file, so a rollback cannot lose it")
-        void shouldDeferFileDeletionUntilCommit() {
+        @DisplayName("delegates file deletion to FileStorageService.deleteRemovedAfterCommit")
+        void shouldDelegateFileDeletionToStorageService() {
             var task = givenExistingTask();
             task.replaceAttachments(List.of("/files/keep.pdf", "/files/drop.pdf"));
             givenAuthor(owner);
             givenTaskIsSavedAsIs();
 
-            TransactionSynchronizationManager.initSynchronization();
-            try {
-                taskService.updateTask("PROJ", "PROJ-1",
-                        request().attachments(List.of("/files/keep.pdf")).build(), 1, null);
+            taskService.updateTask("PROJ", "PROJ-1",
+                    request().attachments(List.of("/files/keep.pdf")).build(), 1, null);
 
-                verify(fileStorageService, never()).deleteFilesSilently(anyCollection());
-                List.copyOf(TransactionSynchronizationManager.getSynchronizations())
-                        .forEach(TransactionSynchronization::afterCommit);
-            } finally {
-                TransactionSynchronizationManager.clearSynchronization();
-            }
-
-            verify(fileStorageService).deleteFilesSilently(List.of("/files/drop.pdf"));
+            verify(fileStorageService).deleteRemovedAfterCommit(
+                    List.of("/files/keep.pdf", "/files/drop.pdf"),
+                    List.of("/files/keep.pdf"),
+                    "delete detached task attachments");
         }
 
         @Test
-        @DisplayName("leaves the files alone when the update keeps referencing all of them")
+        @DisplayName("passes identical before/after lists when all files are still referenced")
         void shouldKeepReferencedFiles() {
             var task = givenExistingTask();
             task.replaceAttachments(List.of("/files/keep.pdf"));
@@ -702,7 +692,12 @@ class TaskServiceTest {
             taskService.updateTask("PROJ", "PROJ-1",
                     request().attachments(List.of("/files/keep.pdf")).build(), 1, null);
 
-            verify(fileStorageService, never()).deleteFilesSilently(any());
+            // The service always delegates; FileStorageService.deleteRemovedAfterCommit handles
+            // the no-changes case internally by computing an empty removed set.
+            verify(fileStorageService).deleteRemovedAfterCommit(
+                    eq(List.of("/files/keep.pdf")),
+                    eq(List.of("/files/keep.pdf")),
+                    eq("delete detached task attachments"));
         }
 
         @Test
@@ -720,7 +715,7 @@ class TaskServiceTest {
 
             // The point is the ordering: nothing is written and no file is unlinked.
             verify(taskRepository, never()).save(any());
-            verify(fileStorageService, never()).deleteFilesSilently(any());
+            verify(fileStorageService, never()).deleteRemovedAfterCommit(any(), any(), anyString());
             assertThat(task.getAttachments()).containsExactly("/files/mine.pdf");
         }
 

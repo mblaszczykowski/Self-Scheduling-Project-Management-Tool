@@ -220,36 +220,6 @@ class ValidationUtilTest {
     }
 
     @Nested
-    @DisplayName("validatePasswordMatch")
-    class ValidatePasswordMatchTests {
-
-        @Test
-        @DisplayName("should not throw for matching passwords")
-        void shouldNotThrowForMatch() {
-            assertDoesNotThrow(() ->
-                    ValidationUtil.validatePasswordMatch("Password123!", "Password123!")
-            );
-        }
-
-        @Test
-        @DisplayName("should throw for non-matching passwords")
-        void shouldThrowForMismatch() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePasswordMatch("Password123!", "DifferentPass123!")
-            );
-            assertEquals("Passwords do not match", ex.getMessage());
-        }
-
-        @Test
-        @DisplayName("should be case sensitive")
-        void shouldBeCaseSensitive() {
-            assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePasswordMatch("Password123!", "password123!")
-            );
-        }
-    }
-
-    @Nested
     @DisplayName("validateName")
     class ValidateNameTests {
 

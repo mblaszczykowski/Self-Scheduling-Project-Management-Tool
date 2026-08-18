@@ -34,7 +34,7 @@ export const ChartCard = ({ title, subtitle, children, className = "" }: { title
  * sit on (doughnut segment borders). Canvas cannot read a Tailwind class, so the theme has to be
  * resolved to a literal here — matching `ChartCard`'s `bg-white dark:bg-slate-800`.
  */
-export const useChartSurfaceColor = (): string => (useTheme()?.theme === 'dark' ? '#1e293b' : '#ffffff');
+export const useChartSurfaceColor = (): string => (useTheme().theme === 'dark' ? '#1e293b' : '#ffffff');
 
 export const chartOptions = {
     plugins: {

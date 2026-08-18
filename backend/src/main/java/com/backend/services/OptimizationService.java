@@ -84,6 +84,11 @@ public class OptimizationService {
      * the need to trust client-supplied dates, and closes the window where a dependency edited
      * between simulate and apply would have been written as a silently infeasible plan.
      *
+     * <p>{@code acceptedTaskKeys} is therefore a confirmation of <em>which plan</em> the caller
+     * saw, not a subset to cherry-pick: a schedule is a coherent whole, and applying part of one
+     * produces a third plan nobody computed. If the freshly derived plan moves a task the caller
+     * did not approve, their preview is stale and the request is refused.
+     *
      * <p>Writes go through {@link TaskService#applySchedule} so the change appears in each task's
      * activity history and reaches its assignee — the previous direct {@code saveAll} left no trace
      * of how a task's dates got there.
@@ -115,7 +120,15 @@ public class OptimizationService {
                 continue;
             }
             if (accepted != null && !accepted.contains(dto.taskKey())) {
-                continue;
+                // The fresh plan moves a task the caller never saw. Re-deriving keeps the dates
+                // honest, but the accepted set still comes from a preview, and a preview goes
+                // stale the moment someone edits a dependency — or simply when the horizon rolls
+                // over to the next day. Writing only the approved part of a plan persists half a
+                // schedule, and the half left behind is what made the other half feasible, so
+                // this is the very silently-infeasible write the re-derivation exists to prevent.
+                throw new ValidationException(
+                        "The schedule has changed since it was previewed. Re-run the optimization "
+                                + "to review the current plan before applying it.");
             }
             changes.add(new TaskService.ScheduleChange(dto.taskKey(), suggestedStart, suggestedDue));
         }
@@ -201,6 +214,4 @@ public class OptimizationService {
                 metrics.resourceConflicts(),
                 metrics.feasible());
     }
-
-    /** Unused placeholder kept out; see TaskKey for key parsing. */
 }

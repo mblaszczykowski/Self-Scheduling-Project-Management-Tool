@@ -16,12 +16,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import com.backend.util.AfterCommit;
 
 /**
  * Stores uploads under a single directory with generated names, and records who each file
@@ -154,6 +158,22 @@ public class FileStorageService {
                 log.warn("Failed to delete file {}: {}", path, e.getMessage());
             }
         }
+    }
+
+    /**
+     * Computes which files were removed from {@code before} and are absent in {@code after},
+     * and deletes them after the current transaction commits.
+     *
+     * <p>Shared by task and project updates: both track attachment lists and need the same
+     * diff-then-delete-after-commit logic.
+     */
+    public void deleteRemovedAfterCommit(List<String> before, List<String> after, String description) {
+        var removed = new ArrayList<>(before);
+        removed.removeAll(new HashSet<>(after));
+        if (removed.isEmpty()) {
+            return;
+        }
+        AfterCommit.run(description, () -> deleteFilesSilently(removed));
     }
 
     // ======================== Reading ========================

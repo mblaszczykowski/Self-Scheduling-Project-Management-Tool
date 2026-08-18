@@ -168,7 +168,8 @@ public class ProjectService {
         }
 
         var updated = projectRepository.save(project);
-        deleteRemovedAttachmentsAfterCommit(previousAttachments, updatedAttachments);
+        fileStorageService.deleteRemovedAfterCommit(previousAttachments, updatedAttachments,
+                "delete detached project attachments");
 
         // One notification per person, and only for something they can actually see: a member who
         // was just invited does not also need "the project was updated", and nobody needs it when
@@ -362,13 +363,4 @@ public class ProjectService {
         return all;
     }
 
-    private void deleteRemovedAttachmentsAfterCommit(List<String> before, List<String> after) {
-        var removed = new ArrayList<>(before);
-        removed.removeAll(new HashSet<>(after));
-        if (removed.isEmpty()) {
-            return;
-        }
-        AfterCommit.run("delete detached project attachments",
-                () -> fileStorageService.deleteFilesSilently(removed));
-    }
 }
