@@ -41,9 +41,14 @@ updates:
       types:
         patterns:
           - "@types/*"
+        exclude-patterns:
+          - "@types/jest"
       testing-library:
         patterns:
           - "@testing-library/*"
+    ignore:
+      - dependency-name: "@types/jest"
+        versions: [">=28"]
 
   - package-ecosystem: github-actions
     directory: /

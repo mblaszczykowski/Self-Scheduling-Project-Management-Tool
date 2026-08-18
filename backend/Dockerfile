@@ -14,9 +14,13 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
+RUN groupadd --system app && useradd --system --gid app --no-create-home app
+
 COPY --from=build /app/target/*.jar app.jar
 
-RUN mkdir -p /app/uploads
+RUN mkdir -p /app/uploads && chown -R app:app /app
+
+USER app
 
 EXPOSE 8080
 
