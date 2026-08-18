@@ -1,12 +1,14 @@
-import { useContext, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 export const useLogout = () => {
-    const { handleLogout } = useContext(AuthContext);
+    const { handleLogout } = useAuth();
     const navigate = useNavigate();
     return useCallback(async () => {
         await handleLogout();
         navigate('/login');
     }, [handleLogout, navigate]);
 };
+
+export default useLogout;

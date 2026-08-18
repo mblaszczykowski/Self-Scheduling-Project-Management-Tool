@@ -1,12 +1,11 @@
 package com.backend.repositories;
 
 import com.backend.entities.Task;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
-import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,41 +18,40 @@ public interface TaskRepository extends JpaRepository<Task, Integer> {
 
     @EntityGraph("Task.withDetails")
     @Query("SELECT t FROM Task t WHERE t.project.projectKey = :projectKey AND t.taskNumber = :taskNumber")
-    Optional<Task> findByProjectKeyAndTaskNumber(
-            @Param("projectKey") String projectKey,
-            @Param("taskNumber") Integer taskNumber
-    );
+    Optional<Task> findByProjectKeyAndTaskNumber(@Param("projectKey") String projectKey,
+                                                @Param("taskNumber") Integer taskNumber);
 
     default Optional<Task> findByTaskKey(String taskKey) {
-        if (taskKey == null || !taskKey.contains("-")) {
-            return Optional.empty();
-        }
-        var lastDash = taskKey.lastIndexOf('-');
-        var projectKey = taskKey.substring(0, lastDash);
-        try {
-            var taskNumber = Integer.parseInt(taskKey.substring(lastDash + 1));
-            return findByProjectKeyAndTaskNumber(projectKey, taskNumber);
-        } catch (NumberFormatException e) {
-            return Optional.empty();
-        }
+        return TaskKey.parse(taskKey)
+                .flatMap(key -> findByProjectKeyAndTaskNumber(key.projectKey(), key.taskNumber()));
     }
 
     @EntityGraph(attributePaths = "project")
-    @Query("SELECT t FROM Task t WHERE t.project.projectKey = :projectKey AND t.taskNumber IN :taskNumbers")
-    List<Task> findByProjectKeyAndTaskNumbers(
-            @Param("projectKey") String projectKey,
-            @Param("taskNumbers") List<Integer> taskNumbers
-    );
+    @Query("SELECT t FROM Task t WHERE t.project.projectKey = :projectKey AND t.taskNumber IN :taskNumbers " +
+            "ORDER BY t.taskNumber")
+    List<Task> findByProjectKeyAndTaskNumbers(@Param("projectKey") String projectKey,
+                                              @Param("taskNumbers") List<Integer> taskNumbers);
 
     @EntityGraph(value = "Task.withDetails", type = EntityGraph.EntityGraphType.FETCH)
-    @Query("SELECT t FROM Task t WHERE t.project.id IN :projectIds ORDER BY t.taskNumber")
+    @Query("SELECT t FROM Task t WHERE t.project.id IN :projectIds ORDER BY t.project.id, t.taskNumber")
     List<Task> findByProjectIdsWithDetails(@Param("projectIds") List<Integer> projectIds);
+
+    /**
+     * Loads tasks by key across any project — used to pull in precedence constraints that live
+     * outside the set being optimized, so they are respected instead of silently dropped.
+     */
+    @EntityGraph(value = "Task.withDetails", type = EntityGraph.EntityGraphType.FETCH)
+    @Query("SELECT t FROM Task t WHERE t.id IN :ids ORDER BY t.id")
+    List<Task> findAllByIdInWithDetails(@Param("ids") List<Integer> ids);
 
     @EntityGraph(value = "Task.withDetails")
     @Query("SELECT t FROM Task t WHERE " +
-           "(t.project.owner.id = :userId OR t.project.id IN (SELECT p.id FROM Project p JOIN p.members m WHERE m.id = :userId)) " +
-           "AND (LOWER(t.summary) LIKE LOWER(CONCAT('%', :query, '%')) " +
-           "OR LOWER(CONCAT(t.project.projectKey, '-', CAST(t.taskNumber AS string))) LIKE LOWER(CONCAT('%', :query, '%')))")
-    List<Task> searchAccessible(@Param("userId") Integer userId, @Param("query") String query, Pageable pageable);
-
+            "(t.project.owner.id = :userId OR t.project.id IN " +
+            "(SELECT p.id FROM Project p JOIN p.members m WHERE m.id = :userId)) " +
+            "AND (LOWER(t.summary) LIKE LOWER(:pattern) ESCAPE '!' " +
+            "OR LOWER(CONCAT(t.project.projectKey, '-', CAST(t.taskNumber AS string))) LIKE LOWER(:pattern) ESCAPE '!') " +
+            "ORDER BY t.project.projectKey, t.taskNumber")
+    List<Task> searchAccessible(@Param("userId") Integer userId,
+                                @Param("pattern") String pattern,
+                                Pageable pageable);
 }

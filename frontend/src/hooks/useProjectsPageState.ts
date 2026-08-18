@@ -7,24 +7,62 @@ const DEFAULT_FILTER_STATE: FilterState = {
 const DEFAULT_SORT_STATE: SortState = { field: 'id', order: 'asc' };
 const DEFAULT_VIEW_STATE: ViewState = { mode: 'timeline', sidebarCollapsed: false, expandedProjects: {} };
 
-function loadJson<T>(key: string): T | null {
-    try { return JSON.parse(localStorage.getItem(key) as string) as T; } catch { return null; }
+/**
+ * Reads persisted UI state, discarding anything that does not match the current shape.
+ *
+ * A stale or hand-edited entry would otherwise flow straight into state — a `mode` of `"kanban"`
+ * reached the render switch and matched nothing. The version key means an old shape is dropped
+ * rather than reinterpreted.
+ */
+const STORAGE_VERSION = 'v2';
+
+function loadJson<T>(key: string, isValid: (value: unknown) => boolean): T | null {
+    try {
+        const raw = localStorage.getItem(`${key}_${STORAGE_VERSION}`);
+        if (!raw) return null;
+        const parsed: unknown = JSON.parse(raw);
+        return isValid(parsed) ? (parsed as T) : null;
+    } catch {
+        return null;
+    }
 }
+
+function save(key: string, value: unknown): void {
+    try {
+        localStorage.setItem(`${key}_${STORAGE_VERSION}`, JSON.stringify(value));
+    } catch {
+        // A full or unavailable storage quota must not break the page.
+    }
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isFilterState = (value: unknown): boolean =>
+    isRecord(value) && isRecord(value.filters) && typeof value.searchInput === 'string';
+
+const isSortState = (value: unknown): boolean =>
+    isRecord(value) && typeof value.field === 'string'
+    && (value.order === 'asc' || value.order === 'desc');
+
+const isViewState = (value: unknown): boolean =>
+    isRecord(value) && (value.mode === 'timeline' || value.mode === 'list')
+    && typeof value.sidebarCollapsed === 'boolean';
 
 export function useProjectsPageState() {
     const [filterState, setFilterState] = useState<FilterState>(() => {
-        const saved = loadJson<FilterState>('flowlink_filters');
-        if (saved) return { ...saved, openFilterDropdown: null, searchQuery: saved.searchInput || '' };
+        const saved = loadJson<FilterState>('flowlink_filters', isFilterState);
+        if (saved) return { ...saved, openFilterDropdown: null, searchQuery: saved.searchInput };
         return DEFAULT_FILTER_STATE;
     });
 
     const [sortState, setSortState] = useState<SortState>(() => {
-        return loadJson<SortState>('flowlink_sort') || DEFAULT_SORT_STATE;
+        return loadJson<SortState>('flowlink_sort', isSortState) ?? DEFAULT_SORT_STATE;
     });
 
     const [viewState, setViewState] = useState<ViewState>(() => {
-        const saved = loadJson<ViewState>('flowlink_view');
-        if (saved) return { ...saved, expandedProjects: saved.expandedProjects || {} };
+        const saved = loadJson<ViewState>('flowlink_view', isViewState);
+        if (saved) return { ...saved, expandedProjects: saved.expandedProjects ?? {} };
         return DEFAULT_VIEW_STATE;
     });
 
@@ -33,18 +71,18 @@ export function useProjectsPageState() {
         // Debounced so typing in the search box doesn't write to localStorage on
         // every keystroke.
         const timer = setTimeout(() => {
-            localStorage.setItem('flowlink_filters', JSON.stringify(toSave));
+            save('flowlink_filters', toSave);
         }, 400);
         return () => clearTimeout(timer);
     }, [filterState]);
 
     useEffect(() => {
-        localStorage.setItem('flowlink_sort', JSON.stringify(sortState));
+        save('flowlink_sort', sortState);
     }, [sortState]);
 
     useEffect(() => {
         const { expandedProjects, ...toSave } = viewState;
-        localStorage.setItem('flowlink_view', JSON.stringify(toSave));
+        save('flowlink_view', toSave);
     }, [viewState]);
 
     return { filterState, setFilterState, sortState, setSortState, viewState, setViewState };

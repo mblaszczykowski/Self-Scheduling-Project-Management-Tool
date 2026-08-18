@@ -8,40 +8,57 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Holds the open Server-Sent Events streams, keyed by user.
+ *
+ * <p>Capped per user: the server only notices a vanished client on the next write or at the
+ * configured timeout, so a client stuck in a reconnect loop would otherwise accumulate live
+ * emitters — each holding a servlet async context — and multiply every notification fan-out.
+ */
 @Service
 public class SseEmitterManager {
+
     private static final Logger log = LoggerFactory.getLogger(SseEmitterManager.class);
 
     private final ConcurrentHashMap<Integer, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
-    private final AppProperties appProperties;
+    private final long timeoutMs;
+    private final int maxPerUser;
 
     public SseEmitterManager(ObjectMapper objectMapper, AppProperties appProperties) {
         this.objectMapper = objectMapper;
-        this.appProperties = appProperties;
+        this.timeoutMs = appProperties.getSse().getTimeoutMs();
+        this.maxPerUser = appProperties.getSse().getMaxEmittersPerUser();
     }
 
     public SseEmitter createEmitter(Integer userId) {
-        var emitter = new SseEmitter(appProperties.getSse().getTimeoutMs());
-        emitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+        var emitter = new SseEmitter(timeoutMs);
+
+        var userEmitters = emitters.computeIfAbsent(userId, key -> new CopyOnWriteArrayList<>());
+        userEmitters.add(emitter);
+
+        // Over the cap, retire the oldest rather than refusing the newest: the newest is the one
+        // the user is actually looking at.
+        while (userEmitters.size() > maxPerUser) {
+            var oldest = userEmitters.get(0);
+            userEmitters.remove(oldest);
+            log.debug("Retiring oldest SSE stream for user {} (cap {})", userId, maxPerUser);
+            completeQuietly(oldest);
+        }
 
         Runnable removeEmitter = () -> removeEmitter(userId, emitter);
         emitter.onCompletion(removeEmitter);
         emitter.onTimeout(removeEmitter);
-        emitter.onError(e -> {
-            emitter.completeWithError(e);
-            removeEmitter.run();
-        });
+        emitter.onError(e -> removeEmitter.run());
 
-        // Send an initial event so proxies flush headers and the client confirms the stream is open.
+        // An initial event makes proxies flush headers and lets the client confirm the stream.
         try {
             emitter.send(SseEmitter.event().name("connected").data("ok"));
-        } catch (IOException e) {
+        } catch (Exception e) {
             removeEmitter.run();
         }
 
@@ -50,16 +67,27 @@ public class SseEmitterManager {
 
     public void sendNotification(Integer userId, NotificationDTO notification) {
         var userEmitters = emitters.get(userId);
-        if (userEmitters == null || userEmitters.isEmpty()) return;
+        if (userEmitters == null || userEmitters.isEmpty()) {
+            return;
+        }
+
+        String json;
+        try {
+            // Serialize once, not once per stream.
+            json = objectMapper.writeValueAsString(notification);
+        } catch (Exception e) {
+            log.error("Could not serialize notification {} for user {}", notification.id(), userId, e);
+            return;
+        }
 
         for (var emitter : userEmitters) {
             try {
-                String json = objectMapper.writeValueAsString(notification);
-                emitter.send(SseEmitter.event()
-                        .name("notification")
-                        .data(json));
-            } catch (IOException e) {
-                log.debug("Failed to send SSE to user {}, removing emitter", userId);
+                emitter.send(SseEmitter.event().name("notification").data(json));
+            } catch (Exception e) {
+                // Catch Exception, not IOException: sending to an emitter that has already
+                // completed throws IllegalStateException, and letting that escape would abort the
+                // loop so the remaining streams never received the event.
+                log.debug("Dropping dead SSE stream for user {}: {}", userId, e.getMessage());
                 removeEmitter(userId, emitter);
             }
         }
@@ -74,5 +102,13 @@ public class SseEmitterManager {
             list.remove(emitter);
             return list.isEmpty() ? null : list;
         });
+    }
+
+    private static void completeQuietly(SseEmitter emitter) {
+        try {
+            emitter.complete();
+        } catch (Exception e) {
+            // Already closed by the container; nothing to do.
+        }
     }
 }

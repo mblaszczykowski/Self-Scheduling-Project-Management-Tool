@@ -6,14 +6,15 @@ target/
 build/
 dist/
 
-# Environment
+# Environment (never commit real secrets; .env.example is the committed template)
 .env
 .env.local
 .env.*.local
 
-# IDE
+# IDE / tooling
 .idea/
 .vscode/
+.claude/
 *.iml
 *.swp
 *.swo
@@ -22,7 +23,7 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Uploads
+# Runtime upload storage
 uploads/
 
 # Logs

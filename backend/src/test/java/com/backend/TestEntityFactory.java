@@ -3,10 +3,14 @@ package com.backend;
 import com.backend.entities.*;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.List;
 
-public class TestEntityFactory {
+/** Builders for entities in unit tests, so a test body describes only what it is about. */
+public final class TestEntityFactory {
+
+    private TestEntityFactory() {}
 
     public static User createUser(Integer id, String email) {
         var user = new User();
@@ -40,8 +44,6 @@ public class TestEntityFactory {
         task.setStatus(TaskStatus.BACKLOG);
         task.setPriority(TaskPriority.MEDIUM);
         task.setProgress(0);
-        task.setCreated(Instant.now());
-        task.setUpdated(Instant.now());
         return task;
     }
 
@@ -60,5 +62,30 @@ public class TestEntityFactory {
         notification.setTimestamp(Instant.now());
         notification.setIsRead(false);
         return notification;
+    }
+
+    public static Project createProjectWithMembers(Integer id, String projectKey, User owner,
+                                                   User... members) {
+        var project = createProject(id, projectKey, owner);
+        var all = new ArrayList<User>();
+        all.add(owner);
+        all.addAll(List.of(members));
+        project.replaceMembers(all);
+        return project;
+    }
+
+    public static RefreshToken createRefreshToken(String tokenHash, User user, String familyId) {
+        return new RefreshToken(tokenHash, user, familyId, Instant.now(),
+                Instant.now().plus(7, ChronoUnit.DAYS));
+    }
+
+    public static RefreshToken createExpiredRefreshToken(String tokenHash, User user, String familyId) {
+        return new RefreshToken(tokenHash, user, familyId,
+                Instant.now().minus(8, ChronoUnit.DAYS),
+                Instant.now().minus(1, ChronoUnit.DAYS));
+    }
+
+    public static StoredFile createStoredFile(String storedName, Integer projectId, Integer uploaderId) {
+        return new StoredFile(storedName, projectId, uploaderId);
     }
 }

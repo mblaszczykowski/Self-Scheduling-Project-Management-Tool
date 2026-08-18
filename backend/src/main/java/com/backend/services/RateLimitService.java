@@ -1,67 +1,60 @@
 package com.backend.services;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.backend.config.AppProperties;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * In-memory, per-client fixed-window rate limiting. Owns the attempt state so both the
- * {@code RateLimitFilter} (enforcement) and {@code AuthService} (resetting on success) depend
- * on this component rather than on each other.
+ * In-memory fixed-window rate limiting, keyed per bucket.
+ *
+ * <p>State is per-JVM, which is correct for a single instance and must move to a shared store
+ * (Redis) before running more than one replica — noted rather than pre-built, since the limits
+ * that matter most (login, register) are already backed by per-account lockout semantics.
  */
 @Service
 public class RateLimitService {
 
-    private final int maxLoginAttempts;
-    private final int maxRegisterAttempts;
-    private final int maxExistsAttempts;
-    private final long windowMs;
+    /** Named buckets, so a new limit is one enum constant plus one config property. */
+    public enum Bucket {
+        LOGIN,
+        REGISTER,
+        WRITE,
+        OPTIMIZE,
+        SEARCH,
+        INVITATION
+    }
 
-    private final ConcurrentHashMap<String, Entry> loginAttempts = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Entry> registerAttempts = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Entry> existsAttempts = new ConcurrentHashMap<>();
+    private final AppProperties.RateLimit config;
+    private final Map<Bucket, ConcurrentHashMap<String, Entry>> buckets =
+            new ConcurrentHashMap<>();
 
-    public RateLimitService(@Value("${rate-limit.max-login-attempts:5}") int maxLoginAttempts,
-                            @Value("${rate-limit.max-register-attempts:3}") int maxRegisterAttempts,
-                            @Value("${rate-limit.max-exists-attempts:30}") int maxExistsAttempts,
-                            @Value("${rate-limit.window-ms:900000}") long windowMs) {
-        this.maxLoginAttempts = maxLoginAttempts;
-        this.maxRegisterAttempts = maxRegisterAttempts;
-        this.maxExistsAttempts = maxExistsAttempts;
-        this.windowMs = windowMs;
+    public RateLimitService(AppProperties appProperties) {
+        this.config = appProperties.getRateLimit();
+        for (var bucket : Bucket.values()) {
+            buckets.put(bucket, new ConcurrentHashMap<>());
+        }
     }
 
     public long getWindowMs() {
-        return windowMs;
-    }
-
-    public boolean allowLogin(String clientIp) {
-        return allow(loginAttempts, clientIp, maxLoginAttempts);
-    }
-
-    public boolean allowRegister(String clientIp) {
-        return allow(registerAttempts, clientIp, maxRegisterAttempts);
-    }
-
-    public boolean allowExists(String clientIp) {
-        return allow(existsAttempts, clientIp, maxExistsAttempts);
-    }
-
-    public void resetLoginAttempts(String clientIp) {
-        loginAttempts.remove(clientIp);
+        return config.getWindowMs();
     }
 
     /**
-     * Atomically records an attempt and reports whether it is within the limit; check and
-     * increment happen in a single {@code compute} so concurrent requests cannot all pass first.
+     * Records an attempt and reports whether it is within the bucket's limit. Check and
+     * increment happen inside a single {@code compute} so concurrent requests cannot all pass.
      */
-    private boolean allow(ConcurrentHashMap<String, Entry> attempts, String clientIp, int max) {
+    public boolean allow(Bucket bucket, String key) {
+        if (key == null || key.isBlank()) {
+            key = "unknown";
+        }
+        int max = limitFor(bucket);
         long now = System.currentTimeMillis();
-        Entry entry = attempts.compute(clientIp, (key, existing) -> {
-            if (existing == null || now - existing.windowStart > windowMs) {
+        var entry = buckets.get(bucket).compute(key, (k, existing) -> {
+            if (existing == null || now - existing.windowStart > config.getWindowMs()) {
                 return new Entry(now);
             }
             existing.count.incrementAndGet();
@@ -70,16 +63,43 @@ public class RateLimitService {
         return entry.count.get() <= max;
     }
 
-    @Scheduled(fixedRate = 60000)
-    public void cleanupExpiredEntries() {
-        long now = System.currentTimeMillis();
-        long expiryThreshold = windowMs * 2; // keep entries for 2x window before cleanup
-        loginAttempts.entrySet().removeIf(e -> now - e.getValue().windowStart > expiryThreshold);
-        registerAttempts.entrySet().removeIf(e -> now - e.getValue().windowStart > expiryThreshold);
-        existsAttempts.entrySet().removeIf(e -> now - e.getValue().windowStart > expiryThreshold);
+    /**
+     * Clears one key in one bucket. Used on a successful login for the (ip, email) key only:
+     * clearing a coarse per-IP bucket on success would let anyone holding a single valid account
+     * reset the counter every few guesses and brute-force indefinitely.
+     */
+    public void reset(Bucket bucket, String key) {
+        if (key != null) {
+            buckets.get(bucket).remove(key);
+        }
     }
 
-    private static class Entry {
+    /** Composite key so a login flood against one account cannot lock out an entire office NAT. */
+    public static String loginKey(String clientIp, String email) {
+        var normalized = email == null ? "" : email.toLowerCase().trim();
+        return clientIp + "|" + normalized;
+    }
+
+    private int limitFor(Bucket bucket) {
+        return switch (bucket) {
+            case LOGIN -> config.getLogin();
+            case REGISTER -> config.getRegister();
+            case WRITE -> config.getWrite();
+            case OPTIMIZE -> config.getOptimize();
+            case SEARCH -> config.getSearch();
+            case INVITATION -> config.getInvitation();
+        };
+    }
+
+    @Scheduled(fixedRate = 60_000)
+    public void cleanupExpiredEntries() {
+        long now = System.currentTimeMillis();
+        long expiryThreshold = config.getWindowMs() * 2;
+        buckets.values().forEach(bucket ->
+                bucket.entrySet().removeIf(e -> now - e.getValue().windowStart > expiryThreshold));
+    }
+
+    private static final class Entry {
         final long windowStart;
         final AtomicInteger count;
 

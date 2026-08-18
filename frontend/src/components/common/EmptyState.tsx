@@ -39,6 +39,8 @@ interface EmptyStateProps {
     action?: () => void;
     actionLabel?: string;
     className?: string;
+    /** 'sm' fits inside a dashboard card, where a full-page empty state would dwarf the card. */
+    size?: 'sm' | 'md';
 }
 
 const EmptyState = ({
@@ -49,24 +51,34 @@ const EmptyState = ({
     action,
     actionLabel,
     className = '',
+    size = 'md',
 }: EmptyStateProps) => {
     const [isVisible] = useAnimateIn();
 
+    const compact = size === 'sm';
     const Icon = CustomIcon || iconMap[variant] || iconMap.list;
     const displayTitle = title || defaultMessages[variant]?.title || defaultMessages.list.title;
-    const displayDescription = description || defaultMessages[variant]?.description || defaultMessages.list.description;
+    // At 'sm' the title carries the whole message, so an unasked-for default would only add noise.
+    const displayDescription = description
+        || (compact ? '' : defaultMessages[variant]?.description || defaultMessages.list.description);
 
     return (
         <div
-            className={`flex flex-col items-center justify-center py-16 px-4 transition-all duration-300 ${
-                isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            } ${className}`}
+            className={`flex flex-col items-center justify-center transition-all duration-300 ${
+                compact ? 'py-8' : 'py-16 px-4'
+            } ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} ${className}`}
         >
-            <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
-                <Icon className="w-7 h-7 text-slate-400 dark:text-slate-500" />
+            <div className={`rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center ${
+                compact ? 'w-12 h-12 mb-3' : 'w-14 h-14 mb-4'
+            }`}>
+                <Icon className={`text-slate-400 dark:text-slate-500 ${compact ? 'w-6 h-6' : 'w-7 h-7'}`} />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{displayTitle}</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-sm mb-4">{displayDescription}</p>
+            <h3 className={`text-slate-900 dark:text-white ${
+                compact ? 'text-xs font-medium text-slate-500 dark:text-slate-400' : 'text-lg font-semibold mb-1'
+            }`}>{displayTitle}</h3>
+            {displayDescription && (
+                <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-sm mb-4">{displayDescription}</p>
+            )}
             {action && actionLabel && (
                 <button
                     onClick={action}

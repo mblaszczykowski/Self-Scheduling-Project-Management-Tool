@@ -1,6 +1,13 @@
 import config from '../config';
 import { TIMELINE_CONSTANTS } from '../config/timelineConstants';
-import { User, Attachment, ErrorLike } from '../types';
+import { Attachment, ErrorLike, TaskPriority, TaskStatus, User } from '../types';
+
+/**
+ * Just enough of a person to draw an avatar for them: a full {@link User}, or a name-only
+ * stand-in for the places that only carry a display name (an activity author, a reaction).
+ */
+export type AvatarSubject =
+    Partial<Pick<User, 'firstname' | 'lastname' | 'email'>> & { profilePicture?: string | null };
 
 type DateInput = string | number | Date;
 
@@ -87,13 +94,24 @@ export const isUpcomingDeadline = (dueDate?: DateInput | null, daysThreshold = U
     return diffDays <= daysThreshold && diffDays >= 0;
 };
 
-export const calculateDuration = (startDate?: string, dueDate?: string): number | string => {
-    if (!startDate || !dueDate) return 'N/A';
-    const start = new Date(startDate);
-    const due = new Date(dueDate);
-    const diffDays = Math.ceil((due.getTime() - start.getTime()) / MS_PER_DAY);
-    return diffDays >= 0 ? diffDays : 'N/A';
+/**
+ * Inclusive duration in days, or 0 when the range is missing or inverted.
+ *
+ * Returns a number rather than "a number or the string N/A": the union forced every consumer to
+ * re-narrow it, and one of them compared it numerically anyway.
+ */
+export const calculateDuration = (startDate?: string | null, dueDate?: string | null): number => {
+    if (!startDate || !dueDate) return 0;
+    const start = new Date(startDate).getTime();
+    const due = new Date(dueDate).getTime();
+    if (Number.isNaN(start) || Number.isNaN(due)) return 0;
+    const diffDays = Math.round((due - start) / MS_PER_DAY) + 1;
+    return diffDays > 0 ? diffDays : 0;
 };
+
+/** How a duration reads in the UI, where "no dates set" is a legitimate state. */
+export const formatDuration = (days: number): string =>
+    days > 0 ? `${days}d` : 'N/A';
 
 export const getFileTypeFromPath = (path: unknown): 'image' | 'pdf' | 'file' => {
     if (typeof path !== 'string') return 'file';
@@ -159,33 +177,58 @@ export const revokeFileUrl = (file: unknown): void => {
     }
 };
 
-// Single source of truth for status styling. `hex` is the canonical colour for
-// canvas contexts (Chart.js) that can't read Tailwind classes; `dot`/`color`
-// are the Tailwind equivalents for DOM badges.
-const getStatusConfig = () => ({
-    'BACKLOG': { label: 'Backlog', color: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400', dot: 'bg-slate-400', hex: '#94a3b8' },
-    'TODO': { label: 'To Do', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800', dot: 'bg-blue-500', hex: '#3b82f6' },
-    'IN_PROGRESS': { label: 'In Progress', color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-800', dot: 'bg-amber-500', hex: '#f59e0b' },
-    'IN_TEST': { label: 'In Test', color: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:ring-sky-800', dot: 'bg-sky-500', hex: '#0ea5e9' },
-    'TO_TEST': { label: 'To Test', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800', dot: 'bg-blue-500', hex: '#3b82f6' },
-    'TO_REVIEW': { label: 'To Review', color: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200 dark:bg-cyan-950 dark:text-cyan-300 dark:ring-cyan-800', dot: 'bg-cyan-500', hex: '#06b6d4' },
-    'READY_TO_MERGE': { label: 'Ready to Merge', color: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300', dot: 'bg-teal-500', hex: '#14b8a6' },
-    'READY_TO_DEPLOY': { label: 'Ready to Deploy', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300', dot: 'bg-emerald-500', hex: '#10b981' },
-    'DONE': { label: 'Done', color: 'bg-green-100 text-green-800 font-medium dark:bg-green-950 dark:text-green-300', dot: 'bg-green-500', hex: '#22c55e' },
-    'RELEASED': { label: 'Released', color: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400', dot: 'bg-green-600', hex: '#16a34a' },
-    'WITHDRAWN': { label: 'Withdrawn', color: 'bg-red-50 text-red-600 line-through dark:bg-red-950 dark:text-red-400', dot: 'bg-red-500', hex: '#ef4444' },
-    'GATHERING_INTEREST': { label: 'Gathering Interest', color: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:ring-orange-800', dot: 'bg-orange-500', hex: '#f97316' },
+/**
+ * Presentation of one task status.
+ *
+ * `hex` is the canonical colour for canvas contexts (Chart.js) that cannot read Tailwind classes;
+ * `color`/`dot` are the badge equivalents, and `pillBg`/`pillText` the softer form used by the
+ * task form's inline selects.
+ */
+export interface StatusStyle {
+    label: string;
+    color: string;
+    dot: string;
+    hex: string;
+    pillBg: string;
+    pillText: string;
+}
+
+export interface PriorityStyle {
+    label: string;
+    icon: string;
+    color: string;
+    hex: string;
+    pillBg: string;
+    pillText: string;
+}
+
+// The single source of truth for status and priority presentation. Typed as a Record over the
+// domain unions, so a status that is added to the model but forgotten here — or a key that is
+// simply misspelled — is a compile error rather than a silent fall-through to neutral grey.
+const STATUS_STYLES: Record<TaskStatus, StatusStyle> = ({
+    'BACKLOG': { label: 'Backlog', color: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400', dot: 'bg-slate-400', hex: '#94a3b8' , pillBg: 'bg-slate-100 dark:bg-slate-800', pillText: 'text-slate-600 dark:text-slate-400' },
+    'TODO': { label: 'To Do', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800', dot: 'bg-blue-500', hex: '#3b82f6' , pillBg: 'bg-blue-50 dark:bg-blue-950/60', pillText: 'text-blue-700 dark:text-blue-300' },
+    'IN_PROGRESS': { label: 'In Progress', color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-800', dot: 'bg-amber-500', hex: '#f59e0b' , pillBg: 'bg-amber-50 dark:bg-amber-950/60', pillText: 'text-amber-700 dark:text-amber-300' },
+    'IN_TEST': { label: 'In Test', color: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:ring-sky-800', dot: 'bg-sky-500', hex: '#0ea5e9' , pillBg: 'bg-sky-50 dark:bg-sky-950/60', pillText: 'text-sky-700 dark:text-sky-300' },
+    'TO_TEST': { label: 'To Test', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800', dot: 'bg-blue-500', hex: '#3b82f6' , pillBg: 'bg-blue-50 dark:bg-blue-950/60', pillText: 'text-blue-700 dark:text-blue-300' },
+    'TO_REVIEW': { label: 'To Review', color: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200 dark:bg-cyan-950 dark:text-cyan-300 dark:ring-cyan-800', dot: 'bg-cyan-500', hex: '#06b6d4' , pillBg: 'bg-cyan-50 dark:bg-cyan-950/60', pillText: 'text-cyan-700 dark:text-cyan-300' },
+    'READY_TO_MERGE': { label: 'Ready to Merge', color: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300', dot: 'bg-teal-500', hex: '#14b8a6' , pillBg: 'bg-teal-50 dark:bg-teal-950/60', pillText: 'text-teal-700 dark:text-teal-300' },
+    'READY_TO_DEPLOY': { label: 'Ready to Deploy', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300', dot: 'bg-emerald-500', hex: '#10b981' , pillBg: 'bg-emerald-50 dark:bg-emerald-950/60', pillText: 'text-emerald-700 dark:text-emerald-300' },
+    'DONE': { label: 'Done', color: 'bg-green-100 text-green-800 font-medium dark:bg-green-950 dark:text-green-300', dot: 'bg-green-500', hex: '#22c55e' , pillBg: 'bg-green-50 dark:bg-green-950/60', pillText: 'text-green-700 dark:text-green-300' },
+    'RELEASED': { label: 'Released', color: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400', dot: 'bg-green-600', hex: '#16a34a' , pillBg: 'bg-green-50 dark:bg-green-950/60', pillText: 'text-green-700 dark:text-green-400' },
+    'WITHDRAWN': { label: 'Withdrawn', color: 'bg-red-50 text-red-600 line-through dark:bg-red-950 dark:text-red-400', dot: 'bg-red-500', hex: '#ef4444' , pillBg: 'bg-red-50 dark:bg-red-950/60', pillText: 'text-red-600 dark:text-red-400' },
+    'GATHERING_INTEREST': { label: 'Gathering Interest', color: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:ring-orange-800', dot: 'bg-orange-500', hex: '#f97316' , pillBg: 'bg-orange-50 dark:bg-orange-950/60', pillText: 'text-orange-700 dark:text-orange-300' },
 });
 
-const getPriorityConfig = () => ({
-    'LOWEST': { label: 'Lowest', icon: '↓↓', color: 'bg-slate-100 text-slate-600', hex: '#94a3b8' },
-    'LOW': { label: 'Low', icon: '↓', color: 'bg-blue-50 text-blue-600', hex: '#3b82f6' },
-    'MEDIUM': { label: 'Medium', icon: '—', color: 'bg-amber-50 text-amber-600', hex: '#f59e0b' },
-    'HIGH': { label: 'High', icon: '↑', color: 'bg-orange-50 text-orange-600', hex: '#f97316' },
-    'HIGHEST': { label: 'Highest', icon: '↑↑', color: 'bg-red-50 text-red-600', hex: '#ef4444' },
+const PRIORITY_STYLES: Record<TaskPriority, PriorityStyle> = ({
+    'LOWEST': { label: 'Lowest', icon: '↓↓', color: 'bg-slate-100 text-slate-600', hex: '#94a3b8' , pillBg: 'bg-slate-100 dark:bg-slate-800', pillText: 'text-slate-600 dark:text-slate-400' },
+    'LOW': { label: 'Low', icon: '↓', color: 'bg-blue-50 text-blue-600', hex: '#3b82f6' , pillBg: 'bg-blue-50 dark:bg-blue-950/60', pillText: 'text-blue-700 dark:text-blue-300' },
+    'MEDIUM': { label: 'Medium', icon: '—', color: 'bg-amber-50 text-amber-600', hex: '#f59e0b' , pillBg: 'bg-amber-50 dark:bg-amber-950/60', pillText: 'text-amber-700 dark:text-amber-300' },
+    'HIGH': { label: 'High', icon: '↑', color: 'bg-orange-50 text-orange-600', hex: '#f97316' , pillBg: 'bg-orange-50 dark:bg-orange-950/60', pillText: 'text-orange-700 dark:text-orange-300' },
+    'HIGHEST': { label: 'Highest', icon: '↑↑', color: 'bg-red-50 text-red-600', hex: '#ef4444' , pillBg: 'bg-red-50 dark:bg-red-950/60', pillText: 'text-red-700 dark:text-red-300' },
 });
 
-export const getAvatarColor = (user?: User | string | null): string => {
+export const getAvatarColor = (user?: AvatarSubject | string | null): string => {
     const colors = [
         'from-slate-600 to-slate-700',
         'from-blue-600 to-blue-700',
@@ -212,7 +255,7 @@ export const getAvatarColor = (user?: User | string | null): string => {
     return colors[Math.abs(hash) % colors.length];
 };
 
-export const getAvatarInitials = (user?: User | null): string => {
+export const getAvatarInitials = (user?: AvatarSubject | null): string => {
     if (!user) return 'U';
 
     if (user.firstname && user.lastname) {
@@ -245,12 +288,24 @@ export const calculateTaskPosition = (startDate: DateInput, dueDate: DateInput, 
     };
 };
 
+/**
+ * A message worth showing a user.
+ *
+ * Field-level validation failures are surfaced rather than swallowed: the server sends them as
+ * `fieldErrors: [{field, message}]`, and this helper previously looked for a differently named and
+ * differently shaped `errors` map, so a form rejected by validation only ever showed the generic
+ * "Invalid request data".
+ */
 export const getErrorMessage = (err: unknown, defaultMessage = 'An unexpected error occurred'): string => {
     const e = (err ?? {}) as ErrorLike;
+    const fieldErrors = e.response?.data?.fieldErrors;
+    if (fieldErrors && fieldErrors.length > 0) {
+        return fieldErrors.map((fieldError) => fieldError.message).join('. ');
+    }
     if (e.response?.data?.message) return e.response.data.message;
     if (e.response?.data?.error) return e.response.data.error;
     if (e.message === 'Network Error') return 'Unable to connect to server';
-    if (e.code === 'ECONNABORTED') return 'Request timed out';
+    if (e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT') return 'Request timed out';
     return e.message || defaultMessage;
 };
 
@@ -262,5 +317,5 @@ export const daysBetween = (date1: DateInput, date2: DateInput): number => {
     return Math.round((utc2 - utc1) / MS_PER_DAY);
 };
 
-export const STATUS_CONFIG = getStatusConfig();
-export const PRIORITY_CONFIG = getPriorityConfig();
+export const STATUS_CONFIG = STATUS_STYLES;
+export const PRIORITY_CONFIG = PRIORITY_STYLES;

@@ -1,17 +1,17 @@
-import React, { Suspense, useContext, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AuthPage from './pages/AuthPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { AuthContext, AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProjectsProvider } from './context/ProjectsContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { checkUserAuth } from './util/api';
 import PageTransition from './components/common/PageTransition';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import { User } from './types';
+import { CurrentUser } from './types';
 
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = React.lazy(() => import('./pages/ProjectsPage'));
@@ -35,18 +35,17 @@ const LoadingSpinner = () => (
 );
 
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
-    const { user } = useContext(AuthContext);
-
+    const { user } = useAuth();
     if (!user) return <Navigate to="/login" replace />;
-
     return children;
 };
 
-const PublicRoute = ({ children, redirectTo = '/dashboard' }: { children: React.ReactElement; redirectTo?: string }) => {
-    const { user } = useContext(AuthContext);
-
+const PublicRoute = ({ children, redirectTo = '/dashboard' }: {
+    children: React.ReactElement;
+    redirectTo?: string;
+}) => {
+    const { user } = useAuth();
     if (user) return <Navigate to={redirectTo} replace />;
-
     return children;
 };
 
@@ -129,7 +128,7 @@ function AppRoutes() {
 }
 
 function App() {
-    const [initialUser, setInitialUser] = useState<User | null>(null);
+    const [initialUser, setInitialUser] = useState<CurrentUser | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
     const authCheckInitiated = useRef(false);
 

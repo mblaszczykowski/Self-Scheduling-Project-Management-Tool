@@ -1,56 +1,42 @@
-import React, { Suspense, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { ProjectsContext } from '../context/ProjectsContext';
+import { useAuth } from '../context/AuthContext';
+import { useProjects } from '../context/ProjectsContext';
 import Header from '../components/layout/Header';
 import { ChartBarIcon, ListIcon } from '../components/common/Icons';
+import ErrorBoundary from '../components/common/ErrorBoundary';
 import FilterBar from '../components/projects/FilterBar';
 import TaskListView from '../components/projects/TaskListView';
 import TimelineView from '../components/projects/TimelineView';
-import { TaskTooltip, FilterTooltip } from '../components/projects/TimelineTooltip';
 import OptimizationMetrics from '../components/projects/OptimizationMetrics';
-import ErrorBoundary from '../components/common/ErrorBoundary';
-import { useTaskFiltering } from '../hooks/useTaskFiltering';
-import { useTimelineResize } from '../hooks/useTimelineResize';
+import { FilterTooltip, TaskTooltip } from '../components/projects/TimelineTooltips';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { useModal } from '../hooks/useModal';
-import { useLogout } from '../hooks/useLogout';
-import { useProjectsPageState } from '../hooks/useProjectsPageState';
 import { useEnrichedProjects } from '../hooks/useEnrichedProjects';
-import { useUrlSyncedFilters } from '../hooks/useUrlSyncedFilters';
-import { useScheduleOptimization } from '../hooks/useScheduleOptimization';
-import { toDateString, MS_PER_DAY } from '../util/helpers';
-import { showToast } from '../util/toast';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
-import { getSidebarWidth, TIMELINE_CONSTANTS } from '../config/timelineConstants';
-import { Project, Task, EnrichedTask } from '../types';
-import { TooltipState, FilterTooltipState, TimelineTooltipContent, ResizeSide } from '../components/projects/types';
-
-interface ResizeState {
-    taskKey: string;
-    projectKey: string;
-    task: EnrichedTask;
-    startDate: string;
-    dueDate: string;
-}
-
-interface ResizePreview {
-    taskKey: string;
-    projectKey: string;
-    startDate: string;
-    dueDate: string;
-}
+import { useLogout } from '../hooks/useLogout';
+import { useModal } from '../hooks/useModal';
+import { useProjectsPageState } from '../hooks/useProjectsPageState';
+import { useScheduleOptimization } from '../hooks/useScheduleOptimization';
+import { useTaskFiltering } from '../hooks/useTaskFiltering';
+import { useTaskResizePreview } from '../hooks/useTaskResizePreview';
+import { useTimelineViewport } from '../hooks/useTimelineViewport';
+import { useUrlSyncedFilters } from '../hooks/useUrlSyncedFilters';
+import { getSidebarWidth } from '../config/timelineConstants';
+import { ModalMode, ModalType, Project, Task } from '../types';
+import {
+    FilterTooltipState, TimelineTooltipContent, TooltipState,
+} from '../components/projects/types';
 
 // Lazy so TipTap (loaded by the modal's rich-text editor) stays out of the page bundle.
 const TaskProjectModal = React.lazy(() => import('../components/modals/TaskProjectModal'));
 
-const { DAY_WIDTH, TIMELINE_END_PADDING } = TIMELINE_CONSTANTS;
-
 const ProjectsPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user } = useContext(AuthContext);
-    const { projects, projectsError, updateTask, refreshProjects } = useContext(ProjectsContext);
+    const { user } = useAuth();
+    const {
+        projects, projectsError, updateTaskSchedule, retryProjects,
+    } = useProjects();
     const handleLogout = useLogout();
 
     const {
@@ -59,32 +45,40 @@ const ProjectsPage = () => {
         openModal: baseOpenModal, closeModal: baseCloseModal,
     } = useModal();
 
-    // --- Hooks: state, enrichment, filters, optimization ---
-
     const { filterState, setFilterState, sortState, setSortState, viewState, setViewState } =
         useProjectsPageState();
 
-    const { allTasks, processedProjects, taskKeyToTaskMap, projectKeyToProject, projectRowOffsets } =
+    const { allTasks, processedProjects, taskKeyToTaskMap, projectKeyToProject } =
         useEnrichedProjects(projects);
 
+    /**
+     * Opens a modal and records the selection in the URL.
+     *
+     * Merges into the existing query string rather than replacing it. `navigate('?selectedIssue=…')`
+     * discards every other parameter, which silently dropped `commentId` before the comment thread
+     * could read it (so deep-links from search never worked) and reset an active project filter
+     * behind the open modal.
+     */
     const openModal = useCallback((
-        type: 'task' | 'project',
-        mode: 'create' | 'edit' | 'view',
+        type: ModalType,
+        mode: ModalMode,
         project: Project | null = null,
         task: Task | null = null,
     ) => {
         baseOpenModal(type, mode, project, task);
         if (type === 'task' && task) {
-            navigate(`?selectedIssue=${task.taskKey}`, { replace: true });
+            const params = new URLSearchParams(location.search);
+            params.set('selectedIssue', task.taskKey);
+            navigate({ search: params.toString() }, { replace: true });
         }
-    }, [baseOpenModal, navigate]);
+    }, [baseOpenModal, location.search, navigate]);
 
     const closeModal = useCallback(() => {
         baseCloseModal();
         const params = new URLSearchParams(location.search);
         params.delete('selectedIssue');
         params.delete('commentId');
-        navigate(`?${params.toString()}`, { replace: true });
+        navigate({ search: params.toString() }, { replace: true });
     }, [baseCloseModal, location.search, navigate]);
 
     const {
@@ -96,127 +90,42 @@ const ProjectsPage = () => {
     });
 
     const { optimization, handleOptimize, handleAcceptOptimization, handleRejectOptimization } =
-        useScheduleOptimization({ processedProjects, projects, refreshProjects });
+        useScheduleOptimization({ processedProjects, onApplied: retryProjects });
 
+    // Escape is deliberately absent: the task/project modal owns that key and checks for unsaved
+    // changes first. A second listener here closed the modal unconditionally in the same event,
+    // so the confirmation never rendered and the edits were lost.
     useKeyboardShortcuts([
         { key: 'n', handler: () => openModal('task', 'create') },
         { key: 'p', handler: () => openModal('project', 'create') },
         { key: '/', handler: () => document.querySelector<HTMLElement>('[data-search-input]')?.focus() },
-        { key: '1', handler: () => setViewState(prev => ({ ...prev, mode: 'timeline' })) },
-        { key: '2', handler: () => setViewState(prev => ({ ...prev, mode: 'list' })) },
-        { key: 'Escape', handler: () => { if (modalOpen) closeModal(); } },
+        { key: '1', handler: () => setViewState((previous) => ({ ...previous, mode: 'timeline' })) },
+        { key: '2', handler: () => setViewState((previous) => ({ ...previous, mode: 'list' })) },
     ]);
 
-    // Auto-switch to list on mobile
+    // The timeline is unusable on a narrow screen, so fall back to the list.
     useEffect(() => {
-        const checkMobile = () => {
-            if (window.innerWidth < 640 && viewState.mode === 'timeline') {
-                setViewState(prev => ({ ...prev, mode: 'list' }));
+        const applyMobileFallback = () => {
+            if (window.innerWidth < 640) {
+                setViewState((previous) => (previous.mode === 'timeline'
+                    ? { ...previous, mode: 'list' } : previous));
             }
         };
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, [viewState.mode, setViewState]);
-
-    // --- Local UI state ---
+        applyMobileFallback();
+        window.addEventListener('resize', applyMobileFallback);
+        return () => window.removeEventListener('resize', applyMobileFallback);
+    }, [setViewState]);
 
     const [tooltip, setTooltip] = useState<TooltipState>({ visible: false, x: 0, y: 0, content: null });
-    const [filterTooltip, setFilterTooltip] = useState<FilterTooltipState>({ visible: false, x: 0, y: 0, text: '' });
+    const [filterTooltip, setFilterTooltip] =
+        useState<FilterTooltipState>({ visible: false, x: 0, y: 0, text: '' });
 
     const sidebarWidth = getSidebarWidth(viewState.sidebarCollapsed);
-
-    const headerRef = useRef(null);
-    const timelineRef = useRef(null);
-    const filterRef = useRef(null);
-
+    const filterRef = useRef<HTMLDivElement | null>(null);
     useClickOutside(filterRef, closeFilterDropdown);
 
-    // --- Task resize ---
-
-    // Resize is optimistic: each drag step updates a local preview only (no
-    // network), and a single updateTask is committed when the drag ends. This
-    // replaces the previous per-step write+refetch+toast (one drag = N calls).
-    const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
-    const resizeRef = useRef<ResizeState | null>(null);
-
-    const handleTaskResize = useCallback((taskKey: string, projectKey: string, side: ResizeSide, deltaDays: number) => {
-        let current = resizeRef.current;
-        if (!current || current.taskKey !== taskKey) {
-            const project = processedProjects.find(p => p.projectKey === projectKey);
-            const task = project?.tasks.find(t => t.taskKey === taskKey);
-            if (!task) return;
-            current = { taskKey, projectKey, task, startDate: task.startDate, dueDate: task.dueDate };
-        }
-
-        let { startDate, dueDate } = current;
-        if (side === 'left') {
-            const d = new Date(startDate);
-            d.setDate(d.getDate() + deltaDays);
-            const next = toDateString(d);
-            if (next <= dueDate) startDate = next;
-        } else {
-            const d = new Date(dueDate);
-            d.setDate(d.getDate() + deltaDays);
-            const next = toDateString(d);
-            if (next >= startDate) dueDate = next;
-        }
-
-        current = { ...current, startDate, dueDate };
-        resizeRef.current = current;
-        setResizePreview({ taskKey, projectKey, startDate, dueDate });
-    }, [processedProjects]);
-
-    const handleTaskResizeEnd = useCallback(() => {
-        const current = resizeRef.current;
-        resizeRef.current = null;
-        if (!current) return;
-
-        const { task, projectKey, taskKey, startDate, dueDate } = current;
-        if (startDate === task.startDate && dueDate === task.dueDate) {
-            setResizePreview(null);
-            return;
-        }
-
-        updateTask(projectKey, taskKey, {
-            summary: task.summary, description: task.description, status: task.status,
-            startDate, dueDate, assignee: task.assignee,
-            labels: task.labels, dependencyKeys: task.dependencies || [],
-        }).then(() => {
-            showToast('Task dates updated', 'success');
-        }).catch(err => {
-            console.error('Error updating task:', err);
-            showToast('Failed to update task dates.', 'error');
-        }).finally(() => {
-            // Drop the preview; the refreshed store (or the unchanged server
-            // state on failure) becomes the source of truth again.
-            setResizePreview(null);
-        });
-    }, [updateTask]);
-
-    const { startResize, shouldPreventClick } = useTimelineResize({
-        onResizeMove: handleTaskResize,
-        onResizeEnd: handleTaskResizeEnd,
-        dayWidth: DAY_WIDTH,
-    });
-
-    // Overlay the in-progress resize onto the rendered projects so the bar
-    // follows the cursor without touching the store until the drag commits.
-    const displayProjects = useMemo(() => {
-        if (!resizePreview) return processedProjects;
-        return processedProjects.map(p =>
-            p.projectKey !== resizePreview.projectKey ? p : {
-                ...p,
-                tasks: p.tasks.map(t =>
-                    t.taskKey === resizePreview.taskKey
-                        ? { ...t, startDate: resizePreview.startDate, dueDate: resizePreview.dueDate }
-                        : t
-                ),
-            }
-        );
-    }, [processedProjects, resizePreview]);
-
-    // --- Filtering ---
+    const { displayProjects, startResize, shouldPreventClick } =
+        useTaskResizePreview({ processedProjects, updateTaskSchedule });
 
     const { filteredTasks, filteredTaskIds, filteredProjectKeys, hasActiveFilters } = useTaskFiltering({
         tasks: allTasks,
@@ -229,105 +138,77 @@ const ProjectsPage = () => {
         urlParams: location.search,
     });
 
-    // --- Timeline bounds ---
+    const {
+        timelineStart, timelineEnd, timelineWidth,
+        headerRef, timelineRef, syncScroll, scrollToToday,
+    } = useTimelineViewport({
+        processedProjects,
+        suggestions: optimization.suggestionMap,
+    });
 
-    const scrollRafRef = useRef(null);
-    const syncScroll = useCallback(() => {
-        if (scrollRafRef.current) return;
-        scrollRafRef.current = requestAnimationFrame(() => {
-            if (headerRef.current && timelineRef.current) {
-                headerRef.current.scrollLeft = timelineRef.current.scrollLeft;
-            }
-            scrollRafRef.current = null;
-        });
+    // Every handler below is memoised because the timeline tree is wrapped in React.memo. A fresh
+    // function identity on each render makes those wrappers unable to bail out, and the tooltip
+    // updates on every mousemove — so one hover across a bar re-rendered every project row and
+    // every task bar on the board.
+    const toggleExpand = useCallback((projectKey: string) => setViewState((previous) => ({
+        ...previous,
+        expandedProjects: {
+            ...previous.expandedProjects,
+            [projectKey]: !previous.expandedProjects[projectKey],
+        },
+    })), [setViewState]);
+
+    const showTooltip = useCallback((event: React.MouseEvent, content: TimelineTooltipContent) => {
+        setTooltip({ visible: true, x: event.clientX, y: event.clientY, content });
+    }, []);
+    const moveTooltip = useCallback((event: React.MouseEvent) => {
+        setTooltip((previous) => (previous.visible
+            ? { ...previous, x: event.clientX, y: event.clientY } : previous));
+    }, []);
+    const hideTooltip = useCallback(() => {
+        setTooltip((previous) => (previous.visible
+            ? { visible: false, x: 0, y: 0, content: null } : previous));
     }, []);
 
-    const timelineBounds = useMemo(() => {
-        const today = new Date();
-        const minMonths = 4;
-        const allDates = processedProjects.flatMap(p =>
-            (p.tasks || []).flatMap(t => [
-                new Date(t.startDate).getTime(),
-                new Date(t.dueDate).getTime(),
-            ])
-        );
+    const showFilterTooltip = useCallback((next: FilterTooltipState) => setFilterTooltip(next), []);
+    const hideFilterTooltip = useCallback(
+        () => setFilterTooltip({ visible: false, x: 0, y: 0, text: '' }), []);
 
-        if (optimization.suggestionMap) {
-            for (const s of optimization.suggestionMap.values()) {
-                if (s.suggestedStartDate) allDates.push(new Date(s.suggestedStartDate).getTime());
-                if (s.suggestedDueDate) allDates.push(new Date(s.suggestedDueDate).getTime());
-            }
-        }
+    const toggleFilterDropdown = useCallback((field: string) => setFilterState((previous) => ({
+        ...previous,
+        openFilterDropdown: previous.openFilterDropdown === field ? null : field,
+    })), [setFilterState]);
 
-        let timelineStart, timelineEnd;
-        if (allDates.length === 0) {
-            timelineStart = new Date(today.getFullYear(), today.getMonth(), 1);
-            timelineEnd = new Date(today.getFullYear(), today.getMonth() + minMonths, 0);
-        } else {
-            const earliest = new Date(Math.min(...allDates));
-            const latest = new Date(Math.max(...allDates));
-            timelineStart = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
-            timelineEnd = new Date(latest.getFullYear(), latest.getMonth() + 1, 0);
-            const monthSpan =
-                (timelineEnd.getFullYear() - timelineStart.getFullYear()) * 12
-                + (timelineEnd.getMonth() - timelineStart.getMonth()) + 1;
-            if (monthSpan < minMonths) {
-                timelineEnd = new Date(
-                    timelineStart.getFullYear(),
-                    timelineStart.getMonth() + minMonths, 0,
-                );
-            }
-        }
+    const setSearchInput = useCallback((value: string) => setFilterState((previous) => ({
+        ...previous, searchInput: value,
+    })), [setFilterState]);
 
-        const timelineWidth =
-            Math.round((timelineEnd.getTime() - timelineStart.getTime()) / MS_PER_DAY) * DAY_WIDTH
-            + TIMELINE_END_PADDING;
+    const toggleSidebar = useCallback(() => setViewState((previous) => ({
+        ...previous, sidebarCollapsed: !previous.sidebarCollapsed,
+    })), [setViewState]);
 
-        return { timelineStart, timelineEnd, timelineWidth };
-    }, [processedProjects, optimization.suggestionMap]);
+    const setMode = useCallback((mode: 'timeline' | 'list') => setViewState((previous) => ({
+        ...previous, mode,
+    })), [setViewState]);
 
-    const { timelineStart, timelineEnd, timelineWidth } = timelineBounds;
+    const openCreateProject = useCallback(() => openModal('project', 'create'), [openModal]);
+    const openCreateTask = useCallback(() => openModal('task', 'create'), [openModal]);
+    const openEditProject = useCallback(
+        (project: Project) => openModal('project', 'edit', project), [openModal]);
+    const openTask = useCallback((project: Project, task: Task | null) => (task
+        ? openModal('task', 'edit', project, task)
+        : openModal('task', 'create', project)), [openModal]);
+    const openTaskFromList = useCallback(
+        (project: Project, task: Task) => openModal('task', 'edit', project, task), [openModal]);
 
-    const scrollToToday = useCallback(() => {
-        if (!timelineRef.current) return;
-        const today = new Date();
-        const daysFromStart = Math.round((today.getTime() - timelineStart.getTime()) / MS_PER_DAY);
-        const scrollLeft = Math.max(0, daysFromStart * DAY_WIDTH - timelineRef.current.clientWidth / 2);
-        timelineRef.current.scrollTo({ left: scrollLeft, behavior: 'smooth' });
-    }, [timelineStart]);
-
-    // --- Event handlers ---
-
-    const toggleExpand = (key: string) => setViewState(prev => ({
-        ...prev,
-        expandedProjects: { ...prev.expandedProjects, [key]: !prev.expandedProjects[key] },
-    }));
-
-    const handleMouseDown = (e: React.MouseEvent, taskKey: string, projectKey: string, side: ResizeSide) => startResize(e, taskKey, projectKey, side);
-
-    const handleTooltipShow = (e: React.MouseEvent, content: TimelineTooltipContent) => {
-        setTooltip({ visible: true, x: e.clientX, y: e.clientY, content });
-    };
-    const handleTooltipMove = (e: React.MouseEvent) => {
-        setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }));
-    };
-    const handleTooltipHide = () => {
-        setTooltip({ visible: false, x: 0, y: 0, content: null });
-    };
-
-    const handleFilterTooltipShow = (tooltipData: FilterTooltipState) => setFilterTooltip(tooltipData);
-    const handleFilterTooltipHide = () => {
-        setFilterTooltip({ visible: false, x: 0, y: 0, text: '' });
-    };
-
-    // --- Render ---
+    const viewModes = useMemo(() => ['timeline', 'list'] as const, []);
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
             <Header
                 onLogout={handleLogout}
-                onCreateProject={() => openModal('project', 'create')}
-                onCreateTask={() => openModal('task', 'create')}
+                onCreateProject={openCreateProject}
+                onCreateTask={openCreateTask}
             />
 
             <div className="flex-grow flex flex-col">
@@ -336,53 +217,56 @@ const ProjectsPage = () => {
                         <span className="text-sm text-red-700 dark:text-red-300">{projectsError}</span>
                         <button
                             type="button"
-                            onClick={refreshProjects}
+                            onClick={retryProjects}
                             className="text-xs font-medium text-red-700 dark:text-red-300 hover:underline shrink-0"
                         >
                             Retry
                         </button>
                     </div>
                 )}
-                {/* Toolbar */}
-                <div className="px-6 lg:px-10 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-[fadeInSlide_0.3s_ease-out_both]">
+
+                <div className="px-6 lg:px-10 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-fade-in-slide">
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2.5 shrink-0 mr-1">
                             <h1 className="text-sm font-semibold text-slate-900 dark:text-white">Projects</h1>
-                            <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">{allTasks.length} tasks</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">
+                                {allTasks.length} tasks
+                            </span>
                         </div>
 
                         <div className="w-px h-5 bg-slate-200 dark:bg-slate-700" />
 
                         <FilterBar
-                        projects={projects}
-                        allTasks={allTasks}
-                        filters={filterState.filters}
-                        searchInput={filterState.searchInput}
-                        assignedToMe={filterState.assignedToMe}
-                        projectKeyFilter={projectKeyFilter}
-                        openFilterDropdown={filterState.openFilterDropdown}
-                        hasActiveFilters={hasActiveFilters()}
-                        onFilterDropdownToggle={(field) => setFilterState(prev => ({
-                            ...prev,
-                            openFilterDropdown: prev.openFilterDropdown === field ? null : field,
-                        }))}
-                        onFilterChange={handleFilterChange}
-                        onProjectFilterChange={handleProjectFilterChange}
-                        onSearchInputChange={(val) => setFilterState(prev => ({
-                            ...prev, searchInput: val,
-                        }))}
-                        onAssignedToMeChange={handleAssignedToMeChange}
-                        onClearAllFilters={clearAllFilters}
-                        onFilterTooltipShow={handleFilterTooltipShow}
-                        onFilterTooltipHide={handleFilterTooltipHide}
-                        filterRef={filterRef}
-                    />
+                            projects={projects}
+                            allTasks={allTasks}
+                            filters={filterState.filters}
+                            searchInput={filterState.searchInput}
+                            assignedToMe={filterState.assignedToMe}
+                            projectKeyFilter={projectKeyFilter}
+                            openFilterDropdown={filterState.openFilterDropdown}
+                            hasActiveFilters={hasActiveFilters}
+                            onFilterDropdownToggle={toggleFilterDropdown}
+                            onFilterChange={handleFilterChange}
+                            onProjectFilterChange={handleProjectFilterChange}
+                            onSearchInputChange={setSearchInput}
+                            onAssignedToMeChange={handleAssignedToMeChange}
+                            onClearAllFilters={clearAllFilters}
+                            onFilterTooltipShow={showFilterTooltip}
+                            onFilterTooltipHide={hideFilterTooltip}
+                            filterRef={filterRef}
+                        />
 
-                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg shrink-0 ml-auto">
-                            {(['timeline', 'list'] as const).map(mode => (
+                        <div
+                            className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg shrink-0 ml-auto"
+                            role="group"
+                            aria-label="View mode"
+                        >
+                            {viewModes.map((mode) => (
                                 <button
                                     key={mode}
-                                    onClick={() => setViewState(prev => ({ ...prev, mode }))}
+                                    type="button"
+                                    onClick={() => setMode(mode)}
+                                    aria-pressed={viewState.mode === mode}
                                     className={
                                         'py-1.5 px-3 text-sm font-medium rounded-md transition-all duration-200 '
                                         + (mode === 'timeline' ? 'hidden sm:flex ' : '')
@@ -393,7 +277,9 @@ const ProjectsPage = () => {
                                 >
                                     <span className="flex items-center gap-1.5">
                                         {mode === 'timeline' ? <ChartBarIcon /> : <ListIcon />}
-                                        <span className="hidden sm:inline">{mode.charAt(0).toUpperCase() + mode.slice(1)}</span>
+                                        <span className="hidden sm:inline">
+                                            {mode === 'timeline' ? 'Timeline' : 'List'}
+                                        </span>
                                     </span>
                                 </button>
                             ))}
@@ -402,83 +288,73 @@ const ProjectsPage = () => {
                 </div>
 
                 <div className="px-6 lg:px-10 pt-4 pb-6 flex-grow flex flex-col">
+                    {optimization.result && viewState.mode === 'timeline' && (
+                        <OptimizationMetrics
+                            originalMetrics={optimization.result.originalMetrics}
+                            optimizedMetrics={optimization.result.optimizedMetrics}
+                            suggestions={optimization.result.suggestions}
+                            suggestionsCount={optimization.suggestionMap?.size ?? 0}
+                            skippedTaskKeys={optimization.result.skippedTaskKeys}
+                            chosenRule={optimization.result.chosenRule}
+                            onAccept={handleAcceptOptimization}
+                            onReject={handleRejectOptimization}
+                            isApplying={optimization.applying}
+                        />
+                    )}
 
-                {optimization.result && viewState.mode === 'timeline' && (
-                    <OptimizationMetrics
-                        originalMetrics={optimization.result.originalMetrics}
-                        optimizedMetrics={optimization.result.optimizedMetrics}
-                        suggestions={optimization.result.suggestions}
-                        suggestionsCount={optimization.suggestionMap?.size ?? 0}
-                        onAccept={handleAcceptOptimization}
-                        onReject={handleRejectOptimization}
-                        isApplying={optimization.applying}
-                    />
-                )}
-
-                {viewState.mode === 'list' ? (
-                  <ErrorBoundary level="section" resetKey={viewState.mode}>
-                    <TaskListView
-                        filteredTasks={filteredTasks}
-                        processedProjects={processedProjects}
-                        taskKeyToTaskMap={taskKeyToTaskMap}
-                        projectKeyToProject={projectKeyToProject}
-                        sortField={sortState.field}
-                        sortOrder={sortState.order}
-                        hasActiveFilters={hasActiveFilters()}
-                        onSort={handleSort}
-                        onTaskClick={(project, task) => openModal('task', 'edit', project, task)}
-                    />
-                  </ErrorBoundary>
-                ) : (
-                  <ErrorBoundary level="section" resetKey={viewState.mode}>
-                    <TimelineView
-                        processedProjects={displayProjects}
-                        allTasks={allTasks}
-                        filteredTasks={filteredTasks}
-                        filteredTaskIds={filteredTaskIds}
-                        filteredProjectKeys={filteredProjectKeys}
-                        projectRowOffsets={projectRowOffsets}
-                        expandedProjects={viewState.expandedProjects}
-                        sidebarCollapsed={viewState.sidebarCollapsed}
-                        sidebarWidth={sidebarWidth}
-                        timelineStart={timelineStart}
-                        timelineEnd={timelineEnd}
-                        timelineWidth={timelineWidth}
-                        projectKeyFilter={projectKeyFilter}
-                        hasActiveFilters={hasActiveFilters()}
-                        onToggleExpand={toggleExpand}
-                        onOpenProjectModal={(project) => openModal('project', 'edit', project)}
-                        onOpenTaskModal={(project, task) => (
-                            task
-                                ? openModal('task', 'edit', project, task)
-                                : openModal('task', 'create', project)
-                        )}
-                        onTooltipShow={handleTooltipShow}
-                        onTooltipMove={handleTooltipMove}
-                        onTooltipHide={handleTooltipHide}
-                        onSidebarToggle={() => setViewState(prev => ({
-                            ...prev, sidebarCollapsed: !prev.sidebarCollapsed,
-                        }))}
-                        onMouseDown={handleMouseDown}
-                        shouldPreventClick={shouldPreventClick}
-                        headerRef={headerRef}
-                        timelineRef={timelineRef}
-                        syncScroll={syncScroll}
-                        optimization={optimization}
-                        onOptimize={handleOptimize}
-                        onScrollToToday={scrollToToday}
-                        onAcceptOptimization={handleAcceptOptimization}
-                        onRejectOptimization={handleRejectOptimization}
-                    />
-                  </ErrorBoundary>
-                )}
-
+                    {viewState.mode === 'list' ? (
+                        <ErrorBoundary level="section" resetKey={viewState.mode}>
+                            <TaskListView
+                                filteredTasks={filteredTasks}
+                                taskKeyToTaskMap={taskKeyToTaskMap}
+                                projectKeyToProject={projectKeyToProject}
+                                sortField={sortState.field}
+                                sortOrder={sortState.order}
+                                hasActiveFilters={hasActiveFilters}
+                                onSort={handleSort}
+                                onTaskClick={openTaskFromList}
+                            />
+                        </ErrorBoundary>
+                    ) : (
+                        <ErrorBoundary level="section" resetKey={viewState.mode}>
+                            <TimelineView
+                                processedProjects={displayProjects}
+                                allTasks={allTasks}
+                                taskKeyMap={taskKeyToTaskMap}
+                                projectKeyToProject={projectKeyToProject}
+                                filteredTaskIds={filteredTaskIds}
+                                filteredProjectKeys={filteredProjectKeys}
+                                expandedProjects={viewState.expandedProjects}
+                                sidebarCollapsed={viewState.sidebarCollapsed}
+                                sidebarWidth={sidebarWidth}
+                                timelineStart={timelineStart}
+                                timelineEnd={timelineEnd}
+                                timelineWidth={timelineWidth}
+                                hasActiveFilters={hasActiveFilters}
+                                onToggleExpand={toggleExpand}
+                                onOpenProjectModal={openEditProject}
+                                onOpenTaskModal={openTask}
+                                onTooltipShow={showTooltip}
+                                onTooltipMove={moveTooltip}
+                                onTooltipHide={hideTooltip}
+                                onSidebarToggle={toggleSidebar}
+                                onMouseDown={startResize}
+                                shouldPreventClick={shouldPreventClick}
+                                headerRef={headerRef}
+                                timelineRef={timelineRef}
+                                syncScroll={syncScroll}
+                                optimization={optimization}
+                                onOptimize={handleOptimize}
+                                onScrollToToday={scrollToToday}
+                            />
+                        </ErrorBoundary>
+                    )}
                 </div>
 
                 <TaskTooltip tooltip={tooltip} />
                 <FilterTooltip filterTooltip={filterTooltip} />
 
-                {modalOpen && (
+                {modalOpen && modalType && modalMode && (
                     <Suspense fallback={null}>
                         <TaskProjectModal
                             modalType={modalType}

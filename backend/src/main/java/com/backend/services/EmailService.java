@@ -1,10 +1,10 @@
 package com.backend.services;
 
+import com.backend.config.AppProperties;
 import com.backend.entities.NotificationType;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -16,15 +16,15 @@ public class EmailService {
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
     private final JavaMailSender mailSender;
+    private final String fromAddress;
+    private final boolean mailEnabled;
+    private final String frontendBaseUrl;
 
-    @Value("${app.mail.from}")
-    private String fromAddress;
-
-    @Value("${app.mail.enabled}")
-    private boolean mailEnabled;
-
-    public EmailService(JavaMailSender mailSender) {
+    public EmailService(JavaMailSender mailSender, AppProperties appProperties) {
         this.mailSender = mailSender;
+        this.fromAddress = appProperties.getMail().getFrom();
+        this.mailEnabled = appProperties.getMail().isEnabled();
+        this.frontendBaseUrl = trimTrailingSlash(appProperties.getFrontend().getBaseUrl());
     }
 
     /**
@@ -102,7 +102,7 @@ public class EmailService {
                               <p style="margin: 0 0 24px 0; color: #1e293b; font-size: 15px; line-height: 1.6;">
                                 Create a free account to get started:
                               </p>
-                              <a href="http://localhost:3000/register"
+                              <a href="%s/register"
                                  style="display: inline-block; padding: 12px 28px; background-color: #0f172a;
                                         color: #ffffff; text-decoration: none; border-radius: 8px;
                                         font-size: 14px; font-weight: 600;">
@@ -126,6 +126,7 @@ public class EmailService {
                 """.formatted(
                 escapeHtml(inviterName),
                 escapeHtml(projectName),
+                escapeHtml(frontendBaseUrl),
                 escapeHtml(email)
         );
     }
@@ -146,7 +147,8 @@ public class EmailService {
 
     private String buildHtmlEmail(String recipientFirstName, String message, String link) {
         String buttonHtml = "";
-        if (link != null && !link.isBlank()) {
+        var absoluteLink = toAbsoluteLink(link);
+        if (absoluteLink != null) {
             buttonHtml = """
                     <tr>
                       <td style="padding: 24px 0 0 0;">
@@ -158,7 +160,7 @@ public class EmailService {
                         </a>
                       </td>
                     </tr>
-                    """.formatted(link);
+                    """.formatted(escapeHtml(absoluteLink));
         }
 
         return """
@@ -219,11 +221,33 @@ public class EmailService {
         );
     }
 
+    /**
+     * Turns an application-relative link into an absolute one the recipient can actually click,
+     * and refuses anything that is not a relative path — so a notification link can never become
+     * a redirect to another host or a {@code javascript:} URI.
+     */
+    private String toAbsoluteLink(String link) {
+        if (link == null || link.isBlank()) {
+            return null;
+        }
+        var trimmed = link.trim();
+        if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+            log.warn("Refusing to embed a non-relative notification link: {}", trimmed);
+            return null;
+        }
+        return frontendBaseUrl + trimmed;
+    }
+
+    private static String trimTrailingSlash(String url) {
+        return url != null && url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
     private String escapeHtml(String text) {
         if (text == null) return "";
         return text.replace("&", "&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;")
-                .replace("\"", "&quot;");
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 }

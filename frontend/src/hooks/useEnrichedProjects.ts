@@ -1,33 +1,44 @@
 import { useMemo } from 'react';
-import { isOverdue, isUpcomingDeadline, calculateDuration } from '../util/helpers';
+import { calculateDuration, isOverdue, isUpcomingDeadline } from '../util/helpers';
 import { computeProjectDateRange, computeProjectProgress } from '../util/projectUtils';
-import { Project, Task, EnrichedTask, ProcessedProject } from '../types';
+import { EnrichedTask, ProcessedProject, Project } from '../types';
 
+/** Epoch millis for a date string, or +Infinity when there is no date, so sorts stay total. */
+const startOrder = (date?: string | null): number => {
+    if (!date) return Number.POSITIVE_INFINITY;
+    const parsed = new Date(date).getTime();
+    return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
+};
+
+/**
+ * Derives the display fields the timeline, list and dashboard all read from.
+ *
+ * <p>Both sorts here are guarded against missing and unparseable dates. A comparator that returns
+ * NaN — which `new Date(undefined).getTime() - ...` does — leaves the sort order
+ * implementation-defined rather than throwing, so the bug shows up as a list that is quietly in the
+ * wrong order.
+ */
 export function useEnrichedProjects(projects: Project[]) {
-    const enriched = useMemo(() => {
+    return useMemo(() => {
         const allTasks: EnrichedTask[] = [];
         const taskKeyToTaskMap = new Map<string, EnrichedTask>();
         const projectKeyToProject = new Map<string, ProcessedProject>();
 
-        // First pass: build enriched tasks per project
-        const processedProjects: ProcessedProject[] = projects.map(project => {
-            const enrichedTasks: EnrichedTask[] = (project.tasks || []).map((task: Task) => {
+        const processedProjects: ProcessedProject[] = projects.map((project) => {
+            const enrichedTasks: EnrichedTask[] = (project.tasks ?? []).map((task) => {
                 const progress = task.progress ?? 0;
                 const delayed = isOverdue(task.dueDate, progress);
-                const upcoming = !delayed && isUpcomingDeadline(task.dueDate);
 
                 const enriched: EnrichedTask = {
                     ...task,
                     projectKey: project.projectKey,
                     projectSummary: project.summary,
-                    taskKey: task.taskKey,
-                    reporter: (typeof task.reporter === 'string' ? task.reporter : task.reporter?.email) || 'N/A',
                     duration: calculateDuration(task.startDate, task.dueDate),
-                    labels: Array.isArray(task.labels) ? task.labels : [],
-                    dependencies: task.dependencyKeys || [],
+                    labels: task.labels ?? [],
+                    dependencies: task.dependencyKeys ?? [],
                     progress,
                     isDelayed: delayed,
-                    isUpcomingDeadline: upcoming,
+                    isUpcomingDeadline: !delayed && isUpcomingDeadline(task.dueDate),
                     isDelayedByDependency: false,
                 };
 
@@ -35,20 +46,28 @@ export function useEnrichedProjects(projects: Project[]) {
                 return enriched;
             });
 
-            const sortedTasks = [...enrichedTasks].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+            const sortedTasks = [...enrichedTasks]
+                .sort((a, b) => startOrder(a.startDate) - startOrder(b.startDate)
+                    || a.taskKey.localeCompare(b.taskKey));
 
             const { projectStartDate, projectDueDate } = computeProjectDateRange(sortedTasks);
-            const projectProgress = computeProjectProgress(sortedTasks);
 
-            const processed = { ...project, tasks: sortedTasks, projectStartDate, projectDueDate, projectProgress };
+            const processed: ProcessedProject = {
+                ...project,
+                tasks: sortedTasks,
+                projectStartDate,
+                projectDueDate,
+                projectProgress: computeProjectProgress(sortedTasks),
+            };
             projectKeyToProject.set(project.projectKey, processed);
             return processed;
         });
 
-        // Second pass: compute isDelayedByDependency and build allTasks sorted by id
-        processedProjects.forEach(project => {
-            project.tasks.forEach(task => {
-                task.isDelayedByDependency = task.dependencies.some(depKey => taskKeyToTaskMap.get(depKey)?.isDelayed);
+        // Second pass: a task is blocked-by-a-late-dependency only once every task is known.
+        processedProjects.forEach((project) => {
+            project.tasks.forEach((task) => {
+                task.isDelayedByDependency = task.dependencies
+                    .some((dependencyKey) => taskKeyToTaskMap.get(dependencyKey)?.isDelayed === true);
                 allTasks.push(task);
             });
         });
@@ -57,15 +76,4 @@ export function useEnrichedProjects(projects: Project[]) {
 
         return { allTasks, processedProjects, taskKeyToTaskMap, projectKeyToProject };
     }, [projects]);
-
-    const projectRowOffsets = useMemo(() => {
-        let offset = 0;
-        return enriched.processedProjects.map(p => {
-            const current = offset;
-            offset += p.tasks.length;
-            return current;
-        });
-    }, [enriched.processedProjects]);
-
-    return { ...enriched, projectRowOffsets };
 }

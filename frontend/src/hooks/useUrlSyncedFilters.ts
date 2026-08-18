@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
 import { NavigateFunction, Location } from 'react-router-dom';
-import { FilterState, ViewState, SortState, ProcessedProject, EnrichedTask } from '../types';
+import {
+    EnrichedTask, FilterState, ModalMode, ModalType, ProcessedProject, SortState, ViewState,
+} from '../types';
 
 interface UseUrlSyncedFiltersOptions {
     filterState: FilterState;
@@ -9,7 +11,7 @@ interface UseUrlSyncedFiltersOptions {
     processedProjects: ProcessedProject[];
     navigate: NavigateFunction;
     location: Location;
-    openModal: (type: string, mode: string, project: ProcessedProject, task: EnrichedTask) => void;
+    openModal: (type: ModalType, mode: ModalMode, project: ProcessedProject, task: EnrichedTask) => void;
     setSortState: Dispatch<SetStateAction<SortState>>;
 }
 
@@ -26,13 +28,18 @@ export function useUrlSyncedFilters({
 
         setViewState(prev => {
             const updated = { ...prev.expandedProjects };
+            let changed = false;
             processedProjects.forEach(p => {
                 if (!(p.projectKey in updated)) {
                     updated[p.projectKey] = projectKeyFilter
                         ? p.projectKey === projectKeyFilter : true;
+                    changed = true;
                 }
             });
-            return { ...prev, expandedProjects: updated };
+            // Returning a fresh object unconditionally re-rendered — and re-persisted to
+            // localStorage — on every projects refetch, since processedProjects gets a new identity
+            // each time.
+            return changed ? { ...prev, expandedProjects: updated } : prev;
         });
     }, [processedProjects, location.search, setViewState]);
 
@@ -117,13 +124,14 @@ export function useUrlSyncedFilters({
             else if (value === 'Upcoming deadline') params.set('upcomingDeadline', 'true');
             else if (value === 'Delayed by dependency') params.set('delayedByDependency', 'true');
         }
-        navigate(`?${params.toString()}`);
+        // replace, not push: otherwise every filter tweak becomes a separate Back step.
+        navigate({ search: params.toString() }, { replace: true });
     }, [setFilterState, navigate, location.search]);
 
     const handleProjectFilterChange = useCallback((value: string) => {
         const params = new URLSearchParams(location.search);
         value === 'All' ? params.delete('projectKey') : params.set('projectKey', value);
-        navigate(`?${params.toString()}`);
+        navigate({ search: params.toString() }, { replace: true });
     }, [navigate, location.search]);
 
     const handleAssignedToMeChange = useCallback(() => {
@@ -131,7 +139,7 @@ export function useUrlSyncedFilters({
         setFilterState(prev => ({ ...prev, assignedToMe: newValue }));
         const params = new URLSearchParams(location.search);
         newValue ? params.set('assignedToMe', 'true') : params.delete('assignedToMe');
-        navigate(`?${params.toString()}`);
+        navigate({ search: params.toString() }, { replace: true });
     }, [filterState.assignedToMe, setFilterState, navigate, location.search]);
 
     const handleSort = useCallback((field: string) => {

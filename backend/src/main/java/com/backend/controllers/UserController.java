@@ -1,90 +1,74 @@
 package com.backend.controllers;
 
+import com.backend.dtos.CurrentUserDTO;
+import com.backend.dtos.LoginResponse;
 import com.backend.dtos.UserDTO;
 import com.backend.requests.EmailPreferencesRequest;
+import com.backend.requests.UpdateProfileRequest;
 import com.backend.requests.UserRegistrationRequest;
-import com.backend.services.TokenService;
 import com.backend.services.UserService;
-import jakarta.servlet.http.HttpServletRequest;
+import com.backend.web.CurrentUserId;
+import com.backend.web.RequestValidator;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
 
     private final UserService userService;
-    private final TokenService tokenService;
+    private final RequestValidator requestValidator;
 
-    @Autowired
-    public UserController(UserService userService, TokenService tokenService) {
+    public UserController(UserService userService, RequestValidator requestValidator) {
         this.userService = userService;
-        this.tokenService = tokenService;
-    }
-
-    @GetMapping
-    public ResponseEntity<UserDTO> getCurrentUser(HttpServletRequest request) {
-        int userId = tokenService.getUserIdFromRequest(request);
-        return ResponseEntity.ok(userService.getUserDetails(userId));
-    }
-
-    @GetMapping("/{email}")
-    public ResponseEntity<UserDTO> getUserByEmail(
-            HttpServletRequest request,
-            @PathVariable("email") String email
-    ) {
-        Integer requestingUserId = tokenService.getUserIdFromRequest(request);
-        return ResponseEntity.ok(userService.getUserByEmailForRequester(email, requestingUserId));
+        this.requestValidator = requestValidator;
     }
 
     @PostMapping
-    public ResponseEntity<?> registerUser(@Valid @RequestBody UserRegistrationRequest request) {
+    public ResponseEntity<LoginResponse> register(@Valid @RequestBody UserRegistrationRequest request) {
         var result = userService.registerUser(request);
-        return ResponseEntity.ok()
+        return ResponseEntity.status(HttpStatus.CREATED)
                 .header(HttpHeaders.SET_COOKIE, result.tokens().accessCookie().toString())
                 .header(HttpHeaders.SET_COOKIE, result.tokens().refreshCookie().toString())
-                .body(Map.of(
-                        "message", "Registration successful",
-                        "userId", result.userId(),
-                        "email", result.email()
-                ));
+                .body(new LoginResponse("Registration successful", result.userId(), result.email(), null));
     }
 
-    @GetMapping("/exists")
-    public ResponseEntity<?> checkUserExists(@RequestParam String email) {
-        boolean exists = userService.existsUserByEmail(email);
-        return ResponseEntity.ok().body(Map.of("exists", exists));
+    // "me" rather than a bare collection path: GET /api/users returned the caller, not a list of
+    // users, and PUT /api/users updated the caller — both lied about what they addressed.
+    @GetMapping("/me")
+    public ResponseEntity<CurrentUserDTO> getCurrentUser(@CurrentUserId Integer userId) {
+        return ResponseEntity.ok(userService.getCurrentUser(userId));
     }
 
-    @PatchMapping("/email-preferences")
-    public ResponseEntity<UserDTO> updateEmailPreferences(
-            HttpServletRequest request,
-            @RequestBody EmailPreferencesRequest preferencesRequest
-    ) {
-        Integer userId = tokenService.getUserIdFromRequest(request);
-        UserDTO updatedUser = userService.updateEmailPreferences(userId, preferencesRequest);
-        return ResponseEntity.ok(updatedUser);
-    }
-
-    @PutMapping(consumes = {"multipart/form-data"})
-    public ResponseEntity<UserDTO> updateUser(
-            HttpServletRequest request,
-            @RequestParam("firstname") String firstname,
-            @RequestParam("lastname") String lastname,
-            @RequestParam("email") String email,
-            @RequestParam(value = "currentPassword", required = false) String currentPassword,
-            @RequestParam(value = "newPassword", required = false) String newPassword,
+    @PutMapping(value = "/me", consumes = {"multipart/form-data"})
+    public ResponseEntity<CurrentUserDTO> updateProfile(
+            @CurrentUserId Integer userId,
+            @RequestPart("profile") String profileJson,
             @RequestPart(value = "profilePicture", required = false) MultipartFile profilePicture
+    ) throws JsonProcessingException {
+        var request = requestValidator.parseAndValidate(profileJson, UpdateProfileRequest.class);
+        return ResponseEntity.ok(userService.updateProfile(userId, request, profilePicture));
+    }
+
+    @PatchMapping("/me/email-preferences")
+    public ResponseEntity<CurrentUserDTO> updateEmailPreferences(
+            @CurrentUserId Integer userId,
+            @Valid @RequestBody EmailPreferencesRequest request
     ) {
-        Integer userId = tokenService.getUserIdFromRequest(request);
-        UserDTO updatedUser = userService.updateUser(userId, firstname, lastname, email,
-                currentPassword, newPassword, profilePicture);
-        return ResponseEntity.ok(updatedUser);
+        return ResponseEntity.ok(userService.updateEmailPreferences(userId, request));
+    }
+
+    // A query parameter, not a path variable: an email in a path segment collides with every
+    // literal sub-resource at the same level, so /api/users/me would have shadowed a user whose
+    // address was literally "me".
+    @GetMapping("/lookup")
+    public ResponseEntity<UserDTO> lookupByEmail(@CurrentUserId Integer userId,
+                                                 @RequestParam String email) {
+        return ResponseEntity.ok(userService.getUserByEmailForRequester(email, userId));
     }
 }

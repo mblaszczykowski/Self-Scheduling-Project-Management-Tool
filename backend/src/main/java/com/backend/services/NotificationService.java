@@ -5,8 +5,10 @@ import com.backend.entities.Notification;
 import com.backend.entities.NotificationType;
 import com.backend.entities.User;
 import com.backend.exception.AuthorizationException;
+import com.backend.mapper.EntityMapper;
 import com.backend.repositories.NotificationRepository;
-import com.backend.util.EntityMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -15,10 +17,16 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 @Service
 public class NotificationService {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
+
     private final NotificationRepository notificationRepository;
     private final SseEmitterManager sseEmitterManager;
     private final EmailService emailService;
@@ -34,74 +42,129 @@ public class NotificationService {
         this.entityMapper = entityMapper;
     }
 
+    /** One notification to send: the recipient plus everything needed to render it. */
+    public record Pending(User recipient, String message, NotificationType type, String link) {}
+
     @Transactional(rollbackFor = Exception.class)
     public void createNotification(User recipient, String message, NotificationType type, String link) {
-        var notification = new Notification();
-        notification.setUser(recipient);
-        notification.setMessage(message);
-        notification.setType(type);
-        notification.setTimestamp(Instant.now());
-        notification.setLink(link);
-        notificationRepository.save(notification);
-
-        // Snapshot everything needed for the side effects while the entities are still managed,
-        // then fire SSE + email only AFTER the surrounding transaction commits. This prevents
-        // real-time pushes / emails for actions that ultimately roll back, and avoids touching
-        // a detached User from the async email thread.
-        var dto = entityMapper.toNotificationDTO(notification);
-        Integer recipientId = recipient.getId();
-        boolean wantsEmail = recipient.wantsEmailFor(type);
-        String recipientEmail = recipient.getEmail();
-        String recipientFirstName = recipient.getFirstname();
-
-        runAfterCommit(() -> {
-            sseEmitterManager.sendNotification(recipientId, dto);
-            if (wantsEmail) {
-                emailService.sendNotificationEmail(recipientEmail, recipientFirstName, message, type, link);
-            }
-        });
+        notifyAll(List.of(new Pending(recipient, message, type, link)));
     }
 
-    /** Runs the action after the current transaction commits, or immediately if none is active. */
-    private void runAfterCommit(Runnable action) {
+    /**
+     * Sends a batch, at most one notification per recipient.
+     *
+     * <p>The de-duplication is the point: adding a project member used to fire both
+     * PROJECT_INVITATION and PROJECT_UPDATED at the same person, and replying to the assignee's
+     * comment on their own task fired both COMMENT_REPLY and TASK_COMMENT. Callers now hand over
+     * every candidate and the first entry per recipient wins.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void notifyAll(Collection<Pending> pending) {
+        if (pending == null || pending.isEmpty()) {
+            return;
+        }
+
+        var byRecipient = new LinkedHashMap<Integer, Pending>();
+        for (var candidate : pending) {
+            if (candidate == null || candidate.recipient() == null || candidate.recipient().getId() == null) {
+                continue;
+            }
+            byRecipient.putIfAbsent(candidate.recipient().getId(), candidate);
+        }
+
+        var sideEffects = new ArrayList<Runnable>(byRecipient.size());
+        for (var entry : byRecipient.values()) {
+            var recipient = entry.recipient();
+
+            var notification = new Notification();
+            notification.setUser(recipient);
+            notification.setMessage(entry.message());
+            notification.setType(entry.type());
+            notification.setTimestamp(Instant.now());
+            notification.setLink(entry.link());
+            notificationRepository.save(notification);
+
+            // Snapshot everything the side effects need while the entities are still managed, so
+            // the async email thread never touches a detached User.
+            var dto = entityMapper.toNotificationDTO(notification);
+            var recipientId = recipient.getId();
+            var recipientEmail = recipient.getEmail();
+            var recipientFirstName = recipient.getFirstname();
+            var wantsEmail = recipient.wantsEmailFor(entry.type());
+            var message = entry.message();
+            var type = entry.type();
+            var link = entry.link();
+
+            sideEffects.add(() -> {
+                sseEmitterManager.sendNotification(recipientId, dto);
+                if (wantsEmail) {
+                    emailService.sendNotificationEmail(recipientEmail, recipientFirstName, message, type, link);
+                }
+            });
+        }
+
+        runAfterCommit(sideEffects);
+    }
+
+    /**
+     * Runs the actions once the transaction has committed, or immediately if none is active.
+     *
+     * <p>Every action is individually guarded. Spring propagates an exception thrown from an
+     * {@code afterCommit} callback to the caller of {@code commit()} — so a stale SSE emitter or a
+     * full mail queue used to turn an already-committed write into a 500, and the user would retry
+     * and create a duplicate.
+     */
+    private void runAfterCommit(List<Runnable> actions) {
+        Runnable batch = () -> {
+            for (var action : actions) {
+                try {
+                    action.run();
+                } catch (Exception e) {
+                    log.warn("Post-commit notification side effect failed", e);
+                }
+            }
+        };
+
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    action.run();
+                    batch.run();
                 }
             });
         } else {
-            action.run();
+            batch.run();
         }
+    }
+
+    /** Mapping happens inside the transaction; entities never leave the service. */
+    @Transactional(readOnly = true)
+    public Page<NotificationDTO> getNotifications(Integer userId, Pageable pageable) {
+        return notificationRepository.findByUserIdOrderByTimestampDescIdDesc(userId, pageable)
+                .map(entityMapper::toNotificationDTO);
     }
 
     @Transactional(readOnly = true)
-    public Page<Notification> getAllNotificationsPaged(Integer userId, Pageable pageable) {
-        return notificationRepository.findByUserIdOrderByTimestampDesc(userId, pageable);
+    public long countUnread(Integer userId) {
+        return notificationRepository.countByUserIdAndIsReadFalse(userId);
     }
 
+    /**
+     * Flips the read flag in one statement. Ownership is checked by counting how many of the ids
+     * actually belong to the caller, rather than loading every row to inspect it in Java.
+     */
     @Transactional(rollbackFor = Exception.class)
     public void markNotificationsAsRead(List<Integer> notificationIds, Integer userId) {
-        var notifications = notificationRepository.findAllById(notificationIds);
-        verifyOwnershipOfAllNotifications(notifications, userId);
-        markAllAsRead(notifications);
-        notificationRepository.saveAll(notifications);
-    }
-
-    private void verifyOwnershipOfAllNotifications(List<Notification> notifications, Integer userId) {
-        for (var notification : notifications) {
-            if (!notification.getUser().getId().equals(userId)) {
-                throw new AuthorizationException("Access denied to notification");
-            }
+        if (notificationIds == null || notificationIds.isEmpty()) {
+            return;
         }
-    }
-
-    public NotificationDTO convertToDTO(Notification notification) {
-        return entityMapper.toNotificationDTO(notification);
-    }
-
-    private void markAllAsRead(List<Notification> notifications) {
-        notifications.forEach(n -> n.setIsRead(true));
+        var distinctIds = notificationIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        if (distinctIds.isEmpty()) {
+            return;
+        }
+        if (notificationRepository.countOwnedBy(distinctIds, userId) != distinctIds.size()) {
+            throw new AuthorizationException("Access denied to notification");
+        }
+        notificationRepository.markReadForUser(distinctIds, userId);
     }
 }

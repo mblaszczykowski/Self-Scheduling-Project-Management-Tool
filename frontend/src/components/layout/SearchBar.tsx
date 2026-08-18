@@ -4,32 +4,12 @@ import { HiOutlineSearch } from 'react-icons/hi';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { globalSearch } from '../../util/api';
 import config from '../../config';
-import { Project, Task } from '../../types';
+import { SearchResults } from '../../types';
+import { STATUS_CONFIG } from '../../util/helpers';
 
-const STATUS_COLORS: Record<string, string> = {
-    BACKLOG: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-    TODO: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-    IN_PROGRESS: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-    IN_REVIEW: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-    DONE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-};
-
-interface SearchCommentResult {
-    commentId: number;
-    taskKey: string;
-    authorName?: string;
-    content?: string;
-    snippet?: string;
-}
-
-interface SearchResults {
-    projects?: Project[];
-    tasks?: Task[];
-    comments?: SearchCommentResult[];
-}
-
-const formatStatus = (status?: string) =>
-    status ? status.replace(/_/g, ' ') : '';
+// Status presentation comes from the shared config. The private map this replaced covered five
+// of the twelve statuses — one of which ("IN_REVIEW") is not a status at all — so seven real
+// statuses fell back to neutral grey and the labels disagreed with the rest of the app.
 
 export default function SearchBar() {
     const [query, setQuery] = useState('');
@@ -65,7 +45,6 @@ export default function SearchBar() {
             setIsOpen(true);
         } catch (err) {
             if (requestId !== requestIdRef.current) return;
-            console.error('Search failed:', err);
             setResults(null);
         } finally {
             if (requestId === requestIdRef.current) setLoading(false);
@@ -102,11 +81,11 @@ export default function SearchBar() {
         }
         if (e.key === 'Enter' && results) {
             e.preventDefault();
-            if (results.projects?.length > 0) {
+            if (results.projects.length > 0) {
                 navigateTo(`/projects?projectKey=${results.projects[0].projectKey}`);
-            } else if (results.tasks?.length > 0) {
+            } else if (results.tasks.length > 0) {
                 navigateTo(`/projects?selectedIssue=${results.tasks[0].taskKey}`);
-            } else if (results.comments?.length > 0) {
+            } else if (results.comments.length > 0) {
                 const c = results.comments[0];
                 navigateTo(`/projects?selectedIssue=${c.taskKey}&commentId=${c.commentId}`);
             }
@@ -114,9 +93,9 @@ export default function SearchBar() {
     };
 
     const hasResults = results && (
-        results.projects?.length > 0 ||
-        results.tasks?.length > 0 ||
-        results.comments?.length > 0
+        results.projects.length > 0 ||
+        results.tasks.length > 0 ||
+        results.comments.length > 0
     );
     const hasNoResults = results && !hasResults && query.trim().length >= 2;
 
@@ -156,7 +135,7 @@ export default function SearchBar() {
                         </div>
                     )}
 
-                    {results.projects?.length > 0 && (
+                    {results.projects.length > 0 && (
                         <div>
                             <div className="px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                                 Projects ({results.projects.length})
@@ -180,7 +159,7 @@ export default function SearchBar() {
                         </div>
                     )}
 
-                    {results.tasks?.length > 0 && (
+                    {results.tasks.length > 0 && (
                         <div>
                             <div className="px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                                 Tasks ({results.tasks.length})
@@ -199,8 +178,8 @@ export default function SearchBar() {
                                             {t.summary}
                                         </span>
                                         {t.status && (
-                                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_COLORS[t.status] || STATUS_COLORS.BACKLOG}`}>
-                                                {formatStatus(t.status)}
+                                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_CONFIG[t.status].color}`}>
+                                                {STATUS_CONFIG[t.status].label}
                                             </span>
                                         )}
                                     </div>
@@ -209,7 +188,7 @@ export default function SearchBar() {
                         </div>
                     )}
 
-                    {results.comments?.length > 0 && (
+                    {results.comments.length > 0 && (
                         <div>
                             <div className="px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                                 Comments ({results.comments.length})

@@ -1,16 +1,19 @@
 package com.backend.controllers;
 
+import com.backend.dtos.LoginResponse;
+import com.backend.dtos.MessageResponse;
 import com.backend.requests.LoginRequest;
 import com.backend.services.AuthService;
+import com.backend.services.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -18,32 +21,32 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @Autowired
     public AuthController(AuthService authService) {
         this.authService = authService;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest, HttpServletRequest httpRequest) {
-        var result = authService.authenticateUser(loginRequest, httpRequest);
-        var headers = new HttpHeaders();
-        headers.add(HttpHeaders.SET_COOKIE, result.tokens().accessCookie().toString());
-        headers.add(HttpHeaders.SET_COOKIE, result.tokens().refreshCookie().toString());
-        return ResponseEntity.ok().headers(headers).body(result.body());
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest loginRequest,
+                                               HttpServletRequest request) {
+        var result = authService.authenticateUser(loginRequest, request);
+        return withAuthCookies(result.tokens()).body(result.body());
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<?> refreshToken(HttpServletRequest request) {
+    public ResponseEntity<MessageResponse> refresh(HttpServletRequest request) {
         var tokens = authService.refreshAccessToken(request);
-        var headers = new HttpHeaders();
-        headers.add(HttpHeaders.SET_COOKIE, tokens.accessCookie().toString());
-        headers.add(HttpHeaders.SET_COOKIE, tokens.refreshCookie().toString());
-        return ResponseEntity.ok().headers(headers).body(Map.of("message", "Token refreshed successfully"));
+        return withAuthCookies(tokens).body(new MessageResponse("Token refreshed"));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
         authService.logoutUser(request, response);
-        return ResponseEntity.ok().body(Map.of("message", "Logged out successfully"));
+        return ResponseEntity.noContent().build();
+    }
+
+    private static ResponseEntity.BodyBuilder withAuthCookies(TokenService.AuthTokens tokens) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, tokens.accessCookie().toString())
+                .header(HttpHeaders.SET_COOKIE, tokens.refreshCookie().toString());
     }
 }

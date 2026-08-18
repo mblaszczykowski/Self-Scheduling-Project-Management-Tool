@@ -1,6 +1,9 @@
 package com.backend.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.Hibernate;
+
+import java.util.Objects;
 
 @Entity
 @Table(name = "users", uniqueConstraints = {
@@ -14,6 +17,9 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false)
     private Integer id;
+
+    @Version
+    private Long version; // profile save vs. preferences patch would otherwise clobber each other
 
     @Column(name = "first_name", nullable = false)
     private String firstname;
@@ -150,5 +156,22 @@ public class User {
             case PROJECT_INVITATION, PROJECT_UPDATED, MEMBER_REMOVED ->
                     Boolean.TRUE.equals(emailOnProjectInvitation);
         };
+    }
+
+    // Id-based equality so a detached User compares equal to its managed twin — this entity
+    // lives in Project.members, a HashSet. hashCode is deliberately constant per type rather
+    // than derived from the id: an entity's id changes on persist, and a changing hashCode
+    // would corrupt any set it was already a member of.
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) return true;
+        if (other == null || Hibernate.getClass(this) != Hibernate.getClass(other)) return false;
+        var that = (User) other;
+        return id != null && Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Hibernate.getClass(this).hashCode();
     }
 }

@@ -2,11 +2,12 @@ package com.backend.controllers;
 
 import com.backend.dtos.TaskDTO;
 import com.backend.requests.TaskRequest;
+import com.backend.requests.TaskScheduleRequest;
 import com.backend.services.TaskService;
-import com.backend.services.TokenService;
-import com.backend.util.RequestValidator;
+import com.backend.web.CurrentUserId;
+import com.backend.web.RequestValidator;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,49 +20,55 @@ import java.util.List;
 public class TaskController {
 
     private final TaskService taskService;
-    private final TokenService tokenService;
     private final RequestValidator requestValidator;
 
-    public TaskController(TaskService taskService, TokenService tokenService, RequestValidator requestValidator) {
+    public TaskController(TaskService taskService, RequestValidator requestValidator) {
         this.taskService = taskService;
-        this.tokenService = tokenService;
         this.requestValidator = requestValidator;
     }
 
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<TaskDTO> createTask(
-            HttpServletRequest request,
+            @CurrentUserId Integer userId,
             @PathVariable String projectKey,
-            @RequestPart("taskDTO") String taskDTOStr,
+            @RequestPart("taskDTO") String taskJson,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
-        var userId = tokenService.getUserIdFromRequest(request);
-        var taskRequest = requestValidator.parseAndValidate(taskDTOStr, TaskRequest.class);
-        var createdTask = taskService.createTask(projectKey, taskRequest, userId, attachments);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdTask);
+        var request = requestValidator.parseAndValidate(taskJson, TaskRequest.class);
+        var created = taskService.createTask(projectKey, request, userId, attachments);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PutMapping(value = "/{taskKey}", consumes = {"multipart/form-data"})
     public ResponseEntity<TaskDTO> updateTask(
-            HttpServletRequest request,
+            @CurrentUserId Integer userId,
             @PathVariable String projectKey,
             @PathVariable String taskKey,
-            @RequestPart("taskDTO") String taskDTOStr,
+            @RequestPart("taskDTO") String taskJson,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
-        var userId = tokenService.getUserIdFromRequest(request);
-        var taskRequest = requestValidator.parseAndValidate(taskDTOStr, TaskRequest.class);
-        var updatedTask = taskService.updateTask(projectKey, taskKey, taskRequest, userId, attachments);
-        return ResponseEntity.ok(updatedTask);
+        var request = requestValidator.parseAndValidate(taskJson, TaskRequest.class);
+        return ResponseEntity.ok(taskService.updateTask(projectKey, taskKey, request, userId, attachments));
+    }
+
+    /**
+     * Moves a task in time. Separate from the full update so a caller that only knows the new dates
+     * cannot accidentally clear everything it did not send.
+     */
+    @PatchMapping("/{taskKey}/schedule")
+    public ResponseEntity<TaskDTO> updateSchedule(
+            @CurrentUserId Integer userId,
+            @PathVariable String projectKey,
+            @PathVariable String taskKey,
+            @Valid @RequestBody TaskScheduleRequest request
+    ) {
+        return ResponseEntity.ok(taskService.updateSchedule(projectKey, taskKey, request, userId));
     }
 
     @DeleteMapping("/{taskKey}")
-    public ResponseEntity<Void> deleteTask(
-            HttpServletRequest request,
-            @PathVariable String projectKey,
-            @PathVariable String taskKey
-    ) {
-        var userId = tokenService.getUserIdFromRequest(request);
+    public ResponseEntity<Void> deleteTask(@CurrentUserId Integer userId,
+                                           @PathVariable String projectKey,
+                                           @PathVariable String taskKey) {
         taskService.deleteTask(projectKey, taskKey, userId);
         return ResponseEntity.noContent().build();
     }

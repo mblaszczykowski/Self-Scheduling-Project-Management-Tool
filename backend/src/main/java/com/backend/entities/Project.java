@@ -1,11 +1,15 @@
 package com.backend.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.Hibernate;
+
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Entity
@@ -74,7 +78,21 @@ public class Project {
     )
     private Set<Project> dependencies = new HashSet<>();
 
-    public Project() {}
+    @Column(nullable = false, updatable = false)
+    private Instant created;
+
+    @Column(nullable = false)
+    private Instant updated;
+
+    public Project() {
+        this.created = Instant.now();
+        this.updated = this.created;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updated = Instant.now();
+    }
 
     public boolean isOwner(Integer userId) {
         return owner != null && owner.getId().equals(userId);
@@ -149,5 +167,23 @@ public class Project {
 
     public void clearDependencies() {
         this.dependencies.clear();
+    }
+
+    public Instant getCreated() { return created; }
+
+    public Instant getUpdated() { return updated; }
+
+    // See User.equals for why hashCode is constant per type rather than id-derived.
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) return true;
+        if (other == null || Hibernate.getClass(this) != Hibernate.getClass(other)) return false;
+        var that = (Project) other;
+        return id != null && Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Hibernate.getClass(this).hashCode();
     }
 }

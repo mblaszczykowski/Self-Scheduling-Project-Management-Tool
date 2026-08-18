@@ -1,14 +1,17 @@
 package com.backend.filter;
 
 import com.backend.config.CookieProperties;
+import com.backend.config.JwtProperties;
 import com.backend.config.PublicEndpoints;
-import com.backend.util.FilterResponseUtil;
+import com.backend.web.FilterResponseUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -23,22 +26,34 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 
+/**
+ * Double-submit CSRF protection: a script-readable cookie must be echoed back in a header.
+ *
+ * <p>The cookie's lifetime matches the refresh token's, so an idle tab cannot come back to a
+ * session that is still valid but a CSRF token that has quietly expired — which surfaced as an
+ * unexplained 403 the client had no way to recover from.
+ */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 3) // last of the functional filters, after authentication
 public class CsrfProtectionFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(CsrfProtectionFilter.class);
+
     private static final String CSRF_COOKIE_NAME = "XSRF-TOKEN";
     private static final String CSRF_HEADER_NAME = "X-CSRF-Token";
     private static final int TOKEN_LENGTH = 32;
-    private static final SecureRandom secureRandom = new SecureRandom();
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final ObjectMapper objectMapper;
     private final CookieProperties cookieProperties;
+    private final long cookieMaxAgeSeconds;
 
     public CsrfProtectionFilter(ObjectMapper objectMapper,
-                                CookieProperties cookieProperties) {
+                                CookieProperties cookieProperties,
+                                JwtProperties jwtProperties) {
         this.objectMapper = objectMapper;
         this.cookieProperties = cookieProperties;
+        this.cookieMaxAgeSeconds = jwtProperties.refreshTokenExpiration().toSeconds();
     }
 
     @Override
@@ -46,8 +61,8 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        String path = request.getRequestURI();
-        String method = request.getMethod();
+        var path = request.getRequestURI();
+        var method = request.getMethod();
 
         if (isSafeMethod(method)) {
             ensureCsrfTokenCookie(request, response);
@@ -60,42 +75,44 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
             return;
         }
 
-        var cookieToken = getCsrfTokenFromCookie(request);
-        String headerToken = request.getHeader(CSRF_HEADER_NAME);
+        var cookieToken = readCsrfCookie(request);
+        var headerToken = request.getHeader(CSRF_HEADER_NAME);
 
         if (cookieToken == null || headerToken == null || !MessageDigest.isEqual(
                 cookieToken.getBytes(StandardCharsets.UTF_8),
                 headerToken.getBytes(StandardCharsets.UTF_8))) {
-            sendCsrfErrorResponse(response);
+            log.warn("CSRF validation failed: client={} method={} path={} cookiePresent={} headerPresent={}",
+                    request.getRemoteAddr(), method, path, cookieToken != null, headerToken != null);
+            FilterResponseUtil.sendJsonError(response, HttpStatus.FORBIDDEN,
+                    "CSRF token validation failed. Please refresh the page and try again.",
+                    objectMapper, "CSRF_ERROR");
             return;
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private boolean isSafeMethod(String method) {
-        return "GET".equalsIgnoreCase(method) ||
-                "HEAD".equalsIgnoreCase(method) ||
-                "OPTIONS".equalsIgnoreCase(method);
+    private static boolean isSafeMethod(String method) {
+        return "GET".equalsIgnoreCase(method)
+                || "HEAD".equalsIgnoreCase(method)
+                || "OPTIONS".equalsIgnoreCase(method);
     }
 
     private void ensureCsrfTokenCookie(HttpServletRequest request, HttpServletResponse response) {
-        var existingToken = getCsrfTokenFromCookie(request);
-
-        if (existingToken == null) {
-            var newToken = generateCsrfToken();
-            var cookie = ResponseCookie.from(CSRF_COOKIE_NAME, newToken)
-                    .path("/")
-                    .httpOnly(false)
-                    .secure(cookieProperties.isSecure())
-                    .maxAge(3600)
-                    .sameSite(cookieProperties.getSameSite())
-                    .build();
-            response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        if (readCsrfCookie(request) != null) {
+            return;
         }
+        var cookie = ResponseCookie.from(CSRF_COOKIE_NAME, generateCsrfToken())
+                .path("/")
+                .httpOnly(false) // must be readable by the SPA to be echoed back
+                .secure(cookieProperties.isSecure())
+                .maxAge(cookieMaxAgeSeconds)
+                .sameSite(cookieProperties.getSameSite())
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
-    private String getCsrfTokenFromCookie(HttpServletRequest request) {
+    private static String readCsrfCookie(HttpServletRequest request) {
         if (request.getCookies() == null) {
             return null;
         }
@@ -107,14 +124,9 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
         return null;
     }
 
-    private String generateCsrfToken() {
-        byte[] bytes = new byte[TOKEN_LENGTH];
-        secureRandom.nextBytes(bytes);
+    private static String generateCsrfToken() {
+        var bytes = new byte[TOKEN_LENGTH];
+        SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    private void sendCsrfErrorResponse(HttpServletResponse response) throws IOException {
-        FilterResponseUtil.sendJsonError(response, HttpStatus.FORBIDDEN,
-                "CSRF token validation failed. Please refresh the page and try again.", objectMapper);
     }
 }

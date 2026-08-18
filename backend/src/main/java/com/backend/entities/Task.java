@@ -1,6 +1,8 @@
 package com.backend.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.Hibernate;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -8,6 +10,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Entity
@@ -17,10 +20,7 @@ import java.util.Set;
         },
         indexes = {
                 @Index(name = "idx_task_project", columnList = "project_id"),
-                @Index(name = "idx_task_assignee", columnList = "assignee_id"),
-                @Index(name = "idx_task_status", columnList = "status"),
-                @Index(name = "idx_task_due_date", columnList = "due_date"),
-                @Index(name = "idx_task_priority", columnList = "priority")
+                @Index(name = "idx_task_assignee", columnList = "assignee_id")
         }
 )
 // Only to-one associations are fetch-joined. The `dependencies` collection is loaded lazily
@@ -177,10 +177,8 @@ public class Task {
     }
 
     public Instant getCreated() { return created; }
-    public void setCreated(Instant created) { this.created = created; }
 
     public Instant getUpdated() { return updated; }
-    public void setUpdated(Instant updated) { this.updated = updated; }
 
     public Integer getProgress() { return progress; }
     public void setProgress(Integer progress) { this.progress = progress; }
@@ -189,4 +187,18 @@ public class Task {
 
     public TaskPriority getPriority() { return priority; }
     public void setPriority(TaskPriority priority) { this.priority = priority; }
+
+    // See User.equals for why hashCode is constant per type rather than id-derived.
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) return true;
+        if (other == null || Hibernate.getClass(this) != Hibernate.getClass(other)) return false;
+        var that = (Task) other;
+        return id != null && Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Hibernate.getClass(this).hashCode();
+    }
 }

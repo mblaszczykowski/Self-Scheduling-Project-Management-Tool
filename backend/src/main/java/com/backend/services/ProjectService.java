@@ -2,29 +2,31 @@ package com.backend.services;
 
 import com.backend.dtos.ProjectDTO;
 import com.backend.dtos.TaskDTO;
-import com.backend.dtos.UserDTO;
 import com.backend.entities.NotificationType;
 import com.backend.entities.Project;
-import com.backend.entities.Task;
 import com.backend.entities.User;
-import com.backend.events.InvitationEmailEvent;
-import com.backend.events.NotificationEvent;
-import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
+import com.backend.mapper.EntityMapper;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
 import com.backend.requests.ProjectRequest;
-import com.backend.util.AccessGuard;
-import com.backend.util.CriticalPathMethodHelper;
-import com.backend.util.EntityMapper;
-import org.springframework.context.ApplicationEventPublisher;
+import com.backend.scheduling.SchedulingService;
+import com.backend.security.AccessGuard;
+import com.backend.services.RateLimitService.Bucket;
+import com.backend.util.AfterCommit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.*;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,30 +36,54 @@ public class ProjectService {
     private final UserService userService;
     private final TaskRepository taskRepository;
     private final FileStorageService fileStorageService;
-    private final CriticalPathMethodHelper cpmHelper;
+    private final SchedulingService schedulingService;
     private final EntityMapper entityMapper;
     private final AccessGuard accessGuard;
-    private final ApplicationEventPublisher applicationEventPublisher;
+    private final NotificationService notificationService;
+    private final EmailService emailService;
+    private final RateLimitService rateLimitService;
 
-    public ProjectService(
-            ProjectRepository projectRepository,
-            UserService userService,
-            TaskRepository taskRepository,
-            FileStorageService fileStorageService,
-            CriticalPathMethodHelper cpmHelper,
-            EntityMapper entityMapper,
-            AccessGuard accessGuard,
-            ApplicationEventPublisher applicationEventPublisher
-    ) {
+    public ProjectService(ProjectRepository projectRepository,
+                          UserService userService,
+                          TaskRepository taskRepository,
+                          FileStorageService fileStorageService,
+                          SchedulingService schedulingService,
+                          EntityMapper entityMapper,
+                          AccessGuard accessGuard,
+                          NotificationService notificationService,
+                          EmailService emailService,
+                          RateLimitService rateLimitService) {
         this.projectRepository = projectRepository;
         this.userService = userService;
         this.taskRepository = taskRepository;
         this.fileStorageService = fileStorageService;
-        this.cpmHelper = cpmHelper;
+        this.schedulingService = schedulingService;
         this.entityMapper = entityMapper;
         this.accessGuard = accessGuard;
-        this.applicationEventPublisher = applicationEventPublisher;
+        this.notificationService = notificationService;
+        this.emailService = emailService;
+        this.rateLimitService = rateLimitService;
     }
+
+    // ======================== Reads ========================
+
+    @Transactional(readOnly = true)
+    public ProjectDTO getProjectByKey(String projectKey, Integer userId) {
+        var project = accessGuard.getAccessibleProject(projectKey, userId);
+        return toDto(project, taskRepository.findByProjectIdWithDetails(project.getId()).stream()
+                .map(task -> entityMapper.toTaskDTO(task, null))
+                .toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProjectDTO> getProjects(Integer userId, Pageable pageable) {
+        var projects = projectRepository.findAllAccessibleByUserPaged(userId, pageable);
+        var tasksByProjectId = loadTasksFor(projects.getContent());
+        return projects.map(project ->
+                toDto(project, tasksByProjectId.getOrDefault(project.getId(), List.of())));
+    }
+
+    // ======================== Writes ========================
 
     @Transactional(rollbackFor = Exception.class)
     public ProjectDTO createProject(ProjectRequest request, Integer userId, List<MultipartFile> attachments) {
@@ -67,247 +93,278 @@ public class ProjectService {
 
         var owner = userService.getRequiredUserById(userId);
 
-        var attachmentUrls = (attachments != null && !attachments.isEmpty())
-                ? fileStorageService.storeFiles(attachments)
-                : new ArrayList<String>();
-
         var project = new Project();
         project.setProjectKey(request.projectKey());
         project.setSummary(request.summary());
         project.setDescription(request.description());
         project.setOwner(owner);
         project.setNextTaskNumber(1);
-        project.replaceAttachments(attachmentUrls);
-
-        var members = resolveMembersFromEmails(request.members(), owner, request.summary());
-        project.replaceMembers(members);
-
-        if (request.dependencies() != null && !request.dependencies().isEmpty()) {
-            var dependencies = request.dependencies().stream()
-                    .map(depKey -> projectRepository.findByProjectKey(depKey)
-                            .orElseThrow(() -> new ValidationException("Dependency project not found: " + depKey)))
-                    .collect(Collectors.toList());
-            validateNoProjectCycles(project, dependencies);
-            project.replaceDependencies(dependencies);
-        }
 
         var savedProject = projectRepository.save(project);
-        notifyNewMembersExcludingOwner(members, owner, savedProject);
-        return convertToDTOWithCPM(savedProject);
-    }
 
-    @Transactional(readOnly = true)
-    public ProjectDTO getProjectByKey(String projectKey, Integer userId) {
-        var project = accessGuard.getAccessibleProject(projectKey, userId);
-        return convertToDTOWithCPM(project);
-    }
+        // Attachments need the project id to be recorded against, so they are stored after the
+        // project row exists.
+        savedProject.replaceAttachments(
+                fileStorageService.storeFiles(attachments, savedProject.getId(), userId));
 
-    @Transactional(readOnly = true)
-    public Page<ProjectDTO> getAllProjectsPaginated(Integer userId, Pageable pageable) {
-        var projects = projectRepository.findAllAccessibleByUserPaged(userId, pageable);
+        var resolution = resolveMembers(request.memberEmails(), owner, userId);
+        savedProject.replaceMembers(resolution.members());
+        applyDependencies(savedProject, request.dependencies(), userId);
 
-        // Batch fetch all tasks for projects in this page
-        var projectIds = projects.getContent().stream().map(Project::getId).toList();
-        if (projectIds.isEmpty()) {
-            return projects.map(project -> convertToDTOWithCPM(project, List.of()));
-        }
-        // distinct(): the dependencies join-fetch can return the same Task instance multiple times.
-        var allTasks = taskRepository.findByProjectIdsWithDetails(projectIds).stream().distinct().toList();
-        var tasksByProjectId = allTasks.stream()
-                .collect(Collectors.groupingBy(t -> t.getProject().getId()));
+        notifyMembersAdded(savedProject, resolution.members(), owner);
+        sendInvitationsAfterCommit(resolution.unregisteredEmails(), savedProject.getSummary(), owner);
 
-        return projects.map(project -> {
-            var tasks = tasksByProjectId.getOrDefault(project.getId(), List.of());
-            return convertToDTOWithCPM(project, tasks);
-        });
-    }
-
-    @Transactional(readOnly = true)
-    public List<ProjectDTO> getAllProjects(Integer userId) {
-        var projects = projectRepository.findAllAccessibleByUser(userId);
-        if (projects.isEmpty()) {
-            return List.of();
-        }
-
-        var projectIds = projects.stream().map(Project::getId).toList();
-        var allTasks = taskRepository.findByProjectIdsWithDetails(projectIds).stream().distinct().toList();
-        var tasksByProjectId = allTasks.stream()
-                .collect(Collectors.groupingBy(t -> t.getProject().getId()));
-
-        return projects.stream()
-                .map(p -> convertToDTOWithCPM(p, tasksByProjectId.getOrDefault(p.getId(), List.of())))
-                .toList();
+        return toDto(savedProject, List.of());
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public ProjectDTO updateProject(String projectKey, ProjectRequest request, Integer userId, List<MultipartFile> attachments) {
+    public ProjectDTO updateProject(String projectKey, ProjectRequest request, Integer userId,
+                                    List<MultipartFile> attachments) {
         var project = accessGuard.getOwnedProject(projectKey, userId);
+        var owner = project.getOwner();
+
+        boolean detailsChanged = !java.util.Objects.equals(project.getSummary(), request.summary())
+                || !java.util.Objects.equals(project.getDescription(), request.description());
 
         project.setSummary(request.summary());
         project.setDescription(request.description());
 
-        if (attachments != null && !attachments.isEmpty()) {
-            var newAttachments = fileStorageService.storeFiles(attachments);
-            project.addAttachments(newAttachments);
-        }
+        // PUT replaces: an attachment the client no longer lists has been removed. Previously this
+        // endpoint only ever added, so removing a project attachment reported success and did
+        // nothing.
+        var previousAttachments = List.copyOf(project.getAttachments());
+        var declared = request.attachments() == null ? List.<String>of() : request.attachments();
+        fileStorageService.requireAttachmentsBelongTo(project.getId(), declared);
+        var updatedAttachments = new ArrayList<>(declared);
+        updatedAttachments.addAll(fileStorageService.storeFiles(attachments, project.getId(), userId));
+        project.replaceAttachments(updatedAttachments);
 
-        if (request.members() != null) {
-            updateProjectMembersAndNotify(project, request.members());
+        var addedMembers = new LinkedHashSet<User>();
+        var removedMembers = new LinkedHashSet<User>();
+        Set<String> unregistered = Set.of();
+
+        if (request.memberEmails() != null) {
+            var existing = new HashSet<>(project.getMembers());
+            var resolution = resolveMembers(request.memberEmails(), owner, userId);
+            unregistered = resolution.unregisteredEmails();
+
+            var existingIds = existing.stream().map(User::getId).collect(Collectors.toSet());
+            var updatedIds = resolution.members().stream().map(User::getId).collect(Collectors.toSet());
+
+            resolution.members().stream()
+                    .filter(member -> !existingIds.contains(member.getId()))
+                    .filter(member -> !member.getId().equals(owner.getId()))
+                    .forEach(addedMembers::add);
+            existing.stream()
+                    .filter(member -> !updatedIds.contains(member.getId()))
+                    .filter(member -> !member.getId().equals(owner.getId()))
+                    .forEach(removedMembers::add);
+
+            project.replaceMembers(resolution.members());
         }
 
         if (request.dependencies() != null) {
-            var dependencies = request.dependencies().stream()
-                    .map(depKey -> projectRepository.findByProjectKey(depKey)
-                            .orElseThrow(() -> new ValidationException("Dependency project not found: " + depKey)))
-                    .collect(Collectors.toList());
-            validateNoProjectCycles(project, dependencies);
-            project.replaceDependencies(dependencies);
+            applyDependencies(project, request.dependencies(), userId);
         }
 
-        var updatedProject = projectRepository.save(project);
-        notifyProjectMembersOfUpdate(updatedProject, userId);
-        return convertToDTOWithCPM(updatedProject);
+        var updated = projectRepository.save(project);
+        deleteRemovedAttachmentsAfterCommit(previousAttachments, updatedAttachments);
+
+        // One notification per person, and only for something they can actually see: a member who
+        // was just invited does not also need "the project was updated", and nobody needs it when
+        // only the member list changed.
+        var pending = new ArrayList<NotificationService.Pending>();
+        var link = "/projects?projectKey=" + updated.getProjectKey();
+        for (var member : addedMembers) {
+            pending.add(new NotificationService.Pending(member,
+                    "You have been added to project: " + updated.getSummary(),
+                    NotificationType.PROJECT_INVITATION, link));
+        }
+        for (var member : removedMembers) {
+            pending.add(new NotificationService.Pending(member,
+                    "You have been removed from project: " + updated.getSummary(),
+                    NotificationType.MEMBER_REMOVED, null));
+        }
+        if (detailsChanged) {
+            for (var member : updated.getMembers()) {
+                if (!member.getId().equals(userId)) {
+                    pending.add(new NotificationService.Pending(member,
+                            "Project '" + updated.getSummary() + "' has been updated",
+                            NotificationType.PROJECT_UPDATED, link));
+                }
+            }
+        }
+        notificationService.notifyAll(pending);
+        sendInvitationsAfterCommit(unregistered, updated.getSummary(), owner);
+
+        return toDto(updated, taskRepository.findByProjectIdWithDetails(updated.getId()).stream()
+                .map(task -> entityMapper.toTaskDTO(task, null))
+                .toList());
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void deleteProject(String projectKey, Integer userId) {
         var project = accessGuard.getOwnedProject(projectKey, userId);
 
-        deleteAllProjectAttachmentsSilently(project);
+        var attachments = collectAllAttachments(project);
         projectRepository.delete(project);
+        // Files come off disk only once the rows are really gone: unlinking first meant a failed
+        // commit left the project intact with every attachment URL pointing at nothing.
+        AfterCommit.run("delete attachments of project " + projectKey,
+                () -> fileStorageService.deleteFilesSilently(attachments));
     }
 
-    private Set<User> resolveMembersFromEmails(List<UserDTO> memberDTOs, User owner, String projectName) {
-        var members = new HashSet<User>();
+    // ======================== Internals ========================
+
+    private record MemberResolution(Set<User> members, Set<String> unregisteredEmails) {}
+
+    /**
+     * Turns member email addresses into users, collecting the ones that do not exist yet so they
+     * can be invited after the transaction commits.
+     */
+    private MemberResolution resolveMembers(List<String> emails, User owner, Integer actorId) {
+        var members = new LinkedHashSet<User>();
         members.add(owner);
-        if (memberDTOs == null || memberDTOs.isEmpty()) return members;
+        if (emails == null || emails.isEmpty()) {
+            return new MemberResolution(members, Set.of());
+        }
 
-        var emailsToFetch = memberDTOs.stream()
-                .map(UserDTO::email)
-                .filter(email -> email != null && !email.isBlank())
-                .filter(email -> !email.equalsIgnoreCase(owner.getEmail()))
-                .collect(Collectors.toSet());
+        var wanted = emails.stream()
+                .map(UserService::normalizeEmail)
+                .filter(email -> email != null && !email.isEmpty())
+                .filter(email -> !email.equals(UserService.normalizeEmail(owner.getEmail())))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        if (emailsToFetch.isEmpty()) return members;
+        if (wanted.isEmpty()) {
+            return new MemberResolution(members, Set.of());
+        }
 
-        var usersByEmail = userService.findByEmailsAsMap(emailsToFetch);
-
-        for (String email : emailsToFetch) {
-            var user = usersByEmail.get(email);
+        var found = userService.findByEmailsAsMap(wanted);
+        var unregistered = new LinkedHashSet<String>();
+        for (var email : wanted) {
+            var user = found.get(email);
             if (user != null) {
                 members.add(user);
             } else {
-                applicationEventPublisher.publishEvent(new InvitationEmailEvent(email, projectName, owner.getFullName()));
+                unregistered.add(email);
             }
         }
 
-        return members;
-    }
-
-    private void updateProjectMembersAndNotify(Project project, List<UserDTO> memberDTOs) {
-        var existingMembers = new HashSet<>(project.getMembers());
-        var existingMemberIds = existingMembers.stream()
-                .map(User::getId)
-                .collect(Collectors.toSet());
-
-        var owner = project.getOwner();
-        var updatedMembers = resolveMembersFromEmails(memberDTOs, owner, project.getSummary());
-        var updatedMemberIds = updatedMembers.stream()
-                .map(User::getId)
-                .collect(Collectors.toSet());
-
-        project.replaceMembers(updatedMembers);
-
-        for (var member : updatedMembers) {
-            var isNewMember = !existingMemberIds.contains(member.getId());
-            var isNotOwner = !member.getId().equals(owner.getId());
-            if (isNewMember && isNotOwner) {
-                notifyMemberAddedToProject(member, project);
-            }
+        if (!unregistered.isEmpty()
+                && !rateLimitService.allow(Bucket.INVITATION, String.valueOf(actorId))) {
+            // Each unregistered address triggers mail from a verified sender with caller-supplied
+            // text in it, so the volume one user can generate has to be bounded.
+            throw new ValidationException("Too many invitations sent. Please try again later.");
         }
 
-        for (var member : existingMembers) {
-            if (!updatedMemberIds.contains(member.getId()) && !member.getId().equals(owner.getId())) {
-                notifyMemberRemovedFromProject(member, project);
-            }
+        return new MemberResolution(members, unregistered);
+    }
+
+    /**
+     * Resolves dependency project keys through the access guard.
+     *
+     * <p>Going through the guard is what stops a caller from writing a dependency row pointing at
+     * another tenant's project, and makes "not found" indistinguishable from "no access" so the
+     * endpoint is not an existence oracle over a small key namespace.
+     */
+    private void applyDependencies(Project project, List<String> dependencyKeys, Integer userId) {
+        if (dependencyKeys == null) {
+            return;
         }
-    }
-
-    private void notifyMemberRemovedFromProject(User member, Project project) {
-        var message = "You have been removed from project: " + project.getSummary();
-        applicationEventPublisher.publishEvent(new NotificationEvent(member, message, NotificationType.MEMBER_REMOVED, null));
-    }
-
-    private void notifyProjectMembersOfUpdate(Project project, Integer updaterId) {
-        var link = "/projects?projectKey=" + project.getProjectKey();
-        var message = "Project '" + project.getSummary() + "' has been updated";
-        for (var member : project.getMembers()) {
-            if (!member.getId().equals(updaterId)) {
-                applicationEventPublisher.publishEvent(new NotificationEvent(member, message, NotificationType.PROJECT_UPDATED, link));
-            }
+        if (dependencyKeys.isEmpty()) {
+            project.clearDependencies();
+            return;
         }
-    }
-
-    private void notifyNewMembersExcludingOwner(Set<User> members, User owner, Project project) {
-        for (var member : members) {
-            if (!member.getId().equals(owner.getId())) {
-                notifyMemberAddedToProject(member, project);
-            }
-        }
-    }
-
-    private void notifyMemberAddedToProject(User member, Project project) {
-        var message = "You have been added to project: " + project.getSummary();
-        var link = "/projects?projectKey=" + project.getProjectKey();
-        applicationEventPublisher.publishEvent(new NotificationEvent(member, message, NotificationType.PROJECT_INVITATION, link));
-    }
-
-    private void deleteAllProjectAttachmentsSilently(Project project) {
-        deleteAttachmentsSilently(project.getAttachments());
-        for (Task task : project.getTasks()) {
-            deleteAttachmentsSilently(task.getAttachments());
-            for (var comment : task.getComments()) {
-                deleteAttachmentsSilently(comment.getAttachments());
-            }
-        }
-    }
-
-    private void deleteAttachmentsSilently(Collection<String> attachments) {
-        fileStorageService.deleteFilesSilently(attachments);
+        var dependencies = dependencyKeys.stream()
+                .distinct()
+                .map(key -> accessGuard.getAccessibleProject(key, userId))
+                .toList();
+        validateNoProjectCycles(project, dependencies);
+        project.replaceDependencies(dependencies);
     }
 
     private void validateNoProjectCycles(Project project, List<Project> newDependencies) {
         if (project.getId() == null || newDependencies.isEmpty()) {
             return;
         }
-
         var visited = new HashSet<Integer>();
         var queue = new LinkedList<>(newDependencies);
-
         while (!queue.isEmpty()) {
             var current = queue.poll();
             if (current.getId().equals(project.getId())) {
-                throw new ValidationException("Circular dependency detected: project cannot depend on itself");
+                throw new ValidationException(
+                        "Circular dependency detected: a project cannot depend on itself");
             }
-            if (visited.add(current.getId()) && current.getDependencies() != null) {
+            if (visited.add(current.getId())) {
                 queue.addAll(current.getDependencies());
             }
         }
     }
 
-    private ProjectDTO convertToDTOWithCPM(Project project) {
-        var tasks = taskRepository.findByProjectIdWithDetails(project.getId());
-        return convertToDTOWithCPM(project, tasks);
+    private void notifyMembersAdded(Project project, Set<User> members, User owner) {
+        var link = "/projects?projectKey=" + project.getProjectKey();
+        var pending = members.stream()
+                .filter(member -> !member.getId().equals(owner.getId()))
+                .map(member -> new NotificationService.Pending(member,
+                        "You have been added to project: " + project.getSummary(),
+                        NotificationType.PROJECT_INVITATION, link))
+                .toList();
+        notificationService.notifyAll(pending);
     }
 
-    /** Single canonical project mapping: sort tasks, enrich with CPM criticality, then map. */
-    private ProjectDTO convertToDTOWithCPM(Project project, List<Task> tasks) {
-        var taskDTOs = tasks.stream()
-                .sorted(Comparator.comparingInt(Task::getTaskNumber))
-                .map(entityMapper::toTaskDTO)
-                .toList();
+    /**
+     * Invitations go out only once the project really exists. Sending them inline meant a
+     * validation failure later in the same method rolled the project back after the mail had
+     * already left.
+     */
+    private void sendInvitationsAfterCommit(Set<String> emails, String projectName, User inviter) {
+        if (emails == null || emails.isEmpty()) {
+            return;
+        }
+        var inviterName = inviter.getFullName();
+        AfterCommit.run("send project invitations", () ->
+                emails.forEach(email -> emailService.sendInvitationEmail(email, projectName, inviterName)));
+    }
 
-        var cpmTaskDTOs = cpmHelper.calculateTaskDTOsWithCPM(taskDTOs);
-        return entityMapper.toProjectDTO(project, cpmTaskDTOs);
+    private java.util.Map<Integer, List<TaskDTO>> loadTasksFor(List<Project> projects) {
+        var projectIds = projects.stream().map(Project::getId).toList();
+        if (projectIds.isEmpty()) {
+            return java.util.Map.of();
+        }
+        return taskRepository.findByProjectIdsWithDetails(projectIds).stream()
+                .distinct()
+                .collect(Collectors.groupingBy(
+                        task -> task.getProject().getId(),
+                        Collectors.mapping(task -> entityMapper.toTaskDTO(task, null), Collectors.toList())));
+    }
+
+    /** Single canonical project mapping: enrich the tasks with critical-path flags, then map. */
+    private ProjectDTO toDto(Project project, List<TaskDTO> tasks) {
+        var critical = schedulingService.criticalTaskKeys(tasks, LocalDate.now());
+        var enriched = tasks.stream()
+                .map(task -> task.withIsCritical(critical.contains(task.taskKey())))
+                .toList();
+        return entityMapper.toProjectDTO(project, enriched);
+    }
+
+    private List<String> collectAllAttachments(Project project) {
+        var all = new ArrayList<String>(project.getAttachments());
+        for (var task : project.getTasks()) {
+            all.addAll(task.getAttachments());
+            for (var comment : task.getComments()) {
+                all.addAll(comment.getAttachments());
+            }
+        }
+        return all;
+    }
+
+    private void deleteRemovedAttachmentsAfterCommit(List<String> before, List<String> after) {
+        var removed = new ArrayList<>(before);
+        removed.removeAll(new HashSet<>(after));
+        if (removed.isEmpty()) {
+            return;
+        }
+        AfterCommit.run("delete detached project attachments",
+                () -> fileStorageService.deleteFilesSilently(removed));
     }
 }

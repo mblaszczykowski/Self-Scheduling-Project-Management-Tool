@@ -92,6 +92,21 @@ public class Comment {
 
     public Set<CommentReaction> getReactions() { return Collections.unmodifiableSet(reactions); }
 
+    // Reactions are mutated through the aggregate so the in-memory collection always matches
+    // what will be flushed — the DTO built from getReactions() then reflects the change by
+    // construction, rather than depending on Hibernate's flush/collection-load ordering.
+    public void addReaction(CommentReaction reaction) {
+        if (reaction == null) return;
+        reaction.setComment(this);
+        this.reactions.add(reaction);
+    }
+
+    public void removeReaction(CommentReaction reaction) {
+        if (reaction == null) return;
+        this.reactions.remove(reaction);
+        reaction.setComment(null);
+    }
+
     public Set<String> getAttachments() { return Collections.unmodifiableSet(attachments); }
 
     public void addAttachments(Collection<String> attachments) {

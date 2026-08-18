@@ -1,8 +1,8 @@
-import React, { useContext, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { HiOutlineMenu, HiOutlineX } from 'react-icons/hi';
-import { AuthContext } from '../../context/AuthContext';
-import { NotificationsContext } from '../../context/NotificationsContext';
+import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationsContext';
 import { useTheme } from '../../context/ThemeContext';
 import AccountModal from '../modals/AccountModal';
 import NotificationDropdown from './NotificationDropdown';
@@ -10,7 +10,6 @@ import CreateMenu from './CreateMenu';
 import UserMenu from './UserMenu';
 import ConfirmDialog from '../modals/ConfirmDialog';
 import MobileMenu from './MobileMenu';
-import { markNotificationsAsRead } from '../../util/api';
 import SearchBar from './SearchBar';
 
 const NavLink = ({ to, active, children }: { to: string; active: boolean; children: React.ReactNode }) => (
@@ -33,8 +32,8 @@ interface HeaderProps {
 }
 
 export default function Header({ onLogout, onCreateProject, onCreateTask }: HeaderProps) {
-    const { user, setUser } = useContext(AuthContext);
-    const { notifications, setNotifications } = useContext(NotificationsContext);
+    const { user, setUser } = useAuth();
+    const { notifications, unreadCount, markAsRead } = useNotifications();
     const { theme, toggleTheme } = useTheme();
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [accountModalOpen, setAccountModalOpen] = useState(false);
@@ -50,30 +49,25 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
         onLogout();
     };
 
-    const handleMarkNotificationsAsRead = async () => {
-        const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id);
-        if (unreadIds.length > 0) {
-            try {
-                await markNotificationsAsRead(unreadIds);
-                // Only mark the ids we actually acknowledged — notifications that
-                // arrived via SSE during the await must stay unread.
-                setNotifications(prev => prev.map(n =>
-                    unreadIds.includes(n.id) ? { ...n, isRead: true } : n
-                ));
-            } catch (err) {
-                console.error('Error marking notifications as read:', err);
-            }
-        }
-    };
-
-    const handleMarkSingleRead = async (notificationId: number) => {
+    // Only the ids present when the click happened are acknowledged; a notification that arrives
+    // over the stream while the request is in flight must stay unread.
+    const handleMarkNotificationsAsRead = useCallback(async () => {
+        const unreadIds = notifications.filter((n) => !n.isRead).map((n) => n.id);
+        if (unreadIds.length === 0) return;
         try {
-            await markNotificationsAsRead([notificationId]);
-            setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n));
+            await markAsRead(unreadIds);
         } catch (err) {
-            console.error('Error marking notification as read:', err);
+            console.error('Could not mark notifications as read', err);
         }
-    };
+    }, [notifications, markAsRead]);
+
+    const handleMarkSingleRead = useCallback(async (notificationId: number) => {
+        try {
+            await markAsRead([notificationId]);
+        } catch (err) {
+            console.error('Could not mark the notification as read', err);
+        }
+    }, [markAsRead]);
 
     return (
         <header className="w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-50">
@@ -120,8 +114,9 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
                     </button>
                     <NotificationDropdown
                         notifications={notifications}
+                        unreadCount={unreadCount}
                         isOpen={notificationsOpen}
-                        onToggle={() => setNotificationsOpen(true)}
+                        onOpen={() => setNotificationsOpen(true)}
                         onClose={() => setNotificationsOpen(false)}
                         onMarkAsRead={handleMarkNotificationsAsRead}
                         onMarkSingleRead={handleMarkSingleRead}

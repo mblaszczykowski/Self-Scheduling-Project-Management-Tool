@@ -1,23 +1,37 @@
 package com.backend.services;
 
 import com.backend.dtos.TaskDTO;
-import com.backend.entities.*;
-import com.backend.events.NotificationEvent;
+import com.backend.entities.NotificationType;
+import com.backend.entities.Project;
+import com.backend.entities.Task;
+import com.backend.entities.TaskPriority;
+import com.backend.entities.TaskStatus;
+import com.backend.entities.User;
 import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
+import com.backend.mapper.EntityMapper;
 import com.backend.repositories.ProjectRepository;
+import com.backend.repositories.TaskKey;
 import com.backend.repositories.TaskRepository;
-import com.backend.repositories.UserRepository;
 import com.backend.requests.TaskRequest;
-import com.backend.util.AccessGuard;
-import com.backend.util.EntityMapper;
-import org.springframework.context.ApplicationEventPublisher;
+import com.backend.requests.TaskScheduleRequest;
+import com.backend.scheduling.SchedulingService;
+import com.backend.security.AccessGuard;
+import com.backend.util.AfterCommit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.*;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 @Service
 public class TaskService {
@@ -25,269 +39,384 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
     private final FileStorageService fileStorageService;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final TaskActivityService taskActivityService;
+    private final NotificationService notificationService;
     private final EntityMapper entityMapper;
     private final AccessGuard accessGuard;
-    private final ApplicationEventPublisher applicationEventPublisher;
+    private final SchedulingService schedulingService;
 
-    public TaskService(TaskRepository taskRepository, ProjectRepository projectRepository,
-                       FileStorageService fileStorageService, UserRepository userRepository,
+    public TaskService(TaskRepository taskRepository,
+                       ProjectRepository projectRepository,
+                       FileStorageService fileStorageService,
+                       UserService userService,
                        TaskActivityService taskActivityService,
-                       EntityMapper entityMapper, AccessGuard accessGuard,
-                       ApplicationEventPublisher applicationEventPublisher) {
+                       NotificationService notificationService,
+                       EntityMapper entityMapper,
+                       AccessGuard accessGuard,
+                       SchedulingService schedulingService) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
         this.fileStorageService = fileStorageService;
-        this.userRepository = userRepository;
+        this.userService = userService;
         this.taskActivityService = taskActivityService;
+        this.notificationService = notificationService;
         this.entityMapper = entityMapper;
         this.accessGuard = accessGuard;
-        this.applicationEventPublisher = applicationEventPublisher;
+        this.schedulingService = schedulingService;
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public TaskDTO createTask(String projectKey, TaskRequest request, Integer userId, List<MultipartFile> files) {
-        validateLabels(request.labels());
+    // ======================== Create ========================
 
+    @Transactional(rollbackFor = Exception.class)
+    public TaskDTO createTask(String projectKey, TaskRequest request, Integer userId,
+                              List<MultipartFile> files) {
+        // Locking the project row serialises task-number allocation.
         var project = projectRepository.findByProjectKeyWithLock(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-
         accessGuard.requireAccess(project, userId);
 
-        // Store files only after authorization: file storage is not transactional, so a
-        // later rollback would not remove them (avoids orphaned writes by unauthorized callers).
-        var attachmentUrls = (files != null && !files.isEmpty())
-                ? fileStorageService.storeFiles(files)
-                : new ArrayList<String>();
+        var author = userService.getRequiredUserById(userId);
+
+        // Store files only after authorization: file storage is not transactional, so a later
+        // rollback would not remove them.
+        var uploaded = fileStorageService.storeFiles(files, project.getId(), userId);
 
         var task = new Task();
+        task.setProject(project);
+        task.setTaskNumber(project.allocateNextTaskNumber());
         task.setSummary(request.summary());
         task.setDescription(request.description());
         task.setStatus(Objects.requireNonNullElse(request.status(), TaskStatus.BACKLOG));
-        task.setStartDate(request.startDate());
-        task.setDueDate(request.dueDate());
         task.setPriority(Objects.requireNonNullElse(request.priority(), TaskPriority.MEDIUM));
         task.setProgress(Objects.requireNonNullElse(request.progress(), 0));
-        task.setProject(project);
-        task.setTaskNumber(project.allocateNextTaskNumber());
-        task.replaceAttachments(attachmentUrls);
+        task.setStartDate(request.startDate());
+        task.setDueDate(request.dueDate());
+        task.setLabels(joinLabels(request.labels()));
+        task.setAssignee(resolveAssignee(request.assignee(), project));
 
-        if (request.assignee() != null && !request.assignee().isEmpty()) {
-            var assignee = userRepository.findByEmail(request.assignee())
-                    .orElseThrow(() -> new ValidationException("Assignee not found"));
-            task.setAssignee(assignee);
-        }
+        var declaredAttachments = nullSafe(request.attachments());
+        fileStorageService.requireAttachmentsBelongTo(project.getId(), declaredAttachments);
+        var attachments = new ArrayList<>(declaredAttachments);
+        attachments.addAll(uploaded);
+        task.replaceAttachments(attachments);
 
-        if (request.labels() != null && !request.labels().isEmpty()) {
-            task.setLabels(String.join(",", request.labels()));
-        }
-
-        projectRepository.save(project);
-
-        if (request.dependencyKeys() != null && !request.dependencyKeys().isEmpty()) {
-            task.replaceDependencies(resolveDependenciesBatch(request.dependencyKeys(), userId));
+        if (!nullSafe(request.dependencyKeys()).isEmpty()) {
+            task.replaceDependencies(resolveDependencies(request.dependencyKeys(), userId));
         }
 
         var savedTask = taskRepository.save(task);
+        taskActivityService.logCreated(savedTask, author);
+        notifyAssignee(savedTask, userId, "You have been assigned to task: " + savedTask.getSummary(),
+                NotificationType.TASK_ASSIGNED);
 
-        var author = userRepository.findById(userId).orElse(null);
-        if (author != null) {
-            taskActivityService.logCreated(savedTask, author);
-        }
-
-        if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
-            var message = "You have been assigned to task: " + task.getSummary();
-            var link = "/projects?selectedIssue=" + savedTask.getTaskKey();
-            applicationEventPublisher.publishEvent(new NotificationEvent(task.getAssignee(), message,
-                    NotificationType.TASK_ASSIGNED, link));
-        }
-
-        return convertToDTO(savedTask);
+        return toDtoWithCriticality(savedTask);
     }
 
+    // ======================== Update ========================
+
+    /**
+     * Replaces the task with the submitted representation.
+     *
+     * <p>This is a full {@code PUT}: an absent collection or scalar is a request to clear it. That
+     * is only safe because the one caller which could not send a complete body — the timeline drag —
+     * now has {@link #updateSchedule} instead. Reusing this endpoint for a partial change is what
+     * silently reset progress to 0, priority to MEDIUM, and dropped every attachment.
+     */
     @Transactional(rollbackFor = Exception.class)
     public TaskDTO updateTask(String projectKey, String taskKey, TaskRequest request,
                               Integer userId, List<MultipartFile> files) {
-        validateLabels(request.labels());
-
         var project = accessGuard.getAccessibleProject(projectKey, userId);
+        var task = requireTaskInProject(taskKey, project);
+        var author = userService.getRequiredUserById(userId);
 
-        var task = taskRepository.findByTaskKey(taskKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
-
-        accessGuard.verifyTaskInProject(task, project);
-
-        // Snapshot old values for activity logging
-        var oldStatus = task.getStatus();
-        var oldPriority = task.getPriority();
-        var oldAssignee = task.getAssignee() != null ? task.getAssignee().getFullName() : null;
-        var oldProgress = task.getProgress();
-        var oldStartDate = task.getStartDate() != null ? task.getStartDate().toString() : null;
-        var oldDueDate = task.getDueDate() != null ? task.getDueDate().toString() : null;
-        var oldSummary = task.getSummary();
-        var oldLabels = task.getLabels();
-        var oldDeps = String.join(",", Objects.requireNonNullElse(EntityMapper.extractDependencyKeys(task), List.<String>of()));
+        var before = TaskSnapshot.of(task);
+        var previousAttachments = List.copyOf(task.getAttachments());
 
         task.setSummary(request.summary());
         task.setDescription(request.description());
         task.setStatus(Objects.requireNonNullElse(request.status(), TaskStatus.BACKLOG));
+        task.setPriority(Objects.requireNonNullElse(request.priority(), TaskPriority.MEDIUM));
+        task.setProgress(Objects.requireNonNullElse(request.progress(), 0));
         task.setStartDate(request.startDate());
         task.setDueDate(request.dueDate());
-        task.setProgress(Objects.requireNonNullElse(request.progress(), 0));
-        task.setPriority(Objects.requireNonNullElse(request.priority(), TaskPriority.MEDIUM));
+        task.setLabels(joinLabels(request.labels()));
+        task.setAssignee(resolveAssignee(request.assignee(), project));
 
-        if (request.assignee() != null && !request.assignee().isEmpty()) {
-            var assignee = userRepository.findByEmail(request.assignee())
-                    .orElseThrow(() -> new ValidationException("Assignee not found"));
-            task.setAssignee(assignee);
-        } else {
-            task.setAssignee(null);
-        }
+        var declaredAttachments = nullSafe(request.attachments());
+        fileStorageService.requireAttachmentsBelongTo(project.getId(), declaredAttachments);
+        var attachments = new ArrayList<>(declaredAttachments);
+        attachments.addAll(fileStorageService.storeFiles(files, project.getId(), userId));
+        task.replaceAttachments(attachments);
 
-        if (request.labels() != null) {
-            task.setLabels(String.join(",", request.labels()));
-        }
-
-        task.replaceAttachments(request.attachments() != null
-                ? new ArrayList<>(request.attachments())
-                : new ArrayList<>());
-
-        if (files != null && !files.isEmpty()) {
-            var newAttachments = fileStorageService.storeFiles(files);
-            task.addAttachments(newAttachments);
-        }
-
-        updateTaskDependencies(task, request.dependencyKeys(), userId);
+        var dependencies = resolveDependencies(request.dependencyKeys(), userId);
+        validateNoCycles(task, dependencies);
+        task.replaceDependencies(dependencies);
 
         var updatedTask = taskRepository.save(task);
+        taskActivityService.logFieldChanges(updatedTask, author, before, TaskSnapshot.of(updatedTask));
+        deleteRemovedAttachmentsAfterCommit(previousAttachments, attachments);
+        notifyAssignee(updatedTask, userId,
+                "Task '" + updatedTask.getSummary() + "' has been updated", NotificationType.TASK_UPDATED);
 
-        // Log activity
-        var author = userRepository.findById(userId).orElse(null);
-        if (author != null) {
-            var newAssignee = task.getAssignee() != null ? task.getAssignee().getFullName() : null;
-            var newStartDate = task.getStartDate() != null ? task.getStartDate().toString() : null;
-            var newDueDate = task.getDueDate() != null ? task.getDueDate().toString() : null;
-            var newDeps = String.join(",", Objects.requireNonNullElse(EntityMapper.extractDependencyKeys(task), List.<String>of()));
-            taskActivityService.logFieldChanges(updatedTask, author,
-                    oldStatus, task.getStatus(),
-                    oldPriority, task.getPriority(),
-                    oldAssignee, newAssignee,
-                    oldProgress, task.getProgress(),
-                    oldStartDate, newStartDate,
-                    oldDueDate, newDueDate,
-                    oldSummary, task.getSummary(),
-                    oldLabels, task.getLabels(),
-                    oldDeps, newDeps);
-        }
-
-        if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
-            var message = "Task '" + task.getSummary() + "' has been updated";
-            var link = "/projects?selectedIssue=" + updatedTask.getTaskKey();
-            applicationEventPublisher.publishEvent(new NotificationEvent(task.getAssignee(), message,
-                    NotificationType.TASK_UPDATED, link));
-        }
-
-        return convertToDTO(updatedTask);
+        return toDtoWithCriticality(updatedTask);
     }
 
-    public TaskDTO convertToDTO(Task task) {
-        return entityMapper.toTaskDTO(task);
+    /**
+     * Moves a task in time and changes nothing else.
+     *
+     * <p>Exists so that a timeline drag — which knows only the new dates — cannot express anything
+     * beyond them.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public TaskDTO updateSchedule(String projectKey, String taskKey, TaskScheduleRequest request,
+                                  Integer userId) {
+        var project = accessGuard.getAccessibleProject(projectKey, userId);
+        var task = requireTaskInProject(taskKey, project);
+        var author = userService.getRequiredUserById(userId);
+
+        var before = TaskSnapshot.of(task);
+        task.setStartDate(request.startDate());
+        task.setDueDate(request.dueDate());
+
+        var updatedTask = taskRepository.save(task);
+        taskActivityService.logFieldChanges(updatedTask, author, before, TaskSnapshot.of(updatedTask));
+        notifyAssignee(updatedTask, userId,
+                "Dates changed for task: " + updatedTask.getSummary(), NotificationType.TASK_UPDATED);
+
+        return toDtoWithCriticality(updatedTask);
     }
 
-    private void validateLabels(List<String> labels) {
-        if (labels != null) {
-            for (String label : labels) {
-                if (label != null && label.contains(",")) {
-                    throw new ValidationException("Labels cannot contain commas");
-                }
+    /** One task's new dates, as produced by the optimizer. */
+    public record ScheduleChange(String taskKey, LocalDate startDate, LocalDate dueDate) {}
+
+    /**
+     * Applies a batch of optimizer-derived date changes.
+     *
+     * <p>Routed through the same audit and notification path as a manual edit, so the activity feed
+     * does not lie about how a task's dates got there — bulk-rescheduling used to leave no trace and
+     * notify nobody. Assignees get one notification per task they own.
+     *
+     * @return how many tasks were actually changed
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int applySchedule(List<ScheduleChange> changes, Integer userId) {
+        if (changes == null || changes.isEmpty()) {
+            return 0;
+        }
+        var author = userService.getRequiredUserById(userId);
+        var tasksByKey = loadTasksByKey(changes.stream().map(ScheduleChange::taskKey).toList());
+
+        var pending = new ArrayList<NotificationService.Pending>();
+        int applied = 0;
+
+        for (var change : changes) {
+            var task = tasksByKey.get(change.taskKey());
+            if (task == null) {
+                throw new ResourceNotFoundException("Task not found: " + change.taskKey());
+            }
+            if (!task.getProject().hasAccess(userId)) {
+                throw new AuthorizationException("No access to task: " + change.taskKey());
+            }
+            if (change.startDate() == null || change.dueDate() == null
+                    || change.dueDate().isBefore(change.startDate())) {
+                throw new ValidationException("Invalid schedule for task: " + change.taskKey());
+            }
+            if (Objects.equals(task.getStartDate(), change.startDate())
+                    && Objects.equals(task.getDueDate(), change.dueDate())) {
+                continue;
+            }
+
+            var before = TaskSnapshot.of(task);
+            task.setStartDate(change.startDate());
+            task.setDueDate(change.dueDate());
+            taskActivityService.logFieldChanges(task, author, before, TaskSnapshot.of(task));
+            applied++;
+
+            var assignee = task.getAssignee();
+            if (assignee != null && !assignee.getId().equals(userId)) {
+                pending.add(new NotificationService.Pending(assignee,
+                        "Your task dates were updated by schedule optimization",
+                        NotificationType.TASK_UPDATED,
+                        "/projects?selectedIssue=" + task.getTaskKey()));
             }
         }
+
+        // One notification per assignee, not one per task: a portfolio-wide reschedule would
+        // otherwise flood everyone involved.
+        notificationService.notifyAll(pending);
+        return applied;
     }
 
-    private void updateTaskDependencies(Task task, List<String> dependencyKeys, Integer userId) {
-        if (dependencyKeys != null) {
-            var dependencies = resolveDependenciesBatch(dependencyKeys, userId);
-            validateNoCycles(task, dependencies);
-            task.replaceDependencies(dependencies);
-        } else {
-            task.clearDependencies();
+    // ======================== Delete ========================
+
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteTask(String projectKey, String taskKey, Integer userId) {
+        var project = accessGuard.getOwnedProject(projectKey, userId);
+        var task = requireTaskInProject(taskKey, project);
+
+        var assignee = task.getAssignee();
+        if (assignee != null && !assignee.getId().equals(userId)) {
+            notificationService.createNotification(assignee,
+                    "Task '" + task.getSummary() + "' has been deleted",
+                    NotificationType.TASK_DELETED, null);
         }
+
+        var attachments = List.copyOf(task.getAttachments());
+        taskRepository.delete(task);
+        // Files come off disk only once the row is really gone.
+        AfterCommit.run("delete attachments of " + taskKey,
+                () -> fileStorageService.deleteFilesSilently(attachments));
     }
 
-    private List<Task> resolveDependenciesBatch(List<String> dependencyRefs, Integer userId) {
-        if (dependencyRefs == null || dependencyRefs.isEmpty()) {
-            return new ArrayList<>();
+    // ======================== Internals ========================
+
+    private Task requireTaskInProject(String taskKey, Project project) {
+        var task = taskRepository.findByTaskKey(taskKey)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
+        accessGuard.verifyTaskInProject(task, project);
+        return task;
+    }
+
+    /**
+     * Resolves an assignee, requiring them to be part of the project.
+     *
+     * <p>Without the membership check the endpoint doubled as an authenticated "is this address
+     * registered?" oracle, and let a caller fire a notification with arbitrary text at any user.
+     * The error message is deliberately the same whether the address is unknown or simply not a
+     * member.
+     */
+    private User resolveAssignee(String email, Project project) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        var assignee = userService.findUserByEmailOrNull(email);
+        if (assignee == null || !project.hasAccess(assignee.getId())) {
+            throw new ValidationException("Assignee must be a member of this project");
+        }
+        return assignee;
+    }
+
+    /**
+     * Resolves dependency task keys, rejecting anything the caller cannot see.
+     *
+     * <p>Unparseable and unknown keys are rejected rather than silently dropped: quietly ignoring
+     * one means the client believes it saved a dependency that does not exist.
+     */
+    private List<Task> resolveDependencies(List<String> dependencyKeys, Integer userId) {
+        var keys = nullSafe(dependencyKeys).stream().filter(Objects::nonNull).distinct().toList();
+        if (keys.isEmpty()) {
+            return List.of();
         }
 
-        var tasksByProjectKey = new HashMap<String, List<Integer>>();
-        for (var ref : dependencyRefs) {
-            if (ref == null || !ref.contains("-")) continue;
-            var lastDash = ref.lastIndexOf('-');
-            var projectKey = ref.substring(0, lastDash);
-            try {
-                var taskNumber = Integer.parseInt(ref.substring(lastDash + 1));
-                tasksByProjectKey.computeIfAbsent(projectKey, k -> new ArrayList<>()).add(taskNumber);
-            } catch (NumberFormatException ignored) {
+        var byProject = new LinkedHashMap<String, List<Integer>>();
+        for (var key : keys) {
+            var parsed = TaskKey.parse(key)
+                    .orElseThrow(() -> new ValidationException("Invalid task key: " + key));
+            byProject.computeIfAbsent(parsed.projectKey(), k -> new ArrayList<>()).add(parsed.taskNumber());
+        }
+
+        var resolved = new ArrayList<Task>();
+        for (var entry : byProject.entrySet()) {
+            resolved.addAll(taskRepository.findByProjectKeyAndTaskNumbers(entry.getKey(), entry.getValue()));
+        }
+        if (resolved.size() != keys.size()) {
+            throw new ValidationException("One or more dependency tasks do not exist");
+        }
+        for (var dependency : resolved) {
+            if (!dependency.getProject().hasAccess(userId)) {
+                throw new AuthorizationException(
+                        "Cannot create dependency to task in inaccessible project: " + dependency.getTaskKey());
             }
         }
-
-        var dependencies = new ArrayList<Task>();
-        for (var entry : tasksByProjectKey.entrySet()) {
-            dependencies.addAll(taskRepository.findByProjectKeyAndTaskNumbers(entry.getKey(), entry.getValue()));
-        }
-
-        if (userId != null) {
-            for (var dep : dependencies) {
-                if (!dep.getProject().hasAccess(userId)) {
-                    throw new AuthorizationException(
-                            "Cannot create dependency to task in inaccessible project: " + dep.getTaskKey());
-                }
-            }
-        }
-
-        return dependencies;
+        return resolved;
     }
 
     private void validateNoCycles(Task task, List<Task> newDependencies) {
         if (task.getId() == null || newDependencies.isEmpty()) {
             return;
         }
-
-        var visitedTaskIds = new HashSet<Integer>();
-        var tasksToCheck = new LinkedList<>(newDependencies);
-
-        while (!tasksToCheck.isEmpty()) {
-            var current = tasksToCheck.poll();
+        var visited = new HashSet<Integer>();
+        var queue = new LinkedList<>(newDependencies);
+        while (!queue.isEmpty()) {
+            var current = queue.poll();
             if (current.getId().equals(task.getId())) {
-                throw new ValidationException("Circular dependency detected: task cannot depend on itself");
+                throw new ValidationException("Circular dependency detected: a task cannot depend on itself");
             }
-            if (visitedTaskIds.add(current.getId()) && current.getDependencies() != null) {
-                tasksToCheck.addAll(current.getDependencies());
+            if (visited.add(current.getId())) {
+                queue.addAll(current.getDependencies());
             }
         }
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public void deleteTask(String projectKey, String taskKey, Integer userId) {
-        var project = accessGuard.getOwnedProject(projectKey, userId);
-
-        var task = taskRepository.findByTaskKey(taskKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskKey));
-
-        accessGuard.verifyTaskInProject(task, project);
-
-        if (task.getAssignee() != null && !task.getAssignee().getId().equals(userId)) {
-            var message = "Task '" + task.getSummary() + "' has been deleted";
-            applicationEventPublisher.publishEvent(new NotificationEvent(task.getAssignee(), message,
-                    NotificationType.TASK_DELETED, null));
+    private Map<String, Task> loadTasksByKey(List<String> taskKeys) {
+        var byProject = new LinkedHashMap<String, List<Integer>>();
+        for (var key : taskKeys) {
+            var parsed = TaskKey.parse(key)
+                    .orElseThrow(() -> new ValidationException("Invalid task key: " + key));
+            byProject.computeIfAbsent(parsed.projectKey(), k -> new ArrayList<>()).add(parsed.taskNumber());
         }
-
-        deleteTaskAttachmentsSilently(task);
-        taskRepository.delete(task);
+        var result = new LinkedHashMap<String, Task>();
+        for (var entry : byProject.entrySet()) {
+            for (var task : taskRepository.findByProjectKeyAndTaskNumbers(entry.getKey(), entry.getValue())) {
+                result.put(task.getTaskKey(), task);
+            }
+        }
+        return result;
     }
 
-    private void deleteTaskAttachmentsSilently(Task task) {
-        fileStorageService.deleteFilesSilently(task.getAttachments());
+    private void notifyAssignee(Task task, Integer actorId, String message, NotificationType type) {
+        var assignee = task.getAssignee();
+        if (assignee == null || assignee.getId().equals(actorId)) {
+            return;
+        }
+        notificationService.createNotification(assignee, message, type,
+                "/projects?selectedIssue=" + task.getTaskKey());
     }
+
+    private void deleteRemovedAttachmentsAfterCommit(List<String> before, List<String> after) {
+        var removed = new ArrayList<>(before);
+        removed.removeAll(new HashSet<>(after));
+        if (removed.isEmpty()) {
+            return;
+        }
+        // Detaching an attachment used to leave the file on disk forever with nothing referencing
+        // it; deleting it before commit would have lost it on a rollback.
+        AfterCommit.run("delete detached attachments",
+                () -> fileStorageService.deleteFilesSilently(removed));
+    }
+
+    /**
+     * Maps a task with its critical-path flag filled in.
+     *
+     * <p>Create and update responses used to hard-code {@code isCritical = null} while reads
+     * populated it, so a client that rendered the response of its own write lost the flag until the
+     * next refetch.
+     */
+    private TaskDTO toDtoWithCriticality(Task task) {
+        var projectTasks = taskRepository.findByProjectIdWithDetails(task.getProject().getId()).stream()
+                .map(t -> entityMapper.toTaskDTO(t, null))
+                .toList();
+        var critical = schedulingService.criticalTaskKeys(projectTasks, LocalDate.now());
+        return entityMapper.toTaskDTO(task, critical.contains(task.getTaskKey()));
+    }
+
+    private static String joinLabels(List<String> labels) {
+        var cleaned = nullSafe(labels).stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(label -> !label.isEmpty())
+                .toList();
+        for (var label : cleaned) {
+            if (label.contains(",")) {
+                throw new ValidationException("Labels cannot contain commas");
+            }
+        }
+        return cleaned.isEmpty() ? null : String.join(",", cleaned);
+    }
+
+    private static <T> List<T> nullSafe(List<T> list) {
+        return list == null ? List.of() : list;
+    }
+
 }

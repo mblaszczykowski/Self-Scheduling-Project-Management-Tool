@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { FormikHelpers } from 'formik';
 import { useComments } from '../../hooks/useComments';
@@ -9,7 +9,7 @@ import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import ConfirmDialog from '../modals/ConfirmDialog';
 import CommentItem from './CommentItem';
 import CommentForm, { CommentFormValues } from './CommentForm';
-import { Comment, Attachment } from '../../types';
+import { Attachment, Comment, ReactionType } from '../../types';
 
 interface PreviewData {
     url: string | null;
@@ -21,50 +21,16 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
     const location = useLocation();
     const highlightCommentId = new URLSearchParams(location.search).get('commentId');
     const {
-        getComments, createComment, updateComment,
-        deleteComment, reactToComment,
-    } = useComments();
+        comments, loading, error, reload,
+        addComment, editComment, removeComment, react,
+    } = useComments(taskId);
 
-    const [comments, setComments] = useState<Comment[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
     const [editingComment, setEditingComment] = useState<Comment | null>(null);
     const [replyingCommentId, setReplyingCommentId] = useState<number | null>(null);
     const [showCommentForm, setShowCommentForm] = useState(false);
     const [preview, setPreview] = useState<PreviewData | null>(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
-    // Latest-request token: incremented per fetch so a slow, stale response for a
-    // previous taskId can't clobber the results of a newer request.
-    const requestIdRef = useRef(0);
-
-    const fetchComments = useCallback(async ({ showLoading = false } = {}) => {
-        const requestId = ++requestIdRef.current;
-        if (showLoading) {
-            setLoading(true);
-            setError(false);
-        }
-        try {
-            const fetched = await getComments(taskId);
-            if (requestId !== requestIdRef.current) return;
-            const sorted = [...fetched].sort(
-                (a, b) => new Date(b.timestamp as string).getTime() - new Date(a.timestamp as string).getTime(),
-            );
-            setComments(sorted);
-            if (showLoading) setLoading(false);
-        } catch (err) {
-            if (requestId !== requestIdRef.current) return;
-            console.error('Error fetching comments:', err);
-            if (showLoading) {
-                setError(true);
-                setLoading(false);
-            }
-        }
-    }, [taskId, getComments]);
-
-    useEffect(() => {
-        fetchComments({ showLoading: true });
-    }, [fetchComments]);
 
     const handleAddComment = useCallback(async (
         values: CommentFormValues,
@@ -73,11 +39,7 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
         attachments: File[] = [],
     ) => {
         try {
-            await createComment(
-                taskId, { content: values.content },
-                attachments, parentCommentId,
-            );
-            await fetchComments();
+            await addComment(values.content, attachments, parentCommentId);
             resetForm();
             if (parentCommentId) setReplyingCommentId(null);
             setShowCommentForm(false);
@@ -86,22 +48,18 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
         } finally {
             setSubmitting(false);
         }
-    }, [taskId, createComment, fetchComments]);
+    }, [addComment]);
 
     const handleUpdateComment = useCallback(async (comment: Comment, values: CommentFormValues, { setSubmitting }: FormikHelpers<CommentFormValues>, attachments: File[] = []) => {
         try {
-            await updateComment(
-                taskId, comment.id,
-                { content: values.content }, attachments,
-            );
-            await fetchComments();
+            await editComment(comment.id, values.content, attachments);
             setEditingComment(null);
         } catch (err) {
             showToast(getErrorMessage(err, 'Failed to update comment'), 'error');
         } finally {
             setSubmitting(false);
         }
-    }, [taskId, updateComment, fetchComments]);
+    }, [editComment]);
 
     const handleDeleteComment = useCallback((commentId: number) => {
         setDeleteConfirmId(commentId);
@@ -110,8 +68,7 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
     const confirmDeleteComment = async () => {
         if (!deleteConfirmId) return;
         try {
-            await deleteComment(taskId, deleteConfirmId);
-            await fetchComments();
+            await removeComment(deleteConfirmId);
         } catch (err) {
             showToast(getErrorMessage(err, 'Failed to delete comment'), 'error');
         } finally {
@@ -119,14 +76,15 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
         }
     };
 
-    const handleReactToComment = useCallback(async (commentId: number, reactionType: string) => {
+    const handleReactToComment = useCallback(async (commentId: number, reactionType: ReactionType) => {
         try {
-            await reactToComment(taskId, commentId, reactionType);
-            await fetchComments();
+            // The endpoint returns the updated comment and the hook applies it in place, so no
+            // refetch of the whole thread is needed for a single click.
+            await react(commentId, reactionType);
         } catch (err) {
-            showToast(getErrorMessage(err, 'Failed to react'), 'error');
+            showToast(getErrorMessage(err, 'Could not save your reaction'), 'error');
         }
-    }, [taskId, reactToComment, fetchComments]);
+    }, [react]);
 
     const openPreview = useCallback((attachment: Attachment) => {
         const { url, fileName, fileType } = getFileInfo(attachment);
@@ -187,11 +145,11 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
                     <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-200 dark:border-slate-700 border-t-slate-500 dark:border-t-slate-400 mx-auto" />
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Loading comments...</p>
                 </div>
-            ) : error ? (
+            ) : error !== null ? (
                 <div className="py-6 text-center">
-                    <p className="text-xs text-red-500 dark:text-red-400">Failed to load comments</p>
+                    <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
                     <button
-                        onClick={() => fetchComments({ showLoading: true })}
+                        onClick={reload}
                         className="mt-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                     >
                         Retry

@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project version="4">
-  <component name="DataSourcePerFileMappings">
-    <file url="file://$PROJECT_DIR$/.idea/queries/Query.sql" value="a66cc717-69c0-49d5-8a76-6341dec7c1eb" />
-    <file url="file://$PROJECT_DIR$/backend/src/main/resources/demo-seed.sql" value="a66cc717-69c0-49d5-8a76-6341dec7c1eb" />
-    <file url="file://$PROJECT_DIR$/backend/src/main/resources/test_optimization_data.sql" value="a66cc717-69c0-49d5-8a76-6341dec7c1eb" />
-    <file url="file://$PROJECT_DIR$/backend/src/main/resources/test_scenarios.sql" value="a66cc717-69c0-49d5-8a76-6341dec7c1eb" />
-  </component>
-</project>

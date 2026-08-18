@@ -1,10 +1,11 @@
 package com.backend.controllers;
 
 import com.backend.dtos.CommentDTO;
+import com.backend.dtos.PagedResponse;
 import com.backend.entities.ReactionType;
 import com.backend.services.CommentService;
-import com.backend.services.TokenService;
-import jakarta.servlet.http.HttpServletRequest;
+import com.backend.web.CurrentUserId;
+import com.backend.web.PageRequests;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,70 +18,63 @@ import java.util.List;
 public class CommentController {
 
     private final CommentService commentService;
-    private final TokenService tokenService;
+    private final PageRequests pageRequests;
 
-    public CommentController(CommentService commentService, TokenService tokenService) {
+    public CommentController(CommentService commentService, PageRequests pageRequests) {
         this.commentService = commentService;
-        this.tokenService = tokenService;
+        this.pageRequests = pageRequests;
     }
 
     @GetMapping
-    public ResponseEntity<List<CommentDTO>> getComments(
-            HttpServletRequest request,
-            @PathVariable Integer taskId
+    public ResponseEntity<PagedResponse<CommentDTO>> getComments(
+            @CurrentUserId Integer userId,
+            @PathVariable Integer taskId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
     ) {
-        var userId = tokenService.getUserIdFromRequest(request);
-        var comments = commentService.getCommentsByTask(taskId, userId);
-        return ResponseEntity.ok(comments);
+        var pageable = pageRequests.of(page, size);
+        return ResponseEntity.ok(PagedResponse.of(
+                commentService.getCommentsByTask(taskId, userId, pageable)));
     }
 
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<CommentDTO> addComment(
-            HttpServletRequest request,
+            @CurrentUserId Integer userId,
             @PathVariable Integer taskId,
             @RequestPart("content") String content,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments,
             @RequestParam(value = "parentCommentId", required = false) Integer parentCommentId
     ) {
-        var userId = tokenService.getUserIdFromRequest(request);
-        var createdComment = commentService.addComment(taskId, userId, content,
-                attachments, parentCommentId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdComment);
+        var created = commentService.addComment(taskId, userId, content, attachments, parentCommentId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PutMapping(value = "/{commentId}", consumes = {"multipart/form-data"})
     public ResponseEntity<CommentDTO> updateComment(
-            HttpServletRequest request,
+            @CurrentUserId Integer userId,
             @PathVariable Integer taskId,
             @PathVariable Integer commentId,
             @RequestPart("content") String content,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) {
-        var userId = tokenService.getUserIdFromRequest(request);
-        var updatedComment = commentService.updateComment(taskId, commentId, userId, content, attachments);
-        return ResponseEntity.ok(updatedComment);
+        return ResponseEntity.ok(
+                commentService.updateComment(taskId, commentId, userId, content, attachments));
     }
 
     @DeleteMapping("/{commentId}")
-    public ResponseEntity<Void> deleteComment(
-            HttpServletRequest request,
-            @PathVariable Integer taskId,
-            @PathVariable Integer commentId
-    ) {
-        var userId = tokenService.getUserIdFromRequest(request);
+    public ResponseEntity<Void> deleteComment(@CurrentUserId Integer userId,
+                                              @PathVariable Integer taskId,
+                                              @PathVariable Integer commentId) {
         commentService.deleteComment(taskId, commentId, userId);
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{commentId}/react")
-    public ResponseEntity<CommentDTO> reactToComment(
-            HttpServletRequest request,
-            @PathVariable Integer taskId,
-            @PathVariable Integer commentId,
-            @RequestParam("type") ReactionType reactionType
-    ) {
-        var userId = tokenService.getUserIdFromRequest(request);
-        var updatedComment = commentService.reactToComment(taskId, commentId, userId, reactionType);
-        return ResponseEntity.ok(updatedComment);
+    @PostMapping("/{commentId}/reactions")
+    public ResponseEntity<CommentDTO> reactToComment(@CurrentUserId Integer userId,
+                                                     @PathVariable Integer taskId,
+                                                     @PathVariable Integer commentId,
+                                                     @RequestParam("type") ReactionType reactionType) {
+        return ResponseEntity.ok(
+                commentService.reactToComment(taskId, commentId, userId, reactionType));
     }
 }

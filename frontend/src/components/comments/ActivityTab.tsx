@@ -2,9 +2,9 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { getTaskActivities } from '../../util/api';
 import { IconType } from 'react-icons';
-import { formatAssigneeName, splitFullName } from '../../util/helpers';
+import { formatAssigneeName, PRIORITY_CONFIG, splitFullName, STATUS_CONFIG } from '../../util/helpers';
 import Avatar from '../common/Avatar';
-import { Activity } from '../../types';
+import { Activity, ActivityType, TaskPriority, TaskStatus } from '../../types';
 import {
     HiOutlinePlus,
     HiOutlineSwitchHorizontal,
@@ -19,7 +19,7 @@ import {
     HiOutlineFlag,
 } from 'react-icons/hi';
 
-const TYPE_CONFIG: Record<string, { icon: IconType; color: string; bg: string }> = {
+const TYPE_CONFIG: Partial<Record<ActivityType, { icon: IconType; color: string; bg: string }>> = {
     CREATED:              { icon: HiOutlinePlus, color: 'text-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-900/40' },
     STATUS_CHANGED:       { icon: HiOutlineSwitchHorizontal, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/40' },
     PRIORITY_CHANGED:     { icon: HiOutlineFlag, color: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/40' },
@@ -37,22 +37,13 @@ const TYPE_CONFIG: Record<string, { icon: IconType; color: string; bg: string }>
 
 const FALLBACK = { icon: HiOutlineSwitchHorizontal, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-700' };
 
-const STATUS_LABELS: Record<string, string> = {
-    BACKLOG: 'Backlog', TODO: 'To Do', IN_PROGRESS: 'In Progress',
-    IN_TEST: 'In Test', TO_TEST: 'To Test', TO_REVIEW: 'To Review',
-    READY_TO_MERGE: 'Ready to Merge', READY_TO_DEPLOY: 'Ready to Deploy',
-    DONE: 'Done', RELEASED: 'Released', WITHDRAWN: 'Withdrawn',
-    GATHERING_INTEREST: 'Gathering Interest',
-};
-
-const PRIORITY_LABELS: Record<string, string> = {
-    LOWEST: 'Lowest', LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High', HIGHEST: 'Highest',
-};
+// Labels come from the shared status/priority config. This file used to re-type all seventeen of
+// them character-for-character, which is duplication waiting to drift.
 
 function formatValue(field: string, value: string | null | undefined) {
     if (!value || value === 'null') return null;
-    if (field === 'status') return STATUS_LABELS[value] || value;
-    if (field === 'priority') return PRIORITY_LABELS[value] || value;
+    if (field === 'status') return STATUS_CONFIG[value as TaskStatus]?.label ?? value;
+    if (field === 'priority') return PRIORITY_CONFIG[value as TaskPriority]?.label ?? value;
     if (field === 'progress') return `${value}%`;
     return value;
 }
@@ -121,12 +112,11 @@ export default function ActivityTab({ taskId }: { taskId: number }) {
         const requestId = ++requestIdRef.current;
         setLoading(true);
         try {
-            const data = await getTaskActivities(taskId);
+            const page = await getTaskActivities(taskId);
             if (requestId !== requestIdRef.current) return;
-            setActivities(data);
+            setActivities(page.content);
         } catch (err) {
             if (requestId !== requestIdRef.current) return;
-            console.error('Error fetching activities:', err);
         } finally {
             if (requestId === requestIdRef.current) setLoading(false);
         }

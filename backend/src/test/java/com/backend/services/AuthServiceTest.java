@@ -1,9 +1,16 @@
 package com.backend.services;
 
+import com.backend.TestEntityFactory;
+import com.backend.config.AppProperties;
+import com.backend.config.CookieProperties;
+import com.backend.config.PasswordEncoderConfig;
+import com.backend.dtos.LoginResponse;
 import com.backend.entities.User;
 import com.backend.exception.AuthorizationException;
+import com.backend.exception.TooManyAttemptsException;
 import com.backend.exception.ValidationException;
 import com.backend.requests.LoginRequest;
+import com.backend.web.CookieFactory;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,20 +19,50 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+/**
+ * Unit tests for {@link AuthService}. The password encoder and the rate limiter are real, so the
+ * throttling and the constant-time credential check are exercised rather than simulated; only the
+ * collaborators that reach the database or mint credentials are mocked.
+ */
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
+
+    private static final String EMAIL = "user@example.com";
+    private static final String OTHER_EMAIL = "someone.else@example.com";
+    private static final String PASSWORD = "TestPassword123!";
+    private static final String WRONG_PASSWORD = "WrongPassword123!";
+    private static final Integer USER_ID = 42;
+    private static final String CLIENT_IP = "203.0.113.7";
+    private static final String OTHER_IP = "198.51.100.9";
+
+    private static final String CREDENTIAL_ERROR = "Invalid email or password";
+    private static final String THROTTLE_ERROR = "Too many login attempts. Please try again later.";
 
     @Mock
     private UserService userService;
@@ -34,290 +71,467 @@ class AuthServiceTest {
     private TokenService tokenService;
 
     @Mock
-    private com.backend.services.RateLimitService rateLimitService;
-
-    @Mock
     private HttpServletRequest request;
 
     @Mock
     private HttpServletResponse response;
 
-    private AuthService authService;
-
-    private static final String TEST_EMAIL = "test@example.com";
-    private static final String TEST_PASSWORD = "TestPassword123!";
-    private static final Integer TEST_USER_ID = 1;
-
-    private User testUser;
     private BCryptPasswordEncoder passwordEncoder;
+    private AuthService authService;
+    private User user;
 
     @BeforeEach
     void setUp() {
-        passwordEncoder = new BCryptPasswordEncoder(12);
-        var cookieProperties = new com.backend.config.CookieProperties();
-        cookieProperties.setSecure(false);
-        cookieProperties.setSameSite("Strict");
-        var cookieFactory = new com.backend.util.CookieFactory(cookieProperties);
-        authService = new AuthService(userService, tokenService, rateLimitService, passwordEncoder, cookieFactory, "");
+        // Cost factor 4 keeps the suite fast; the timing test below uses a realistic cost.
+        passwordEncoder = new BCryptPasswordEncoder(4);
+        authService = authServiceWith(5, passwordEncoder);
 
-        testUser = new User();
-        testUser.setId(TEST_USER_ID);
-        testUser.setEmail(TEST_EMAIL);
-        testUser.setPassword(passwordEncoder.encode(TEST_PASSWORD));
-        testUser.setFirstname("Test");
-        testUser.setLastname("User");
+        user = TestEntityFactory.createUser(USER_ID, EMAIL);
+        user.setPassword(passwordEncoder.encode(PASSWORD));
+
+        lenient().when(request.getRemoteAddr()).thenReturn(CLIENT_IP);
     }
 
     @Nested
-    @DisplayName("authenticateUser")
-    class AuthenticateUserTests {
+    @DisplayName("authenticateUser: credentials")
+    class Credentials {
 
         @Test
-        @DisplayName("should return tokens for valid credentials")
-        void shouldReturnTokensForValidCredentials() {
-            when(userService.findUserByEmailOrNull(TEST_EMAIL)).thenReturn(testUser);
+        @DisplayName("returns the signed-in user's details together with the cookies issued for that user")
+        void returnsUserDetailsAndIssuedCookies() {
+            when(userService.findUserByEmailOrNull(EMAIL)).thenReturn(user);
+            var issued = authTokens("access-value", "refresh-value");
+            when(tokenService.createAuthTokens(USER_ID)).thenReturn(issued);
 
-            TokenService.AuthTokens mockTokens = new TokenService.AuthTokens(
-                    ResponseCookie.from("accessToken", "access-value").build(),
-                    ResponseCookie.from("refreshToken", "refresh-value").build()
-            );
-            when(tokenService.createAuthTokens(TEST_USER_ID)).thenReturn(mockTokens);
+            var result = authService.authenticateUser(new LoginRequest(EMAIL, PASSWORD), request);
 
-            LoginRequest loginReq = new LoginRequest(TEST_EMAIL, TEST_PASSWORD);
-            var result = authService.authenticateUser(loginReq, request);
+            assertThat(result.body())
+                    .isEqualTo(new LoginResponse("Login successful", USER_ID, EMAIL, "User 42"));
+            assertThat(result.tokens()).isSameAs(issued);
 
-            assertNotNull(result);
-            assertNotNull(result.tokens());
-            assertEquals("Login successful", result.body().get("message"));
-            assertEquals(TEST_USER_ID, result.body().get("userId"));
+            var userIdArg = ArgumentCaptor.forClass(Integer.class);
+            verify(tokenService).createAuthTokens(userIdArg.capture());
+            assertThat(userIdArg.getValue()).isEqualTo(USER_ID);
         }
 
         @Test
-        @DisplayName("should throw ValidationException for invalid password")
-        void shouldThrowForInvalidPassword() {
-            when(userService.findUserByEmailOrNull(TEST_EMAIL)).thenReturn(testUser);
+        @DisplayName("refuses a wrong password and issues no credentials")
+        void refusesWrongPassword() {
+            when(userService.findUserByEmailOrNull(EMAIL)).thenReturn(user);
 
-            LoginRequest loginReq = new LoginRequest(TEST_EMAIL, "WrongPassword123!");
+            assertThatThrownBy(() -> authService.authenticateUser(
+                    new LoginRequest(EMAIL, WRONG_PASSWORD), request))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage(CREDENTIAL_ERROR);
 
-            var ex = assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(loginReq, request));
-            assertEquals("Invalid email or password", ex.getMessage());
+            verifyNoInteractions(tokenService);
         }
 
         @Test
-        @DisplayName("should throw ValidationException for non-existent user without revealing user existence")
-        void shouldThrowForNonExistentUser() {
-            when(userService.findUserByEmailOrNull("nonexistent@example.com")).thenReturn(null);
+        @DisplayName("refuses an unknown email with the very same message, so accounts cannot be enumerated")
+        void refusesUnknownEmailIndistinguishably() {
+            when(userService.findUserByEmailOrNull(EMAIL)).thenReturn(user);
+            when(userService.findUserByEmailOrNull(OTHER_EMAIL)).thenReturn(null);
 
-            LoginRequest loginReq = new LoginRequest("nonexistent@example.com", TEST_PASSWORD);
+            var wrongPassword = catchLoginFailure(authService, new LoginRequest(EMAIL, WRONG_PASSWORD), request);
+            var unknownEmail = catchLoginFailure(authService, new LoginRequest(OTHER_EMAIL, PASSWORD), request);
 
-            var ex = assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(loginReq, request));
-            assertEquals("Invalid email or password", ex.getMessage());
+            assertThat(wrongPassword).isInstanceOf(ValidationException.class);
+            assertThat(unknownEmail).isInstanceOf(ValidationException.class);
+            assertThat(unknownEmail.getMessage())
+                    .isEqualTo(wrongPassword.getMessage())
+                    .isEqualTo(CREDENTIAL_ERROR);
+            verifyNoInteractions(tokenService);
+        }
+
+        @ParameterizedTest(name = "email=[{0}] password=[{1}]")
+        @CsvSource(nullValues = "NULL", value = {
+                "NULL, TestPassword123!",
+                "'', TestPassword123!",
+                "'   ', TestPassword123!",
+                "user@example.com, NULL",
+                "user@example.com, ''",
+                "user@example.com, '   '"
+        })
+        @DisplayName("refuses a missing or blank credential before looking any account up")
+        void refusesBlankCredentials(String email, String password) {
+            assertThatThrownBy(() -> authService.authenticateUser(new LoginRequest(email, password), request))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Email and password are required");
+
+            verifyNoInteractions(userService, tokenService);
+        }
+
+        @ParameterizedTest(name = "email=[{0}]")
+        @ValueSource(strings = {"not-an-email", "user@", "@example.com", "user@example", "a..b@example.com"})
+        @DisplayName("refuses a malformed email before looking any account up")
+        void refusesMalformedEmail(String email) {
+            assertThatThrownBy(() -> authService.authenticateUser(new LoginRequest(email, PASSWORD), request))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Invalid email format");
+
+            verifyNoInteractions(userService, tokenService);
+        }
+    }
+
+    @Nested
+    @DisplayName("authenticateUser: timing-attack resistance")
+    class TimingAttackResistance {
+
+        /** The encoder the application actually wires in, so its real cost factor is used here. */
+        private static final BCryptPasswordEncoder PRODUCTION_ENCODER =
+                new PasswordEncoderConfig().passwordEncoder();
+
+        @Test
+        @DisplayName("still runs a bcrypt comparison, at the application's own cost factor, when the email is unknown")
+        void hashesAgainstDummyHashForUnknownEmail() {
+            var encoder = mock(BCryptPasswordEncoder.class);
+            when(encoder.matches(anyString(), anyString())).thenReturn(false);
+            when(userService.findUserByEmailOrNull(OTHER_EMAIL)).thenReturn(null);
+            var service = new AuthService(userService, tokenService, rateLimiter(5), encoder);
+
+            assertThatThrownBy(() -> service.authenticateUser(
+                    new LoginRequest(OTHER_EMAIL, PASSWORD), request))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage(CREDENTIAL_ERROR);
+
+            var raw = ArgumentCaptor.forClass(String.class);
+            var hash = ArgumentCaptor.forClass(String.class);
+            verify(encoder).matches(raw.capture(), hash.capture());
+            assertThat(raw.getValue()).isEqualTo(PASSWORD);
+            // A full-length bcrypt hash whose cost factor matches the configured encoder's, so the
+            // wasted comparison takes as long as a comparison against a real account would.
+            assertThat(hash.getValue())
+                    .hasSize(60)
+                    .startsWith(costPrefix(PRODUCTION_ENCODER.encode(PASSWORD)));
         }
 
         @Test
-        @DisplayName("should throw ValidationException for empty email")
-        void shouldThrowForEmptyEmail() {
-            LoginRequest loginReq = new LoginRequest("", TEST_PASSWORD);
+        @DisplayName("rejects a wrong password and an unknown email in comparable time")
+        void takesComparableTimeForBothFailures() {
+            var realUser = TestEntityFactory.createUser(USER_ID, EMAIL);
+            realUser.setPassword(PRODUCTION_ENCODER.encode(PASSWORD));
+            when(userService.findUserByEmailOrNull(EMAIL)).thenReturn(realUser);
+            when(userService.findUserByEmailOrNull(OTHER_EMAIL)).thenReturn(null);
+            var service = new AuthService(userService, tokenService, rateLimiter(1_000),
+                    PRODUCTION_ENCODER);
 
-            assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(loginReq, request)
-            );
-        }
+            var wrongPassword = new LoginRequest(EMAIL, WRONG_PASSWORD);
+            var unknownEmail = new LoginRequest(OTHER_EMAIL, WRONG_PASSWORD);
+            // One warm-up round each, so JIT compilation is not charged to the first sample.
+            timeFailure(service, wrongPassword);
+            timeFailure(service, unknownEmail);
 
-        @Test
-        @DisplayName("should throw ValidationException for null password")
-        void shouldThrowForNullPassword() {
-            LoginRequest loginReq = new LoginRequest(TEST_EMAIL, null);
-
-            assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(loginReq, request)
-            );
-        }
-
-        @Test
-        @DisplayName("should throw ValidationException for invalid email format")
-        void shouldThrowForInvalidEmailFormat() {
-            LoginRequest loginReq = new LoginRequest("not-an-email", TEST_PASSWORD);
-
-            assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(loginReq, request)
-            );
-        }
-
-        @Test
-        @DisplayName("should throw ValidationException for whitespace-only email")
-        void shouldThrowForWhitespaceEmail() {
-            LoginRequest loginReq = new LoginRequest("   ", TEST_PASSWORD);
-
-            assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(loginReq, request)
-            );
-        }
-
-        @Test
-        @DisplayName("should throw ValidationException for whitespace-only password")
-        void shouldThrowForWhitespacePassword() {
-            LoginRequest loginReq = new LoginRequest(TEST_EMAIL, "   ");
-
-            assertThrows(ValidationException.class, () ->
-                    authService.authenticateUser(loginReq, request)
-            );
-        }
-
-        @Test
-        @DisplayName("timing attack resistance - should take similar time for existing and non-existing users")
-        void shouldBeTimingAttackResistant() {
-            when(userService.findUserByEmailOrNull(TEST_EMAIL)).thenReturn(testUser);
-            when(userService.findUserByEmailOrNull("nonexistent@example.com")).thenReturn(null);
-
-            // Run multiple iterations to get average time
-            int iterations = 5;
-            long existingUserTotalTime = 0;
-            long nonExistingUserTotalTime = 0;
-
-            for (int i = 0; i < iterations; i++) {
-                // Time for existing user with wrong password
-                long startExisting = System.nanoTime();
-                assertThrows(ValidationException.class, () ->
-                        authService.authenticateUser(new LoginRequest(TEST_EMAIL, "WrongPassword123!"), request));
-                existingUserTotalTime += System.nanoTime() - startExisting;
-
-                // Time for non-existing user
-                long startNonExisting = System.nanoTime();
-                assertThrows(ValidationException.class, () ->
-                        authService.authenticateUser(new LoginRequest("nonexistent@example.com", "WrongPassword123!"), request));
-                nonExistingUserTotalTime += System.nanoTime() - startNonExisting;
+            var samples = 3;
+            var wrongPasswordTimes = new long[samples];
+            var unknownEmailTimes = new long[samples];
+            for (int i = 0; i < samples; i++) {
+                wrongPasswordTimes[i] = timeFailure(service, wrongPassword);
+                unknownEmailTimes[i] = timeFailure(service, unknownEmail);
             }
 
-            long avgExisting = existingUserTotalTime / iterations;
-            long avgNonExisting = nonExistingUserTotalTime / iterations;
+            double slower = Math.max(median(wrongPasswordTimes), median(unknownEmailTimes));
+            double faster = Math.min(median(wrongPasswordTimes), median(unknownEmailTimes));
+            assertThat(slower / faster)
+                    .as("median time for a wrong password vs an unknown email")
+                    .isLessThan(2.0);
+        }
 
-            // Times should be within 50% of each other (BCrypt hashing dominates)
-            double ratio = (double) Math.max(avgExisting, avgNonExisting) / Math.min(avgExisting, avgNonExisting);
-            assertTrue(ratio < 2.0, "Timing difference too large: ratio = " + ratio);
+        private long timeFailure(AuthService service, LoginRequest login) {
+            var start = System.nanoTime();
+            assertThat(catchLoginFailure(service, login, request)).isInstanceOf(ValidationException.class);
+            return System.nanoTime() - start;
+        }
+
+        private static double median(long[] samples) {
+            var sorted = samples.clone();
+            Arrays.sort(sorted);
+            return sorted[sorted.length / 2];
+        }
+
+        /** The {@code $2a$NN$} prefix of a bcrypt hash, i.e. its algorithm and cost factor. */
+        private static String costPrefix(String bcryptHash) {
+            return bcryptHash.substring(0, bcryptHash.indexOf('$', 4) + 1);
+        }
+    }
+
+    @Nested
+    @DisplayName("authenticateUser: rate limiting")
+    class RateLimiting {
+
+        private static final int LIMIT = 3;
+
+        private AuthService throttled;
+
+        @BeforeEach
+        void useATightLimit() {
+            throttled = authServiceWith(LIMIT, passwordEncoder);
+        }
+
+        @Test
+        @DisplayName("throttles further attempts once the limit for one (client, email) pair is used up")
+        void throttlesAfterTheConfiguredNumberOfAttempts() {
+            when(userService.findUserByEmailOrNull(EMAIL)).thenReturn(user);
+            var wrongPassword = new LoginRequest(EMAIL, WRONG_PASSWORD);
+
+            exhaust(wrongPassword, request);
+
+            assertThatThrownBy(() -> throttled.authenticateUser(wrongPassword, request))
+                    .isInstanceOf(TooManyAttemptsException.class)
+                    .hasMessage(THROTTLE_ERROR);
+            // A throttled attempt is rejected before the account is even looked up.
+            verify(userService, times(LIMIT)).findUserByEmailOrNull(EMAIL);
+        }
+
+        @Test
+        @DisplayName("keys the limit by email too, so flooding one account leaves the others usable from that client")
+        void oneFloodedAccountDoesNotBlockAnother() {
+            when(userService.findUserByEmailOrNull(EMAIL)).thenReturn(user);
+            when(userService.findUserByEmailOrNull(OTHER_EMAIL)).thenReturn(null);
+
+            exhaust(new LoginRequest(EMAIL, WRONG_PASSWORD), request);
+
+            assertThat(catchLoginFailure(throttled, new LoginRequest(OTHER_EMAIL, WRONG_PASSWORD), request))
+                    .as("a different account from the same client must still be evaluated")
+                    .isInstanceOf(ValidationException.class);
+        }
+
+        @Test
+        @DisplayName("keys the limit by client too, so one flooded address cannot lock the account out everywhere")
+        void oneFloodedClientDoesNotLockTheAccountOut() {
+            when(userService.findUserByEmailOrNull(EMAIL)).thenReturn(user);
+            var attacker = requestFrom(OTHER_IP);
+            var wrongPassword = new LoginRequest(EMAIL, WRONG_PASSWORD);
+
+            exhaust(wrongPassword, attacker);
+            assertThat(catchLoginFailure(throttled, wrongPassword, attacker))
+                    .isInstanceOf(TooManyAttemptsException.class);
+
+            assertThat(catchLoginFailure(throttled, wrongPassword, request))
+                    .as("the legitimate client must still be evaluated")
+                    .isInstanceOf(ValidationException.class);
+        }
+
+        @Test
+        @DisplayName("a successful login clears the counter for that (client, email) pair only")
+        void successResetsOnlyItsOwnCounter() {
+            when(userService.findUserByEmailOrNull(EMAIL)).thenReturn(user);
+            when(tokenService.createAuthTokens(USER_ID)).thenReturn(authTokens("access", "refresh"));
+            var attacker = requestFrom(OTHER_IP);
+            var wrongPassword = new LoginRequest(EMAIL, WRONG_PASSWORD);
+
+            exhaust(wrongPassword, attacker);
+            assertThat(catchLoginFailure(throttled, wrongPassword, attacker))
+                    .isInstanceOf(TooManyAttemptsException.class);
+
+            // Two failures, then a success, from the legitimate client.
+            assertThat(catchLoginFailure(throttled, wrongPassword, request)).isInstanceOf(ValidationException.class);
+            assertThat(catchLoginFailure(throttled, wrongPassword, request)).isInstanceOf(ValidationException.class);
+            assertThat(throttled.authenticateUser(new LoginRequest(EMAIL, PASSWORD), request)).isNotNull();
+
+            // Its counter started over, so a full run of attempts is allowed again...
+            exhaust(wrongPassword, request);
+            // ...while the flooding address stays locked out.
+            assertThat(catchLoginFailure(throttled, wrongPassword, attacker))
+                    .as("the reset must not clear another client's counter")
+                    .isInstanceOf(TooManyAttemptsException.class);
+        }
+
+        private void exhaust(LoginRequest login, HttpServletRequest from) {
+            for (int attempt = 1; attempt <= LIMIT; attempt++) {
+                assertThat(catchLoginFailure(throttled, login, from))
+                        .as("attempt %d must be evaluated, not throttled", attempt)
+                        .isInstanceOf(ValidationException.class);
+            }
         }
     }
 
     @Nested
     @DisplayName("refreshAccessToken")
-    class RefreshAccessTokenTests {
+    class RefreshAccessToken {
 
         @Test
-        @DisplayName("should return new tokens for valid refresh token")
-        void shouldReturnNewTokensForValidRefreshToken() {
-            Cookie refreshCookie = new Cookie("refreshToken", "valid-refresh-token");
-            when(request.getCookies()).thenReturn(new Cookie[]{refreshCookie});
-            when(tokenService.validateRefreshToken("valid-refresh-token")).thenReturn(TEST_USER_ID);
+        @DisplayName("rotates the presented refresh token and re-issues both cookies for the rotated one")
+        void rotatesAndReissuesCookies() {
+            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie("refreshToken", "presented")});
+            when(tokenService.rotateRefreshToken("presented"))
+                    .thenReturn(TokenService.RotationResult.rotated(USER_ID, "rotated"));
+            var reissued = authTokens("new-access", "rotated");
+            when(tokenService.buildCookies(USER_ID, "rotated")).thenReturn(reissued);
 
-            TokenService.AuthTokens mockTokens = new TokenService.AuthTokens(
-                    ResponseCookie.from("accessToken", "new-access").build(),
-                    ResponseCookie.from("refreshToken", "new-refresh").build()
-            );
-            when(tokenService.createAuthTokens(TEST_USER_ID)).thenReturn(mockTokens);
+            assertThat(authService.refreshAccessToken(request)).isSameAs(reissued);
 
-            var tokens = authService.refreshAccessToken(request);
-
-            assertNotNull(tokens);
-            assertNotNull(tokens.accessCookie());
-            assertNotNull(tokens.refreshCookie());
+            var userId = ArgumentCaptor.forClass(Integer.class);
+            var refreshValue = ArgumentCaptor.forClass(String.class);
+            verify(tokenService).buildCookies(userId.capture(), refreshValue.capture());
+            assertThat(userId.getValue()).isEqualTo(USER_ID);
+            assertThat(refreshValue.getValue())
+                    .as("the new cookie must carry the rotated token, not the one just consumed")
+                    .isEqualTo("rotated")
+                    .isNotEqualTo("presented");
         }
 
         @Test
-        @DisplayName("should throw when refresh token cookie is missing")
-        void shouldThrowWhenCookieMissing() {
+        @DisplayName("picks the refreshToken cookie out from among the other cookies")
+        void findsTheRefreshCookieAmongOthers() {
+            when(request.getCookies()).thenReturn(new Cookie[]{
+                    new Cookie("accessToken", "some-access-token"),
+                    new Cookie("refreshToken", "the-refresh-token"),
+                    new Cookie("otherCookie", "other-value")
+            });
+            when(tokenService.rotateRefreshToken("the-refresh-token"))
+                    .thenReturn(TokenService.RotationResult.rotated(USER_ID, "rotated"));
+            when(tokenService.buildCookies(USER_ID, "rotated")).thenReturn(authTokens("a", "rotated"));
+
+            assertThat(authService.refreshAccessToken(request)).isNotNull();
+
+            var presented = ArgumentCaptor.forClass(String.class);
+            verify(tokenService).rotateRefreshToken(presented.capture());
+            assertThat(presented.getValue()).isEqualTo("the-refresh-token");
+        }
+
+        @Test
+        @DisplayName("turns a failed rotation into a 401 that carries the rotation's own reason")
+        void failedRotationBecomesAuthorizationException() {
+            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie("refreshToken", "stale")});
+            when(tokenService.rotateRefreshToken("stale"))
+                    .thenReturn(TokenService.RotationResult.failed("Session expired. Please sign in again."));
+
+            assertThatThrownBy(() -> authService.refreshAccessToken(request))
+                    .isInstanceOf(AuthorizationException.class)
+                    .hasMessage("Session expired. Please sign in again.");
+
+            verify(tokenService, never()).buildCookies(any(), any());
+        }
+
+        @Test
+        @DisplayName("does not attempt a rotation when the request carries no cookies at all")
+        void refusesWithoutARefreshCookie() {
             when(request.getCookies()).thenReturn(null);
 
-            var ex = assertThrows(AuthorizationException.class, () ->
-                    authService.refreshAccessToken(request));
-            assertEquals("Refresh token not provided", ex.getMessage());
+            assertThatThrownBy(() -> authService.refreshAccessToken(request))
+                    .isInstanceOf(AuthorizationException.class)
+                    .hasMessage("Refresh token not provided");
+
+            verifyNoInteractions(tokenService);
         }
 
         @Test
-        @DisplayName("should throw when refresh token is invalid")
-        void shouldThrowWhenTokenInvalid() {
-            Cookie refreshCookie = new Cookie("refreshToken", "invalid-token");
-            when(request.getCookies()).thenReturn(new Cookie[]{refreshCookie});
-            when(tokenService.validateRefreshToken("invalid-token")).thenReturn(null);
-
-            var ex = assertThrows(AuthorizationException.class, () ->
-                    authService.refreshAccessToken(request));
-            assertEquals("Invalid or expired refresh token", ex.getMessage());
-        }
-
-        @Test
-        @DisplayName("should throw when no refreshToken cookie among multiple cookies")
-        void shouldThrowWhenNoRefreshTokenCookie() {
-            Cookie[] cookies = {
+        @DisplayName("does not attempt a rotation when only other cookies were sent")
+        void refusesWhenOnlyOtherCookiesArePresent() {
+            when(request.getCookies()).thenReturn(new Cookie[]{
                     new Cookie("accessToken", "some-access-token"),
                     new Cookie("otherCookie", "other-value")
-            };
-            when(request.getCookies()).thenReturn(cookies);
+            });
 
-            assertThrows(AuthorizationException.class, () ->
-                    authService.refreshAccessToken(request));
-        }
+            assertThatThrownBy(() -> authService.refreshAccessToken(request))
+                    .isInstanceOf(AuthorizationException.class)
+                    .hasMessage("Refresh token not provided");
 
-        @Test
-        @DisplayName("should find refresh token among multiple cookies")
-        void shouldFindRefreshTokenAmongMultipleCookies() {
-            Cookie[] cookies = {
-                    new Cookie("accessToken", "some-access-token"),
-                    new Cookie("refreshToken", "valid-refresh-token"),
-                    new Cookie("otherCookie", "other-value")
-            };
-            when(request.getCookies()).thenReturn(cookies);
-            when(tokenService.validateRefreshToken("valid-refresh-token")).thenReturn(TEST_USER_ID);
-
-            TokenService.AuthTokens mockTokens = new TokenService.AuthTokens(
-                    ResponseCookie.from("accessToken", "new-access").build(),
-                    ResponseCookie.from("refreshToken", "new-refresh").build()
-            );
-            when(tokenService.createAuthTokens(TEST_USER_ID)).thenReturn(mockTokens);
-
-            var tokens = authService.refreshAccessToken(request);
-
-            assertNotNull(tokens);
+            verifyNoInteractions(tokenService);
         }
     }
 
     @Nested
     @DisplayName("logoutUser")
-    class LogoutUserTests {
+    class LogoutUser {
 
         @Test
-        @DisplayName("should revoke only the presented refresh token and delete cookies")
-        void shouldRevokeTokensAndDeleteCookies() {
-            var refreshCookie = new jakarta.servlet.http.Cookie("refreshToken", "device-token");
-            when(request.getCookies()).thenReturn(new jakarta.servlet.http.Cookie[]{refreshCookie});
+        @DisplayName("revokes the presented refresh token and sends both deletion cookies")
+        void revokesThisDeviceAndClearsCookies() {
+            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie("refreshToken", "device-token")});
+            stubDeletionCookies();
 
             authService.logoutUser(request, response);
 
-            verify(tokenService).deleteRefreshToken("device-token"); // per-device, not all sessions
-            verify(response).setHeader(eq(HttpHeaders.SET_COOKIE), contains("accessToken"));
-            verify(response).addHeader(eq(HttpHeaders.SET_COOKIE), contains("refreshToken"));
+            var revoked = ArgumentCaptor.forClass(String.class);
+            verify(tokenService).revokeRefreshToken(revoked.capture());
+            assertThat(revoked.getValue()).isEqualTo("device-token");
+            // Signing out one device must not end the user's sessions elsewhere.
+            verify(tokenService, never()).revokeAllSessionsForUser(any());
+
+            assertThat(setCookieHeaders())
+                    .anySatisfy(header -> assertThat(header).contains("accessToken=").contains("Max-Age=0"))
+                    .anySatisfy(header -> assertThat(header).contains("refreshToken=").contains("Max-Age=0"));
         }
 
         @Test
-        @DisplayName("should delete cookies even when no refresh token is present")
-        void shouldDeleteCookiesWhenNoRefreshToken() {
+        @DisplayName("adds each deletion cookie as its own header, so neither overwrites the other")
+        void addsBothCookiesAsSeparateHeaders() {
+            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie("refreshToken", "device-token")});
+            stubDeletionCookies();
+
+            authService.logoutUser(request, response);
+
+            assertThat(setCookieHeaders()).hasSize(2);
+            verify(response, never()).setHeader(anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("still clears the cookies when the request carried no refresh token")
+        void clearsCookiesWithoutARefreshToken() {
             when(request.getCookies()).thenReturn(null);
+            stubDeletionCookies();
 
             authService.logoutUser(request, response);
 
-            verify(tokenService, never()).deleteRefreshToken(any());
-            verify(response).setHeader(eq(HttpHeaders.SET_COOKIE), contains("accessToken"));
-            verify(response).addHeader(eq(HttpHeaders.SET_COOKIE), contains("refreshToken"));
+            verify(tokenService, never()).revokeRefreshToken(any());
+            assertThat(setCookieHeaders()).hasSize(2);
         }
 
-        @Test
-        @DisplayName("should set maxAge to 0 for deleted cookies")
-        void shouldSetMaxAgeToZero() {
-            authService.logoutUser(request, response);
-
-            verify(response).setHeader(eq(HttpHeaders.SET_COOKIE), contains("Max-Age=0"));
-            verify(response).addHeader(eq(HttpHeaders.SET_COOKIE), contains("Max-Age=0"));
+        private void stubDeletionCookies() {
+            var cookieFactory = new CookieFactory(cookieProperties());
+            when(tokenService.accessCookieDeletion()).thenReturn(cookieFactory.deletion("accessToken", true));
+            when(tokenService.refreshCookieDeletion()).thenReturn(cookieFactory.deletion("refreshToken", true));
         }
+
+        private List<String> setCookieHeaders() {
+            var headers = ArgumentCaptor.forClass(String.class);
+            verify(response, times(2)).addHeader(eq(HttpHeaders.SET_COOKIE), headers.capture());
+            return headers.getAllValues();
+        }
+    }
+
+    // ======================== helpers ========================
+
+    private AuthService authServiceWith(int loginLimit, BCryptPasswordEncoder encoder) {
+        return new AuthService(userService, tokenService, rateLimiter(loginLimit), encoder);
+    }
+
+    private static RateLimitService rateLimiter(int loginLimit) {
+        var appProperties = new AppProperties();
+        appProperties.getRateLimit().setLogin(loginLimit);
+        return new RateLimitService(appProperties);
+    }
+
+    private static CookieProperties cookieProperties() {
+        var cookieProperties = new CookieProperties();
+        cookieProperties.setSecure(false);
+        cookieProperties.setSameSite("Strict");
+        return cookieProperties;
+    }
+
+    private static TokenService.AuthTokens authTokens(String accessValue, String refreshValue) {
+        var cookieFactory = new CookieFactory(cookieProperties());
+        return new TokenService.AuthTokens(
+                cookieFactory.build("accessToken", accessValue, Duration.ofMinutes(15), true),
+                cookieFactory.build("refreshToken", refreshValue, Duration.ofDays(7), true));
+    }
+
+    /** Runs a login that is expected to be refused and returns the exception it was refused with. */
+    private static Throwable catchLoginFailure(AuthService service, LoginRequest login,
+                                               HttpServletRequest from) {
+        try {
+            service.authenticateUser(login, from);
+            throw new AssertionError("expected the login to be refused, but it succeeded");
+        } catch (RuntimeException expected) {
+            return expected;
+        }
+    }
+
+    private static HttpServletRequest requestFrom(String clientIp) {
+        var other = mock(HttpServletRequest.class);
+        when(other.getRemoteAddr()).thenReturn(clientIp);
+        return other;
     }
 }

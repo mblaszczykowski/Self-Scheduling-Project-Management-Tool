@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { getImageUrl, getAvatarColor, getAvatarInitials } from '../../util/helpers';
-import { User } from '../../types';
+import { AvatarSubject, getAvatarColor, getAvatarInitials, getImageUrl } from '../../util/helpers';
 
-type AvatarSize = 'xs' | 'sm' | 'md' | 'lg';
+export type AvatarSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg';
 
+// `sm` and `md` used to be the same box, so a caller asking for `md` silently got `sm`.
 const sizeMap: Record<AvatarSize, { container: string; text: string }> = {
+    xxs: { container: 'h-4 w-4', text: 'text-[8px]' },
     xs: { container: 'h-5 w-5', text: 'text-[10px]' },
     sm: { container: 'h-7 w-7', text: 'text-[10px]' },
-    md: { container: 'h-7 w-7', text: 'text-xs' },
+    md: { container: 'h-8 w-8', text: 'text-xs' },
     lg: { container: 'h-20 w-20', text: 'text-2xl' },
 };
 
+
 interface AvatarProps {
-    user?: User | { firstname?: string; lastname?: string } | null;
+    user?: AvatarSubject | null;
     profilePicture?: string | null;
     size?: AvatarSize;
     className?: string;
@@ -22,8 +24,8 @@ interface AvatarProps {
 const Avatar = ({ user, profilePicture, size = 'sm', className = '', onError: externalOnError }: AvatarProps) => {
     const [hasError, setHasError] = useState(false);
 
-    const pic = profilePicture ?? (user as User)?.profilePicture;
-    const { container, text } = sizeMap[size] || sizeMap.sm;
+    const pic = profilePicture ?? user?.profilePicture;
+    const { container, text } = sizeMap[size];
 
     // A new image source should get a fresh chance to load (e.g. after a
     // profile-picture change on an already-mounted Avatar).
@@ -35,14 +37,14 @@ const Avatar = ({ user, profilePicture, size = 'sm', className = '', onError: ex
     };
 
     if (pic && !hasError) {
-        const src = pic.startsWith?.('blob:') || pic.startsWith?.('http')
+        const src = pic.startsWith('blob:') || pic.startsWith('http')
             ? pic
             : getImageUrl(pic);
 
         return (
             <img
                 src={src}
-                alt={user?.firstname ? `${user.firstname} ${user.lastname || ''}`.trim() : ''}
+                alt={user?.firstname ? `${user.firstname} ${user.lastname ?? ''}`.trim() : ''}
                 className={`${container} rounded-full object-cover ${className}`}
                 onError={handleError}
             />

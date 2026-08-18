@@ -1,8 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
-import { simulateOptimization, applyOptimization } from '../util/api';
-import { showToast } from '../util/toast';
+import { useCallback, useEffect, useState } from 'react';
+import { applyOptimization, simulateOptimization } from '../util/api';
 import { getErrorMessage } from '../util/helpers';
-import { Project, OptimizationResult, OptimizationSuggestion } from '../types';
+import { showToast } from '../util/toast';
+import { OptimizationResult, OptimizationSuggestion, ProcessedProject } from '../types';
 
 export interface OptimizationState {
     loading: boolean;
@@ -10,6 +10,7 @@ export interface OptimizationState {
     result: OptimizationResult | null;
     showGhostBars: boolean;
     error: string | null;
+    /** Shifted suggestions by task key, for O(1) ghost-bar lookups while rendering the timeline. */
     suggestionMap: Map<string, OptimizationSuggestion> | null;
 }
 
@@ -18,33 +19,30 @@ const INITIAL_STATE: OptimizationState = {
     error: null, suggestionMap: null,
 };
 
-interface UseScheduleOptimizationOptions {
-    processedProjects: Project[];
-    projects: Project[];
-    refreshProjects: () => void;
+interface Options {
+    processedProjects: ProcessedProject[];
+    /** Invalidates the project cache after an applied schedule. */
+    onApplied: () => void | Promise<unknown>;
 }
 
-export function useScheduleOptimization({ processedProjects, projects, refreshProjects }: UseScheduleOptimizationOptions) {
+export function useScheduleOptimization({ processedProjects, onApplied }: Options) {
     const [optimization, setOptimization] = useState<OptimizationState>(INITIAL_STATE);
 
     const handleOptimize = useCallback(async () => {
-        setOptimization(prev => ({ ...prev, loading: true, error: null }));
+        setOptimization((previous) => ({ ...previous, loading: true, error: null }));
         try {
-            const projectKeys = processedProjects.map(p => p.projectKey);
-            const result: OptimizationResult = await simulateOptimization({ projectKeys, alpha: 0.8, beta: 0.2 });
+            const projectKeys = processedProjects.map((project) => project.projectKey);
+            // alpha/beta are omitted so the server's configured defaults apply; hard-coding them
+            // here made that configuration dead.
+            const result = await simulateOptimization({ projectKeys });
 
-            // Pre-build Map for O(1) ghost bar lookups in TimelineView
             const suggestionMap = new Map<string, OptimizationSuggestion>();
-            if (result?.suggestions) {
-                for (const s of result.suggestions) {
-                    if (s.wasShifted) suggestionMap.set(s.taskKey, s);
-                }
-            }
+            result.suggestions.filter((suggestion) => suggestion.wasShifted)
+                .forEach((suggestion) => suggestionMap.set(suggestion.taskKey, suggestion));
 
-            const shiftedCount = suggestionMap.size;
-            if (shiftedCount === 0) {
+            if (suggestionMap.size === 0) {
                 showToast('Schedule is already optimal — no changes needed.', 'info');
-                setOptimization(prev => ({ ...prev, loading: false }));
+                setOptimization((previous) => ({ ...previous, loading: false, result }));
                 return;
             }
 
@@ -53,40 +51,46 @@ export function useScheduleOptimization({ processedProjects, projects, refreshPr
                 error: null, suggestionMap,
             });
         } catch (err) {
-            const msg = getErrorMessage(err);
-            showToast(msg, 'error');
-            setOptimization(prev => ({ ...prev, loading: false, error: msg }));
+            const message = getErrorMessage(err);
+            showToast(message, 'error');
+            setOptimization((previous) => ({ ...previous, loading: false, error: message }));
         }
     }, [processedProjects]);
 
     const handleAcceptOptimization = useCallback(async () => {
-        if (!optimization.result?.suggestions) return;
-        setOptimization(prev => ({ ...prev, applying: true }));
+        const suggestionMap = optimization.suggestionMap;
+        if (!suggestionMap || suggestionMap.size === 0) return;
+
+        setOptimization((previous) => ({ ...previous, applying: true }));
         try {
-            await applyOptimization(optimization.result.suggestions);
+            // The server recomputes the schedule from these inputs rather than trusting dates the
+            // browser echoes back, so what is persisted is feasible by construction.
+            const { tasksUpdated } = await applyOptimization({
+                projectKeys: processedProjects.map((project) => project.projectKey),
+                acceptedTaskKeys: [...suggestionMap.keys()],
+            });
             setOptimization(INITIAL_STATE);
-            refreshProjects();
-            showToast('Schedule optimized successfully.', 'success');
+            await onApplied();
+            showToast(tasksUpdated > 0
+                ? `Rescheduled ${tasksUpdated} task${tasksUpdated === 1 ? '' : 's'}.`
+                : 'Nothing left to reschedule.', 'success');
         } catch (err) {
-            const msg = getErrorMessage(err);
-            showToast(msg, 'error');
-            setOptimization(prev => ({ ...prev, applying: false, error: msg }));
+            const message = getErrorMessage(err);
+            showToast(message, 'error');
+            setOptimization((previous) => ({ ...previous, applying: false, error: message }));
         }
-    }, [optimization.result, refreshProjects]);
+    }, [optimization.suggestionMap, processedProjects, onApplied]);
 
-    const handleRejectOptimization = useCallback(() => {
-        setOptimization(INITIAL_STATE);
-    }, []);
+    const handleRejectOptimization = useCallback(() => setOptimization(INITIAL_STATE), []);
 
-    // Clear optimization results when underlying data changes
+    // A proposal describes one particular arrangement of tasks; once that changes it is stale.
     useEffect(() => {
-        if (optimization.result) {
-            setOptimization(prev => ({
-                ...prev, result: null, showGhostBars: false, suggestionMap: null,
-            }));
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [projects]);
+        setOptimization((previous) => (previous.result
+            ? { ...previous, result: null, showGhostBars: false, suggestionMap: null }
+            : previous));
+    }, [processedProjects]);
 
     return { optimization, handleOptimize, handleAcceptOptimization, handleRejectOptimization };
 }
+
+export default useScheduleOptimization;

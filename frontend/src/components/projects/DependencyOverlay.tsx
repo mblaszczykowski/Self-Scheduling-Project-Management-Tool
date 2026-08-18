@@ -167,7 +167,6 @@ const DependencyOverlay = ({
     filteredTaskIds,
     filteredProjectKeys,
     hasActiveFilters,
-    projectKeyFilter,
 }: DependencyOverlayProps) => {
     const [arrows, setArrows] = useState<Arrow[]>([]);
     const [dims, setDims] = useState({ w: 0, h: 0 });
@@ -199,7 +198,6 @@ const DependencyOverlay = ({
             if (!filteredTaskIds.has(task.id)) continue;
             const proj = projectKeyToProject.get(task.projectKey);
             if (!proj || !expandedProjects[proj.projectKey]) continue;
-            if (projectKeyFilter && proj.projectKey !== projectKeyFilter) continue;
             if (!filteredProjectKeys.has(proj.projectKey) && hasActiveFilters) continue;
 
             const target = barMap.get(task.taskKey);
@@ -210,7 +208,6 @@ const DependencyOverlay = ({
                 if (!dep || !filteredTaskIds.has(dep.id)) continue;
                 const dp = projectKeyToProject.get(dep.projectKey);
                 if (!dp || !expandedProjects[dp.projectKey]) continue;
-                if (projectKeyFilter && dp.projectKey !== projectKeyFilter) continue;
                 if (!filteredProjectKeys.has(dp.projectKey) && hasActiveFilters) continue;
 
                 const source = barMap.get(depKey);
@@ -232,8 +229,7 @@ const DependencyOverlay = ({
         })));
         setDims({ w: el.scrollWidth, h: el.scrollHeight });
     }, [containerRef, allTasks, taskKeyMap, expandedProjects,
-        projectKeyToProject, filteredTaskIds, filteredProjectKeys,
-        hasActiveFilters, projectKeyFilter]);
+        projectKeyToProject, filteredTaskIds, filteredProjectKeys, hasActiveFilters]);
 
     useEffect(() => {
         const id = requestAnimationFrame(compute);

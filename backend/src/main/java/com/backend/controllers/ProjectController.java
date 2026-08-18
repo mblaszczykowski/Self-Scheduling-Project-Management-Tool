@@ -1,15 +1,13 @@
 package com.backend.controllers;
 
-import com.backend.config.AppProperties;
 import com.backend.dtos.PagedResponse;
 import com.backend.dtos.ProjectDTO;
 import com.backend.requests.ProjectRequest;
 import com.backend.services.ProjectService;
-import com.backend.services.TokenService;
-import com.backend.util.RequestValidator;
+import com.backend.web.CurrentUserId;
+import com.backend.web.PageRequests;
+import com.backend.web.RequestValidator;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,73 +20,64 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService projectService;
-    private final TokenService tokenService;
     private final RequestValidator requestValidator;
-    private final AppProperties appProperties;
+    private final PageRequests pageRequests;
 
-    public ProjectController(ProjectService projectService, TokenService tokenService,
-                             RequestValidator requestValidator, AppProperties appProperties) {
+    public ProjectController(ProjectService projectService,
+                             RequestValidator requestValidator,
+                             PageRequests pageRequests) {
         this.projectService = projectService;
-        this.tokenService = tokenService;
         this.requestValidator = requestValidator;
-        this.appProperties = appProperties;
+        this.pageRequests = pageRequests;
     }
 
+    /**
+     * Always paginated. The endpoint previously had two modes — paginated when {@code page} was
+     * present, the entire portfolio with every task otherwise — and no client ever sent
+     * {@code page}, so the unbounded branch was the only one that ran and the paginated one had
+     * never been executed at all.
+     */
     @GetMapping
-    public ResponseEntity<PagedResponse<ProjectDTO>> getAllProjects(
-            HttpServletRequest request,
+    public ResponseEntity<PagedResponse<ProjectDTO>> getProjects(
+            @CurrentUserId Integer userId,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false, defaultValue = "20") Integer size
+            @RequestParam(required = false) Integer size
     ) {
-        var userId = tokenService.getUserIdFromRequest(request);
-        if (page != null) {
-            var pageable = PageRequest.of(page, Math.min(size, appProperties.getPagination().getMaxSize()));
-            return ResponseEntity.ok(PagedResponse.of(projectService.getAllProjectsPaginated(userId, pageable)));
-        }
-        return ResponseEntity.ok(PagedResponse.ofList(projectService.getAllProjects(userId)));
+        var pageable = pageRequests.of(page, size);
+        return ResponseEntity.ok(PagedResponse.of(projectService.getProjects(userId, pageable)));
     }
 
     @GetMapping("/{projectKey}")
-    public ResponseEntity<ProjectDTO> getProject(
-            HttpServletRequest request,
-            @PathVariable String projectKey
-    ) {
-        var userId = tokenService.getUserIdFromRequest(request);
-        var project = projectService.getProjectByKey(projectKey, userId);
-        return ResponseEntity.ok(project);
+    public ResponseEntity<ProjectDTO> getProject(@CurrentUserId Integer userId,
+                                                 @PathVariable String projectKey) {
+        return ResponseEntity.ok(projectService.getProjectByKey(projectKey, userId));
     }
 
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<ProjectDTO> createProject(
-            HttpServletRequest request,
-            @RequestPart("projectDTO") String projectDTOStr,
+            @CurrentUserId Integer userId,
+            @RequestPart("projectDTO") String projectJson,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
-        var userId = tokenService.getUserIdFromRequest(request);
-        var projectRequest = requestValidator.parseAndValidate(projectDTOStr, ProjectRequest.class);
-        var createdProject = projectService.createProject(projectRequest, userId, attachments);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdProject);
+        var request = requestValidator.parseAndValidate(projectJson, ProjectRequest.class);
+        var created = projectService.createProject(request, userId, attachments);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PutMapping(value = "/{projectKey}", consumes = {"multipart/form-data"})
     public ResponseEntity<ProjectDTO> updateProject(
-            HttpServletRequest request,
+            @CurrentUserId Integer userId,
             @PathVariable String projectKey,
-            @RequestPart("projectDTO") String projectDTOStr,
+            @RequestPart("projectDTO") String projectJson,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws JsonProcessingException {
-        var userId = tokenService.getUserIdFromRequest(request);
-        var projectRequest = requestValidator.parseAndValidate(projectDTOStr, ProjectRequest.class);
-        var updatedProject = projectService.updateProject(projectKey, projectRequest, userId, attachments);
-        return ResponseEntity.ok(updatedProject);
+        var request = requestValidator.parseAndValidate(projectJson, ProjectRequest.class);
+        return ResponseEntity.ok(projectService.updateProject(projectKey, request, userId, attachments));
     }
 
     @DeleteMapping("/{projectKey}")
-    public ResponseEntity<Void> deleteProject(
-            HttpServletRequest request,
-            @PathVariable String projectKey
-    ) {
-        var userId = tokenService.getUserIdFromRequest(request);
+    public ResponseEntity<Void> deleteProject(@CurrentUserId Integer userId,
+                                              @PathVariable String projectKey) {
         projectService.deleteProject(projectKey, userId);
         return ResponseEntity.noContent().build();
     }

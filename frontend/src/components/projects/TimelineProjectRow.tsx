@@ -12,7 +12,6 @@ import { TimelineProjectRowProps } from './types';
 
 const TimelineProjectRow = ({
     project,
-    projectIndex,
     isExpanded,
     sidebarCollapsed,
     sidebarWidth,
@@ -20,13 +19,6 @@ const TimelineProjectRow = ({
     timelineWidth,
     hasActiveFilters,
     filteredTaskIds,
-    filteredProjectKeys,
-    projectRowOffsets,
-    taskKeyMap,
-    projectIndexMap,
-    projectKeyToProject,
-    expandedProjects,
-    projectKeyFilter,
     onToggleExpand,
     onOpenProjectModal,
     onOpenTaskModal,
@@ -65,8 +57,9 @@ const TimelineProjectRow = ({
                                 onClick={() => onToggleExpand(project.projectKey)}
                                 className={
                                     'w-9 h-9 flex items-center justify-center'
-                                    + ' rounded-lg bg-slate-100 hover:bg-slate-200'
-                                    + ' text-xs font-bold text-slate-700'
+                                    + ' rounded-lg bg-slate-100 dark:bg-slate-700'
+                                    + ' hover:bg-slate-200 dark:hover:bg-slate-600'
+                                    + ' text-xs font-bold text-slate-700 dark:text-slate-200'
                                 }
                                 title={project.summary}
                             >
@@ -144,7 +137,7 @@ const TimelineProjectRow = ({
                                     formatShortDate(project.projectDueDate)
                                 }`,
                                 progress: project.projectProgress,
-                                extra: `${project.tasks?.length || 0} tasks`
+                                extra: `${project.tasks.length} tasks`
                             })}
                             onMouseMove={onTooltipMove}
                             onMouseLeave={onTooltipHide}

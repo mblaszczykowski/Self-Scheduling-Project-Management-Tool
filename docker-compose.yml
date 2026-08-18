@@ -2,45 +2,74 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: flowlink
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-flowlink}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    # The database port is deliberately not published. Only the backend needs it, and it
+    # reaches the container over the compose network. To attach psql or a GUI client from the
+    # host, publish it for that session only:
+    #   docker compose run --rm --publish 5432:5432 db
+    # or add a local, uncommitted docker-compose.override.yml with a ports mapping.
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d flowlink"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-flowlink}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   backend:
     build: ./backend
-    ports:
-      - "8080:8080"
     environment:
-      DATABASE_URL: jdbc:postgresql://db:5432/flowlink
-      DATABASE_USER: postgres
-      DATABASE_PASSWORD: postgres
-      JWT_SECRET: flowlink-dev-secret-key-minimum-32-chars
-      CORS_ORIGIN: http://localhost
-      COOKIE_SECURE: "false"
+      DATABASE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-flowlink}
+      DATABASE_USER: ${POSTGRES_USER:-postgres}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Mandatory. The application refuses to start without it; there is no default.
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (min 32 chars)}
+      # Origin the browser loads the app from. Behind the bundled nginx this is the site root.
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost}
+      # Secure cookies are the default and the correct production value. Set COOKIE_SECURE=false
+      # in .env only for a plain-HTTP localhost stack, where the browser would otherwise drop the
+      # auth cookies entirely.
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      # Outbound mail is off by default; the invitation flow degrades to in-app notifications.
+      APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-false}
+      MAIL_FROM: ${MAIL_FROM:-noreply@example.com}
+      MAIL_HOST: ${MAIL_HOST:-smtp-relay.brevo.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      # No SPRING_PROFILES_ACTIVE: application.properties already carries the safe defaults
+      # (Flyway on, ddl-auto=validate, secure cookies), so there is no profile to activate.
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
     volumes:
       - uploads:/app/uploads
+    restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       args:
+        # Empty on purpose: the bundle then issues same-origin relative requests, which nginx
+        # proxies to the backend. Setting an absolute URL here bakes a hostname into the build
+        # and bypasses the proxy.
         REACT_APP_API_URL: ""
     ports:
-      - "80:80"
+      - "${HTTP_PORT:-80}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pgdata:

@@ -1,15 +1,22 @@
 package com.backend.services;
 
 import com.backend.dtos.TaskActivityDTO;
-import com.backend.entities.*;
+import com.backend.entities.Task;
+import com.backend.entities.TaskActivity;
+import com.backend.entities.TaskActivityType;
+import com.backend.entities.User;
+import com.backend.mapper.EntityMapper;
 import com.backend.repositories.TaskActivityRepository;
-import com.backend.util.EntityMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
+/** Records what changed on a task, who changed it, and when. */
 @Service
 public class TaskActivityService {
 
@@ -22,95 +29,109 @@ public class TaskActivityService {
     }
 
     @Transactional(readOnly = true)
-    public List<TaskActivityDTO> getActivitiesForTask(Integer taskId) {
-        return taskActivityRepository.findByTaskIdWithAuthor(taskId).stream()
-                .map(this::convertToDTO)
-                .toList();
+    public Page<TaskActivityDTO> getActivitiesForTask(Integer taskId, Pageable pageable) {
+        return taskActivityRepository.findByTaskIdWithAuthor(taskId, pageable)
+                .map(entityMapper::toTaskActivityDTO);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void logCreated(Task task, User author) {
-        save(new TaskActivity(task, author, TaskActivityType.CREATED, null, null, null));
+        save(task, author, TaskActivityType.CREATED, null, null, null);
     }
 
+    /** Diffs two snapshots and writes one row per field that actually changed. */
     @Transactional(rollbackFor = Exception.class)
-    public void logFieldChanges(Task task, User author,
-                                TaskStatus oldStatus, TaskStatus newStatus,
-                                TaskPriority oldPriority, TaskPriority newPriority,
-                                String oldAssignee, String newAssignee,
-                                Integer oldProgress, Integer newProgress,
-                                String oldStartDate, String newStartDate,
-                                String oldDueDate, String newDueDate,
-                                String oldSummary, String newSummary,
-                                String oldLabels, String newLabels,
-                                String oldDeps, String newDeps) {
-        if (!Objects.equals(oldStatus, newStatus)) {
-            save(new TaskActivity(task, author, TaskActivityType.STATUS_CHANGED, "status",
-                    formatEnum(oldStatus), formatEnum(newStatus)));
+    public void logFieldChanges(Task task, User author, TaskSnapshot before, TaskSnapshot after) {
+        if (author == null || before == null || after == null) {
+            return;
         }
-        if (!Objects.equals(oldPriority, newPriority)) {
-            save(new TaskActivity(task, author, TaskActivityType.PRIORITY_CHANGED, "priority",
-                    formatEnum(oldPriority), formatEnum(newPriority)));
-        }
-        if (!Objects.equals(oldAssignee, newAssignee)) {
-            save(new TaskActivity(task, author, TaskActivityType.ASSIGNEE_CHANGED, "assignee",
-                    oldAssignee, newAssignee));
-        }
-        if (!Objects.equals(oldProgress, newProgress)) {
-            save(new TaskActivity(task, author, TaskActivityType.PROGRESS_CHANGED, "progress",
-                    String.valueOf(oldProgress), String.valueOf(newProgress)));
-        }
-        if (!Objects.equals(oldStartDate, newStartDate) || !Objects.equals(oldDueDate, newDueDate)) {
-            var oldDates = formatDates(oldStartDate, oldDueDate);
-            var newDates = formatDates(newStartDate, newDueDate);
-            if (!oldDates.equals(newDates)) {
-                save(new TaskActivity(task, author, TaskActivityType.DATES_CHANGED, "dates", oldDates, newDates));
-            }
-        }
-        if (!Objects.equals(oldSummary, newSummary)) {
-            save(new TaskActivity(task, author, TaskActivityType.SUMMARY_CHANGED, "summary", oldSummary, newSummary));
-        }
-        if (!Objects.equals(normalize(oldLabels), normalize(newLabels))) {
-            save(new TaskActivity(task, author, TaskActivityType.LABELS_CHANGED, "labels",
-                    emptyIfNull(oldLabels), emptyIfNull(newLabels)));
-        }
-        if (!Objects.equals(normalize(oldDeps), normalize(newDeps))) {
-            save(new TaskActivity(task, author, TaskActivityType.DEPENDENCIES_CHANGED, "dependencies",
-                    emptyIfNull(oldDeps), emptyIfNull(newDeps)));
-        }
+
+        logChange(task, author, TaskActivityType.STATUS_CHANGED, "status",
+                name(before.status()), name(after.status()));
+        logChange(task, author, TaskActivityType.PRIORITY_CHANGED, "priority",
+                name(before.priority()), name(after.priority()));
+        logChange(task, author, TaskActivityType.ASSIGNEE_CHANGED, "assignee",
+                before.assignee(), after.assignee());
+        logChange(task, author, TaskActivityType.PROGRESS_CHANGED, "progress",
+                text(before.progress()), text(after.progress()));
+        logChange(task, author, TaskActivityType.DATES_CHANGED, "dates",
+                formatDates(before.startDate(), before.dueDate()),
+                formatDates(after.startDate(), after.dueDate()));
+        logChange(task, author, TaskActivityType.SUMMARY_CHANGED, "summary",
+                before.summary(), after.summary());
+        logChange(task, author, TaskActivityType.DESCRIPTION_CHANGED, "description",
+                summarize(before.description()), summarize(after.description()));
+        logChange(task, author, TaskActivityType.LABELS_CHANGED, "labels",
+                joinList(before.labels()), joinList(after.labels()));
+        logChange(task, author, TaskActivityType.DEPENDENCIES_CHANGED, "dependencies",
+                joinList(before.dependencyKeys()), joinList(after.dependencyKeys()));
+        logChange(task, author, TaskActivityType.ATTACHMENTS_CHANGED, "attachments",
+                countText(before.attachments()), countText(after.attachments()));
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void logCommentAdded(Task task, User author) {
-        save(new TaskActivity(task, author, TaskActivityType.COMMENT_ADDED, null, null, null));
+        save(task, author, TaskActivityType.COMMENT_ADDED, null, null, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void logCommentEdited(Task task, User author) {
+        save(task, author, TaskActivityType.COMMENT_EDITED, null, null, null);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void logCommentDeleted(Task task, User author) {
-        save(new TaskActivity(task, author, TaskActivityType.COMMENT_DELETED, null, null, null));
+        save(task, author, TaskActivityType.COMMENT_DELETED, null, null, null);
     }
 
-    private void save(TaskActivity activity) {
-        taskActivityRepository.save(activity);
+    private void logChange(Task task, User author, TaskActivityType type, String field,
+                           String oldValue, String newValue) {
+        if (Objects.equals(blankToNull(oldValue), blankToNull(newValue))) {
+            return;
+        }
+        save(task, author, type, field, oldValue, newValue);
     }
 
-    private TaskActivityDTO convertToDTO(TaskActivity activity) {
-        return entityMapper.toTaskActivityDTO(activity);
+    private void save(Task task, User author, TaskActivityType type,
+                      String field, String oldValue, String newValue) {
+        taskActivityRepository.save(new TaskActivity(task, author, type, field, oldValue, newValue));
     }
 
-    private String formatEnum(Enum<?> val) {
-        return val != null ? val.name() : null;
+    private static String name(Enum<?> value) {
+        return value != null ? value.name() : null;
     }
 
-    private String formatDates(String start, String due) {
-        return (start != null ? start : "none") + " → " + (due != null ? due : "none");
+    private static String text(Object value) {
+        return value != null ? String.valueOf(value) : null;
     }
 
-    private String normalize(String s) {
-        return s == null || s.isEmpty() ? null : s;
+    private static String formatDates(LocalDate start, LocalDate due) {
+        return (start != null ? start : "none") + " \u2192 " + (due != null ? due : "none");
     }
 
-    private String emptyIfNull(String s) {
-        return s == null ? "" : s;
+    private static String joinList(List<String> values) {
+        return values == null || values.isEmpty() ? null : String.join(", ", values);
+    }
+
+    /**
+     * Descriptions are rich text and can be thousands of characters; the activity feed only needs
+     * to say that it changed, so a length marker is recorded rather than two full documents.
+     */
+    private static String summarize(String description) {
+        if (description == null || description.isBlank()) {
+            return null;
+        }
+        return description.length() + " characters";
+    }
+
+    private static String countText(List<String> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return null;
+        }
+        return attachments.size() + (attachments.size() == 1 ? " file" : " files");
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

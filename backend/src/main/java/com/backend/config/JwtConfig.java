@@ -1,6 +1,6 @@
 package com.backend.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -9,42 +9,23 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 
 @Configuration
+@EnableConfigurationProperties(JwtProperties.class)
 public class JwtConfig {
 
-    @Value("${jwt.secret}")
-    private String secretKey;
-
-    @Value("${jwt.access-token-expiration:15}")
-    private int accessTokenExpirationMinutes;
-
-    @Value("${jwt.refresh-token-expiration:7}")
-    private int refreshTokenExpirationDays;
-
+    /**
+     * Derives a fixed-length HMAC-SHA256 key from the configured secret, so any secret of at
+     * least the validated minimum length yields a key of the algorithm's full strength.
+     */
     @Bean
-    public SecretKey jwtSecretKey() {
-        if (secretKey == null || secretKey.length() < 32) {
-            throw new IllegalStateException("JWT secret must be at least 32 characters");
-        }
-
+    public SecretKey jwtSecretKey(JwtProperties properties) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(secretKey.getBytes(StandardCharsets.UTF_8));
+            var digest = MessageDigest.getInstance("SHA-256");
+            var hash = digest.digest(properties.secret().getBytes(StandardCharsets.UTF_8));
             return new SecretKeySpec(hash, "HmacSHA256");
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Error creating JWT secret key", e);
+            throw new IllegalStateException("SHA-256 unavailable; cannot derive JWT signing key", e);
         }
-    }
-
-    @Bean
-    public Duration accessTokenExpiration() {
-        return Duration.ofMinutes(accessTokenExpirationMinutes);
-    }
-
-    @Bean
-    public Duration refreshTokenExpiration() {
-        return Duration.ofDays(refreshTokenExpirationDays);
     }
 }

@@ -1,6 +1,6 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { toDateString } from '../util/helpers';
-import { EnrichedTask, User } from '../types';
+import { CurrentUser, EnrichedTask, TaskPriority } from '../types';
 
 const matchesTimeStatus = (task: EnrichedTask, statusFilter: string): boolean => {
     const statusMatchers: Record<string, () => boolean> = {
@@ -17,7 +17,7 @@ const taskMatchesFilter = (task: EnrichedTask, filterField: string, filterValue:
 
     switch (filterField) {
         case 'labels':
-            return !!task.labels?.includes(filterValue);
+            return task.labels.includes(filterValue);
         case 'assignee':
             // FilterBar surfaces unassigned tasks under the 'Unassigned' option,
             // but the raw value is null/'' — match it explicitly.
@@ -38,30 +38,34 @@ const taskMatchesFilter = (task: EnrichedTask, filterField: string, filterValue:
     }
 };
 
-const PRIORITY_ORDER: Record<string, number> = {
-    'LOWEST': 1,
-    'LOW': 2,
-    'MEDIUM': 3,
-    'HIGH': 4,
-    'HIGHEST': 5,
+const PRIORITY_ORDER: Record<TaskPriority, number> = {
+    LOWEST: 1, LOW: 2, MEDIUM: 3, HIGH: 4, HIGHEST: 5,
 };
 
-const getSortValue = (task: EnrichedTask, field: string): string | number | Date => {
-    const value = task[field as keyof EnrichedTask];
-
+/**
+ * A comparable value for one sort field.
+ *
+ * Dates become epoch millis rather than Date objects, with a missing or unparseable date sorting
+ * last: subtracting Dates that include an Invalid Date yields NaN, and a NaN comparator leaves the
+ * order implementation-defined instead of throwing, so the bug appears as a silently wrong list.
+ */
+const getSortValue = (task: EnrichedTask, field: string): number | string => {
     if (field === 'startDate' || field === 'dueDate') {
-        return new Date(value as string);
+        const raw = task[field];
+        if (!raw) return Number.POSITIVE_INFINITY;
+        const parsed = new Date(raw).getTime();
+        return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
     }
-    if (field === 'progress' || field === 'duration') {
-        return Number(value);
-    }
-    if (field === 'isCritical' || field === 'isDelayed') {
-        return value ? 1 : 0;
-    }
-    if (field === 'priority') {
-        return PRIORITY_ORDER[value as string] || 0;
-    }
-    return (value as string | number | Date) ?? '';
+    if (field === 'progress') return task.progress;
+    if (field === 'duration') return task.duration;
+    if (field === 'isCritical') return task.isCritical ? 1 : 0;
+    if (field === 'isDelayed') return task.isDelayed ? 1 : 0;
+    if (field === 'priority') return PRIORITY_ORDER[task.priority] ?? 0;
+    if (field === 'id') return task.id;
+
+    const value = task[field as keyof EnrichedTask];
+    if (typeof value === 'number' || typeof value === 'string') return value;
+    return '';
 };
 
 const applyUrlFilters = (tasks: EnrichedTask[], urlParams: string): EnrichedTask[] => {
@@ -94,12 +98,11 @@ const applyStateFilters = (tasks: EnrichedTask[], filters: Record<string, string
     );
 };
 
-const applyAssignedToMeFilter = (tasks: EnrichedTask[], assignedToMe: boolean, user: User | null): EnrichedTask[] => {
+const applyAssignedToMeFilter = (
+    tasks: EnrichedTask[], assignedToMe: boolean, user: CurrentUser | null,
+): EnrichedTask[] => {
     if (!assignedToMe || !user?.email) return tasks;
-
-    return tasks.filter(task =>
-        task.assignee === user.email || task.assignee === `${user.firstname} ${user.lastname}`
-    );
+    return tasks.filter((task) => task.assignee === user.email);
 };
 
 const applySearchFilter = (tasks: EnrichedTask[], searchQuery: string): EnrichedTask[] => {
@@ -110,13 +113,14 @@ const applySearchFilter = (tasks: EnrichedTask[], searchQuery: string): Enriched
 };
 
 const applySorting = (tasks: EnrichedTask[], sortField: string, sortOrder: string): EnrichedTask[] => {
+    const direction = sortOrder === 'asc' ? 1 : -1;
     return [...tasks].sort((a, b) => {
         const valueA = getSortValue(a, sortField);
         const valueB = getSortValue(b, sortField);
-
-        if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
-        if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
-        return 0;
+        if (valueA < valueB) return -direction;
+        if (valueA > valueB) return direction;
+        // Total order, so paging or re-rendering cannot reshuffle equal rows.
+        return a.taskKey.localeCompare(b.taskKey);
     });
 };
 
@@ -125,7 +129,7 @@ interface UseTaskFilteringOptions {
     filters: Record<string, string>;
     searchQuery: string;
     assignedToMe: boolean;
-    currentUser: User | null;
+    currentUser: CurrentUser | null;
     sortField: string;
     sortOrder: string;
     urlParams: string;
@@ -153,17 +157,18 @@ export const useTaskFiltering = ({
         return result;
     }, [tasks, filters, searchQuery, assignedToMe, currentUser, sortField, sortOrder, urlParams]);
 
-    const hasActiveFilters = useCallback((): boolean => {
-        const params = new URLSearchParams(urlParams);
-        const hasStateFilters = Object.values(filters).some(v => v && v !== 'All');
-        const hasSearch = !!searchQuery?.trim();
-        const hasProjectFilter = !!params.get('projectKey');
-
-        return hasStateFilters || hasSearch || assignedToMe || hasProjectFilter;
+    // A value, not a function. Every consumer called it during render — three times per render on
+    // the projects page — so the memoisation bought nothing and each call rebuilt a URLSearchParams.
+    const hasActiveFilters = useMemo(() => {
+        const hasStateFilters = Object.values(filters).some((value) => value && value !== 'All');
+        const hasProjectFilter = !!new URLSearchParams(urlParams).get('projectKey');
+        return hasStateFilters || !!searchQuery.trim() || assignedToMe || hasProjectFilter;
     }, [filters, searchQuery, assignedToMe, urlParams]);
 
-    const filteredTaskIds = useMemo(() => new Set(filteredTasks.map(t => t.id)), [filteredTasks]);
-    const filteredProjectKeys = useMemo(() => new Set(filteredTasks.map(t => t.projectKey)), [filteredTasks]);
+    const filteredTaskIds = useMemo(
+        () => new Set<number>(filteredTasks.map((task) => task.id)), [filteredTasks]);
+    const filteredProjectKeys = useMemo(
+        () => new Set<string>(filteredTasks.map((task) => task.projectKey)), [filteredTasks]);
 
     return {
         filteredTasks,

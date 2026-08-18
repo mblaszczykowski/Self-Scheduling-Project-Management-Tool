@@ -1,25 +1,23 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { EmptyState } from '../common';
 import TimelineHeader from './TimelineHeader';
 import TimelineProjectRow from './TimelineProjectRow';
 import DependencyOverlay from './DependencyOverlay';
-import { EnrichedTask, ProcessedProject } from '../../types';
 import { TimelineViewProps } from './types';
 
 const TimelineView = ({
     processedProjects,
     allTasks,
-    filteredTasks,
+    taskKeyMap,
+    projectKeyToProject,
     filteredTaskIds,
     filteredProjectKeys,
-    projectRowOffsets,
     expandedProjects,
     sidebarCollapsed,
     sidebarWidth,
     timelineStart,
     timelineEnd,
     timelineWidth,
-    projectKeyFilter,
     hasActiveFilters,
     onToggleExpand,
     onOpenProjectModal,
@@ -36,30 +34,10 @@ const TimelineView = ({
     optimization,
     onOptimize,
     onScrollToToday,
-    onAcceptOptimization,
-    onRejectOptimization,
 }: TimelineViewProps) => {
-    const projectIndexMap = useMemo(() => {
-        const map = new Map<string, number>();
-        processedProjects.forEach((p, i) => map.set(p.projectKey, i));
-        return map;
-    }, [processedProjects]);
-
-    const projectKeyToProject = useMemo(() => {
-        const map = new Map<string, ProcessedProject>();
-        for (const p of processedProjects) map.set(p.projectKey, p);
-        return map;
-    }, [processedProjects]);
-
-    const taskKeyMap = useMemo(() => {
-        const map = new Map<string, EnrichedTask>();
-        for (const t of allTasks) map.set(t.taskKey, t);
-        return map;
-    }, [allTasks]);
-
+    // A project-key filter already narrows filteredProjectKeys, so no separate check is needed.
     const visibleProjects = processedProjects
-        .filter(p => !projectKeyFilter || p.projectKey === projectKeyFilter)
-        .filter(p => filteredProjectKeys.has(p.projectKey) || !hasActiveFilters);
+        .filter((project) => filteredProjectKeys.has(project.projectKey) || !hasActiveFilters);
 
     if (visibleProjects.length === 0) {
         const emptyTitle = hasActiveFilters ? 'No matching projects' : 'No projects yet';
@@ -80,15 +58,7 @@ const TimelineView = ({
 
     return (
         <>
-            {optimization?.showGhostBars && (
-                <style>{`
-                    @keyframes optGhostShimmer {
-                        0%, 100% { background-position: 200% 0; }
-                        50% { background-position: -200% 0; }
-                    }
-                `}</style>
-            )}
-            <TimelineHeader
+                <TimelineHeader
                 timelineStart={timelineStart}
                 timelineEnd={timelineEnd}
                 sidebarWidth={sidebarWidth}
@@ -111,27 +81,18 @@ const TimelineView = ({
                     filteredTaskIds={filteredTaskIds}
                     filteredProjectKeys={filteredProjectKeys}
                     hasActiveFilters={hasActiveFilters}
-                    projectKeyFilter={projectKeyFilter}
                 />
                 {visibleProjects.map((project) => (
                     <TimelineProjectRow
                         key={project.projectKey}
                         project={project}
-                        projectIndex={projectIndexMap.get(project.projectKey)}
-                        isExpanded={expandedProjects[project.projectKey]}
+                        isExpanded={expandedProjects[project.projectKey] ?? false}
                         sidebarCollapsed={sidebarCollapsed}
                         sidebarWidth={sidebarWidth}
                         timelineStart={timelineStart}
                         timelineWidth={timelineWidth}
                         hasActiveFilters={hasActiveFilters}
                         filteredTaskIds={filteredTaskIds}
-                        filteredProjectKeys={filteredProjectKeys}
-                        projectRowOffsets={projectRowOffsets}
-                        taskKeyMap={taskKeyMap}
-                        projectIndexMap={projectIndexMap}
-                        projectKeyToProject={projectKeyToProject}
-                        expandedProjects={expandedProjects}
-                        projectKeyFilter={projectKeyFilter}
                         onToggleExpand={onToggleExpand}
                         onOpenProjectModal={onOpenProjectModal}
                         onOpenTaskModal={onOpenTaskModal}

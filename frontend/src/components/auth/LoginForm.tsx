@@ -1,12 +1,12 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ErrorMessage, Field, Form, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import { useNavigate } from 'react-router-dom';
 import EyeButton from '../common/EyeButton';
-import { login, getUser } from '../../util/api';
+import { getCurrentUser, login } from '../../util/api';
 import { showToast } from '../../util/toast';
 import { getErrorMessage } from '../../util/helpers';
-import { AuthContext } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { authInputClass } from '../common/formHelpers';
 
 interface LoginValues {
@@ -24,7 +24,7 @@ const validationSchema = Yup.object().shape({
 function LoginForm({ onToggleForm }: { onToggleForm: () => void }) {
     const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
-    const { setUser } = useContext(AuthContext);
+    const { setUser } = useAuth();
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -37,12 +37,14 @@ function LoginForm({ onToggleForm }: { onToggleForm: () => void }) {
     const handleSubmit = async (values: LoginValues, { setSubmitting }: FormikHelpers<LoginValues>) => {
         try {
             await login(values.email, values.password);
-            const fetchedUser = await getUser();
+            const fetchedUser = await getCurrentUser();
             setUser(fetchedUser);
-            navigate('/dashboard');
+            // Return the user to wherever the expired session interrupted them.
+            const next = new URLSearchParams(window.location.search).get('next');
+            navigate(next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
         } catch (err) {
             showToast(getErrorMessage(err, 'Login failed. Check your credentials.'));
-            console.error('Login error:', err.response || err.message);
+
         } finally {
             setSubmitting(false);
         }

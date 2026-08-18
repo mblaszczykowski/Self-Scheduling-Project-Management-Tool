@@ -1,418 +1,399 @@
 package com.backend.filter;
 
 import com.backend.config.CookieProperties;
+import com.backend.config.JwtProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.time.Duration;
 import java.util.Base64;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
-@ExtendWith(MockitoExtension.class)
 class CsrfProtectionFilterTest {
-
-    @Mock
-    private HttpServletRequest request;
-
-    @Mock
-    private HttpServletResponse response;
-
-    @Mock
-    private FilterChain filterChain;
-
-    private CsrfProtectionFilter filter;
-    private ObjectMapper objectMapper;
 
     private static final String CSRF_COOKIE_NAME = "XSRF-TOKEN";
     private static final String CSRF_HEADER_NAME = "X-CSRF-Token";
     private static final String VALID_TOKEN = "validCsrfToken123456789012345678901234567890";
 
+    private static final Duration ACCESS_TOKEN_TTL = Duration.ofMinutes(15);
+    private static final Duration REFRESH_TOKEN_TTL = Duration.ofDays(7);
+
+    /** Configured like the application's own mapper, so the error body is the real one. */
+    private final ObjectMapper objectMapper = JsonMapper.builder()
+            .addModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .build();
+
+    private CookieProperties cookieProperties;
+    private CsrfProtectionFilter filter;
+    private MockHttpServletRequest request;
+    private MockHttpServletResponse response;
+    private RecordingFilterChain chain;
+
+    /** Records whether — and with what — the request was let through. */
+    private static final class RecordingFilterChain implements FilterChain {
+        private ServletRequest passedRequest;
+        private ServletResponse passedResponse;
+        private int invocations;
+
+        @Override
+        public void doFilter(ServletRequest request, ServletResponse response) {
+            this.passedRequest = request;
+            this.passedResponse = response;
+            this.invocations++;
+        }
+
+        boolean wasCalled() {
+            return invocations > 0;
+        }
+    }
+
     @BeforeEach
     void setUp() {
-        objectMapper = new ObjectMapper();
-        CookieProperties cookieProperties = new CookieProperties();
+        cookieProperties = new CookieProperties();
         cookieProperties.setSecure(false);
         cookieProperties.setSameSite("Lax");
-        filter = new CsrfProtectionFilter(objectMapper, cookieProperties);
+        filter = filterWithRefreshTokenLifetime(REFRESH_TOKEN_TTL);
+        request = new MockHttpServletRequest();
+        response = new MockHttpServletResponse();
+        chain = new RecordingFilterChain();
+    }
+
+    private CsrfProtectionFilter filterWithRefreshTokenLifetime(Duration refreshTokenExpiration) {
+        var jwtProperties = new JwtProperties("a-test-secret-of-at-least-32-characters",
+                ACCESS_TOKEN_TTL, refreshTokenExpiration, Duration.ofSeconds(30),
+                "flowlink", "flowlink-web");
+        return new CsrfProtectionFilter(objectMapper, cookieProperties, jwtProperties);
+    }
+
+    // ======================== helpers ========================
+
+    private void requestOf(String method, String path) {
+        request.setMethod(method);
+        request.setRequestURI(path);
+    }
+
+    private void withCsrfCookie(String value) {
+        request.setCookies(new Cookie(CSRF_COOKIE_NAME, value));
+    }
+
+    private void invokeFilter() throws Exception {
+        filter.doFilterInternal(request, response, chain);
+    }
+
+    private String setCookieHeader() {
+        return response.getHeader(HttpHeaders.SET_COOKIE);
+    }
+
+    private String issuedCsrfToken() {
+        var header = setCookieHeader();
+        assertThat(header).startsWith(CSRF_COOKIE_NAME + "=");
+        return header.substring((CSRF_COOKIE_NAME + "=").length(), header.indexOf(';'));
+    }
+
+    private void assertRejectedAsCsrfFailure() throws Exception {
+        assertThat(chain.wasCalled())
+                .as("request must not reach the application")
+                .isFalse();
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(response.getContentType()).startsWith(MediaType.APPLICATION_JSON_VALUE);
+        assertThat(response.getCharacterEncoding()).isEqualToIgnoringCase("UTF-8");
+
+        var body = objectMapper.readTree(response.getContentAsString());
+        assertThat(body.path("status").asInt()).isEqualTo(403);
+        assertThat(body.path("error").asText()).isEqualTo("Forbidden");
+        assertThat(body.path("code").asText()).isEqualTo("CSRF_ERROR");
+        assertThat(body.path("message").asText()).contains("CSRF token validation failed");
+        assertThat(body.path("timestamp").asText()).isNotBlank();
+    }
+
+    private void assertPassedThrough() throws Exception {
+        assertThat(chain.wasCalled()).as("request should have been let through").isTrue();
+        assertThat(chain.passedRequest).isSameAs(request);
+        assertThat(chain.passedResponse).isSameAs(response);
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(response.getContentAsString()).isEmpty();
     }
 
     @Nested
-    @DisplayName("Safe Methods (GET, HEAD, OPTIONS)")
+    @DisplayName("safe methods")
     class SafeMethodTests {
 
         @ParameterizedTest
-        @ValueSource(strings = {"GET", "HEAD", "OPTIONS"})
-        @DisplayName("should allow safe methods without CSRF validation")
-        void shouldAllowSafeMethodsWithoutCsrf(String method) throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn(method);
-            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie(CSRF_COOKIE_NAME, VALID_TOKEN)});
+        @ValueSource(strings = {"GET", "HEAD", "OPTIONS", "get"})
+        @DisplayName("pass through without any CSRF header")
+        void shouldPassThroughWithoutAHeader(String method) throws Exception {
+            requestOf(method, "/api/projects");
+            withCsrfCookie(VALID_TOKEN);
 
-            filter.doFilterInternal(request, response, filterChain);
+            invokeFilter();
 
-            verify(filterChain).doFilter(request, response);
+            assertPassedThrough();
+            assertThat(setCookieHeader()).as("existing cookie must be left alone").isNull();
         }
 
         @Test
-        @DisplayName("should set CSRF cookie on GET request when missing")
-        void shouldSetCsrfCookieOnGet() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("GET");
-            when(request.getCookies()).thenReturn(null);
+        @DisplayName("hand out a fresh script-readable token cookie when the caller has none")
+        void shouldIssueAFreshTokenCookie() throws Exception {
+            requestOf("GET", "/api/projects");
 
-            filter.doFilterInternal(request, response, filterChain);
+            invokeFilter();
 
-            // Cookie is emitted as a Set-Cookie header (ResponseCookie) so SameSite can be set.
-            ArgumentCaptor<String> cookieHeader = ArgumentCaptor.forClass(String.class);
-            verify(response).addHeader(eq("Set-Cookie"), cookieHeader.capture());
+            assertPassedThrough();
+            var header = setCookieHeader();
+            assertThat(header).contains("Path=/", "SameSite=Lax");
+            assertThat(header).as("the SPA has to read this cookie to echo it back")
+                    .doesNotContain("HttpOnly");
+            assertThat(header).doesNotContain("Secure");
 
-            String setCookie = cookieHeader.getValue();
-            assertTrue(setCookie.startsWith(CSRF_COOKIE_NAME + "="));
-            assertTrue(setCookie.contains("Path=/"));
-            assertTrue(setCookie.contains("Max-Age=3600"));
-            assertFalse(setCookie.contains("HttpOnly")); // Must be readable by JS
+            var token = issuedCsrfToken();
+            assertThat(Base64.getUrlDecoder().decode(token))
+                    .as("32 random bytes, url-encoded without padding").hasSize(32);
         }
 
         @Test
-        @DisplayName("should generate Base64 URL-encoded CSRF token")
-        void shouldGenerateBase64UrlEncodedToken() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("GET");
-            when(request.getCookies()).thenReturn(null);
+        @DisplayName("give the token cookie the refresh token's lifetime, not the access token's")
+        void shouldGiveTheCookieTheRefreshTokenLifetime() throws Exception {
+            requestOf("GET", "/api/projects");
 
-            filter.doFilterInternal(request, response, filterChain);
+            invokeFilter();
 
-            ArgumentCaptor<String> cookieHeader = ArgumentCaptor.forClass(String.class);
-            verify(response).addHeader(eq("Set-Cookie"), cookieHeader.capture());
-
-            String setCookie = cookieHeader.getValue();
-            String token = setCookie.substring((CSRF_COOKIE_NAME + "=").length(), setCookie.indexOf(';'));
-            // Token should be 32 bytes = 43 Base64 URL-safe characters (no padding)
-            assertTrue(token.length() >= 40);
-            // Should be valid Base64 URL
-            assertDoesNotThrow(() -> Base64.getUrlDecoder().decode(token));
+            assertThat(setCookieHeader()).contains("Max-Age=" + REFRESH_TOKEN_TTL.toSeconds());
+            assertThat(setCookieHeader()).doesNotContain("Max-Age=" + ACCESS_TOKEN_TTL.toSeconds());
         }
 
         @Test
-        @DisplayName("should NOT set new cookie when CSRF cookie already exists")
-        void shouldNotSetCookieWhenExists() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("GET");
-            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie(CSRF_COOKIE_NAME, VALID_TOKEN)});
+        @DisplayName("follow the configured refresh token lifetime rather than a fixed value")
+        void shouldFollowTheConfiguredRefreshTokenLifetime() throws Exception {
+            filter = filterWithRefreshTokenLifetime(Duration.ofDays(3));
+            requestOf("GET", "/api/projects");
 
-            filter.doFilterInternal(request, response, filterChain);
+            invokeFilter();
 
-            verify(response, never()).addCookie(any());
-            verify(filterChain).doFilter(request, response);
+            assertThat(setCookieHeader()).contains("Max-Age=259200");
+        }
+
+        @Test
+        @DisplayName("mark the cookie Secure and SameSite=None when the deployment says so")
+        void shouldHonourTheCookieConfiguration() throws Exception {
+            cookieProperties.setSecure(true);
+            cookieProperties.setSameSite("None");
+            filter = filterWithRefreshTokenLifetime(REFRESH_TOKEN_TTL);
+            requestOf("GET", "/api/projects");
+
+            invokeFilter();
+
+            assertThat(setCookieHeader()).contains("Secure", "SameSite=None");
+        }
+
+        @Test
+        @DisplayName("keep the token the caller already has instead of rotating it")
+        void shouldKeepAnExistingToken() throws Exception {
+            requestOf("GET", "/api/projects");
+            withCsrfCookie(VALID_TOKEN);
+
+            invokeFilter();
+
+            assertThat(setCookieHeader()).isNull();
+            assertThat(response.getCookies()).isEmpty();
         }
     }
 
     @Nested
-    @DisplayName("State-Changing Methods (POST, PUT, DELETE, PATCH)")
+    @DisplayName("state-changing methods")
     class StateChangingMethodTests {
 
-        @Test
-        @DisplayName("should allow POST with matching CSRF tokens")
-        void shouldAllowPostWithMatchingTokens() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("POST");
-            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie(CSRF_COOKIE_NAME, VALID_TOKEN)});
-            when(request.getHeader(CSRF_HEADER_NAME)).thenReturn(VALID_TOKEN);
+        @ParameterizedTest
+        @ValueSource(strings = {"POST", "PUT", "DELETE", "PATCH"})
+        @DisplayName("pass through when the header echoes the cookie exactly")
+        void shouldPassThroughWhenTheHeaderMatches(String method) throws Exception {
+            requestOf(method, "/api/projects/PROJ");
+            withCsrfCookie(VALID_TOKEN);
+            request.addHeader(CSRF_HEADER_NAME, VALID_TOKEN);
 
-            filter.doFilterInternal(request, response, filterChain);
+            invokeFilter();
 
-            verify(filterChain).doFilter(request, response);
-        }
-
-        @Test
-        @DisplayName("should reject POST with mismatched CSRF tokens")
-        void shouldRejectPostWithMismatchedTokens() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("POST");
-            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie(CSRF_COOKIE_NAME, VALID_TOKEN)});
-            when(request.getHeader(CSRF_HEADER_NAME)).thenReturn("different-token");
-
-            StringWriter stringWriter = new StringWriter();
-            when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(response).setStatus(HttpStatus.FORBIDDEN.value());
-            verify(filterChain, never()).doFilter(request, response);
-        }
-
-        @Test
-        @DisplayName("should reject POST with missing CSRF header")
-        void shouldRejectPostWithMissingHeader() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("POST");
-            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie(CSRF_COOKIE_NAME, VALID_TOKEN)});
-            when(request.getHeader(CSRF_HEADER_NAME)).thenReturn(null);
-
-            StringWriter stringWriter = new StringWriter();
-            when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(response).setStatus(HttpStatus.FORBIDDEN.value());
-            verify(filterChain, never()).doFilter(request, response);
-        }
-
-        @Test
-        @DisplayName("should reject POST with missing CSRF cookie")
-        void shouldRejectPostWithMissingCookie() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("POST");
-            when(request.getCookies()).thenReturn(null);
-            when(request.getHeader(CSRF_HEADER_NAME)).thenReturn(VALID_TOKEN);
-
-            StringWriter stringWriter = new StringWriter();
-            when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(response).setStatus(HttpStatus.FORBIDDEN.value());
-            verify(filterChain, never()).doFilter(request, response);
+            assertPassedThrough();
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {"PUT", "DELETE", "PATCH"})
-        @DisplayName("should validate CSRF for PUT, DELETE, PATCH methods")
-        void shouldValidateCsrfForAllStateChangingMethods(String method) throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects/ABC");
-            when(request.getMethod()).thenReturn(method);
-            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie(CSRF_COOKIE_NAME, VALID_TOKEN)});
-            when(request.getHeader(CSRF_HEADER_NAME)).thenReturn(VALID_TOKEN);
+        @ValueSource(strings = {"POST", "PUT", "DELETE", "PATCH"})
+        @DisplayName("are rejected when the header does not match the cookie")
+        void shouldRejectAMismatchedHeader(String method) throws Exception {
+            requestOf(method, "/api/projects/PROJ");
+            withCsrfCookie(VALID_TOKEN);
+            request.addHeader(CSRF_HEADER_NAME, "some-other-token");
 
-            filter.doFilterInternal(request, response, filterChain);
+            invokeFilter();
 
-            verify(filterChain).doFilter(request, response);
+            assertRejectedAsCsrfFailure();
+        }
+
+        @Test
+        @DisplayName("are rejected when the header is missing altogether")
+        void shouldRejectAMissingHeader() throws Exception {
+            requestOf("POST", "/api/projects");
+            withCsrfCookie(VALID_TOKEN);
+
+            invokeFilter();
+
+            assertRejectedAsCsrfFailure();
+        }
+
+        @Test
+        @DisplayName("are rejected when there is no CSRF cookie to compare against")
+        void shouldRejectAMissingCookie() throws Exception {
+            requestOf("POST", "/api/projects");
+            request.addHeader(CSRF_HEADER_NAME, VALID_TOKEN);
+
+            invokeFilter();
+
+            assertRejectedAsCsrfFailure();
+            assertThat(setCookieHeader()).as("no token is handed out on the rejection").isNull();
+        }
+
+        @Test
+        @DisplayName("are rejected when the request carries an empty cookie array")
+        void shouldRejectAnEmptyCookieArray() throws Exception {
+            requestOf("POST", "/api/projects");
+            request.setCookies(new Cookie[0]);
+            request.addHeader(CSRF_HEADER_NAME, VALID_TOKEN);
+
+            invokeFilter();
+
+            assertRejectedAsCsrfFailure();
+        }
+
+        @ParameterizedTest
+        @CsvSource(value = {
+                "empty header|",
+                "trailing space|" + VALID_TOKEN + " ",
+                "leading space| " + VALID_TOKEN,
+                "prefix of the real token|validCsrfToken",
+                "token plus a suffix|" + VALID_TOKEN + "extra"
+        }, delimiter = '|', ignoreLeadingAndTrailingWhitespace = false)
+        @DisplayName("are rejected for anything short of an exact, equal-length match")
+        void shouldRequireAnExactMatch(String description, String headerValue) throws Exception {
+            requestOf("POST", "/api/projects");
+            withCsrfCookie(VALID_TOKEN);
+            request.addHeader(CSRF_HEADER_NAME, headerValue == null ? "" : headerValue);
+
+            invokeFilter();
+
+            assertRejectedAsCsrfFailure();
+        }
+
+        @Test
+        @DisplayName("find the CSRF cookie among the auth cookies")
+        void shouldFindTheCsrfCookieAmongOthers() throws Exception {
+            requestOf("POST", "/api/projects");
+            request.setCookies(
+                    new Cookie("accessToken", "an-access-token"),
+                    new Cookie(CSRF_COOKIE_NAME, VALID_TOKEN),
+                    new Cookie("refreshToken", "a-refresh-token"));
+            request.addHeader(CSRF_HEADER_NAME, VALID_TOKEN);
+
+            invokeFilter();
+
+            assertPassedThrough();
         }
     }
 
     @Nested
-    @DisplayName("Exempt Endpoints")
+    @DisplayName("exempt endpoints")
     class ExemptEndpointTests {
 
-        @Test
-        @DisplayName("should exempt login endpoint from CSRF")
-        void shouldExemptLogin() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/auth/login");
-            when(request.getMethod()).thenReturn("POST");
+        @ParameterizedTest
+        @CsvSource({
+                "/api/auth/login, POST",
+                "/api/users, POST",
+                "/error, POST",
+                "/actuator/health, POST"
+        })
+        @DisplayName("are the requests that cannot have a token yet, and they still pass without one")
+        void shouldExemptTheRequestsThatCannotHaveATokenYet(String path, String method) throws Exception {
+            requestOf(method, path);
 
-            filter.doFilterInternal(request, response, filterChain);
+            invokeFilter();
 
-            verify(filterChain).doFilter(request, response);
-            verify(request, never()).getHeader(CSRF_HEADER_NAME);
+            assertPassedThrough();
         }
 
         @Test
-        @DisplayName("should exempt refresh endpoint from CSRF")
-        void shouldExemptRefresh() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/auth/refresh");
-            when(request.getMethod()).thenReturn("POST");
+        @DisplayName("no longer include POST /api/auth/refresh, which is rejected without a header")
+        void shouldNoLongerExemptTheRefreshEndpoint() throws Exception {
+            requestOf("POST", "/api/auth/refresh");
+            withCsrfCookie(VALID_TOKEN);
 
-            filter.doFilterInternal(request, response, filterChain);
+            invokeFilter();
 
-            verify(filterChain).doFilter(request, response);
+            assertRejectedAsCsrfFailure();
         }
 
         @Test
-        @DisplayName("should exempt registration endpoint from CSRF")
-        void shouldExemptRegistration() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/users");
-            when(request.getMethod()).thenReturn("POST");
+        @DisplayName("let POST /api/auth/refresh through once it echoes the token like any other write")
+        void shouldAllowTheRefreshEndpointWithAMatchingToken() throws Exception {
+            requestOf("POST", "/api/auth/refresh");
+            withCsrfCookie(VALID_TOKEN);
+            request.addHeader(CSRF_HEADER_NAME, VALID_TOKEN);
 
-            filter.doFilterInternal(request, response, filterChain);
+            invokeFilter();
 
-            verify(filterChain).doFilter(request, response);
-        }
-
-        @Test
-        @DisplayName("should exempt user exists check from CSRF")
-        void shouldExemptUserExists() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/users/exists");
-            when(request.getMethod()).thenReturn("GET");
-            when(request.getCookies()).thenReturn(null);
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(filterChain).doFilter(request, response);
+            assertPassedThrough();
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {"/uploads/image.png", "/static/script.js"})
-        @DisplayName("should exempt static content endpoints from CSRF (/files serves via authenticated controller)")
-        void shouldExemptFileEndpoints(String path) throws Exception {
-            when(request.getRequestURI()).thenReturn(path);
-            when(request.getMethod()).thenReturn("POST");
+        @CsvSource({
+                "/api/users, PUT",
+                "/api/users, DELETE",
+                "/api/users/exists, POST",
+                "/api/users/me, POST",
+                "/api/auth/logout, POST"
+        })
+        @DisplayName("cover registration only, so every other write on those paths is checked")
+        void shouldNotExemptNeighbouringPathsAndMethods(String path, String method) throws Exception {
+            requestOf(method, path);
 
-            filter.doFilterInternal(request, response, filterChain);
+            invokeFilter();
 
-            verify(filterChain).doFilter(request, response);
-        }
-    }
-
-    @Nested
-    @DisplayName("Error Response")
-    class ErrorResponseTests {
-
-        @Test
-        @DisplayName("should return JSON error with correct format")
-        void shouldReturnJsonError() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("POST");
-            when(request.getCookies()).thenReturn(null);
-
-            StringWriter stringWriter = new StringWriter();
-            when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(response).setStatus(HttpStatus.FORBIDDEN.value());
-            verify(response).setContentType(MediaType.APPLICATION_JSON_VALUE);
-
-            String jsonResponse = stringWriter.toString();
-            assertTrue(jsonResponse.contains("\"status\":403"));
-            assertTrue(jsonResponse.contains("\"error\":\"Forbidden\""));
-            assertTrue(jsonResponse.contains("CSRF token validation failed"));
-        }
-    }
-
-    @Nested
-    @DisplayName("Edge Cases")
-    class EdgeCaseTests {
-
-        @Test
-        @DisplayName("should handle empty cookies array")
-        void shouldHandleEmptyCookiesArray() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("POST");
-            when(request.getCookies()).thenReturn(new Cookie[]{});
-
-            StringWriter stringWriter = new StringWriter();
-            when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(response).setStatus(HttpStatus.FORBIDDEN.value());
+            assertRejectedAsCsrfFailure();
         }
 
-        @Test
-        @DisplayName("should find CSRF cookie among multiple cookies")
-        void shouldFindCsrfCookieAmongMany() throws Exception {
-            Cookie[] cookies = {
-                    new Cookie("accessToken", "some-token"),
-                    new Cookie(CSRF_COOKIE_NAME, VALID_TOKEN),
-                    new Cookie("refreshToken", "refresh-token")
-            };
+        @ParameterizedTest
+        @ValueSource(strings = {
+                "/api/auth/login/",
+                "/api/auth/login;jsessionid=1",
+                "/api/auth/LOGIN",
+                "/api/auth/login/../login",
+                "/uploads/image.png",
+                "/static/script.js"
+        })
+        @DisplayName("are matched exactly, so a decorated path is checked rather than waved through")
+        void shouldMatchExemptionsExactly(String path) throws Exception {
+            requestOf("POST", path);
 
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("POST");
-            when(request.getCookies()).thenReturn(cookies);
-            when(request.getHeader(CSRF_HEADER_NAME)).thenReturn(VALID_TOKEN);
+            invokeFilter();
 
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(filterChain).doFilter(request, response);
-        }
-
-        @Test
-        @DisplayName("should handle case-insensitive method comparison")
-        void shouldHandleCaseInsensitiveMethod() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("get");
-            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie(CSRF_COOKIE_NAME, VALID_TOKEN)});
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(filterChain).doFilter(request, response);
-        }
-
-        @Test
-        @DisplayName("should reject empty string as CSRF header")
-        void shouldRejectEmptyHeader() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("POST");
-            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie(CSRF_COOKIE_NAME, VALID_TOKEN)});
-            when(request.getHeader(CSRF_HEADER_NAME)).thenReturn("");
-
-            StringWriter stringWriter = new StringWriter();
-            when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(response).setStatus(HttpStatus.FORBIDDEN.value());
-        }
-
-        @Test
-        @DisplayName("should use strict equality for token comparison")
-        void shouldUseStrictEqualityForTokens() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/projects");
-            when(request.getMethod()).thenReturn("POST");
-            when(request.getCookies()).thenReturn(new Cookie[]{new Cookie(CSRF_COOKIE_NAME, VALID_TOKEN)});
-            // Token with extra whitespace
-            when(request.getHeader(CSRF_HEADER_NAME)).thenReturn(VALID_TOKEN + " ");
-
-            StringWriter stringWriter = new StringWriter();
-            when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(response).setStatus(HttpStatus.FORBIDDEN.value());
-        }
-    }
-
-    @Nested
-    @DisplayName("Non-exempt PUT /api/users requires CSRF")
-    class NonExemptEndpointTests {
-
-        @Test
-        @DisplayName("PUT /api/users should require CSRF validation")
-        void shouldRequireCsrfForUserUpdate() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/users");
-            when(request.getMethod()).thenReturn("PUT");
-            when(request.getCookies()).thenReturn(null);
-
-            StringWriter stringWriter = new StringWriter();
-            when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(response).setStatus(HttpStatus.FORBIDDEN.value());
-        }
-
-        @Test
-        @DisplayName("DELETE /api/users should require CSRF validation")
-        void shouldRequireCsrfForUserDelete() throws Exception {
-            when(request.getRequestURI()).thenReturn("/api/users");
-            when(request.getMethod()).thenReturn("DELETE");
-            when(request.getCookies()).thenReturn(null);
-
-            StringWriter stringWriter = new StringWriter();
-            when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            verify(response).setStatus(HttpStatus.FORBIDDEN.value());
+            assertRejectedAsCsrfFailure();
         }
     }
 }

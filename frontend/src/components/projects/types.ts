@@ -46,27 +46,32 @@ export type ResizeMouseDownHandler = (
 
 export type ProjectKeyMap = Map<string, ProcessedProject>;
 export type TaskKeyMap = Map<string, EnrichedTask>;
-export type ProjectIndexMap = Map<string, number>;
 export type ExpandedProjects = Record<string, boolean>;
 export type FilteredTaskIds = Set<number>;
 export type FilteredProjectKeys = Set<string>;
 export type DivRef = RefObject<HTMLDivElement | null>;
 
-/** Shared props threaded through the timeline (view -> row -> bar). */
+/**
+ * Shared props threaded through the timeline (view -> row -> bar).
+ *
+ * Eleven props were removed from this file because nothing downstream read them — including a
+ * `projectRowOffsets` array that had a dedicated memo, was returned, destructured, passed and
+ * forwarded through three components, and was never used.
+ */
 export interface TimelineViewProps {
     processedProjects: ProcessedProject[];
     allTasks: EnrichedTask[];
-    filteredTasks: EnrichedTask[];
+    /** Derived once by useEnrichedProjects rather than rebuilt here from the same data. */
+    taskKeyMap: TaskKeyMap;
+    projectKeyToProject: ProjectKeyMap;
     filteredTaskIds: FilteredTaskIds;
     filteredProjectKeys: FilteredProjectKeys;
-    projectRowOffsets: number[];
     expandedProjects: ExpandedProjects;
     sidebarCollapsed: boolean;
     sidebarWidth: number;
     timelineStart: Date;
     timelineEnd: Date;
     timelineWidth: number;
-    projectKeyFilter: string | null;
     hasActiveFilters: boolean;
     onToggleExpand: (key: string) => void;
     onOpenProjectModal: OpenProjectModalHandler;
@@ -83,8 +88,6 @@ export interface TimelineViewProps {
     optimization: OptimizationState;
     onOptimize: () => void;
     onScrollToToday: () => void;
-    onAcceptOptimization: () => void;
-    onRejectOptimization: () => void;
 }
 
 export interface TimelineHeaderProps {
@@ -103,7 +106,6 @@ export interface TimelineHeaderProps {
 
 export interface TimelineProjectRowProps {
     project: ProcessedProject;
-    projectIndex: number;
     isExpanded: boolean;
     sidebarCollapsed: boolean;
     sidebarWidth: number;
@@ -111,13 +113,6 @@ export interface TimelineProjectRowProps {
     timelineWidth: number;
     hasActiveFilters: boolean;
     filteredTaskIds: FilteredTaskIds;
-    filteredProjectKeys: FilteredProjectKeys;
-    projectRowOffsets: number[];
-    taskKeyMap: TaskKeyMap;
-    projectIndexMap: ProjectIndexMap;
-    projectKeyToProject: ProjectKeyMap;
-    expandedProjects: ExpandedProjects;
-    projectKeyFilter: string | null;
     onToggleExpand: (key: string) => void;
     onOpenProjectModal: OpenProjectModalHandler;
     onOpenTaskModal: OpenTaskModalHandler;
@@ -155,12 +150,10 @@ export interface DependencyOverlayProps {
     filteredTaskIds: FilteredTaskIds;
     filteredProjectKeys: FilteredProjectKeys;
     hasActiveFilters: boolean;
-    projectKeyFilter: string | null;
 }
 
 export interface TaskListViewProps {
     filteredTasks: EnrichedTask[];
-    processedProjects: ProcessedProject[];
     taskKeyToTaskMap: TaskKeyMap;
     projectKeyToProject: ProjectKeyMap;
     sortField: string;

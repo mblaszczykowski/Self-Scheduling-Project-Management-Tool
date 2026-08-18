@@ -1,39 +1,40 @@
 package com.backend.controllers;
 
+import com.backend.dtos.PagedResponse;
 import com.backend.dtos.TaskActivityDTO;
+import com.backend.security.AccessGuard;
 import com.backend.services.TaskActivityService;
-import com.backend.services.TokenService;
-import com.backend.util.AccessGuard;
-import jakarta.servlet.http.HttpServletRequest;
+import com.backend.web.CurrentUserId;
+import com.backend.web.PageRequests;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/tasks/{taskId}/activities")
 public class TaskActivityController {
 
     private final TaskActivityService taskActivityService;
-    private final TokenService tokenService;
     private final AccessGuard accessGuard;
+    private final PageRequests pageRequests;
 
     public TaskActivityController(TaskActivityService taskActivityService,
-                                  TokenService tokenService,
-                                  AccessGuard accessGuard) {
+                                  AccessGuard accessGuard,
+                                  PageRequests pageRequests) {
         this.taskActivityService = taskActivityService;
-        this.tokenService = tokenService;
         this.accessGuard = accessGuard;
+        this.pageRequests = pageRequests;
     }
 
     @GetMapping
-    public ResponseEntity<List<TaskActivityDTO>> getActivities(
-            HttpServletRequest request,
-            @PathVariable Integer taskId
+    public ResponseEntity<PagedResponse<TaskActivityDTO>> getActivities(
+            @CurrentUserId Integer userId,
+            @PathVariable Integer taskId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
     ) {
-        var userId = tokenService.getUserIdFromRequest(request);
         accessGuard.getAccessibleTaskById(taskId, userId);
-        var activities = taskActivityService.getActivitiesForTask(taskId);
-        return ResponseEntity.ok(activities);
+        var pageable = pageRequests.of(page, size);
+        return ResponseEntity.ok(PagedResponse.of(
+                taskActivityService.getActivitiesForTask(taskId, pageable)));
     }
 }

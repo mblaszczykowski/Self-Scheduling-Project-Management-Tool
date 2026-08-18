@@ -1,15 +1,16 @@
 package com.backend.controllers;
 
-import com.backend.config.AppProperties;
 import com.backend.dtos.NotificationDTO;
 import com.backend.dtos.PagedResponse;
 import com.backend.services.NotificationService;
 import com.backend.services.SseEmitterManager;
-import com.backend.services.TokenService;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.data.domain.PageRequest;
+import com.backend.web.CurrentUserId;
+import com.backend.web.PageRequests;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -17,52 +18,54 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/notifications")
+@Validated
 public class NotificationController {
+
     private final NotificationService notificationService;
     private final SseEmitterManager sseEmitterManager;
-    private final TokenService tokenService;
-    private final AppProperties appProperties;
+    private final PageRequests pageRequests;
 
     public NotificationController(NotificationService notificationService,
                                   SseEmitterManager sseEmitterManager,
-                                  TokenService tokenService,
-                                  AppProperties appProperties) {
+                                  PageRequests pageRequests) {
         this.notificationService = notificationService;
         this.sseEmitterManager = sseEmitterManager;
-        this.tokenService = tokenService;
-        this.appProperties = appProperties;
+        this.pageRequests = pageRequests;
     }
 
     @GetMapping
     public ResponseEntity<PagedResponse<NotificationDTO>> getNotifications(
-            HttpServletRequest request,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size
+            @CurrentUserId Integer userId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
     ) {
-        var userId = tokenService.getUserIdFromRequest(request);
-        var clampedSize = Math.min(size, appProperties.getPagination().getMaxSize());
-
-        var pageable = PageRequest.of(page, clampedSize);
-        var dtoPage = notificationService.getAllNotificationsPaged(userId, pageable)
-                .map(notificationService::convertToDTO);
-
-        return ResponseEntity.ok(PagedResponse.of(dtoPage));
+        var pageable = pageRequests.of(page, size);
+        return ResponseEntity.ok(PagedResponse.of(notificationService.getNotifications(userId, pageable)));
     }
 
+    /**
+     * The unread count comes from the database rather than from the client counting a truncated
+     * page, which under-reported once a user passed the page size.
+     */
+    @GetMapping("/unread-count")
+    public ResponseEntity<UnreadCount> getUnreadCount(@CurrentUserId Integer userId) {
+        return ResponseEntity.ok(new UnreadCount(notificationService.countUnread(userId)));
+    }
+
+    public record UnreadCount(long count) {}
+
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamNotifications(HttpServletRequest request) {
-        var userId = tokenService.getUserIdFromRequest(request);
+    public SseEmitter streamNotifications(@CurrentUserId Integer userId) {
         return sseEmitterManager.createEmitter(userId);
     }
 
     @PostMapping("/mark-as-read")
     public ResponseEntity<Void> markAsRead(
-            HttpServletRequest request,
-            @RequestBody List<Integer> notificationIds
+            @CurrentUserId Integer userId,
+            @RequestBody @NotEmpty @Size(max = 500, message = "At most 500 notifications at a time")
+            List<Integer> notificationIds
     ) {
-        var userId = tokenService.getUserIdFromRequest(request);
         notificationService.markNotificationsAsRead(notificationIds, userId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
-
 }

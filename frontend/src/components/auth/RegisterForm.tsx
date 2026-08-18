@@ -1,10 +1,10 @@
-import React, { useContext, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorMessage, Field, Form, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import EyeButton from '../common/EyeButton';
 import { register, checkUserAuth } from '../../util/api';
-import { AuthContext } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../util/toast';
 import { getErrorMessage } from '../../util/helpers';
 import { authInputClass } from '../common/formHelpers';
@@ -82,7 +82,7 @@ const PasswordRequirements = ({ password }: { password: string }) => {
 
 function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
     const [showPassword, setShowPassword] = useState(false);
-    const { setUser } = useContext(AuthContext);
+    const { setUser } = useAuth();
     const navigate = useNavigate();
 
     const handleSubmit = async (values: RegisterValues, { setSubmitting }: FormikHelpers<RegisterValues>) => {
@@ -93,7 +93,7 @@ function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
             navigate('/dashboard');
         } catch (err) {
             showToast(getErrorMessage(err, 'Registration failed.'));
-            console.error('Register error:', err.response || err.message);
+
         } finally {
             setSubmitting(false);
         }

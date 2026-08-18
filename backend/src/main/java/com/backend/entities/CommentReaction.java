@@ -1,6 +1,9 @@
 package com.backend.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.Hibernate;
+
+import java.util.Objects;
 
 @Entity
 @Table(name = "comment_reactions", uniqueConstraints = {
@@ -61,5 +64,20 @@ public class CommentReaction {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    // See User.equals for why hashCode is constant per type rather than id-derived: this
+    // entity is added to Comment.reactions (a HashSet) while still transient.
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) return true;
+        if (other == null || Hibernate.getClass(this) != Hibernate.getClass(other)) return false;
+        var that = (CommentReaction) other;
+        return id != null && Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Hibernate.getClass(this).hashCode();
     }
 }

@@ -1,112 +1,109 @@
 package com.backend.services;
 
 import com.backend.dtos.CommentDTO;
-import com.backend.entities.*;
-import com.backend.events.NotificationEvent;
+import com.backend.entities.Comment;
+import com.backend.entities.CommentReaction;
+import com.backend.entities.NotificationType;
+import com.backend.entities.ReactionType;
+import com.backend.entities.Task;
+import com.backend.entities.User;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
+import com.backend.mapper.EntityMapper;
 import com.backend.repositories.CommentReactionRepository;
 import com.backend.repositories.CommentRepository;
-import com.backend.repositories.TaskRepository;
-import com.backend.repositories.UserRepository;
-import com.backend.util.AccessGuard;
-import com.backend.util.EntityMapper;
+import com.backend.security.AccessGuard;
+import com.backend.util.AfterCommit;
 import com.backend.util.ValidationUtil;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class CommentService {
 
-
     private final CommentRepository commentRepository;
     private final CommentReactionRepository commentReactionRepository;
-    private final TaskRepository taskRepository;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final FileStorageService fileStorageService;
     private final TaskActivityService taskActivityService;
+    private final NotificationService notificationService;
     private final EntityMapper entityMapper;
     private final AccessGuard accessGuard;
-    private final ApplicationEventPublisher applicationEventPublisher;
 
     public CommentService(CommentRepository commentRepository,
                           CommentReactionRepository commentReactionRepository,
-                          TaskRepository taskRepository,
-                          UserRepository userRepository,
+                          UserService userService,
                           FileStorageService fileStorageService,
                           TaskActivityService taskActivityService,
+                          NotificationService notificationService,
                           EntityMapper entityMapper,
-                          AccessGuard accessGuard,
-                          ApplicationEventPublisher applicationEventPublisher) {
+                          AccessGuard accessGuard) {
         this.commentRepository = commentRepository;
         this.commentReactionRepository = commentReactionRepository;
-        this.taskRepository = taskRepository;
-        this.userRepository = userRepository;
+        this.userService = userService;
         this.fileStorageService = fileStorageService;
         this.taskActivityService = taskActivityService;
+        this.notificationService = notificationService;
         this.entityMapper = entityMapper;
         this.accessGuard = accessGuard;
-        this.applicationEventPublisher = applicationEventPublisher;
     }
 
+    // ======================== Reads ========================
+
+    /**
+     * Top-level comments for a task, paged, each with its full reply tree.
+     *
+     * <p>Paged because the previous unbounded version returned every comment on a task plus the
+     * whole recursive reply tree and every reactor's name in one response.
+     */
     @Transactional(readOnly = true)
-    public List<CommentDTO> getCommentsByTask(Integer taskId, Integer userId) {
-        var task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
-
-        accessGuard.requireAccess(task.getProject(), userId);
-
-        var topLevelComments = commentRepository.findTopLevelCommentsByTaskIdWithDetails(taskId);
-        var repliesByParentId = batchLoadReplies(topLevelComments);
-        return topLevelComments.stream()
-                .sorted(Comparator.comparing(Comment::getTimestamp))
-                .map(c -> entityMapper.toCommentDTOWithReplies(c, repliesByParentId, userId))
-                .toList();
+    public Page<CommentDTO> getCommentsByTask(Integer taskId, Integer userId, Pageable pageable) {
+        var task = accessGuard.getAccessibleTaskById(taskId, userId);
+        var topLevel = commentRepository.findTopLevelCommentsByTaskId(task.getId(), pageable);
+        var repliesByParentId = batchLoadReplies(topLevel.getContent());
+        return topLevel.map(comment ->
+                entityMapper.toCommentDTOWithReplies(comment, repliesByParentId, userId));
     }
+
+    // ======================== Writes ========================
 
     @Transactional(rollbackFor = Exception.class)
     public CommentDTO addComment(Integer taskId, Integer userId, String content,
                                  List<MultipartFile> files, Integer parentCommentId) {
         validateCommentContent(content);
 
-        var task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
-
-        accessGuard.requireAccess(task.getProject(), userId);
-
-        var user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        var task = accessGuard.getAccessibleTaskById(taskId, userId);
+        var author = userService.getRequiredUserById(userId);
 
         Comment parentComment = null;
         if (parentCommentId != null) {
             parentComment = commentRepository.findById(parentCommentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Parent comment not found"));
-            // A reply must thread under a comment on the SAME task, otherwise a user could
-            // graft replies (and notifications) onto comments in projects they don't belong to.
+            // A reply must thread under a comment on the SAME task, otherwise a user could graft
+            // replies (and notifications) onto comments in projects they do not belong to.
             if (!parentComment.getTask().getId().equals(taskId)) {
                 throw new ValidationException("Parent comment does not belong to this task");
             }
         }
 
-        var attachmentUrls = (files != null && !files.isEmpty())
-                ? fileStorageService.storeFiles(files)
-                : new ArrayList<String>();
-
-        var sanitizedContent = Jsoup.clean(content, Safelist.basicWithImages());
-
-        var comment = new Comment(task, user, parentComment, sanitizedContent, attachmentUrls);
+        var attachments = fileStorageService.storeFiles(files, task.getProject().getId(), userId);
+        var comment = new Comment(task, author, parentComment, sanitize(content), attachments);
         var savedComment = commentRepository.save(comment);
-        initializeLazyCollections(savedComment);
-        taskActivityService.logCommentAdded(task, user);
-        notifyParentCommentAuthorIfDifferentUser(parentComment, userId, task, savedComment.getId());
-        notifyTaskAssigneeOfNewComment(task, userId, savedComment.getId());
+
+        taskActivityService.logCommentAdded(task, author);
+        notifyAboutNewComment(task, parentComment, author, savedComment.getId());
+
         return entityMapper.toCommentDTO(savedComment, userId);
     }
 
@@ -115,65 +112,81 @@ public class CommentService {
                                     List<MultipartFile> files) {
         validateCommentContent(content);
 
-        var comment = commentRepository.findByIdWithTaskAndProject(commentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
-
-        requireCommentBelongsToTask(comment, taskId);
-        accessGuard.requireAccess(comment.getTask().getProject(), userId);
-        accessGuard.requireCommentOwnership(comment, userId);
-
-        var sanitizedContent = Jsoup.clean(content, Safelist.basicWithImages());
-        comment.setContent(sanitizedContent);
+        var comment = requireOwnEditableComment(taskId, commentId, userId);
+        comment.setContent(sanitize(content));
         comment.setEditedAt(Instant.now());
+        comment.addAttachments(fileStorageService.storeFiles(
+                files, comment.getTask().getProject().getId(), userId));
 
-        if (files != null && !files.isEmpty()) {
-            var newAttachments = fileStorageService.storeFiles(files);
-            comment.addAttachments(newAttachments);
-        }
-
-        var updatedComment = commentRepository.save(comment);
-        initializeLazyCollections(updatedComment);
-        return entityMapper.toCommentDTO(updatedComment, userId);
+        var updated = commentRepository.save(comment);
+        taskActivityService.logCommentEdited(comment.getTask(), userService.getRequiredUserById(userId));
+        return entityMapper.toCommentDTO(updated, userId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void deleteComment(Integer taskId, Integer commentId, Integer userId) {
-        var comment = commentRepository.findByIdWithTaskAndProject(commentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+        var comment = requireOwnEditableComment(taskId, commentId, userId);
+        var author = userService.getRequiredUserById(userId);
+        taskActivityService.logCommentDeleted(comment.getTask(), author);
 
-        requireCommentBelongsToTask(comment, taskId);
-        accessGuard.requireAccess(comment.getTask().getProject(), userId);
-        accessGuard.requireCommentOwnership(comment, userId);
-
-        var user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        taskActivityService.logCommentDeleted(comment.getTask(), user);
-
+        var attachments = List.copyOf(comment.getAttachments());
         commentRepository.delete(comment);
+        AfterCommit.run("delete attachments of comment " + commentId,
+                () -> fileStorageService.deleteFilesSilently(attachments));
     }
 
+    /**
+     * Adds, switches or removes the caller's reaction.
+     *
+     * <p>Mutations go through the {@code Comment} aggregate rather than the reaction repository, so
+     * the collection the response is built from already reflects the change instead of depending on
+     * Hibernate's flush and collection-load ordering.
+     */
     @Transactional(rollbackFor = Exception.class)
-    public CommentDTO reactToComment(Integer taskId, Integer commentId, Integer userId, ReactionType reactionType) {
+    public CommentDTO reactToComment(Integer taskId, Integer commentId, Integer userId,
+                                     ReactionType reactionType) {
         var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
-
         requireCommentBelongsToTask(comment, taskId);
         accessGuard.requireAccess(comment.getTask().getProject(), userId);
 
-        var user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        var user = userService.getRequiredUserById(userId);
+        var existing = commentReactionRepository.findByCommentIdAndUserId(commentId, userId);
+        boolean isNewReaction = false;
 
-        var isNewReaction = processReaction(comment, user, reactionType, commentId);
-
-        if (isNewReaction && isNotCommentAuthor(comment, userId)) {
-            notifyCommentAuthorOfReaction(comment);
+        if (existing.isPresent()) {
+            var reaction = existing.get();
+            if (reaction.getType() == reactionType) {
+                comment.removeReaction(reaction);
+            } else {
+                reaction.setType(reactionType);
+            }
+        } else {
+            comment.addReaction(new CommentReaction(comment, user, reactionType));
+            isNewReaction = true;
         }
 
-        initializeLazyCollections(comment);
+        if (isNewReaction && !comment.getAuthor().getId().equals(userId)) {
+            notificationService.createNotification(comment.getAuthor(),
+                    "Someone reacted to your comment on task: " + comment.getTask().getSummary(),
+                    NotificationType.COMMENT_REACTION, commentLink(comment.getTask(), commentId));
+        }
+
         return entityMapper.toCommentDTO(comment, userId);
     }
 
-    // In-transaction check using the already-loaded comment (no separate query, no TOCTOU gap).
+    // ======================== Internals ========================
+
+    private Comment requireOwnEditableComment(Integer taskId, Integer commentId, Integer userId) {
+        var comment = commentRepository.findByIdWithTaskAndProject(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+        // Checked on the already-loaded comment: no second query, no time-of-check gap.
+        requireCommentBelongsToTask(comment, taskId);
+        accessGuard.requireAccess(comment.getTask().getProject(), userId);
+        accessGuard.requireCommentOwnership(comment, userId);
+        return comment;
+    }
+
     private void requireCommentBelongsToTask(Comment comment, Integer taskId) {
         if (!comment.getTask().getId().equals(taskId)) {
             throw new ValidationException("Comment does not belong to the specified task");
@@ -185,87 +198,59 @@ public class CommentService {
             throw new ValidationException("Comment content cannot be empty");
         }
         if (content.length() > ValidationUtil.MAX_COMMENT_LENGTH) {
-            throw new ValidationException("Comment exceeds maximum length of " + ValidationUtil.MAX_COMMENT_LENGTH + " characters");
+            throw new ValidationException("Comment exceeds maximum length of "
+                    + ValidationUtil.MAX_COMMENT_LENGTH + " characters");
         }
     }
 
+    private static String sanitize(String content) {
+        return Jsoup.clean(content, Safelist.basicWithImages());
+    }
+
+    /**
+     * One notification per person for one comment: replying to the assignee's own comment on their
+     * own task used to send them both a reply notification and a new-comment notification.
+     */
+    private void notifyAboutNewComment(Task task, Comment parentComment, User author, Integer commentId) {
+        var pending = new ArrayList<NotificationService.Pending>(2);
+        var link = commentLink(task, commentId);
+
+        if (parentComment != null && !parentComment.getAuthor().getId().equals(author.getId())) {
+            pending.add(new NotificationService.Pending(parentComment.getAuthor(),
+                    "Someone replied to your comment on task: " + task.getSummary(),
+                    NotificationType.COMMENT_REPLY, link));
+        }
+        if (task.getAssignee() != null && !task.getAssignee().getId().equals(author.getId())) {
+            pending.add(new NotificationService.Pending(task.getAssignee(),
+                    "New comment on task: " + task.getSummary(),
+                    NotificationType.TASK_COMMENT, link));
+        }
+        notificationService.notifyAll(pending);
+    }
+
+    private static String commentLink(Task task, Integer commentId) {
+        return "/projects?selectedIssue=" + task.getTaskKey() + "&commentId=" + commentId;
+    }
+
+    /**
+     * Loads the whole reply tree in one query per depth level rather than one per comment.
+     */
     private Map<Integer, List<Comment>> batchLoadReplies(List<Comment> topLevelComments) {
-        var allRepliesMap = new HashMap<Integer, List<Comment>>();
-        var currentParentIds = topLevelComments.stream()
-                .map(Comment::getId)
-                .toList();
+        var repliesByParent = new HashMap<Integer, List<Comment>>();
+        var parentIds = topLevelComments.stream().map(Comment::getId).toList();
 
-        while (!currentParentIds.isEmpty()) {
-            var replies = commentRepository.findRepliesByParentIdsWithDetails(currentParentIds);
-            if (replies.isEmpty()) break;
-
-            for (var reply : replies) {
-                allRepliesMap.computeIfAbsent(reply.getParentComment().getId(), k -> new ArrayList<>()).add(reply);
+        while (!parentIds.isEmpty()) {
+            var replies = commentRepository.findRepliesByParentIdsWithDetails(parentIds);
+            if (replies.isEmpty()) {
+                break;
             }
-
-            currentParentIds = replies.stream()
-                    .map(Comment::getId)
-                    .toList();
+            for (var reply : replies) {
+                repliesByParent
+                        .computeIfAbsent(reply.getParentComment().getId(), key -> new ArrayList<>())
+                        .add(reply);
+            }
+            parentIds = replies.stream().map(Comment::getId).toList();
         }
-
-        return allRepliesMap;
-    }
-
-    private void initializeLazyCollections(Comment comment) {
-        comment.getAttachments().size();
-        comment.getReactions().size();
-    }
-
-    private void notifyParentCommentAuthorIfDifferentUser(Comment parentComment, Integer userId, Task task, Integer commentId) {
-        if (parentComment == null || parentComment.getAuthor().getId().equals(userId)) {
-            return;
-        }
-        var message = "Someone replied to your comment on task: " + task.getSummary();
-        var link = "/projects?selectedIssue=" + task.getTaskKey() + "&commentId=" + commentId;
-        applicationEventPublisher.publishEvent(new NotificationEvent(parentComment.getAuthor(), message,
-                NotificationType.COMMENT_REPLY, link));
-    }
-
-    private void notifyTaskAssigneeOfNewComment(Task task, Integer commentAuthorId, Integer commentId) {
-        if (task.getAssignee() == null || task.getAssignee().getId().equals(commentAuthorId)) {
-            return;
-        }
-        var message = "New comment on task: " + task.getSummary();
-        var link = "/projects?selectedIssue=" + task.getTaskKey() + "&commentId=" + commentId;
-        applicationEventPublisher.publishEvent(new NotificationEvent(task.getAssignee(), message,
-                NotificationType.TASK_COMMENT, link));
-    }
-
-    private boolean processReaction(Comment comment, User user, ReactionType reactionType, Integer commentId) {
-        var existingReaction = commentReactionRepository.findByCommentIdAndUserId(commentId, user.getId());
-
-        if (existingReaction.isPresent()) {
-            handleExistingReaction(existingReaction.get(), reactionType);
-            return false;
-        }
-
-        var newReaction = new CommentReaction(comment, user, reactionType);
-        commentReactionRepository.save(newReaction);
-        return true;
-    }
-
-    private void handleExistingReaction(CommentReaction existingReaction, ReactionType newType) {
-        if (existingReaction.getType() == newType) {
-            commentReactionRepository.delete(existingReaction);
-        } else {
-            existingReaction.setType(newType);
-            commentReactionRepository.save(existingReaction);
-        }
-    }
-
-    private boolean isNotCommentAuthor(Comment comment, Integer userId) {
-        return !comment.getAuthor().getId().equals(userId);
-    }
-
-    private void notifyCommentAuthorOfReaction(Comment comment) {
-        var message = "Someone reacted to your comment on task: " + comment.getTask().getSummary();
-        var link = "/projects?selectedIssue=" + comment.getTask().getTaskKey() + "&commentId=" + comment.getId();
-        applicationEventPublisher.publishEvent(new NotificationEvent(comment.getAuthor(), message,
-                NotificationType.COMMENT_REACTION, link));
+        return repliesByParent;
     }
 }
