@@ -206,10 +206,12 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
     @Test
     @DisplayName("all comment queries parse and run")
     void commentQueriesRun() {
-        var topLevel = commentRepository.findTopLevelCommentsByTaskId(task.getId(), PageRequest.of(0, 10));
-        assertThat(topLevel.getTotalElements()).isEqualTo(1);
+        var topLevelIds = commentRepository.findTopLevelCommentIds(task.getId(), PageRequest.of(0, 10));
+        assertThat(topLevelIds.getTotalElements()).isEqualTo(1);
+        var topLevel = commentRepository.findTopLevelCommentsWithDetails(topLevelIds.getContent());
+        assertThat(topLevel).hasSize(1);
 
-        var parentId = topLevel.getContent().get(0).getId();
+        var parentId = topLevel.get(0).getId();
         assertThat(commentRepository.findByIdWithTaskAndProject(parentId)).isPresent();
         assertThat(commentRepository.findRepliesByParentIdsWithDetails(List.of(parentId))).isEmpty();
         assertThat(commentRepository.searchAccessible(owner.getId(), "%comment%", PageRequest.of(0, 5)))

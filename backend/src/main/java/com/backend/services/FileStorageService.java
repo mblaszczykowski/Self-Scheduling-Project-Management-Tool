@@ -122,7 +122,12 @@ public class FileStorageService {
                 // make historic attachments un-editable, but do not let it move between projects.
                 continue;
             }
-            if (ownership.getProjectId() != null && !ownership.getProjectId().equals(projectId)) {
+            // A row with no project is deliberately unscoped — a profile picture. Those are
+            // readable by every member through the member views, and their URLs travel in every
+            // UserDTO, which is exactly why claiming one as a task attachment has to be refused:
+            // whoever attaches a file also gets to detach it, and detaching unlinks it from disk.
+            // Any account could otherwise delete any other account's picture.
+            if (ownership.getProjectId() == null || !ownership.getProjectId().equals(projectId)) {
                 throw new ValidationException("Attachment does not belong to this project");
             }
         }

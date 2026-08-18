@@ -167,8 +167,10 @@ class CommentServiceTest {
             Map<Integer, List<Comment>> repliesByParent =
                     Map.of(1, List.of(reply), 3, List.of(replyToTheReply));
             when(accessGuard.getAccessibleTaskById(100, 2)).thenReturn(task);
-            when(commentRepository.findTopLevelCommentsByTaskId(100, pageable))
-                    .thenReturn(new PageImpl<>(List.of(first, second), pageable, 5));
+            when(commentRepository.findTopLevelCommentIds(100, pageable))
+                    .thenReturn(new PageImpl<>(List.of(1, 2), pageable, 5));
+            when(commentRepository.findTopLevelCommentsWithDetails(List.of(1, 2)))
+                    .thenReturn(List.of(first, second));
             when(commentRepository.findRepliesByParentIdsWithDetails(anyList())).thenAnswer(invocation -> {
                 List<Integer> parentIds = invocation.getArgument(0);
                 return parentIds.stream()
@@ -207,8 +209,10 @@ class CommentServiceTest {
 
             Pageable pageable = PageRequest.of(0, 20);
             when(accessGuard.getAccessibleTaskById(100, 1)).thenReturn(task);
-            when(commentRepository.findTopLevelCommentsByTaskId(100, pageable))
-                    .thenReturn(new PageImpl<>(List.of(first, second), pageable, 2));
+            when(commentRepository.findTopLevelCommentIds(100, pageable))
+                    .thenReturn(new PageImpl<>(List.of(1, 2), pageable, 2));
+            when(commentRepository.findTopLevelCommentsWithDetails(List.of(1, 2)))
+                    .thenReturn(List.of(first, second));
             when(commentRepository.findRepliesByParentIdsWithDetails(List.of(1, 2)))
                     .thenReturn(List.of(replyToFirst, replyToSecond));
             when(commentRepository.findRepliesByParentIdsWithDetails(List.of(3, 4)))

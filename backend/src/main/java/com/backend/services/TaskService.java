@@ -263,7 +263,14 @@ public class TaskService {
                     NotificationType.TASK_DELETED, null);
         }
 
-        var attachments = List.copyOf(task.getAttachments());
+        // The task's own files and its comments' files. Missing the latter left them on disk with
+        // nothing referencing them; deleting the project later cascaded their stored_files rows
+        // away, and a file on disk with no ownership row is treated as pre-V5 legacy — readable by
+        // every authenticated account, including members who have since been removed.
+        var attachments = new ArrayList<>(task.getAttachments());
+        for (var comment : task.getComments()) {
+            attachments.addAll(comment.getAttachments());
+        }
         taskRepository.delete(task);
         // Files come off disk only once the row is really gone.
         AfterCommit.run("delete attachments of " + taskKey,

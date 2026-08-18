@@ -18,6 +18,7 @@ import com.backend.util.ValidationUtil;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,10 +71,18 @@ public class CommentService {
     @Transactional(readOnly = true)
     public Page<CommentDTO> getCommentsByTask(Integer taskId, Integer userId, Pageable pageable) {
         var task = accessGuard.getAccessibleTaskById(taskId, userId);
-        var topLevel = commentRepository.findTopLevelCommentsByTaskId(task.getId(), pageable);
-        var repliesByParentId = batchLoadReplies(topLevel.getContent());
-        return topLevel.map(comment ->
-                entityMapper.toCommentDTOWithReplies(comment, repliesByParentId, userId));
+        // Two steps so the database does the paging: a collection fetch and a Pageable in one
+        // query makes Hibernate load every top-level comment on the task and slice in memory.
+        var ids = commentRepository.findTopLevelCommentIds(task.getId(), pageable);
+        if (ids.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        var topLevel = commentRepository.findTopLevelCommentsWithDetails(ids.getContent());
+        var repliesByParentId = batchLoadReplies(topLevel);
+        var dtos = topLevel.stream()
+                .map(comment -> entityMapper.toCommentDTOWithReplies(comment, repliesByParentId, userId))
+                .toList();
+        return new PageImpl<>(dtos, pageable, ids.getTotalElements());
     }
 
     // ======================== Writes ========================

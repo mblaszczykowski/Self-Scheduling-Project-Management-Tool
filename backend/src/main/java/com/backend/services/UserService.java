@@ -11,6 +11,7 @@ import com.backend.repositories.UserRepository;
 import com.backend.requests.EmailPreferencesRequest;
 import com.backend.requests.UpdateProfileRequest;
 import com.backend.requests.UserRegistrationRequest;
+import com.backend.util.AfterCommit;
 import com.backend.util.FileValidationConstants;
 import com.backend.util.ValidationUtil;
 import org.slf4j.Logger;
@@ -234,8 +235,12 @@ public class UserService {
         // Not project-scoped: a profile picture is visible wherever its owner is.
         user.setProfilePicture(fileStorageService.storeFile(profilePicture, null, user.getId()));
         if (oldPicture != null) {
-            // Best-effort: the new picture is already set, and an orphaned old file is harmless.
-            fileStorageService.deleteFilesSilently(java.util.List.of(oldPicture));
+            // Deferred like every other unlink: deleting inside the transaction meant a later
+            // rollback restored the row's pointer to a file that no longer existed, which is the
+            // exact failure AfterCommit was introduced to remove. An orphaned old file is harmless
+            // by comparison, so this stays best-effort.
+            AfterCommit.run("delete replaced profile picture",
+                    () -> fileStorageService.deleteFilesSilently(java.util.List.of(oldPicture)));
         }
     }
 
