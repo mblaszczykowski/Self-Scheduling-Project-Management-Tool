@@ -41,6 +41,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
     });
 
     const modalRef = useRef<HTMLDivElement>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
     const formikRef = useRef<FormikProps<ModalFormValues>>(null);
     const [emailError, setEmailError] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -53,7 +54,14 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
         requestAnimationFrame(() => setUiState(prev => ({ ...prev, isVisible: true })));
     }, []);
 
-    // Lock body scroll when modal is open
+    useEffect(() => {
+        previousFocusRef.current = document.activeElement as HTMLElement | null;
+        modalRef.current?.focus();
+        return () => {
+            previousFocusRef.current?.focus();
+        };
+    }, []);
+
     useEffect(() => {
         document.body.style.overflow = 'hidden';
         return () => { document.body.style.overflow = ''; };
@@ -62,14 +70,14 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
     const handleCloseAttempt = useCallback(() => {
         const formTouched = formikRef.current?.touched && Object.keys(formikRef.current.touched).length > 0;
         const formDirty = formikRef.current?.dirty && formTouched;
-        const isDirty = (formDirty || uiState.isDirty) && modalMode !== 'view';
+        const isDirty = formDirty || uiState.isDirty;
         if (isDirty) {
             setUiState(prev => ({ ...prev, closeConfirmOpen: true }));
         } else {
             setUiState(prev => ({ ...prev, isVisible: false }));
             setTimeout(onClose, 200);
         }
-    }, [onClose, uiState.isDirty, modalMode]);
+    }, [onClose, uiState.isDirty]);
 
     const handleForceClose = useCallback(() => {
         setUiState(prev => ({ ...prev, closeConfirmOpen: false, isVisible: false }));
@@ -208,7 +216,6 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
 
     return (
         <>
-            {/* Overlay */}
             <div
                 className={
                     'fixed inset-0 z-[60] transition-opacity duration-200 '
@@ -220,12 +227,12 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                 aria-hidden="true"
             />
 
-            {/* Modal */}
             <div
                 ref={modalRef}
                 role="dialog"
                 aria-modal="true"
-                aria-label={`${modalMode === 'create' ? 'Create' : modalMode === 'edit' ? 'Edit' : 'View'} ${modalType}`}
+                tabIndex={-1}
+                aria-label={`${modalMode === 'create' ? 'Create' : 'Edit'} ${modalType}`}
                 className={
                     'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'
                     + ' w-[92vw] max-w-[1200px] max-h-[88vh]'
@@ -239,7 +246,6 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                         : 'scale-95 opacity-0 translate-y-[-50%]')
                 }
             >
-                {/* ─── Body ─── */}
                 <div className="flex-1 overflow-y-auto min-h-0">
                     <Formik
                         innerRef={formikRef}
@@ -292,7 +298,6 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                     </Formik>
                 </div>
 
-                {/* ─── Footer ─── */}
                 <div className="flex-shrink-0 px-5 py-2.5 border-t border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/50 rounded-b-xl flex items-center gap-2">
                     {modalMode === 'edit' && (
                         <button

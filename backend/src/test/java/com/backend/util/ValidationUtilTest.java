@@ -283,7 +283,6 @@ class ValidationUtilTest {
         @Test
         @DisplayName("should handle unicode in email validation")
         void shouldHandleUnicodeEmail() {
-            // Standard ASCII email should work
             assertTrue(ValidationUtil.isValidEmail("test@example.com"));
 
             // IDN domains are not supported by the simple regex
@@ -320,7 +319,6 @@ class ValidationUtilTest {
             assertFalse(ValidationUtil.isValidEmail(veryLongString + "@example.com"));
             long duration = System.currentTimeMillis() - startTime;
 
-            // Should complete in reasonable time (less than 1 second)
             assertTrue(duration < 1000, "Email validation took too long: " + duration + "ms");
         }
     }

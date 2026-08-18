@@ -106,7 +106,7 @@ export function useTaskResizePreview({ processedProjects, updateTaskSchedule }: 
             }));
     }, [processedProjects, preview]);
 
-    return { displayProjects, startResize, shouldPreventClick };
+    return { displayProjects, startResize, shouldPreventClick, draggingTaskKey: preview?.taskKey ?? null };
 }
 
 export default useTaskResizePreview;

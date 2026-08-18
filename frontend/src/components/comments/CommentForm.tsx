@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useId, useRef } from 'react';
 import { ErrorMessage, Field, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import { HiOutlinePlus } from 'react-icons/hi';
@@ -27,6 +27,7 @@ const CommentForm = ({
     buttonText,
     onCancel,
 }: CommentFormProps) => {
+    const textareaId = useId();
     const [localAttachments, setLocalAttachments] = useState<File[]>([]);
 
     // Revoke any preview object URLs still held when the form unmounts.
@@ -59,8 +60,12 @@ const CommentForm = ({
         >
             {({ isSubmitting, handleSubmit: formikSubmit }) => (
                 <div className="space-y-1.5">
+                    <label htmlFor={textareaId} className="sr-only">
+                        {buttonText === 'Reply' ? 'Reply' : 'Comment'}
+                    </label>
                     <Field
                         as="textarea"
+                        id={textareaId}
                         name="content"
                         rows={2}
                         className={

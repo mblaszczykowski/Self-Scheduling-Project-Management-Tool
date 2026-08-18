@@ -100,7 +100,7 @@ const CommentItem = React.memo(({
                                     </span>
                                     <span
                                         className="text-xs text-slate-400 dark:text-slate-500"
-                                        title={new Date(comment.timestamp).toLocaleString()}
+                                        title={new Date(comment.timestamp).toLocaleString('en-US')}
                                     >
                                         {formatDistanceToNow(
                                             new Date(comment.timestamp),
@@ -129,6 +129,7 @@ const CommentItem = React.memo(({
                                     onClick={() =>
                                         onHandleReactToComment(comment.id, 'LIKE')
                                     }
+                                    aria-label={comment.likedByCurrentUser ? 'Remove like' : 'Like'}
                                     className={
                                         'flex items-center gap-0.5 text-xs transition-colors '
                                         + (comment.likedByCurrentUser
@@ -144,6 +145,7 @@ const CommentItem = React.memo(({
                                     onClick={() =>
                                         onHandleReactToComment(comment.id, 'DISLIKE')
                                     }
+                                    aria-label={comment.dislikedByCurrentUser ? 'Remove dislike' : 'Dislike'}
                                     className={
                                         'flex items-center gap-0.5 text-xs transition-colors '
                                         + (comment.dislikedByCurrentUser

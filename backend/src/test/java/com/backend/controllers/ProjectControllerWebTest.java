@@ -132,7 +132,7 @@ class ProjectControllerWebTest {
         }
 
         @Test
-        @DisplayName("answers 400 in the ApiError shape when the submitted project fails validation")
+        @DisplayName("answers 400 in the ApiError shape, with a fieldErrors entry, when the submitted project fails validation")
         void answers400InTheApiErrorShapeOnValidationFailure() throws Exception {
             mockMvc.perform(multipart("/api/projects")
                             .file(projectPart("""
@@ -140,11 +140,14 @@ class ProjectControllerWebTest {
                             .requestAttr(TokenService.USER_ID_ATTRIBUTE, USER_ID))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.error").value("Validation Error"))
-                    .andExpect(jsonPath("$.message").value(
-                            org.hamcrest.Matchers.containsString("Project key is required")))
+                    .andExpect(jsonPath("$.error").value("Validation Failed"))
+                    .andExpect(jsonPath("$.message").value("Invalid request data"))
                     .andExpect(jsonPath("$.timestamp").exists())
-                    .andExpect(jsonPath("$.fieldErrors").doesNotExist());
+                    .andExpect(jsonPath("$.fieldErrors").isArray())
+                    .andExpect(jsonPath("$.fieldErrors[*].field",
+                            org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("projectKey"))))
+                    .andExpect(jsonPath("$.fieldErrors[*].message",
+                            org.hamcrest.Matchers.hasItem("Project key is required")));
 
             verify(projectService, never()).createProject(any(), anyInt(), any());
         }

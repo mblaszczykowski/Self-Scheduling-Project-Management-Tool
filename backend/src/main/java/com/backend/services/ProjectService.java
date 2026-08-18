@@ -14,6 +14,7 @@ import com.backend.scheduling.SchedulingService;
 import com.backend.security.AccessGuard;
 import com.backend.services.RateLimitService.Bucket;
 import com.backend.util.AfterCommit;
+import com.backend.util.GraphCycles;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -24,7 +25,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -65,8 +65,6 @@ public class ProjectService {
         this.rateLimitService = rateLimitService;
     }
 
-    // ======================== Reads ========================
-
     @Transactional(readOnly = true)
     public ProjectDTO getProjectByKey(String projectKey, Integer userId) {
         var project = accessGuard.getAccessibleProject(projectKey, userId);
@@ -82,8 +80,6 @@ public class ProjectService {
         return projects.map(project ->
                 toDto(project, tasksByProjectId.getOrDefault(project.getId(), List.of())));
     }
-
-    // ======================== Writes ========================
 
     @Transactional(rollbackFor = Exception.class)
     public ProjectDTO createProject(ProjectRequest request, Integer userId, List<MultipartFile> attachments) {
@@ -102,14 +98,12 @@ public class ProjectService {
 
         var savedProject = projectRepository.save(project);
 
-        // Attachments need the project id to be recorded against, so they are stored after the
-        // project row exists.
-        savedProject.replaceAttachments(
-                fileStorageService.storeFiles(attachments, savedProject.getId(), userId));
-
         var resolution = resolveMembers(request.memberEmails(), owner, userId);
         savedProject.replaceMembers(resolution.members());
         applyDependencies(savedProject, request.dependencies(), userId);
+
+        savedProject.replaceAttachments(
+                fileStorageService.storeFiles(attachments, savedProject.getId(), userId));
 
         notifyMembersAdded(savedProject, resolution.members(), owner);
         sendInvitationsAfterCommit(resolution.unregisteredEmails(), savedProject.getSummary(), owner);
@@ -129,15 +123,9 @@ public class ProjectService {
         project.setSummary(request.summary());
         project.setDescription(request.description());
 
-        // PUT replaces: an attachment the client no longer lists has been removed. Previously this
-        // endpoint only ever added, so removing a project attachment reported success and did
-        // nothing.
         var previousAttachments = List.copyOf(project.getAttachments());
         var declared = request.attachments() == null ? List.<String>of() : request.attachments();
         fileStorageService.requireAttachmentsBelongTo(project.getId(), declared);
-        var updatedAttachments = new ArrayList<>(declared);
-        updatedAttachments.addAll(fileStorageService.storeFiles(attachments, project.getId(), userId));
-        project.replaceAttachments(updatedAttachments);
 
         var addedMembers = new LinkedHashSet<User>();
         var removedMembers = new LinkedHashSet<User>();
@@ -166,6 +154,10 @@ public class ProjectService {
         if (request.dependencies() != null) {
             applyDependencies(project, request.dependencies(), userId);
         }
+
+        var updatedAttachments = new ArrayList<>(declared);
+        updatedAttachments.addAll(fileStorageService.storeFiles(attachments, project.getId(), userId));
+        project.replaceAttachments(updatedAttachments);
 
         var updated = projectRepository.save(project);
         fileStorageService.deleteRemovedAfterCommit(previousAttachments, updatedAttachments,
@@ -218,8 +210,6 @@ public class ProjectService {
         AfterCommit.run("delete attachments of project " + projectKey,
                 () -> fileStorageService.deleteFilesSilently(attachments));
     }
-
-    // ======================== Internals ========================
 
     private record MemberResolution(Set<User> members, Set<String> unregisteredEmails) {}
 
@@ -292,17 +282,8 @@ public class ProjectService {
         if (project.getId() == null || newDependencies.isEmpty()) {
             return;
         }
-        var visited = new HashSet<Integer>();
-        var queue = new LinkedList<>(newDependencies);
-        while (!queue.isEmpty()) {
-            var current = queue.poll();
-            if (current.getId().equals(project.getId())) {
-                throw new ValidationException(
-                        "Circular dependency detected: a project cannot depend on itself");
-            }
-            if (visited.add(current.getId())) {
-                queue.addAll(current.getDependencies());
-            }
+        if (GraphCycles.createsCycle(project.getId(), newDependencies, Project::getId, Project::getDependencies)) {
+            throw new ValidationException("Circular dependency detected: a project cannot depend on itself");
         }
     }
 

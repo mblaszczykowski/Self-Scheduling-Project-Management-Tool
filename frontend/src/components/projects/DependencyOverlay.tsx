@@ -161,6 +161,7 @@ function buildArrowPath(sx: number, sy: number, ex: number, ey: number, allBars:
 const DependencyOverlay = ({
     containerRef,
     allTasks,
+    draggingTaskKey,
     taskKeyMap,
     expandedProjects,
     projectKeyToProject,
@@ -198,6 +199,7 @@ const DependencyOverlay = ({
         const result: ArrowBase[] = [];
         for (const task of allTasks) {
             if (!filteredTaskIds.has(task.id)) continue;
+            if (task.taskKey === draggingTaskKey) continue;
             const proj = projectKeyToProject.get(task.projectKey);
             if (!proj || !expandedProjects[proj.projectKey]) continue;
             if (!filteredProjectKeys.has(proj.projectKey) && hasActiveFilters) continue;
@@ -206,6 +208,7 @@ const DependencyOverlay = ({
             if (!target) continue;
 
             for (const depKey of (task.dependencies || [])) {
+                if (depKey === draggingTaskKey) continue;
                 const dep = taskKeyMap.get(depKey);
                 if (!dep || !filteredTaskIds.has(dep.id)) continue;
                 const dp = projectKeyToProject.get(dep.projectKey);
@@ -230,7 +233,7 @@ const DependencyOverlay = ({
             d: buildArrowPath(a.sx, a.sy, a.ex, a.ey, allBars),
         })));
         setDims({ w: el.scrollWidth, h: el.scrollHeight });
-    }, [containerRef, allTasks, taskKeyMap, expandedProjects,
+    }, [containerRef, allTasks, draggingTaskKey, taskKeyMap, expandedProjects,
         projectKeyToProject, filteredTaskIds, filteredProjectKeys, hasActiveFilters]);
 
     useEffect(() => {

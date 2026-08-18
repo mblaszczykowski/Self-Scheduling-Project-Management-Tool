@@ -17,6 +17,34 @@ proposed dates can be reviewed before anything is written.
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart LR
+    Browser(["Browser"])
+
+    subgraph Compose ["docker compose"]
+        Nginx["nginx<br/>reverse proxy + static SPA"]
+        Backend["Spring Boot API"]
+        DB[("PostgreSQL 16")]
+        Uploads[("uploads volume")]
+    end
+
+    Browser -->|"HTTP :80"| Nginx
+    Nginx -->|"/api/*, /files/*"| Backend
+    Nginx -.->|"static bundle"| Browser
+    Backend --> DB
+    Backend --> Uploads
+    Backend -.->|"SSE notifications"| Browser
+```
+
+The browser only ever talks to nginx: it serves the built SPA directly and reverse-proxies
+`/api/` and `/files/` to the backend, so there is exactly one origin from the browser's point of
+view and nothing to configure for CORS in production. The backend is a single Spring Boot
+process — there is no separate auth server, message queue or cache; sessions, rate limiting and
+the SSE notification stream all live inside that one JVM. PostgreSQL is the only other moving
+part.
+
 ## Quick start with Docker
 
 This is the supported path. It builds both images, starts PostgreSQL, applies the database
@@ -274,15 +302,227 @@ With mail disabled, project invitations still arrive as in-app notifications.
 
 ---
 
+## Authentication
+
+JWTs live in HTTP-only cookies rather than local storage, so they are invisible to JavaScript and
+immune to token-stealing XSS. A short-lived access token authenticates requests; a long-lived
+refresh token, rotated on every use, keeps the session alive without asking for a password again.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant F as JwtAuthenticationFilter
+    participant S as AuthService / TokenService
+    participant DB as PostgreSQL
+
+    B->>F: POST /api/auth/login
+    F->>S: authenticateUser(email, password)
+    S->>DB: verify BCrypt hash
+    S->>DB: INSERT refresh_tokens (hash, family_id)
+    S-->>B: Set-Cookie: accessToken, refreshToken, XSRF-TOKEN
+
+    rect rgb(240, 240, 240)
+    Note over B,F: every subsequent request
+    B->>F: GET /api/... (Cookie: accessToken)
+    F->>F: verify JWT, set request attribute
+    F-->>B: 200 OK
+    end
+
+    rect rgb(240, 240, 240)
+    Note over B,S: access token expired
+    B->>F: GET /api/...
+    F-->>B: 401 Unauthorized
+    B->>S: POST /api/auth/refresh (Cookie: refreshToken)
+    alt refresh token already consumed
+        S->>DB: revoke the whole family_id
+        S-->>B: 401, session terminated
+    else refresh token valid
+        S->>DB: mark consumed, insert rotated token (same family_id)
+        S-->>B: new accessToken + refreshToken cookies
+        B->>F: retry the original request
+    end
+    end
+```
+
+Every token descended from one login shares a `family_id`. Presenting an already-consumed
+refresh token — the signature of a stolen token being replayed — revokes every token in that
+family rather than just the one presented, so a single compromised cookie cannot be reused even
+if the legitimate client refreshes first. `app.session.absolute-max-days` caps a session
+regardless of how many times it has been rotated. CSRF is handled separately, by double-submit:
+the `XSRF-TOKEN` cookie value must be echoed back in an `X-CSRF-Token` header on every unsafe
+method, which a cross-site request cannot do without reading the cookie itself.
+
+---
+
+## Schedule optimizer
+
+Projects in a portfolio usually share the same people, so plans drawn up independently collide —
+the same engineer assigned to overlapping work in two projects at once. The optimizer treats the
+whole portfolio as one resource-constrained project scheduling problem: assignees are the
+renewable resources, task dependencies are precedence constraints, and it searches for a schedule
+that resolves the conflicts.
+
+```mermaid
+flowchart TD
+    Tasks["Task DTOs<br/>(entire portfolio)"] --> Model["ScheduleModel"]
+    Model --> Graph["PrecedenceGraph<br/>topological order + cycle check"]
+    Graph --> Decode["SsgsDecoder<br/>run once per priority rule"]
+    Decode --> R1["MORCPSP"]
+    Decode --> R2["AS_PLANNED"]
+    Decode --> R3["LFT"]
+    Decode --> R4["SPT"]
+    Decode --> R5["MTS"]
+    R1 --> Eval["ScheduleEvaluator<br/>Z = α·(WT / WTmax) + β·(Cmax / H)"]
+    R2 --> Eval
+    R3 --> Eval
+    R4 --> Eval
+    R5 --> Eval
+    Eval --> Pick["lowest Z wins"]
+    Pick --> Simulate["POST /optimization/simulate<br/>preview only"]
+    Pick --> Apply["POST /optimization/apply<br/>recomputed server-side, then persisted"]
+```
+
+`SsgsDecoder` is a serial schedule generation scheme: at every step it takes the
+highest-priority eligible task — one whose predecessors are all already placed — and puts it at
+the earliest day that satisfies its release date, its predecessors' finish times and its
+assignee's availability. Because a task is only ever considered once every predecessor is final,
+the result is precedence-feasible by construction, with no repair pass needed. The decoder runs
+once under each of five priority rules (`MORCPSP`, the composite priority-and-fan-out rule that
+gives the algorithm its name, plus four textbook baselines), and `ScheduleEvaluator` scores every
+candidate against a single objective: a weighted combination of priority-weighted tardiness and
+makespan, both normalised to `[0, 1]` so portfolios of different sizes stay comparable. The
+lowest-scoring candidate wins.
+
+`POST /optimization/simulate` runs this whole pipeline and returns the proposed dates without
+writing anything, which is what lets the UI show them as ghost bars alongside the current plan
+before anyone commits to them. `POST /optimization/apply` does not trust dates echoed back by the
+browser — it recomputes the schedule server-side from the current data and persists that, so
+what ends up in the database is feasible by construction rather than whatever the client last
+saw.
+
+---
+
 ## Database schema
 
 Flyway owns the schema. The migrations are in
-`backend/src/main/resources/db/migration/` (`V1` … `V5`) and run automatically on startup, in
+`backend/src/main/resources/db/migration/` (`V1` … `V6`) and run automatically on startup, in
 development, in CI and in production alike.
 
 Hibernate is set to `spring.jpa.hibernate.ddl-auto=validate`: it verifies that the entity model
 matches the migrated schema and never mutates it. A drifted entity fails the application at
 startup instead of silently altering a production table.
+
+```mermaid
+erDiagram
+    USERS ||--o{ PROJECTS : owns
+    USERS |o--o{ PROJECTS : "member of"
+    USERS |o--o{ TASKS : "assigned to"
+    USERS ||--o{ COMMENTS : authors
+    USERS ||--o{ COMMENT_REACTIONS : reacts
+    USERS ||--o{ NOTIFICATIONS : receives
+    USERS ||--o{ TASK_ACTIVITIES : authors
+    USERS ||--o{ REFRESH_TOKENS : sessions
+    USERS |o--o{ STORED_FILES : uploads
+
+    PROJECTS ||--o{ TASKS : contains
+    PROJECTS |o--o{ STORED_FILES : scopes
+    PROJECTS }o--o{ PROJECTS : "depends on"
+    PROJECTS ||--o{ PROJECT_ATTACHMENTS : has
+
+    TASKS ||--o{ COMMENTS : has
+    TASKS ||--o{ TASK_ACTIVITIES : logs
+    TASKS ||--o{ TASK_ATTACHMENTS : has
+    TASKS }o--o{ TASKS : "depends on"
+
+    COMMENTS ||--o{ COMMENT_REACTIONS : has
+    COMMENTS |o--o{ COMMENTS : "replies to"
+    COMMENTS ||--o{ COMMENT_ATTACHMENTS : has
+
+    USERS {
+        int id PK
+        string email UK "case-insensitive"
+        string password "BCrypt"
+        bigint version "optimistic lock"
+    }
+    PROJECTS {
+        int id PK
+        string project_key UK "e.g. ECOM"
+        string summary
+        int next_task_number
+        int owner_id FK
+        bigint version
+    }
+    TASKS {
+        int id PK
+        int project_id FK
+        int task_number "unique per project"
+        string status "12 values"
+        string priority "5 values, nullable"
+        int assignee_id FK "nullable"
+        date start_date
+        date due_date
+        int progress "0-100"
+        bigint version
+    }
+    COMMENTS {
+        int id PK
+        int task_id FK
+        int author_id FK
+        int parent_comment_id FK "nullable, threading"
+        text content
+        bigint version
+    }
+    COMMENT_REACTIONS {
+        int id PK
+        int comment_id FK
+        int user_id FK
+        string type "LIKE or DISLIKE"
+    }
+    NOTIFICATIONS {
+        int id PK
+        int user_id FK
+        string type "9 values"
+        string message
+        boolean is_read
+    }
+    TASK_ACTIVITIES {
+        int id PK
+        int task_id FK
+        int author_id FK
+        string type "13 values"
+        string field_name "nullable"
+    }
+    REFRESH_TOKENS {
+        bigint id PK
+        int user_id FK
+        string token_hash UK "SHA-256"
+        string family_id "rotation family"
+        timestamp consumed_at "nullable, replay check"
+    }
+    STORED_FILES {
+        bigint id PK
+        string stored_name UK
+        int project_id FK "nullable = profile picture"
+        int uploaded_by FK "nullable"
+    }
+    PROJECT_ATTACHMENTS {
+        int project_id FK
+        string attachment_url
+    }
+    TASK_ATTACHMENTS {
+        int task_id FK
+        string attachment_url
+    }
+    COMMENT_ATTACHMENTS {
+        int comment_id FK
+        string attachment_url
+    }
+```
+
+`project_members`, `project_dependencies` and `task_dependencies` are plain join tables backing
+the many-to-many edges above; the three `*_attachments` tables are Hibernate element collections
+(just a foreign key and a URL, no id of their own) rather than entities in their own right.
 
 Consequences worth knowing:
 

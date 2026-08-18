@@ -34,6 +34,9 @@ services:
       # in .env only for a plain-HTTP localhost stack, where the browser would otherwise drop the
       # auth cookies entirely.
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_SAME_SITE: ${COOKIE_SAME_SITE:-Lax}
+      SESSION_MAX_DAYS: ${SESSION_MAX_DAYS:-30}
+      INTERNAL_PROXIES:
       # Outbound mail is off by default; the invitation flow degrades to in-app notifications.
       APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-false}
       MAIL_FROM: ${MAIL_FROM:-noreply@example.com}

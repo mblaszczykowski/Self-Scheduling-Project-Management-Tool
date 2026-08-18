@@ -145,7 +145,6 @@ export default function ActivityTab({ taskId }: { taskId: number }) {
 
     return (
         <div className="relative">
-            {/* Timeline line */}
             <div className="absolute left-[15px] top-4 bottom-4 w-px bg-slate-200 dark:bg-slate-700" />
 
             <div className="space-y-0">
@@ -156,12 +155,10 @@ export default function ActivityTab({ taskId }: { taskId: number }) {
 
                     return (
                         <div key={activity.id} className="relative flex gap-3 py-2 group">
-                            {/* Icon dot */}
                             <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center flex-shrink-0 ${cfg.bg} ring-2 ring-white dark:ring-slate-900`}>
                                 <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
                             </div>
 
-                            {/* Content */}
                             <div className="flex-1 min-w-0 pt-0.5">
                                 <div className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                                     <ActivityDescription activity={activity} />

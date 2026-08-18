@@ -83,7 +83,7 @@ public class Task {
     )
     private Set<Task> dependencies = new HashSet<>();
 
-    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "task")
     private List<Comment> comments = new ArrayList<>();
 
     @ElementCollection

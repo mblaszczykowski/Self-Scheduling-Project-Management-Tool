@@ -20,11 +20,9 @@ export default function AuthPage({ show }: { show: AuthFormMode }) {
             <div className="auth-noise absolute inset-0 pointer-events-none" />
             <div className="auth-grid absolute inset-0 pointer-events-none" />
 
-            {/* Ambient glows */}
             <div className="absolute top-[-5%] left-[10%] w-[500px] h-[500px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%)' }} />
             <div className="absolute bottom-[-10%] right-[5%] w-[600px] h-[600px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.04) 0%, transparent 70%)' }} />
 
-            {/* ── Navigation ── */}
             <nav className="anim-in anim-d1 relative z-20 flex items-center justify-between px-6 lg:px-12 py-5">
                 <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
@@ -57,10 +55,8 @@ export default function AuthPage({ show }: { show: AuthFormMode }) {
                 </div>
             </nav>
 
-            {/* ── Hero Section ── */}
             <div className="relative z-10 px-6 lg:px-12 pt-8 lg:pt-12 pb-8">
                 <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row gap-10 lg:gap-14 items-start">
-                    {/* Left: headline + gantt */}
                     <div className="flex-1 min-w-0">
                         <h1 className="auth-heading anim-in anim-d2 text-[clamp(2.2rem,4.5vw,3.5rem)] leading-[1.08] tracking-tight text-[var(--text-primary)] mb-4">
                             Schedules that<br />
@@ -72,12 +68,10 @@ export default function AuthPage({ show }: { show: AuthFormMode }) {
                             with ghost-bar previews you can accept in one click.
                         </p>
 
-                        {/* Gantt */}
                         <div className="anim-in anim-d5">
                             <GanttChart />
                         </div>
 
-                        {/* Feature strip */}
                         <div className="anim-in anim-d6 flex gap-1 mt-6">
                             {FEATURES.map((f, i) => (
                                 <div key={i} className="feat-item flex-1 flex flex-col items-center text-center gap-1.5 py-4 px-2 rounded-xl cursor-default transition-colors duration-200 hover:bg-white/70">
@@ -89,7 +83,6 @@ export default function AuthPage({ show }: { show: AuthFormMode }) {
                         </div>
                     </div>
 
-                    {/* Right: auth card */}
                     <div className="anim-in anim-d4 w-full lg:w-[380px] xl:w-[400px] shrink-0 lg:sticky lg:top-24">
                         <div className="auth-card rounded-2xl p-6">
                             <div className="mb-5">

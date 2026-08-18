@@ -168,6 +168,22 @@ class EntityMapperTest {
         }
 
         @Test
+        @DisplayName("lists dependency keys in a fixed order regardless of the order they were added in")
+        void listsDependencyKeysInAFixedOrder() {
+            var first = TestEntityFactory.createTask(101, 2, project);
+            var second = TestEntityFactory.createTask(102, 3, project);
+
+            task.replaceDependencies(List.of(first, second));
+            var ascending = mapper.toTaskDTO(task, null).dependencyKeys();
+
+            task.replaceDependencies(List.of(second, first));
+            var descending = mapper.toTaskDTO(task, null).dependencyKeys();
+
+            assertThat(ascending).containsExactly("PROJ-2", "PROJ-3");
+            assertThat(descending).containsExactly("PROJ-2", "PROJ-3");
+        }
+
+        @Test
         @DisplayName("reports the assignee by email, and null when the task is unassigned")
         void reportsTheAssigneeByEmail() {
             assertThat(mapper.toTaskDTO(task, null).assignee()).isNull();

@@ -8,6 +8,7 @@ import { TimelineViewProps } from './types';
 const TimelineView = ({
     processedProjects,
     allTasks,
+    draggingTaskKey,
     taskKeyMap,
     projectKeyToProject,
     filteredTaskIds,
@@ -75,6 +76,7 @@ const TimelineView = ({
                 <DependencyOverlay
                     containerRef={timelineRef}
                     allTasks={allTasks}
+                    draggingTaskKey={draggingTaskKey}
                     taskKeyMap={taskKeyMap}
                     expandedProjects={expandedProjects}
                     projectKeyToProject={projectKeyToProject}

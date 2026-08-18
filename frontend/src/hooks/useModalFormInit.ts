@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as Yup from 'yup';
-import { formatDate, formatDateTime, MS_PER_DAY, toDateString } from '../util/helpers';
+import { formatDateTime, MS_PER_DAY, toDateString } from '../util/helpers';
 import {
     AttachmentsState, CurrentUser, ModalFormValues, ModalMode, ModalType, Project, Task,
 } from '../types';
@@ -51,7 +51,6 @@ const inclusiveDays = (startDate?: string | null, dueDate?: string | null): numb
     return Math.max(1, Math.floor((due - start) / MS_PER_DAY) + 1);
 };
 
-/** Builds the form's initial values, its validation schema, and the dependency list. */
 const useModalFormInit = ({ modalType, modalMode, project, task, user, setAttachments }: Options) => {
     const [dependencies, setDependencies] = useState<string[]>([]);
     const [initialValues, setInitialValues] = useState<ModalFormValues>(DEFAULT_VALUES);
@@ -68,8 +67,8 @@ const useModalFormInit = ({ modalType, modalMode, project, task, user, setAttach
                     summary: task.summary,
                     description: task.description ?? '',
                     status: task.status,
-                    startDate: formatDate(task.startDate),
-                    dueDate: formatDate(task.dueDate),
+                    startDate: toDateString(task.startDate),
+                    dueDate: toDateString(task.dueDate),
                     assignee: task.assignee ?? '',
                     duration: inclusiveDays(task.startDate, task.dueDate),
                     progress: task.progress,

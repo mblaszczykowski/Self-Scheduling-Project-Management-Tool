@@ -81,8 +81,17 @@ const TimelineProjectRow = ({
                                     />
                                 </button>
                                 <div
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={`Open project ${project.projectKey}: ${project.summary}`}
                                     className="flex-1 min-w-0 cursor-pointer group/proj"
                                     onClick={() => onOpenProjectModal(project)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            onOpenProjectModal(project);
+                                        }
+                                    }}
                                 >
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 font-mono">

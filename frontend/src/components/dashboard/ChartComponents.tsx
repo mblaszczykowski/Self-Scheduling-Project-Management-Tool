@@ -36,6 +36,15 @@ export const ChartCard = ({ title, subtitle, children, className = "" }: { title
  */
 export const useChartSurfaceColor = (): string => (useTheme().theme === 'dark' ? '#1e293b' : '#ffffff');
 
+const CHART_TICK_COLOR_LIGHT = '#64748b';
+const CHART_TICK_COLOR_DARK = '#94a3b8';
+
+const resolveChartTickColor = (): string =>
+    (document.documentElement.classList.contains('dark') ? CHART_TICK_COLOR_DARK : CHART_TICK_COLOR_LIGHT);
+
+export const useChartTickColor = (): string =>
+    (useTheme().theme === 'dark' ? CHART_TICK_COLOR_DARK : CHART_TICK_COLOR_LIGHT);
+
 export const chartOptions = {
     plugins: {
         legend: { display: false },
@@ -53,12 +62,12 @@ export const chartOptions = {
     scales: {
         x: {
             grid: { display: false },
-            ticks: { font: { size: 10, family: 'system-ui' }, color: '#64748b' },
+            ticks: { font: { size: 10, family: 'system-ui' }, color: resolveChartTickColor },
             border: { display: false },
         },
         y: {
             grid: { color: 'rgba(148, 163, 184, 0.1)', drawBorder: false },
-            ticks: { font: { size: 10, family: 'system-ui' }, color: '#64748b', padding: 8 },
+            ticks: { font: { size: 10, family: 'system-ui' }, color: resolveChartTickColor, padding: 8 },
             border: { display: false },
         },
     },

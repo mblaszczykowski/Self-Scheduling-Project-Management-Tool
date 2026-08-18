@@ -49,10 +49,10 @@ public class AccessGuard {
         }
     }
 
-    /** Fetch a project (with owner + members) and require the caller to be its owner. */
     public Project getOwnedProject(String projectKey, Integer userId) {
         var project = projectRepository.findByProjectKeyWithOwnerAndMembers(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        requireAccess(project, userId);
         requireOwner(project, userId);
         return project;
     }
@@ -70,7 +70,9 @@ public class AccessGuard {
     public Task getAccessibleTaskById(Integer taskId, Integer userId) {
         var task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
-        requireAccess(task.getProject(), userId);
+        if (!task.getProject().hasAccess(userId)) {
+            throw new ResourceNotFoundException("Task not found");
+        }
         return task;
     }
 

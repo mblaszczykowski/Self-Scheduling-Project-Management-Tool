@@ -49,7 +49,6 @@ export const insertTable = (editor: Editor | null): void => {
     editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
 };
 
-// Dispatch a config item's editor command (with optional args).
 export const runItemCommand = (editor: Editor, item: ToolbarItem): void => {
     if (!item.command) return;
     const chain = editor.chain().focus() as unknown as CommandMap;
@@ -57,7 +56,6 @@ export const runItemCommand = (editor: Editor, item: ToolbarItem): void => {
     result.run();
 };
 
-// Whether a config item's mark/node is currently active.
 export const isItemActive = (editor: Editor, item: ToolbarItem): boolean => {
     if (!item.activeKey) return false;
     if (typeof item.activeKey === 'object') return editor.isActive(item.activeKey);
@@ -66,7 +64,6 @@ export const isItemActive = (editor: Editor, item: ToolbarItem): boolean => {
         : editor.isActive(item.activeKey);
 };
 
-// Whether an undo/redo-style command can currently run.
 export const editorCan = (editor: Editor, canKey: string): boolean => {
     const can = editor.can() as unknown as CanMap;
     return typeof can[canKey] === 'function' ? can[canKey]() : false;

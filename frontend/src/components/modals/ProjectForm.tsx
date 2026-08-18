@@ -13,7 +13,7 @@ type SetFieldValue = FormikHelpers<ModalFormValues>['setFieldValue'];
 interface ProjectFormProps {
     values: ModalFormValues;
     setFieldValue: SetFieldValue;
-    modalMode: 'create' | 'edit' | 'view';
+    modalMode: 'create' | 'edit';
     project?: Project | null;
     projects: Project[];
     entityKey?: string | null;
@@ -76,14 +76,14 @@ const ProjectForm = ({
                                 type="text"
                                 id="projectKey"
                                 name="projectKey"
-                                maxLength="4"
+                                maxLength={10}
                                 placeholder="e.g. PROJ"
                                 className={
                                     `${inputClass} uppercase font-mono tracking-wider`
                                 }
                             />
                             <p className="text-xs text-slate-400 mt-1.5">
-                                Max 4 characters
+                                Max 10 characters
                             </p>
                             <ErrorMessage
                                 name="projectKey"

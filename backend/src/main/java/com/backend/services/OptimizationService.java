@@ -44,8 +44,6 @@ public class OptimizationService {
         this.config = appProperties.getOptimization();
     }
 
-    // ======================== Simulate ========================
-
     public OptimizationResultDTO simulate(OptimizationRequest request, Integer userId) {
         var alpha = request.alpha() != null ? request.alpha() : config.getDefaultAlpha();
         var beta = request.beta() != null ? request.beta() : config.getDefaultBeta();
@@ -73,8 +71,6 @@ public class OptimizationService {
                 outcome.chosen().rule().label(),
                 outcome.skippedKeys());
     }
-
-    // ======================== Apply ========================
 
     /**
      * Re-derives the schedule server-side and persists it.
@@ -140,8 +136,6 @@ public class OptimizationService {
                 changes.size(), request.projectKeys().size(), userId);
         return taskService.applySchedule(changes, userId);
     }
-
-    // ======================== Internals ========================
 
     /**
      * Bounds a caller-supplied horizon. Without this, a simulation could be asked to start in the

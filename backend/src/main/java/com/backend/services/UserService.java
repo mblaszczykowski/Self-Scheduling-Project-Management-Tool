@@ -59,8 +59,6 @@ public class UserService {
         return email == null ? null : email.toLowerCase(Locale.ROOT).trim();
     }
 
-    // ======================== Lookups ========================
-
     public User findUserByEmailOrNull(String email) {
         return userRepository.findByEmailIgnoringCase(normalizeEmail(email)).orElse(null);
     }
@@ -109,8 +107,6 @@ public class UserService {
         return entityMapper.toCurrentUserDTO(getRequiredUserById(userId));
     }
 
-    // ======================== Registration ========================
-
     public record RegistrationResult(TokenService.AuthTokens tokens, Integer userId, String email) {}
 
     @Transactional(rollbackFor = Exception.class)
@@ -133,8 +129,6 @@ public class UserService {
 
         return new RegistrationResult(tokenService.createAuthTokens(user.getId()), user.getId(), user.getEmail());
     }
-
-    // ======================== Profile ========================
 
     /**
      * Applies profile changes. Blank fields are left alone.

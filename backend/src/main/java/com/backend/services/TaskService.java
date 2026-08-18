@@ -7,7 +7,6 @@ import com.backend.entities.Task;
 import com.backend.entities.TaskPriority;
 import com.backend.entities.TaskStatus;
 import com.backend.entities.User;
-import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.mapper.EntityMapper;
@@ -19,15 +18,14 @@ import com.backend.requests.TaskScheduleRequest;
 import com.backend.scheduling.SchedulingService;
 import com.backend.security.AccessGuard;
 import com.backend.util.AfterCommit;
+import com.backend.util.GraphCycles;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -66,8 +64,6 @@ public class TaskService {
         this.schedulingService = schedulingService;
     }
 
-    // ======================== Create ========================
-
     @Transactional(rollbackFor = Exception.class)
     public TaskDTO createTask(String projectKey, TaskRequest request, Integer userId,
                               List<MultipartFile> files) {
@@ -77,10 +73,6 @@ public class TaskService {
         accessGuard.requireAccess(project, userId);
 
         var author = userService.getRequiredUserById(userId);
-
-        // Store files only after authorization: file storage is not transactional, so a later
-        // rollback would not remove them.
-        var uploaded = fileStorageService.storeFiles(files, project.getId(), userId);
 
         var task = new Task();
         task.setProject(project);
@@ -97,13 +89,14 @@ public class TaskService {
 
         var declaredAttachments = nullSafe(request.attachments());
         fileStorageService.requireAttachmentsBelongTo(project.getId(), declaredAttachments);
-        var attachments = new ArrayList<>(declaredAttachments);
-        attachments.addAll(uploaded);
-        task.replaceAttachments(attachments);
 
         if (!nullSafe(request.dependencyKeys()).isEmpty()) {
             task.replaceDependencies(resolveDependencies(request.dependencyKeys(), userId));
         }
+
+        var attachments = new ArrayList<>(declaredAttachments);
+        attachments.addAll(fileStorageService.storeFiles(files, project.getId(), userId));
+        task.replaceAttachments(attachments);
 
         var savedTask = taskRepository.save(task);
         taskActivityService.logCreated(savedTask, author);
@@ -112,8 +105,6 @@ public class TaskService {
 
         return toDtoWithCriticality(savedTask);
     }
-
-    // ======================== Update ========================
 
     /**
      * Replaces the task with the submitted representation.
@@ -145,13 +136,14 @@ public class TaskService {
 
         var declaredAttachments = nullSafe(request.attachments());
         fileStorageService.requireAttachmentsBelongTo(project.getId(), declaredAttachments);
-        var attachments = new ArrayList<>(declaredAttachments);
-        attachments.addAll(fileStorageService.storeFiles(files, project.getId(), userId));
-        task.replaceAttachments(attachments);
 
         var dependencies = resolveDependencies(request.dependencyKeys(), userId);
         validateNoCycles(task, dependencies);
         task.replaceDependencies(dependencies);
+
+        var attachments = new ArrayList<>(declaredAttachments);
+        attachments.addAll(fileStorageService.storeFiles(files, project.getId(), userId));
+        task.replaceAttachments(attachments);
 
         var updatedTask = taskRepository.save(task);
         taskActivityService.logFieldChanges(updatedTask, author, before, TaskSnapshot.of(updatedTask));
@@ -216,9 +208,7 @@ public class TaskService {
             if (task == null) {
                 throw new ResourceNotFoundException("Task not found: " + change.taskKey());
             }
-            if (!task.getProject().hasAccess(userId)) {
-                throw new AuthorizationException("No access to task: " + change.taskKey());
-            }
+            accessGuard.requireAccess(task.getProject(), userId);
             if (change.startDate() == null || change.dueDate() == null
                     || change.dueDate().isBefore(change.startDate())) {
                 throw new ValidationException("Invalid schedule for task: " + change.taskKey());
@@ -249,8 +239,6 @@ public class TaskService {
         return applied;
     }
 
-    // ======================== Delete ========================
-
     @Transactional(rollbackFor = Exception.class)
     public void deleteTask(String projectKey, String taskKey, Integer userId) {
         var project = accessGuard.getOwnedProject(projectKey, userId);
@@ -276,8 +264,6 @@ public class TaskService {
         AfterCommit.run("delete attachments of " + taskKey,
                 () -> fileStorageService.deleteFilesSilently(attachments));
     }
-
-    // ======================== Internals ========================
 
     private Task requireTaskInProject(String taskKey, Project project) {
         var task = taskRepository.findByTaskKey(taskKey)
@@ -333,8 +319,7 @@ public class TaskService {
         }
         for (var dependency : resolved) {
             if (!dependency.getProject().hasAccess(userId)) {
-                throw new AuthorizationException(
-                        "Cannot create dependency to task in inaccessible project: " + dependency.getTaskKey());
+                throw new ValidationException("One or more dependency tasks do not exist");
             }
         }
         return resolved;
@@ -344,16 +329,8 @@ public class TaskService {
         if (task.getId() == null || newDependencies.isEmpty()) {
             return;
         }
-        var visited = new HashSet<Integer>();
-        var queue = new LinkedList<>(newDependencies);
-        while (!queue.isEmpty()) {
-            var current = queue.poll();
-            if (current.getId().equals(task.getId())) {
-                throw new ValidationException("Circular dependency detected: a task cannot depend on itself");
-            }
-            if (visited.add(current.getId())) {
-                queue.addAll(current.getDependencies());
-            }
+        if (GraphCycles.createsCycle(task.getId(), newDependencies, Task::getId, Task::getDependencies)) {
+            throw new ValidationException("Circular dependency detected: a task cannot depend on itself");
         }
     }
 

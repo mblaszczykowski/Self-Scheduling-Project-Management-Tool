@@ -43,10 +43,10 @@ public record TaskRequest(
         List<@Size(max = 20, message = "A label must not exceed 20 characters") String> labels,
 
         @Size(max = 50, message = "A task cannot depend on more than 50 tasks")
-        List<String> dependencyKeys,
+        List<@NotBlank String> dependencyKeys,
 
         @Size(max = 50, message = "A task cannot have more than 50 attachments")
-        List<String> attachments
+        List<@NotBlank String> attachments
 ) {
     @AssertTrue(message = "Due date must not be before the start date")
     public boolean isDateRangeOrdered() {

@@ -103,10 +103,6 @@ public final class PrecedenceGraph {
         return tasks.get(key);
     }
 
-    public boolean contains(String key) {
-        return tasks.containsKey(key);
-    }
-
     /** Predecessors first. */
     public List<String> topologicalOrder() {
         return topologicalOrder;

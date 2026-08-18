@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 
-/* ─────────────────────────── GANTT DATA ───────────────────────── */
-
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
 const TODAY_PCT = 52;
 
@@ -61,8 +59,6 @@ const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
     </svg>
 );
 
-/* ──────────────────────── GANTT CHART ─────────────────────────── */
-
 export const GanttChart = () => {
     const [expanded, setExpanded] = useState<Record<string, boolean>>({ WEB: true, MOB: true });
     const [showOptimization, setShowOptimization] = useState(true);
@@ -79,7 +75,6 @@ export const GanttChart = () => {
 
     return (
         <div className="gantt-widget rounded-2xl border border-slate-900 bg-white overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.06)' }}>
-            {/* Toolbar */}
             <div className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-200 bg-white">
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-slate-900" />
@@ -112,7 +107,6 @@ export const GanttChart = () => {
                 </div>
             </div>
 
-            {/* Month headers */}
             <div className="flex border-b border-slate-200">
                 <div style={{ width: SIDEBAR_W, minWidth: SIDEBAR_W }} className="border-r border-slate-200 px-3 py-1.5 flex items-center">
                     <span className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Projects / Tasks</span>
@@ -126,14 +120,11 @@ export const GanttChart = () => {
                 </div>
             </div>
 
-            {/* Content rows */}
             <div className="relative">
-                {/* Grid lines */}
                 <div className="absolute top-0 bottom-0 flex pointer-events-none" style={{ left: SIDEBAR_W, right: 0 }}>
                     {MONTHS.map((_, i) => <div key={i} className="flex-1 border-r border-slate-50 last:border-r-0" />)}
                 </div>
 
-                {/* Today line */}
                 <div className="today-line absolute top-0 bottom-0 w-px z-10 pointer-events-none" style={{ left: `calc(${SIDEBAR_W}px + (100% - ${SIDEBAR_W}px) * ${TODAY_PCT} / 100)`, background: 'linear-gradient(to bottom, #ef4444, #ef444430)' }}>
                     <div className="absolute -top-0 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[6px] font-bold px-1 py-px rounded-b tracking-wide">TODAY</div>
                 </div>
@@ -142,7 +133,6 @@ export const GanttChart = () => {
                     const isExpanded = expanded[project.key];
                     return (
                         <div key={project.key}>
-                            {/* Project header row */}
                             <div
                                 className={`gantt-row flex items-center border-b cursor-pointer transition-colors duration-150 ${isExpanded ? 'border-slate-200 bg-white' : 'border-slate-100'}`}
                                 style={{ height: PROJ_ROW_H }}
@@ -166,13 +156,11 @@ export const GanttChart = () => {
                                         </div>
                                     </div>
                                 </div>
-                                {/* Project bar */}
                                 <div className="flex-1 relative h-full flex items-center">
                                     <div className="absolute bg-slate-800 h-3.5 rounded cursor-pointer hover:bg-slate-700 transition-colors" style={{ left: `${project.barLeft}%`, width: `${project.barW}%` }} />
                                 </div>
                             </div>
 
-                            {/* Task rows */}
                             {isExpanded && project.tasks.map((task, tIdx) => {
                                 const status = STATUS_PILL[task.status];
                                 const isHovered = hoveredTask === task.key;
@@ -200,9 +188,7 @@ export const GanttChart = () => {
                                                 </div>
                                             </div>
                                         </div>
-                                        {/* Task bar area */}
                                         <div className="flex-1 relative h-full flex items-center">
-                                            {/* Task bar */}
                                             <div
                                                 className={`gantt-bar gantt-d${tIdx} absolute ${task.critical ? 'bg-red-500 hover:bg-red-400' : 'bg-slate-700 hover:bg-slate-600'} h-3 rounded-full cursor-pointer transition-colors shadow-sm`}
                                                 style={{ left: `${task.left}%`, width: `${task.w}%` }}
@@ -211,7 +197,6 @@ export const GanttChart = () => {
                                                 <div className="absolute right-0 top-0 h-full w-1.5 rounded-r-full cursor-e-resize opacity-0 hover:opacity-100 bg-white/30 transition-opacity" />
                                             </div>
 
-                                            {/* Delayed badge */}
                                             {task.delayed && (
                                                 <div className="absolute flex items-center z-[5]" style={{ left: `${task.left + task.w / 2 - 3}%`, top: 4 }}>
                                                     <span className="text-[6px] py-px px-1.5 rounded-full bg-amber-100 text-amber-700 font-semibold flex items-center gap-0.5 shadow-sm border border-amber-200 whitespace-nowrap">
@@ -220,10 +205,8 @@ export const GanttChart = () => {
                                                 </div>
                                             )}
 
-                                            {/* Optimization ghost bar */}
                                             {showOptimization && task.ghost && (
                                                 <>
-                                                    {/* Connecting dashed line: original right edge → ghost left edge */}
                                                     <svg className="absolute pointer-events-none" style={{ left: 0, top: 0, width: '100%', height: '100%', zIndex: 1, overflow: 'visible' }}>
                                                         <defs>
                                                             <marker id={`ghost-arr-${task.key}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
@@ -253,7 +236,6 @@ export const GanttChart = () => {
                                 );
                             })}
 
-                            {/* Dependency arrows */}
                             {isExpanded && (
                                 <div className="relative" style={{ height: 0, overflow: 'visible' }}>
                                     <svg className="absolute pointer-events-none" style={{ left: SIDEBAR_W, width: `calc(100% - ${SIDEBAR_W}px)`, top: -(project.tasks.length * TASK_ROW_H), height: project.tasks.length * TASK_ROW_H, zIndex: 3, overflow: 'visible' }}>
@@ -285,7 +267,6 @@ export const GanttChart = () => {
                 })}
             </div>
 
-            {/* Summary footer */}
             <div className="flex items-center gap-3 px-4 py-2 border-t border-slate-200 bg-slate-50/60 text-[9px]">
                 <span className="font-semibold text-[var(--text-primary)]">{totalTasks} tasks</span>
                 <span className="text-[var(--text-muted)]">|</span>
@@ -304,8 +285,6 @@ export const GanttChart = () => {
         </div>
     );
 };
-
-/* ──────────────────── FEATURE HIGHLIGHTS ──────────────────────── */
 
 export const FEATURES = [
     { icon: <><path d="M5.5 1v9M1 5.5h9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity="0.5"/><circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.5" fill="none"/><circle cx="12" cy="12" r="2" fill="currentColor"/></>, label: 'Smart Optimize', desc: 'RCPSP scheduling solver' },

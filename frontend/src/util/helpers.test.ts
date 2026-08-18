@@ -18,6 +18,7 @@ import {
     STATUS_CONFIG,
     PRIORITY_CONFIG,
 } from './helpers';
+import { TIMELINE_CONSTANTS } from '../config/timelineConstants';
 
 describe('toDateString', () => {
     test('passes a date-only string through unchanged', () => {
@@ -235,5 +236,18 @@ describe('missing dates', () => {
         const position = calculateTaskPosition(null, null, '2024-06-01');
         expect(position).toEqual({ marginLeft: 0, width: 0 });
         expect(Number.isNaN(position.width)).toBe(false);
+    });
+
+    test('a task starting on the timeline\'s own first day has no left offset', () => {
+        const position = calculateTaskPosition('2024-06-01', '2024-06-03', '2024-06-01');
+        expect(position.marginLeft).toBe(0);
+    });
+
+    test('day offset and width are exact calendar-day counts, independent of local time-of-day', () => {
+        const position = calculateTaskPosition(
+            '2024-06-05T23:30:00.000Z', '2024-06-08T00:15:00.000Z', '2024-06-01T12:00:00.000Z',
+        );
+        expect(position.marginLeft).toBe(4 * TIMELINE_CONSTANTS.DAY_WIDTH);
+        expect(position.width).toBe(4 * TIMELINE_CONSTANTS.DAY_WIDTH);
     });
 });

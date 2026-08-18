@@ -81,6 +81,10 @@
     text-align: left;
 }
 
+.dark .ProseMirror table th {
+    background-color: #334155;
+}
+
 .ProseMirror table .selectedCell:after {
     background: rgba(15, 23, 42, 0.05);
     content: "";
@@ -151,6 +155,10 @@
     color: #475569;
 }
 
+.dark .ProseMirror blockquote {
+    color: #94a3b8;
+}
+
 /* Horizontal Rule */
 .ProseMirror hr {
     border: none;
@@ -193,6 +201,16 @@
     margin-top: 1rem;
     margin-bottom: 0.5rem;
     color: #1e293b;
+}
+
+.dark .ProseMirror h1,
+.dark .ProseMirror h2 {
+    color: #f8fafc;
+}
+
+.dark .ProseMirror h3,
+.dark .ProseMirror h4 {
+    color: #e2e8f0;
 }
 
 /* Image Styling */

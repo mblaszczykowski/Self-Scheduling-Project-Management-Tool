@@ -6,10 +6,6 @@ import Avatar from '../common/Avatar';
 import { EnrichedTask } from '../../types';
 import { TaskKeyMap, TaskListViewProps } from './types';
 
-/* ═══════════════════════════════════════════
-   Helpers
-   ═══════════════════════════════════════════ */
-
 const TERMINAL_STATUSES = new Set(['DONE', 'RELEASED', 'WITHDRAWN']);
 
 const relativeDue = (dueDate?: string | null, status?: string | null, progress = 0) => {
@@ -96,9 +92,6 @@ const ScheduleBar = ({ startDate, dueDate, progress }: { startDate?: string | nu
     );
 };
 
-/* ═══════════════════════════════════════════
-   Clickable dependency chip
-   ═══════════════════════════════════════════ */
 const DepChip = ({ dep, onClick, overdue }: { dep: EnrichedTask; onClick: (dep: EnrichedTask) => void; overdue?: boolean }) => (
     <button
         type="button"
@@ -115,10 +108,6 @@ const DepChip = ({ dep, onClick, overdue }: { dep: EnrichedTask; onClick: (dep: 
         <span className="font-sans text-[10px] opacity-60">{dep.progress}%</span>
     </button>
 );
-
-/* ═══════════════════════════════════════════
-   TaskListView
-   ═══════════════════════════════════════════ */
 
 interface TaskInsight {
     blocking: ReturnType<typeof getBlockingInfo>;
@@ -171,7 +160,7 @@ const TaskListView = ({
         ['assignee', 'Assignee', 'w-40'],
         ['startDate', 'Schedule', 'w-56'],
         ['progress', 'Progress', 'w-44'],
-        ['labels', 'Dependencies', 'min-w-[240px]'],
+        ['dependencies', 'Dependencies', 'min-w-[240px]'],
     ];
 
     if (filteredTasks.length === 0) {
@@ -194,7 +183,7 @@ const TaskListView = ({
                         <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/90 backdrop-blur-sm">
                             {columns.map(([field, label, width]) => {
                                 const isSorted = sortField === field;
-                                const nonsortable = field === 'labels';
+                                const nonsortable = field === 'dependencies';
                                 const heading = (
                                     <>
                                         {label}
@@ -258,7 +247,6 @@ const TaskListView = ({
                                     }}
                                     className={`border-b border-slate-100 dark:border-slate-700/40 hover:bg-blue-50/40 dark:hover:bg-slate-700/30 cursor-pointer transition-colors group ${task.isCritical && task.isDelayed ? 'bg-red-50/30 dark:bg-red-950/10' : ''}`}>
 
-                                    {/* ── Task ── */}
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                                             <span className={`text-xs font-bold font-mono ${task.isCritical ? 'text-red-600 dark:text-red-400' : 'text-slate-400 dark:text-slate-500'}`}>
@@ -281,7 +269,6 @@ const TaskListView = ({
                                         </p>
                                     </td>
 
-                                    {/* ── Status ── */}
                                     <td className="px-4 py-3">
                                         <span className={`inline-flex items-center gap-1.5 py-[3px] px-2 rounded-md text-[11px] font-semibold ${STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.color || 'bg-slate-100 text-slate-600'}`}>
                                             <span className={`w-[6px] h-[6px] rounded-full ${STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.dot || 'bg-slate-400'}`} />
@@ -289,7 +276,6 @@ const TaskListView = ({
                                         </span>
                                     </td>
 
-                                    {/* ── Priority ── */}
                                     <td className="px-4 py-3">
                                         <span className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-xs font-bold ${PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG]?.color || 'bg-slate-100 text-slate-600'}`}
                                             title={PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG]?.label || task.priority}>
@@ -297,7 +283,6 @@ const TaskListView = ({
                                         </span>
                                     </td>
 
-                                    {/* ── Assignee ── */}
                                     <td className="px-4 py-3">
                                         {task.assignee ? (
                                             <div className="flex items-center gap-2">
@@ -315,7 +300,6 @@ const TaskListView = ({
                                         )}
                                     </td>
 
-                                    {/* ── Schedule ── */}
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-1.5 text-xs tabular-nums">
                                             <span className="text-slate-500 dark:text-slate-400">{task.startDate ? formatShortDate(task.startDate) : '—'}</span>
@@ -344,7 +328,6 @@ const TaskListView = ({
                                         <ScheduleBar startDate={task.startDate} dueDate={task.dueDate} progress={task.progress} />
                                     </td>
 
-                                    {/* ── Progress ── */}
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2.5">
                                             <div className="flex-1 h-[6px] bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden relative">
@@ -367,10 +350,8 @@ const TaskListView = ({
                                         )}
                                     </td>
 
-                                    {/* ── Dependencies ── */}
                                     <td className="px-4 py-3">
                                         <div className="space-y-1.5">
-                                            {/* Active blockers — clickable */}
                                             {blocking && (
                                                 <div>
                                                     <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 mr-1.5">Blocked by</span>
@@ -390,7 +371,6 @@ const TaskListView = ({
                                                 </div>
                                             )}
 
-                                            {/* Resolved deps */}
                                             {!blocking && task.dependencies?.length > 0 && (
                                                 <div className="flex flex-wrap items-center gap-1">
                                                     <span className="text-[10px] font-medium text-green-600 dark:text-green-400">Deps cleared</span>
@@ -406,7 +386,6 @@ const TaskListView = ({
                                                 </div>
                                             )}
 
-                                            {/* Late / blocked / due soon indicators */}
                                             <div className="flex flex-wrap items-center gap-1.5">
                                                 {task.isDelayed && (
                                                     <span className="text-[10px] font-semibold text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-1.5 py-px rounded-full">
@@ -424,7 +403,6 @@ const TaskListView = ({
                                                     </span>
                                                 )}
 
-                                                {/* Labels */}
                                                 {task.labels?.length > 0 && task.labels.slice(0, 3).map((l, i) => (
                                                     <span key={i} className="text-[10px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-px rounded-full">{l}</span>
                                                 ))}
@@ -443,7 +421,6 @@ const TaskListView = ({
                 </table>
             </div>
 
-            {/* ── Footer ── */}
             <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-700/50 flex flex-wrap items-center gap-x-4 gap-y-1 bg-slate-50/50 dark:bg-slate-800/50">
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                     <span className="font-semibold text-slate-700 dark:text-slate-300">{filteredTasks.length}</span> {filteredTasks.length === 1 ? 'task' : 'tasks'}

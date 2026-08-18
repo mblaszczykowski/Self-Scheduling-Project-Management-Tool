@@ -9,5 +9,3 @@ export const getSidebarWidth = (isCollapsed: boolean) =>
     isCollapsed
         ? TIMELINE_CONSTANTS.SIDEBAR_COLLAPSED_WIDTH
         : TIMELINE_CONSTANTS.SIDEBAR_EXPANDED_WIDTH;
-
-export default TIMELINE_CONSTANTS;

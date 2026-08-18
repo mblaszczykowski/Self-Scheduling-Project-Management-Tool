@@ -245,7 +245,7 @@ Two that are easy to get wrong:
 
 ## Database schema
 
-Flyway owns the schema: `backend/src/main/resources/db/migration/`, currently `V1` through `V5`.
+Flyway owns the schema: `backend/src/main/resources/db/migration/`, currently `V1` through `V6`.
 It is enabled by default and runs on every startup — development, CI and production alike.
 `spring.jpa.hibernate.ddl-auto=validate` means Hibernate only verifies that the entity model
 matches; it never mutates the schema.
@@ -260,7 +260,8 @@ Migration highlights, useful when reading entities: V2 made `refresh_tokens.user
 key; V3 gave every foreign key an explicit `ON DELETE` action, added the missing join-table primary
 keys, made email identity case-insensitive, and added `projects.created/updated` (NOT NULL) and
 `users.version`; V4 renamed `refresh_tokens.token` to `token_hash` and added
-`family_id`/`family_started_at`/`consumed_at`; V5 added `stored_files`.
+`family_id`/`family_started_at`/`consumed_at`; V5 added `stored_files`; V6 backfilled
+`users.version` for rows that predate V3 and made the column `NOT NULL`.
 
 ## Key entities
 

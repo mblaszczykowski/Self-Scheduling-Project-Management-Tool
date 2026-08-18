@@ -127,6 +127,9 @@ const TimelineTaskBar = ({
             style={{ width: `${timelineWidth}px` }}
         >
             <div
+                role="button"
+                tabIndex={0}
+                aria-label={`Open task ${task.taskKey}: ${task.summary}`}
                 className={taskRowClass}
                 style={{
                     minWidth: `${sidebarWidth}px`,
@@ -134,6 +137,12 @@ const TimelineTaskBar = ({
                 }}
                 onClick={() => {
                     if (!shouldPreventClick()) onOpenTaskModal(project, task);
+                }}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (!shouldPreventClick()) onOpenTaskModal(project, task);
+                    }
                 }}
             >
                 {sidebarCollapsed ? (
@@ -200,6 +209,9 @@ const TimelineTaskBar = ({
             </div>
             <div className="flex-1 flex items-center relative z-[3]">
                 <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open task ${task.taskKey}: ${task.summary}`}
                     className={`absolute ${
                         task.isCritical
                             ? 'bg-red-500 dark:bg-red-400'
@@ -217,6 +229,12 @@ const TimelineTaskBar = ({
                             onOpenTaskModal(project, task);
                         } else {
                             e.stopPropagation();
+                        }
+                    }}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            if (!shouldPreventClick()) onOpenTaskModal(project, task);
                         }
                     }}
                     onMouseEnter={(e) => onTooltipShow(e, {

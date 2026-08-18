@@ -60,8 +60,6 @@ public class CommentService {
         this.accessGuard = accessGuard;
     }
 
-    // ======================== Reads ========================
-
     /**
      * Top-level comments for a task, paged, each with its full reply tree.
      *
@@ -85,8 +83,6 @@ public class CommentService {
         return new PageImpl<>(dtos, pageable, ids.getTotalElements());
     }
 
-    // ======================== Writes ========================
-
     @Transactional(rollbackFor = Exception.class)
     public CommentDTO addComment(Integer taskId, Integer userId, String content,
                                  List<MultipartFile> files, Integer parentCommentId) {
@@ -99,10 +95,9 @@ public class CommentService {
         if (parentCommentId != null) {
             parentComment = commentRepository.findById(parentCommentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Parent comment not found"));
-            // A reply must thread under a comment on the SAME task, otherwise a user could graft
-            // replies (and notifications) onto comments in projects they do not belong to.
-            if (!parentComment.getTask().getId().equals(taskId)) {
-                throw new ValidationException("Parent comment does not belong to this task");
+            if (!parentComment.getTask().getId().equals(taskId)
+                    || !parentComment.getTask().getProject().hasAccess(userId)) {
+                throw new ResourceNotFoundException("Parent comment not found");
             }
         }
 
@@ -156,8 +151,7 @@ public class CommentService {
                                      ReactionType reactionType) {
         var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
-        requireCommentBelongsToTask(comment, taskId);
-        accessGuard.requireAccess(comment.getTask().getProject(), userId);
+        requireCommentAccessibleFromTask(comment, taskId, userId);
 
         var user = userService.getRequiredUserById(userId);
         var existing = commentReactionRepository.findByCommentIdAndUserId(commentId, userId);
@@ -184,21 +178,19 @@ public class CommentService {
         return entityMapper.toCommentDTO(comment, userId);
     }
 
-    // ======================== Internals ========================
-
     private Comment requireOwnEditableComment(Integer taskId, Integer commentId, Integer userId) {
         var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
         // Checked on the already-loaded comment: no second query, no time-of-check gap.
-        requireCommentBelongsToTask(comment, taskId);
-        accessGuard.requireAccess(comment.getTask().getProject(), userId);
+        requireCommentAccessibleFromTask(comment, taskId, userId);
         accessGuard.requireCommentOwnership(comment, userId);
         return comment;
     }
 
-    private void requireCommentBelongsToTask(Comment comment, Integer taskId) {
-        if (!comment.getTask().getId().equals(taskId)) {
-            throw new ValidationException("Comment does not belong to the specified task");
+    private void requireCommentAccessibleFromTask(Comment comment, Integer taskId, Integer userId) {
+        if (!comment.getTask().getId().equals(taskId)
+                || !comment.getTask().getProject().hasAccess(userId)) {
+            throw new ResourceNotFoundException("Comment not found");
         }
     }
 

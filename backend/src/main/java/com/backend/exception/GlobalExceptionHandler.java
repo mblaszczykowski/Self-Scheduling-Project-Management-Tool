@@ -34,8 +34,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    // ======================== Domain exceptions ========================
-
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<ApiError> handleValidation(ValidationException ex) {
         return build(HttpStatus.BAD_REQUEST, "Validation Error", ex.getMessage());
@@ -100,8 +98,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Error",
                 "An unexpected error occurred");
     }
-
-    // ======================== Framework exceptions ========================
 
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,

@@ -61,6 +61,7 @@ export type DivRef = RefObject<HTMLDivElement>;
 export interface TimelineViewProps {
     processedProjects: ProcessedProject[];
     allTasks: EnrichedTask[];
+    draggingTaskKey: string | null;
     /** Derived once by useEnrichedProjects rather than rebuilt here from the same data. */
     taskKeyMap: TaskKeyMap;
     projectKeyToProject: ProjectKeyMap;
@@ -144,6 +145,7 @@ export interface TimelineTaskBarProps {
 export interface DependencyOverlayProps {
     containerRef: DivRef;
     allTasks: EnrichedTask[];
+    draggingTaskKey: string | null;
     taskKeyMap: TaskKeyMap;
     expandedProjects: ExpandedProjects;
     projectKeyToProject: ProjectKeyMap;

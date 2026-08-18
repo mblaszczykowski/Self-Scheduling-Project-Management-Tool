@@ -172,11 +172,9 @@ public class EntityMapper {
         );
     }
 
-    // --- Helpers ---
-
     /** Task keys of this task's predecessors; empty when it has none. */
     public static List<String> extractDependencyKeys(Task task) {
-        return task.getDependencies().stream().map(Task::getTaskKey).toList();
+        return task.getDependencies().stream().map(Task::getTaskKey).sorted().toList();
     }
 
     private static List<String> parseLabels(String labelsString) {

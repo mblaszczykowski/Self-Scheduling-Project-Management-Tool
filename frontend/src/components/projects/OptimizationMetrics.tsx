@@ -30,14 +30,12 @@ const fmtNum = (v: number, decimals = 1): string => {
     return v % 1 === 0 ? v.toString() : v.toFixed(decimals);
 };
 
-/* Small arrow between before/after */
 const Arrow = () => (
     <svg width="12" height="7" viewBox="0 0 12 7" className="text-slate-300 flex-shrink-0 mx-0.5">
         <path d="M0 3.5h9M7.5 1L10 3.5l-2.5 2.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
 );
 
-/* Before → After metric used in the comparison row */
 interface BeforeAfterProps {
     label: string;
     before: number;
@@ -69,7 +67,6 @@ const BeforeAfter = ({ label, before, after, unit = '', lowerIsBetter = true, in
     );
 };
 
-/* Stat card for headline numbers */
 interface StatCardProps {
     value: string | number;
     label: string;
@@ -167,11 +164,9 @@ const OptimizationMetrics = ({
                 className="mb-4 rounded-2xl overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm"
                 style={{ animation: 'optSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}
             >
-                {/* Top accent line */}
                 <div className="h-1" style={{ background: 'linear-gradient(90deg, #10b981, #3b82f6, #10b981)' }} />
 
                 <div className="px-6 py-5">
-                    {/* ===== Header row ===== */}
                     <div className="flex items-start justify-between gap-6">
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-1">
@@ -214,7 +209,6 @@ const OptimizationMetrics = ({
                                 </div>
                             </div>
 
-                            {/* Infeasible note */}
                             {infeasible && (
                                 <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0 text-amber-500">
@@ -229,7 +223,6 @@ const OptimizationMetrics = ({
                             )}
                         </div>
 
-                        {/* Action buttons */}
                         <div className="flex items-center gap-2 flex-shrink-0 pt-0.5">
                             <div className="flex items-center gap-1.5 mr-2">
                                 <div className="w-4 h-1 rounded-full"
@@ -276,7 +269,6 @@ const OptimizationMetrics = ({
                         </div>
                     </div>
 
-                    {/* ===== Stats cards row ===== */}
                     <div className="flex items-center gap-3 mt-4">
                         <StatCard
                             value={suggestionsCount}
@@ -313,7 +305,6 @@ const OptimizationMetrics = ({
                             delay={320}
                         />
 
-                        {/* On-time progress bar fills remaining space */}
                         <div
                             className="flex-1 ml-1"
                             style={{ animation: `optFadeUp 0.4s 350ms cubic-bezier(0.22, 1, 0.36, 1) both` }}
@@ -343,7 +334,6 @@ const OptimizationMetrics = ({
                         </div>
                     </div>
 
-                    {/* ===== Before/After comparison row ===== */}
                     <div className="flex items-center gap-6 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex-wrap"
                         style={{ animation: `optFadeUp 0.4s 400ms cubic-bezier(0.22, 1, 0.36, 1) both` }}
                     >
@@ -380,7 +370,6 @@ const OptimizationMetrics = ({
                         />
                     </div>
 
-                    {/* ===== Expandable per-task detail ===== */}
                     <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                         <button
                             onClick={() => setShowDetails(p => !p)}
@@ -396,7 +385,6 @@ const OptimizationMetrics = ({
 
                         {showDetails && summary.shifted.length > 0 && (
                             <div className="mt-3 rounded-lg border border-slate-100 dark:border-slate-700 overflow-hidden">
-                                {/* Table header */}
                                 <div className="grid grid-cols-[1fr_120px_120px_55px_50px_130px] gap-3 px-4 py-2 bg-slate-50 dark:bg-slate-700/50 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-slate-700">
                                     <span>Task</span>
                                     <span>Current</span>
@@ -406,7 +394,6 @@ const OptimizationMetrics = ({
                                     <span className="text-right">Assigned to</span>
                                 </div>
 
-                                {/* Rows */}
                                 <div className="max-h-[220px] overflow-y-auto"
                                     style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(148,163,184,0.2) transparent' }}
                                 >

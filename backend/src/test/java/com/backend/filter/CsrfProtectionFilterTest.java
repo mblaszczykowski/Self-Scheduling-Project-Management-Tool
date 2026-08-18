@@ -85,8 +85,6 @@ class CsrfProtectionFilterTest {
         return new CsrfProtectionFilter(objectMapper, cookieProperties, jwtProperties);
     }
 
-    // ======================== helpers ========================
-
     private void requestOf(String method, String path) {
         request.setMethod(method);
         request.setRequestURI(path);

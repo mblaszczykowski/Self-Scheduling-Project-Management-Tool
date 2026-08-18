@@ -138,7 +138,7 @@ class TaskControllerWebTest {
         }
 
         @Test
-        @DisplayName("answers 400 in the ApiError shape when the submitted task fails validation")
+        @DisplayName("answers 400 in the ApiError shape, with a fieldErrors entry, when the submitted task fails validation")
         void answers400InTheApiErrorShapeOnValidationFailure() throws Exception {
             mockMvc.perform(multipart(TASKS_URL, "PROJ")
                             .file(taskPart("""
@@ -146,10 +146,12 @@ class TaskControllerWebTest {
                             .requestAttr(TokenService.USER_ID_ATTRIBUTE, USER_ID))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.error").value("Validation Error"))
-                    .andExpect(jsonPath("$.message").value(
-                            org.hamcrest.Matchers.containsString("Summary is required")))
-                    .andExpect(jsonPath("$.timestamp").exists());
+                    .andExpect(jsonPath("$.error").value("Validation Failed"))
+                    .andExpect(jsonPath("$.message").value("Invalid request data"))
+                    .andExpect(jsonPath("$.timestamp").exists())
+                    .andExpect(jsonPath("$.fieldErrors").isArray())
+                    .andExpect(jsonPath("$.fieldErrors[0].field").value("summary"))
+                    .andExpect(jsonPath("$.fieldErrors[0].message").value("Summary is required"));
 
             verifyNoInteractions(taskService);
         }
@@ -163,8 +165,9 @@ class TaskControllerWebTest {
                                      "dueDate":"2026-01-05"}"""))
                             .requestAttr(TokenService.USER_ID_ATTRIBUTE, USER_ID))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(
-                            org.hamcrest.Matchers.containsString("Due date must not be before the start date")));
+                    .andExpect(jsonPath("$.fieldErrors[0].field").value("dateRangeOrdered"))
+                    .andExpect(jsonPath("$.fieldErrors[0].message")
+                            .value("Due date must not be before the start date"));
 
             verifyNoInteractions(taskService);
         }

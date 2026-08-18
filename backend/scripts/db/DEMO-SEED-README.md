@@ -16,10 +16,10 @@ Every account uses the password `Demo1234!`.
 
 | Email | Role in the data |
 |---|---|
-| `demo@flowlink.pl` | Portfolio manager (Anna Nowak). **Sign in as this one** — she owns all three projects and receives the notifications. |
-| `piotr.kowalski@flowlink.pl` | Contributor (Piotr Kowalski) |
-| `marta.wisniewska@flowlink.pl` | Contributor (Marta Wiśniewska) |
-| `tomasz.lewandowski@flowlink.pl` | Contributor (Tomasz Lewandowski) |
+| `demo@flowlink.dev` | Portfolio manager (Emma Clarke). **Sign in as this one** — she owns all three projects and receives the notifications. |
+| `daniel.brooks@flowlink.dev` | Contributor (Daniel Brooks) |
+| `priya.sharma@flowlink.dev` | Contributor (Priya Sharma) |
+| `marcus.webb@flowlink.dev` | Contributor (Marcus Webb) |
 
 `Demo1234!` satisfies the registration policy enforced by `ValidationUtil`: at least 8 characters,
 an upper-case letter, a lower-case letter, a digit, a special character, and no spaces. The stored
@@ -88,7 +88,7 @@ Open `demo-seed.sql` in DataGrip, DBeaver or pgAdmin and execute it as a script 
 
 ## Re-running and resetting
 
-The script is idempotent. Section 0 deletes everything it owns — the `@flowlink.pl` accounts and
+The script is idempotent. Section 0 deletes everything it owns — the `@flowlink.dev` accounts and
 the `ECOM` / `MAPP` / `B2B` projects with all their tasks, dependencies, comments, reactions,
 notifications, attachments and activity history — before re-inserting it. The whole thing runs in
 one transaction, so a failure leaves the database untouched.
@@ -96,7 +96,7 @@ one transaction, so a failure leaves the database untouched.
 That makes the demo repeatable:
 
 1. Run the script. You get the baseline: 45 tasks with overlapping assignments.
-2. Sign in as `demo@flowlink.pl` and use **Optimize Schedule**. Proposed dates appear as ghost bars
+2. Sign in as `demo@flowlink.dev` and use **Optimize Schedule**. Proposed dates appear as ghost bars
    with a metrics panel.
 3. Apply the suggestions. The schedule in the database changes.
 4. Run the script again to return to step 1.
@@ -122,7 +122,7 @@ path.
 
 ## What to look at in the app
 
-Signed in as `demo@flowlink.pl`:
+Signed in as `demo@flowlink.dev`:
 
 - **Dashboard** — project and task counts, upcoming deadlines, and analytics charts. Completed
   tasks are backdated so the completion trend spans several weeks instead of one bar.

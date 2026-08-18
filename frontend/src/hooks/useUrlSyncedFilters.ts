@@ -21,7 +21,6 @@ export function useUrlSyncedFilters({
 }: UseUrlSyncedFiltersOptions) {
     const handledIssueRef = useRef<string | null>(null);
 
-    // Expand new projects; collapse others if a projectKey filter is active
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const projectKeyFilter = params.get('projectKey');
@@ -43,7 +42,6 @@ export function useUrlSyncedFilters({
         });
     }, [processedProjects, location.search, setViewState]);
 
-    // Read URL params and set filter/expand state + open selected issue modal
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         if (params.get('critical') === 'true') {
@@ -88,7 +86,6 @@ export function useUrlSyncedFilters({
         }
     }, [location.search, processedProjects, openModal, setFilterState]);
 
-    // Debounce search input -> searchQuery
     useEffect(() => {
         const timer = setTimeout(
             () => setFilterState(prev => ({ ...prev, searchQuery: prev.searchInput })),

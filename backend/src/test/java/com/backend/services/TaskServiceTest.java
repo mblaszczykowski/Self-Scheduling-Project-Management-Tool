@@ -8,7 +8,6 @@ import com.backend.entities.Task;
 import com.backend.entities.TaskPriority;
 import com.backend.entities.TaskStatus;
 import com.backend.entities.User;
-import com.backend.exception.AuthorizationException;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.mapper.EntityMapper;
@@ -109,8 +108,6 @@ class TaskServiceTest {
         project = TestEntityFactory.createProjectWithMembers(10, "PROJ", owner, member);
     }
 
-    // ======================== Fixtures ========================
-
     /** A task request in which a test names only the fields it is about. */
     private static final class Req {
         private String summary = "Task summary";
@@ -184,8 +181,6 @@ class TaskServiceTest {
         verify(taskActivityService).logFieldChanges(eq(task), eq(owner), before.capture(), after.capture());
         return new TaskSnapshot[]{before.getValue(), after.getValue()};
     }
-
-    // ======================== Tests ========================
 
     @Nested
     @DisplayName("createTask")
@@ -514,8 +509,8 @@ class TaskServiceTest {
 
             assertThatThrownBy(() -> taskService.createTask("PROJ",
                     request().dependencies(List.of("OTHER-4")).build(), 1, null))
-                    .isInstanceOf(AuthorizationException.class)
-                    .hasMessage("Cannot create dependency to task in inaccessible project: OTHER-4");
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("One or more dependency tasks do not exist");
             verify(taskRepository, never()).save(any());
         }
 
@@ -1020,11 +1015,13 @@ class TaskServiceTest {
             givenAuthor(owner);
             when(taskRepository.findByProjectKeyAndTaskNumbers("OTHER", List.of(1)))
                     .thenReturn(List.of(foreignTask));
+            doThrow(new ResourceNotFoundException("Project not found"))
+                    .when(accessGuard).requireAccess(foreignProject, 1);
 
             assertThatThrownBy(() -> taskService.applySchedule(List.of(
                     new TaskService.ScheduleChange("OTHER-1", MONDAY, FRIDAY)), 1))
-                    .isInstanceOf(AuthorizationException.class)
-                    .hasMessage("No access to task: OTHER-1");
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessage("Project not found");
             assertThat(foreignTask.getStartDate()).isNull();
             verifyNoInteractions(taskActivityService, notificationService);
         }

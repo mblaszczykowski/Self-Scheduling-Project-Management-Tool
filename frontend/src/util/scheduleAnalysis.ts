@@ -36,8 +36,6 @@ export const schedulePercentElapsed = (
     return ((today.getTime() - start) / MS_PER_DAY / spanDays) * 100;
 };
 
-/* ── Resource conflicts ── */
-
 interface ScheduleEntry {
     taskKey: string;
     start: number;
@@ -116,8 +114,6 @@ export const computeResourceConflicts = (allTasks: EnrichedTask[]): ResourceConf
     };
 };
 
-/* ── Schedule health ── */
-
 export interface BehindTask {
     taskKey: string;
     progress: number;
@@ -176,8 +172,6 @@ export const computeScheduleHealth = (allTasks: EnrichedTask[], today: Date): Sc
         worstBehind: behindTasks.slice(0, 5),
     };
 };
-
-/* ── Dependency chains ── */
 
 export interface Bottleneck {
     taskKey: string;
@@ -245,8 +239,6 @@ export const computeDependencyChainAnalysis = (
     return { longestChainLength, bottlenecks: bottlenecks.slice(0, 5) };
 };
 
-/* ── Required velocity ── */
-
 export type VelocityStatus = 'comfortable' | 'moderate' | 'tight' | 'critical';
 
 export interface ProjectVelocity {
@@ -304,8 +296,6 @@ export const computeProjectVelocity = (projects: ProcessedProject[], today: Date
     return velocities.sort((a, b) => b.avgVelocityNeeded - a.avgVelocityNeeded);
 };
 
-/* ── Distributions ── */
-
 export interface StatusCount {
     status: TaskStatus;
     count: number;
@@ -338,8 +328,6 @@ export const computePriorityDistribution = (allTasks: EnrichedTask[]): PriorityC
         .filter(entry => entry.count > 0);
 };
 
-/* ── Completion trend ── */
-
 export interface CompletionWeek {
     label: string;
     count: number;
@@ -371,8 +359,6 @@ export const computeCompletionTrend = (allTasks: EnrichedTask[], today: Date): C
 
     return weeks.map(({ label, count }) => ({ label, count }));
 };
-
-/* ── Slack distribution (CPM) ── */
 
 export type SlackBucketId = 'none' | 'tight' | 'moderate' | 'comfortable' | 'ample';
 
@@ -498,8 +484,6 @@ export const computeSlackDistribution = (allTasks: EnrichedTask[]): SlackDistrib
     };
 };
 
-/* ── Optimization opportunity ── */
-
 export type FactorImpact = 'high' | 'medium';
 
 export interface OptimizationFactor {
@@ -550,8 +534,6 @@ export const computeOptimizationOpportunity = (
 
     return { score, factors, recommendation };
 };
-
-/* ── Assignee load ── */
 
 export interface AssigneeLoad {
     assignee: string;

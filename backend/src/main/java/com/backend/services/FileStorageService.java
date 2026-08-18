@@ -55,8 +55,6 @@ public class FileStorageService {
         }
     }
 
-    // ======================== Storing ========================
-
     /**
      * @param projectId the project the files belong to, or null for files that are not
      *                  project-scoped (profile pictures)
@@ -88,8 +86,6 @@ public class FileStorageService {
         storedFileRepository.save(new StoredFile(safeFileName, projectId, uploaderId));
         return URL_PREFIX + safeFileName;
     }
-
-    // ======================== Authorization support ========================
 
     /** @return the ownership record for a stored name, if one was recorded. */
     public Optional<StoredFile> findOwnership(String storedName) {
@@ -132,8 +128,6 @@ public class FileStorageService {
             }
         }
     }
-
-    // ======================== Deleting ========================
 
     public void deleteFile(String filePath) {
         var fileName = extractFileName(filePath);
@@ -181,8 +175,6 @@ public class FileStorageService {
         AfterCommit.run(description, () -> deleteFilesSilently(removed));
     }
 
-    // ======================== Reading ========================
-
     public Path getFilePath(String fileName) {
         rejectPathTraversalAttempts(fileName);
         return resolveAndValidatePath(fileName);
@@ -194,8 +186,6 @@ public class FileStorageService {
         }
         return filePath.startsWith(URL_PREFIX) ? filePath.substring(URL_PREFIX.length()) : filePath;
     }
-
-    // ======================== Internals ========================
 
     private String validateAndExtractExtension(MultipartFile file) {
         if (file.isEmpty()) {

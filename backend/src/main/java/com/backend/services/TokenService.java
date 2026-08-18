@@ -67,8 +67,6 @@ public class TokenService {
         this.cookieFactory = cookieFactory;
     }
 
-    // ======================== Access tokens ========================
-
     public String generateAccessToken(Integer userId) {
         var now = Instant.now();
         return Jwts.builder()
@@ -112,8 +110,6 @@ public class TokenService {
             return null;
         }
     }
-
-    // ======================== Refresh tokens ========================
 
     /** Starts a new session family. Other devices' sessions are deliberately left alone. */
     @Transactional(rollbackFor = Exception.class)
@@ -209,8 +205,6 @@ public class TokenService {
         return refreshTokenRepository.deleteExpired(Instant.now());
     }
 
-    // ======================== Cookies & request plumbing ========================
-
     public AuthTokens createAuthTokens(Integer userId) {
         return buildCookies(userId, issueRefreshTokenForNewSession(userId));
     }
@@ -248,8 +242,6 @@ public class TokenService {
     public static java.util.Optional<String> readRefreshCookie(HttpServletRequest request) {
         return CookieFactory.read(request, REFRESH_TOKEN_COOKIE);
     }
-
-    // ======================== Hashing ========================
 
     private static String generateOpaqueToken() {
         var bytes = new byte[REFRESH_TOKEN_BYTES];

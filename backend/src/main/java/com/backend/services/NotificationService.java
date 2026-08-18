@@ -7,14 +7,11 @@ import com.backend.entities.User;
 import com.backend.exception.AuthorizationException;
 import com.backend.mapper.EntityMapper;
 import com.backend.repositories.NotificationRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.backend.util.AfterCommit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -24,8 +21,6 @@ import java.util.List;
 
 @Service
 public class NotificationService {
-
-    private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
 
     private final NotificationRepository notificationRepository;
     private final SseEmitterManager sseEmitterManager;
@@ -103,38 +98,7 @@ public class NotificationService {
             });
         }
 
-        runAfterCommit(sideEffects);
-    }
-
-    /**
-     * Runs the actions once the transaction has committed, or immediately if none is active.
-     *
-     * <p>Every action is individually guarded. Spring propagates an exception thrown from an
-     * {@code afterCommit} callback to the caller of {@code commit()} — so a stale SSE emitter or a
-     * full mail queue used to turn an already-committed write into a 500, and the user would retry
-     * and create a duplicate.
-     */
-    private void runAfterCommit(List<Runnable> actions) {
-        Runnable batch = () -> {
-            for (var action : actions) {
-                try {
-                    action.run();
-                } catch (Exception e) {
-                    log.warn("Post-commit notification side effect failed", e);
-                }
-            }
-        };
-
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    batch.run();
-                }
-            });
-        } else {
-            batch.run();
-        }
+        sideEffects.forEach(action -> AfterCommit.run("notification side effect", action));
     }
 
     /** Mapping happens inside the transaction; entities never leave the service. */

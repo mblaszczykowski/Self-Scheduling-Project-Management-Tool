@@ -18,6 +18,7 @@ export default function CreateMenu({
     onCreateTask
 }: CreateMenuProps) {
     const dropdownRef = useRef<HTMLDivElement | null>(null);
+    const triggerRef = useRef<HTMLButtonElement | null>(null);
     useClickOutside(dropdownRef, onClose);
 
     const handleCreateProject = () => {
@@ -30,9 +31,17 @@ export default function CreateMenu({
         onCreateTask();
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Escape') {
+            onClose();
+            triggerRef.current?.focus();
+        }
+    };
+
     return (
-        <div ref={dropdownRef} className="relative ml-1">
+        <div ref={dropdownRef} className="relative ml-1" onKeyDown={handleKeyDown}>
             <button
+                ref={triggerRef}
                 onClick={onToggle}
                 aria-expanded={isOpen}
                 aria-haspopup="menu"

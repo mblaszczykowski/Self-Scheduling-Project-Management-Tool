@@ -93,8 +93,6 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
         entityManager.clear();
     }
 
-    // ======================== The delete paths ========================
-
     @Test
     @DisplayName("a task with audit rows and comments can be deleted")
     void taskWithActivitiesCanBeDeleted() {
@@ -161,8 +159,6 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
             entityManager.flush();
         }).isInstanceOf(Exception.class);
     }
-
-    // ======================== Every hand-written query ========================
 
     @Test
     @DisplayName("all project queries parse and run")
@@ -261,8 +257,6 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
         assertThat(refreshTokenRepository.deleteFamily("family-1")).isZero();
         assertThat(refreshTokenRepository.deleteAllForUser(owner.getId())).isZero();
     }
-
-    // ======================== Schema-level guarantees ========================
 
     @Test
     @DisplayName("email uniqueness ignores case")

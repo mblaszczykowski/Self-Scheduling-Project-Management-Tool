@@ -1,6 +1,6 @@
 // Central domain types, mirroring the backend DTOs one-for-one.
 //
-// These are load-bearing: `util/endpoints.ts` types every response with them, so a field that
+// These are load-bearing: `util/api.ts` types every response with them, so a field that
 // drifts from the server becomes a compile error rather than an `undefined` at runtime.
 
 export type TaskStatus =
@@ -159,8 +159,6 @@ export interface AttachmentsState {
     new: File[];
 }
 
-// ── Request payloads ──
-
 export interface TaskPayload {
     summary: string;
     description?: string;
@@ -208,14 +206,12 @@ export interface RegistrationPayload {
     password: string;
 }
 
-// ── Modal identity ──
-//
 // Declared once. These used to exist twice — nullable in the hook, non-nullable in the component —
 // which the compiler reported as two unrelated types sharing a name, and which made the
 // nullability difference real unsoundness masked only by a render-time guard.
 
 export type ModalType = 'task' | 'project';
-export type ModalMode = 'create' | 'edit' | 'view';
+export type ModalMode = 'create' | 'edit';
 
 export interface ModalState {
     open: boolean;
@@ -224,8 +220,6 @@ export interface ModalState {
     project: Project | null;
     task: Task | null;
 }
-
-// ── Formik values for the task/project modal ──
 
 export interface ModalFormValues {
     projectKey: string;
@@ -246,8 +240,6 @@ export interface ModalFormValues {
     newUserEmail: string;
 }
 
-// ── ProjectsPage UI state ──
-
 export interface FilterState {
     filters: Record<string, string>;
     searchInput: string;
@@ -266,8 +258,6 @@ export interface ViewState {
     sidebarCollapsed: boolean;
     expandedProjects: Record<string, boolean>;
 }
-
-// ── Schedule optimization ──
 
 export interface OptimizationSuggestion {
     taskKey: string;
@@ -318,8 +308,6 @@ export interface ApplyOptimizationRequest extends OptimizationRequest {
     acceptedTaskKeys?: string[];
 }
 
-// ── Search ──
-
 export interface SearchProjectResult {
     projectKey: string;
     summary: string;
@@ -348,8 +336,6 @@ export interface SearchResults {
     tasks: SearchTaskResult[];
     comments: SearchCommentResult[];
 }
-
-// ── Errors ──
 
 /** One field-level validation failure, as sent inside ApiError. */
 export interface ApiFieldError {

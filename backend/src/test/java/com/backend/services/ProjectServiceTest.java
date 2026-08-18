@@ -96,8 +96,6 @@ class ProjectServiceTest {
         return new ProjectRequest(key, summary, description, memberEmails, dependencies, attachments);
     }
 
-    // ======================== Create ========================
-
     @Nested
     @DisplayName("Creating a project")
     class CreateProject {
@@ -240,8 +238,6 @@ class ProjectServiceTest {
             assertThat(result).isNotNull();
         }
     }
-
-    // ======================== Update ========================
 
     @Nested
     @DisplayName("Updating a project")
@@ -399,8 +395,6 @@ class ProjectServiceTest {
         }
     }
 
-    // ======================== Read & delete ========================
-
     @Nested
     @DisplayName("Reading and deleting")
     class ReadAndDelete {
@@ -460,8 +454,6 @@ class ProjectServiceTest {
             verify(projectRepository, never()).delete(any());
         }
     }
-
-    // ======================== Helpers ========================
 
     @SuppressWarnings("unchecked")
     private List<NotificationService.Pending> capturePendingNotifications() {

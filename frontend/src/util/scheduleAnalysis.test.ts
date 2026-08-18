@@ -52,8 +52,6 @@ const project = (projectKey: string, tasks: EnrichedTask[]): ProcessedProject =>
 
 const byKey = (tasks: EnrichedTask[]) => new Map(tasks.map(t => [t.taskKey, t]));
 
-/* ── Slack distribution (CPM) ── */
-
 describe('computeSlackDistribution', () => {
     // A diamond: A ─┬─> B ─┬─> D
     //               └─> C ─┘
@@ -135,8 +133,6 @@ describe('computeSlackDistribution', () => {
     });
 });
 
-/* ── Resource conflicts ── */
-
 describe('computeResourceConflicts', () => {
     const tasks = [
         task({ taskKey: 'A-1', assignee: 'alice@x.com', startDate: '2024-06-01', dueDate: '2024-06-10' }),
@@ -205,8 +201,6 @@ describe('computeResourceConflicts', () => {
     });
 });
 
-/* ── Schedule health ── */
-
 describe('computeScheduleHealth', () => {
     // Every task below spans 2024-06-01 → 2024-06-11 unless stated, so on TODAY it is 100% elapsed.
     const tasks = [
@@ -246,8 +240,6 @@ describe('computeScheduleHealth', () => {
         expect(computeScheduleHealth([], TODAY)).toMatchObject({ scheduleHealthScore: 0, totalActive: 0 });
     });
 });
-
-/* ── Dependency chains ── */
 
 describe('computeDependencyChainAnalysis', () => {
     test('measures depth through the deepest branch of a diamond', () => {
@@ -292,8 +284,6 @@ describe('computeDependencyChainAnalysis', () => {
     });
 });
 
-/* ── Required velocity ── */
-
 describe('computeProjectVelocity', () => {
     test('derives the daily progress rate each project still needs', () => {
         const tasks = [
@@ -325,8 +315,6 @@ describe('computeProjectVelocity', () => {
         expect(computeProjectVelocity([project('P', done)], TODAY)).toEqual([]);
     });
 });
-
-/* ── Distributions ── */
 
 describe('distributions', () => {
     const tasks = [
@@ -370,8 +358,6 @@ describe('computeCompletionTrend', () => {
     });
 });
 
-/* ── Assignee load ── */
-
 describe('computeAssigneeLoad', () => {
     test('ranks by critical and overdue work ahead of raw task count', () => {
         const tasks = [
@@ -392,8 +378,6 @@ describe('computeAssigneeLoad', () => {
         ]);
     });
 });
-
-/* ── Optimization opportunity ── */
 
 describe('computeOptimizationOpportunity', () => {
     const conflicts = (over: Partial<ResourceConflicts>): ResourceConflicts => ({

@@ -71,7 +71,8 @@ public final class SsgsDecoder {
             }
         }
 
-        var order = rule.comparator(compositeScores(graph, horizon), graph.transitiveSuccessorCounts());
+        var scores = rule == PriorityRule.MORCPSP ? compositeScores(graph, horizon) : Map.<String, Double>of();
+        var order = rule.comparator(scores, graph.transitiveSuccessorCounts());
         var unscheduledPredecessorCount = new HashMap<String, Integer>();
         var ready = new PriorityQueue<>(Math.max(1, movable.size()), order);
 

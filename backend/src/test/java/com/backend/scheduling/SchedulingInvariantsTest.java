@@ -31,8 +31,6 @@ class SchedulingInvariantsTest {
 
     private final SchedulingService scheduling = new SchedulingService(new AppProperties());
 
-    // ======================== Feasibility ========================
-
     @Nested
     @DisplayName("Precedence feasibility")
     class Precedence {
@@ -182,8 +180,6 @@ class SchedulingInvariantsTest {
         }
     }
 
-    // ======================== Comparability of before and after ========================
-
     @Nested
     @DisplayName("Before and after are measured on the same axis")
     class Comparability {
@@ -234,8 +230,6 @@ class SchedulingInvariantsTest {
             assertThat(outcome.chosenMetrics().resourceConflicts()).isZero();
         }
     }
-
-    // ======================== Modelling ========================
 
     @Nested
     @DisplayName("Modelling")
@@ -291,8 +285,6 @@ class SchedulingInvariantsTest {
             assertThat(outcome.chosen().placements()).containsOnlyKeys("P-1");
         }
     }
-
-    // ======================== Objective ========================
 
     @Nested
     @DisplayName("Objective value")
@@ -359,8 +351,6 @@ class SchedulingInvariantsTest {
         }
     }
 
-    // ======================== The edge of the guarantee ========================
-
     @Nested
     @DisplayName("What precedence feasibility does and does not cover")
     class PrecedenceLimits {
@@ -408,8 +398,6 @@ class SchedulingInvariantsTest {
             assertPrecedenceFeasible(outcome);
         }
     }
-
-    // ======================== Honest normalisation ========================
 
     @Nested
     @DisplayName("The horizon actually bounds what it normalises")
@@ -460,8 +448,6 @@ class SchedulingInvariantsTest {
         }
     }
 
-    // ======================== Work that already happened ========================
-
     @Nested
     @DisplayName("Completed work does not consume present capacity")
     class PastWork {
@@ -505,7 +491,92 @@ class SchedulingInvariantsTest {
         }
     }
 
-    // ======================== Determinism ========================
+    @Nested
+    @DisplayName("Randomized portfolios")
+    class Fuzzing {
+
+        private static final long[] SEEDS = {1L, 2L, 3L, 4L, 5L};
+        private static final String[] ASSIGNEES = {"a@x", "b@x", "c@x"};
+        private static final int ROUNDS_PER_SEED = 20;
+
+        @Test
+        @DisplayName("stays precedence- and resource-feasible, with a bounded objective, across many random small DAGs")
+        void randomPortfoliosStayFeasible() {
+            for (long seed : SEEDS) {
+                var random = new Random(seed);
+                for (int round = 0; round < ROUNDS_PER_SEED; round++) {
+                    var tasks = randomPortfolio(random, 2 + random.nextInt(10));
+
+                    var outcome = scheduling.optimize(tasks, List.of(), TODAY, 0.8, 0.2);
+
+                    assertPrecedenceFeasible(outcome);
+                    assertResourceFeasibleAmongMovableWork(outcome);
+                    assertThat(outcome.chosenMetrics().objectiveValue())
+                            .as("seed %d round %d", seed, round)
+                            .isBetween(0.0, 1.0);
+                }
+            }
+        }
+
+        private List<com.backend.dtos.TaskDTO> randomPortfolio(Random random, int size) {
+            var tasks = new ArrayList<com.backend.dtos.TaskDTO>();
+            var priorities = TaskPriority.values();
+            for (int i = 1; i <= size; i++) {
+                var start = TODAY.plusDays(random.nextInt(14) - 7);
+                var due = start.plusDays(random.nextInt(6));
+                var builder = task("P-" + i)
+                        .from(start.toString())
+                        .to(due.toString())
+                        .priority(priorities[random.nextInt(priorities.length)]);
+
+                if (random.nextInt(4) != 0) {
+                    builder = builder.assignedTo(ASSIGNEES[random.nextInt(ASSIGNEES.length)]);
+                }
+                boolean fixed = random.nextInt(5) == 0;
+                if (fixed) {
+                    builder = builder.status(TaskStatus.DONE).progress(100);
+                }
+
+                int maxDeps = fixed ? 0 : Math.min(2, i - 1);
+                if (maxDeps > 0 && random.nextBoolean()) {
+                    var indices = new ArrayList<Integer>();
+                    for (int j = 1; j < i; j++) {
+                        indices.add(j);
+                    }
+                    Collections.shuffle(indices, random);
+                    int depCount = 1 + random.nextInt(maxDeps);
+                    var deps = indices.subList(0, depCount).stream()
+                            .map(j -> "P-" + j).toArray(String[]::new);
+                    builder = builder.dependsOn(deps);
+                }
+
+                tasks.add(builder.build());
+            }
+            return tasks;
+        }
+
+        private void assertResourceFeasibleAmongMovableWork(SchedulingService.Outcome outcome) {
+            var placements = new ArrayList<>(outcome.chosen().all());
+            for (int i = 0; i < placements.size(); i++) {
+                for (int j = i + 1; j < placements.size(); j++) {
+                    var first = placements.get(i);
+                    var second = placements.get(j);
+                    var firstTask = outcome.graph().task(first.key());
+                    var secondTask = outcome.graph().task(second.key());
+                    if (firstTask.fixed() && secondTask.fixed()) {
+                        continue;
+                    }
+                    if (!firstTask.hasAssignee() || !firstTask.assignee().equals(secondTask.assignee())) {
+                        continue;
+                    }
+                    assertThat(first.overlaps(second))
+                            .as("%s and %s share %s and must not overlap",
+                                    first.key(), second.key(), firstTask.assignee())
+                            .isFalse();
+                }
+            }
+        }
+    }
 
     @Test
     @DisplayName("the same input produces the same schedule regardless of input order")
@@ -547,8 +618,6 @@ class SchedulingInvariantsTest {
 
         assertThat(first).isEqualTo(second).isEqualTo(third).isEqualTo(2);
     }
-
-    // ======================== Helpers ========================
 
     private static int span(SchedulingService.Outcome outcome) {
         var placement = outcome.chosen().placements().get("P-1");

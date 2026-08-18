@@ -78,8 +78,16 @@ function NotificationItem({ notification, onClose, onMarkSingleRead }: { notific
 
     return (
         <div
-            className={`px-4 py-3 ${isUnread ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}
+            role="button"
+            tabIndex={0}
             onClick={handleClick}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleClick();
+                }
+            }}
+            className={`px-4 py-3 ${isUnread ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}
         >
             {content}
         </div>
@@ -113,6 +121,7 @@ export default function NotificationDropdown({
     onMarkSingleRead,
 }: NotificationDropdownProps) {
     const dropdownRef = useRef<HTMLDivElement | null>(null);
+    const triggerRef = useRef<HTMLButtonElement | null>(null);
     useClickOutside(dropdownRef, onClose);
 
     const { unreadNotifications, readNotifications } = useMemo(() => {
@@ -133,9 +142,17 @@ export default function NotificationDropdown({
         }
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Escape') {
+            onClose();
+            triggerRef.current?.focus();
+        }
+    };
+
     return (
-        <div ref={dropdownRef} className="relative">
+        <div ref={dropdownRef} className="relative" onKeyDown={handleKeyDown}>
             <button
+                ref={triggerRef}
                 type="button"
                 aria-expanded={isOpen}
                 aria-haspopup="true"
@@ -156,7 +173,6 @@ export default function NotificationDropdown({
                     aria-label="Notifications"
                     className="absolute right-0 mt-2 w-[420px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-[slideDown_0.2s_ease-out]"
                 >
-                    {/* Header */}
                     <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</span>
@@ -176,7 +192,6 @@ export default function NotificationDropdown({
                         )}
                     </div>
 
-                    {/* Notification list */}
                     <div className="max-h-[480px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700/50">
                         {unreadNotifications.length > 0 && unreadNotifications.map(n => (
                             <NotificationItem

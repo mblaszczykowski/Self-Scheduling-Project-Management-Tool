@@ -9,8 +9,6 @@ import { EnrichedTask, ProcessedProject } from '../types';
 // Everything here reads `EnrichedTask.isDelayed` instead of comparing due dates itself: whether a
 // task counts as late is decided once, in `useEnrichedProjects`, for the whole app.
 
-/* ── Task counts ── */
-
 export interface TaskCounts {
     criticalTasks: number;
     delayedTasks: number;
@@ -20,8 +18,6 @@ export const computeTaskCounts = (allTasks: EnrichedTask[]): TaskCounts => ({
     criticalTasks: allTasks.filter(t => t.isCritical).length,
     delayedTasks: allTasks.filter(t => t.isDelayed).length,
 });
-
-/* ── Critical path ── */
 
 export interface CriticalPathHealth {
     criticalTasksList: EnrichedTask[];
@@ -111,8 +107,6 @@ export const computeUpcomingCriticalDeadlines = (criticalTasksList: EnrichedTask
         })
         .sort((a, b) => (timeOf(a.dueDate) ?? 0) - (timeOf(b.dueDate) ?? 0));
 };
-
-/* ── Blocked tasks / cross-project deps / completion ── */
 
 export interface BlockedTasks {
     blockedTasks: EnrichedTask[];

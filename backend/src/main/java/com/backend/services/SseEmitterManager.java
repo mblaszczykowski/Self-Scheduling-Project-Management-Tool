@@ -59,6 +59,7 @@ public class SseEmitterManager {
         try {
             emitter.send(SseEmitter.event().name("connected").data("ok"));
         } catch (Exception e) {
+            completeWithErrorQuietly(emitter, e);
             removeEmitter.run();
         }
 
@@ -88,6 +89,7 @@ public class SseEmitterManager {
                 // completed throws IllegalStateException, and letting that escape would abort the
                 // loop so the remaining streams never received the event.
                 log.debug("Dropping dead SSE stream for user {}: {}", userId, e.getMessage());
+                completeWithErrorQuietly(emitter, e);
                 removeEmitter(userId, emitter);
             }
         }
@@ -109,6 +111,14 @@ public class SseEmitterManager {
             emitter.complete();
         } catch (Exception e) {
             // Already closed by the container; nothing to do.
+        }
+    }
+
+    private static void completeWithErrorQuietly(SseEmitter emitter, Exception cause) {
+        try {
+            emitter.completeWithError(cause);
+        } catch (Exception e) {
+            // ignored
         }
     }
 }

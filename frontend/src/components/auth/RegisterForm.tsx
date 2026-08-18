@@ -35,11 +35,11 @@ const PASSWORD_RULES: PasswordRule[] = [
 const validationSchema = Yup.object().shape({
     firstname: Yup.string()
         .min(2, 'First name must be at least 2 characters.')
-        .max(20, 'Max length is 20.')
+        .max(50, 'Max length is 50.')
         .required('First name is required.'),
     lastname: Yup.string()
         .min(2, 'Last name must be at least 2 characters.')
-        .max(20, 'Max length is 20.')
+        .max(50, 'Max length is 50.')
         .required('Last name is required.'),
     email: Yup.string()
         .email('Invalid email address format.')

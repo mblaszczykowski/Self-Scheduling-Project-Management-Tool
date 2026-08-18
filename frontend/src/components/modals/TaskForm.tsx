@@ -15,13 +15,8 @@ import { FormikHelpers, FormikProps } from 'formik';
 type SetFieldValue = FormikHelpers<ModalFormValues>['setFieldValue'];
 type FormikChange = FormikProps<ModalFormValues>['handleChange'];
 
-/* ═══════════════════════════════════════════════════════════
-   Sidebar building blocks
-   ═══════════════════════════════════════════════════════════ */
-
 const propLabelClass = 'w-24 shrink-0 text-sm font-medium text-slate-600 dark:text-slate-300';
 
-/* ── Row with hover highlight + reveal chevron ── */
 const PropRow = ({ label, htmlFor, children }: { label: React.ReactNode; htmlFor: string; children: React.ReactNode }) => (
     <div className="group/row flex items-center gap-3 min-h-[40px] -mx-2.5 px-2.5 rounded-lg hover:bg-white dark:hover:bg-slate-800/50 transition-colors hover:shadow-sm">
         <label htmlFor={htmlFor} className={propLabelClass}>{label}</label>
@@ -29,7 +24,6 @@ const PropRow = ({ label, htmlFor, children }: { label: React.ReactNode; htmlFor
     </div>
 );
 
-/* ── Section card ── */
 const SidebarSection = ({ title, children }: { title?: React.ReactNode; children: React.ReactNode }) => (
     <div className="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 transition-colors hover:border-slate-300 dark:hover:border-slate-600">
         {title && (
@@ -38,53 +32,6 @@ const SidebarSection = ({ title, children }: { title?: React.ReactNode; children
         <div className="space-y-0.5">{children}</div>
     </div>
 );
-
-/* ── Pill-style status/priority chips with invisible select overlay ── */
-const STATUS_PILL_BG: Record<string, string> = {
-    'BACKLOG':           'bg-slate-100 dark:bg-slate-800',
-    'TODO':              'bg-blue-50 dark:bg-blue-950/60',
-    'IN_PROGRESS':       'bg-amber-50 dark:bg-amber-950/60',
-    'IN_TEST':           'bg-sky-50 dark:bg-sky-950/60',
-    'TO_TEST':           'bg-blue-50 dark:bg-blue-950/60',
-    'TO_REVIEW':         'bg-cyan-50 dark:bg-cyan-950/60',
-    'READY_TO_MERGE':    'bg-teal-50 dark:bg-teal-950/60',
-    'READY_TO_DEPLOY':   'bg-emerald-50 dark:bg-emerald-950/60',
-    'DONE':              'bg-green-50 dark:bg-green-950/60',
-    'RELEASED':          'bg-green-50 dark:bg-green-950/60',
-    'WITHDRAWN':         'bg-red-50 dark:bg-red-950/60',
-    'GATHERING_INTEREST':'bg-orange-50 dark:bg-orange-950/60',
-};
-
-const STATUS_PILL_TEXT: Record<string, string> = {
-    'BACKLOG':           'text-slate-600 dark:text-slate-400',
-    'TODO':              'text-blue-700 dark:text-blue-300',
-    'IN_PROGRESS':       'text-amber-700 dark:text-amber-300',
-    'IN_TEST':           'text-sky-700 dark:text-sky-300',
-    'TO_TEST':           'text-blue-700 dark:text-blue-300',
-    'TO_REVIEW':         'text-cyan-700 dark:text-cyan-300',
-    'READY_TO_MERGE':    'text-teal-700 dark:text-teal-300',
-    'READY_TO_DEPLOY':   'text-emerald-700 dark:text-emerald-300',
-    'DONE':              'text-green-700 dark:text-green-300',
-    'RELEASED':          'text-green-700 dark:text-green-400',
-    'WITHDRAWN':         'text-red-600 dark:text-red-400',
-    'GATHERING_INTEREST':'text-orange-700 dark:text-orange-300',
-};
-
-const PRIORITY_PILL_BG: Record<string, string> = {
-    'LOWEST':  'bg-slate-100 dark:bg-slate-800',
-    'LOW':     'bg-blue-50 dark:bg-blue-950/60',
-    'MEDIUM':  'bg-amber-50 dark:bg-amber-950/60',
-    'HIGH':    'bg-orange-50 dark:bg-orange-950/60',
-    'HIGHEST': 'bg-red-50 dark:bg-red-950/60',
-};
-
-const PRIORITY_PILL_TEXT: Record<string, string> = {
-    'LOWEST':  'text-slate-600 dark:text-slate-400',
-    'LOW':     'text-blue-700 dark:text-blue-300',
-    'MEDIUM':  'text-amber-700 dark:text-amber-300',
-    'HIGH':    'text-orange-700 dark:text-orange-300',
-    'HIGHEST': 'text-red-700 dark:text-red-300',
-};
 
 const DEP_DOT_COLOR: Record<string, string> = {
     'DONE': 'bg-green-500', 'RELEASED': 'bg-green-500',
@@ -113,7 +60,6 @@ const SelectChevron = () => (
     <HiOutlineChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 w-4 h-4 pointer-events-none opacity-60 group-hover/row:opacity-100 transition-all duration-150" />
 );
 
-/* ── Progress ring ── */
 const ProgressRing = ({ value, size = 38, stroke = 3.5 }: { value: number; size?: number; stroke?: number }) => {
     const r = (size - stroke) / 2;
     const c = 2 * Math.PI * r;
@@ -134,7 +80,6 @@ const ProgressRing = ({ value, size = 38, stroke = 3.5 }: { value: number; size?
     );
 };
 
-/* ── Due urgency badge ── */
 const DueBadge = ({ date }: { date?: string }) => {
     if (!date) return null;
     const diff = Math.round((new Date(date).getTime() - new Date().getTime()) / MS_PER_DAY);
@@ -146,10 +91,6 @@ const DueBadge = ({ date }: { date?: string }) => {
     return <span className={`ml-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${cls} animate-pulse`}>{text}</span>;
 };
 
-/* ═══════════════════════════════════════════════════════════
-   TaskForm
-   ═══════════════════════════════════════════════════════════ */
-
 const ACTIVITY_TABS = [
     { key: 'comments', label: 'Comments' },
     { key: 'history', label: 'History' },
@@ -159,7 +100,7 @@ interface TaskFormProps {
     values: ModalFormValues;
     setFieldValue: SetFieldValue;
     handleChange: FormikChange;
-    modalMode: 'create' | 'edit' | 'view';
+    modalMode: 'create' | 'edit';
     task?: Task | null;
     project?: Project | null;
     projects: Project[];
@@ -206,7 +147,6 @@ const TaskForm = ({
 
     return (
         <>
-            {/* ─── Main content ─── */}
             <div className="flex-1 px-6 py-5 border-r border-slate-200 dark:border-slate-700 overflow-y-auto">
                 <EntityMainColumn
                     values={values}
@@ -250,10 +190,7 @@ const TaskForm = ({
                 )}
             </div>
 
-            {/* ─── Sidebar ─── */}
             <div className="w-full md:w-[360px] shrink-0 px-5 py-5 overflow-y-auto space-y-4 bg-slate-50/50 dark:bg-slate-800/20">
-
-                {/* ══ Details ══ */}
                 <SidebarSection title="Details">
                     <PropRow label="Project" htmlFor={idFor('projectKey')}>
                         <div className="relative">
@@ -271,10 +208,9 @@ const TaskForm = ({
                         <ErrorMessage name="projectKey" component="div" id={idFor('projectKey-error')} className="text-red-500 text-xs mt-0.5 pl-0.5" />
                     </PropRow>
 
-                    {/* Status — colored pill with invisible select overlay */}
                     <PropRow label="Status" htmlFor={idFor('status')}>
                         <div className="relative cursor-pointer group/pill">
-                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${STATUS_PILL_BG[values.status] || 'bg-slate-100'} ${STATUS_PILL_TEXT[values.status] || 'text-slate-600'}`}>
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${STATUS_CONFIG[values.status]?.pillBg || 'bg-slate-100'} ${STATUS_CONFIG[values.status]?.pillText || 'text-slate-600'}`}>
                                 <span className={`w-[7px] h-[7px] rounded-full ring-1 ring-current/20 ${STATUS_CONFIG[values.status as keyof typeof STATUS_CONFIG]?.dot || 'bg-slate-400'}`} />
                                 {STATUS_CONFIG[values.status as keyof typeof STATUS_CONFIG]?.label || values.status}
                             </div>
@@ -287,10 +223,9 @@ const TaskForm = ({
                         </div>
                     </PropRow>
 
-                    {/* Priority — colored pill */}
                     <PropRow label="Priority" htmlFor={idFor('priority')}>
                         <div className="relative cursor-pointer group/pill">
-                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${PRIORITY_PILL_BG[values.priority] || 'bg-slate-100'} ${PRIORITY_PILL_TEXT[values.priority] || 'text-slate-600'}`}>
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${PRIORITY_CONFIG[values.priority]?.pillBg || 'bg-slate-100'} ${PRIORITY_CONFIG[values.priority]?.pillText || 'text-slate-600'}`}>
                                 <span className="text-xs leading-none">{PRIORITY_CONFIG[values.priority as keyof typeof PRIORITY_CONFIG]?.icon}</span>
                                 {PRIORITY_CONFIG[values.priority as keyof typeof PRIORITY_CONFIG]?.label || values.priority}
                             </div>
@@ -303,7 +238,6 @@ const TaskForm = ({
                         </div>
                     </PropRow>
 
-                    {/* Assignee — avatar + name */}
                     <PropRow label="Assignee" htmlFor={idFor('assignee')}>
                         <div className="relative">
                             {assignee && (
@@ -321,9 +255,7 @@ const TaskForm = ({
                     </PropRow>
                 </SidebarSection>
 
-                {/* ══ Schedule ══ */}
                 <SidebarSection title="Schedule">
-                    {/* Date cells */}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
                             <label htmlFor={idFor('startDate')} className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide block mb-1">Start</label>
@@ -375,7 +307,6 @@ const TaskForm = ({
                         </div>
                     </PropRow>
 
-                    {/* Progress — ring + gradient bar */}
                     <PropRow label="Progress" htmlFor={idFor('progress')}>
                         <div className="flex items-center gap-3">
                             <ProgressRing value={values.progress} />
@@ -398,14 +329,12 @@ const TaskForm = ({
                     </PropRow>
                 </SidebarSection>
 
-                {/* ══ Tracking ══ */}
                 <SidebarSection title="Tracking">
                     <PropRow label="Labels" htmlFor={idFor('labels')}>
                         <Field type="text" id={idFor('labels')} name="labels" placeholder="Add labels..."
                             className={sidebarInputClass} />
                     </PropRow>
 
-                    {/* Dependencies — list with status dots + hover remove */}
                     <div>
                         <div className="flex items-center gap-3 min-h-[40px] -mx-2.5 px-2.5">
                             <label htmlFor={idFor('dependencies')} className={propLabelClass}>
@@ -453,7 +382,6 @@ const TaskForm = ({
                     </div>
                 </SidebarSection>
 
-                {/* ── Meta ── */}
                 {modalMode === 'edit' && (
                     <div className="px-1 pt-2 flex items-center justify-between text-xs font-medium text-slate-400 dark:text-slate-500">
                         <span>Created {values.created || '—'}</span>

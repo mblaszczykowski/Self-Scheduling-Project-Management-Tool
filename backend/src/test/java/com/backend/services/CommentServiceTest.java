@@ -114,8 +114,6 @@ class CommentServiceTest {
                 fileStorageService, taskActivityService, notificationService, entityMapper, accessGuard);
     }
 
-    // ======================== helpers ========================
-
     private void commentIsSavedWithId(int id) {
         when(commentRepository.save(any(Comment.class))).thenAnswer(invocation -> {
             Comment saved = invocation.getArgument(0);
@@ -323,13 +321,34 @@ class CommentServiceTest {
             when(commentRepository.findById(50)).thenReturn(Optional.of(parentOnOtherTask));
 
             assertThatThrownBy(() -> commentService.addComment(100, 1, "A reply", oneUpload(), 50))
-                    .isInstanceOf(ValidationException.class)
-                    .hasMessageContaining("Parent comment does not belong to this task");
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Parent comment not found");
 
             // Rejected before anything is written to disk or to the database.
             verify(fileStorageService, never()).storeFiles(anyList(), any(), any());
             verify(commentRepository, never()).save(any());
             verifyNoInteractions(notificationRepository, taskActivityService);
+        }
+
+        @Test
+        @DisplayName("reports a parent comment in an inaccessible project with exactly the same message as a missing one")
+        void shouldRefuseAParentCommentInAnInaccessibleProjectTheSameAsAMissingOne() {
+            var otherProject = TestEntityFactory.createProject(20, "OTHER", otherUser);
+            var otherTask = TestEntityFactory.createTask(200, 1, otherProject);
+            var parentInInaccessibleProject = TestEntityFactory.createComment(50, otherTask, otherUser);
+            when(accessGuard.getAccessibleTaskById(100, 1)).thenReturn(task);
+            when(userService.getRequiredUserById(1)).thenReturn(author);
+            when(commentRepository.findById(50)).thenReturn(Optional.of(parentInInaccessibleProject));
+            when(commentRepository.findById(999)).thenReturn(Optional.empty());
+
+            var inaccessible = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> commentService.addComment(100, 1, "A reply", null, 50));
+            var missing = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> commentService.addComment(100, 1, "A reply", null, 999));
+
+            assertThat(inaccessible).isInstanceOf(ResourceNotFoundException.class);
+            assertThat(missing).isInstanceOf(ResourceNotFoundException.class);
+            assertThat(inaccessible).hasMessage(missing.getMessage());
         }
 
         @Test
@@ -524,8 +543,8 @@ class CommentServiceTest {
             when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
 
             assertThatThrownBy(() -> commentService.updateComment(100, 1, 1, "Updated", null))
-                    .isInstanceOf(ValidationException.class)
-                    .hasMessageContaining("Comment does not belong to the specified task");
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Comment not found");
 
             verify(commentRepository, never()).save(any());
             verifyNoInteractions(fileStorageService);
@@ -612,7 +631,7 @@ class CommentServiceTest {
             when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
 
             assertThatThrownBy(() -> commentService.deleteComment(100, 1, 1))
-                    .isInstanceOf(ValidationException.class);
+                    .isInstanceOf(ResourceNotFoundException.class);
 
             verify(commentRepository, never()).delete(any());
             verifyNoInteractions(fileStorageService);
@@ -769,8 +788,8 @@ class CommentServiceTest {
                     .thenReturn(Optional.of(commentOnOtherTask));
 
             assertThatThrownBy(() -> commentService.reactToComment(100, 1, 2, ReactionType.LIKE))
-                    .isInstanceOf(ValidationException.class)
-                    .hasMessageContaining("Comment does not belong to the specified task");
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Comment not found");
 
             assertThat(commentOnOtherTask.getReactions()).isEmpty();
             verifyNoInteractions(commentReactionRepository, notificationRepository);
@@ -780,14 +799,31 @@ class CommentServiceTest {
         @DisplayName("refuses a caller who has no access to the comment's project")
         void shouldRefuseACallerWithoutProjectAccess() {
             when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
-            doThrow(new ResourceNotFoundException("Project not found"))
-                    .when(accessGuard).requireAccess(project, 99);
 
             assertThatThrownBy(() -> commentService.reactToComment(100, 1, 99, ReactionType.LIKE))
-                    .isInstanceOf(ResourceNotFoundException.class);
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Comment not found");
 
             assertThat(comment.getReactions()).isEmpty();
             verifyNoInteractions(commentReactionRepository, notificationRepository);
+        }
+
+        @Test
+        @DisplayName("reports a comment in a different task and one that's simply missing with the same message")
+        void shouldReportADifferentTaskCommentTheSameAsAMissingOne() {
+            var otherTask = TestEntityFactory.createTask(200, 2, project);
+            var commentOnOtherTask = TestEntityFactory.createComment(1, otherTask, author);
+            when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(commentOnOtherTask));
+            when(commentRepository.findByIdWithTaskAndProject(999)).thenReturn(Optional.empty());
+
+            var wrongTask = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> commentService.reactToComment(100, 1, 2, ReactionType.LIKE));
+            var missing = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> commentService.reactToComment(100, 999, 2, ReactionType.LIKE));
+
+            assertThat(wrongTask).isInstanceOf(ResourceNotFoundException.class);
+            assertThat(missing).isInstanceOf(ResourceNotFoundException.class);
+            assertThat(wrongTask).hasMessage(missing.getMessage());
         }
 
         @Test

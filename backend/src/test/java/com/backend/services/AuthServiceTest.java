@@ -492,8 +492,6 @@ class AuthServiceTest {
         }
     }
 
-    // ======================== helpers ========================
-
     private AuthService authServiceWith(int loginLimit, BCryptPasswordEncoder encoder) {
         return new AuthService(userService, tokenService, rateLimiter(loginLimit), encoder);
     }

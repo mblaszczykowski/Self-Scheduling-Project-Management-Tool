@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Bar } from 'react-chartjs-2';
 import { ChartOptions } from 'chart.js';
-import { ChartCard, chartOptions } from '../ChartComponents';
+import { ChartCard, chartOptions, useChartTickColor } from '../ChartComponents';
 import { formatAssigneeName } from '../../../util/helpers';
 import { LightningIcon, BlockedIcon, TrendingUpIcon, UsersIcon } from '../../common/Icons';
 import EmptyState from '../../common/EmptyState';
@@ -190,42 +190,9 @@ export const CrossProjectDepsCard = ({ dependencies }: { dependencies: CrossProj
     </ChartCard>
 );
 
-const workloadOptions: ChartOptions<'bar'> = {
-    ...chartOptions,
-    indexAxis: 'y',
-    plugins: {
-        ...chartOptions.plugins,
-        legend: {
-            display: true,
-            position: 'top',
-            labels: {
-                boxWidth: 10,
-                boxHeight: 10,
-                borderRadius: 2,
-                useBorderRadius: true,
-                font: { size: 10, family: 'system-ui' },
-                color: '#64748b',
-                padding: 12,
-            },
-        },
-    },
-    scales: {
-        ...chartOptions.scales,
-        x: {
-            ...chartOptions.scales.x,
-            stacked: true,
-            beginAtZero: true,
-            grid: { display: true, color: 'rgba(148, 163, 184, 0.1)' },
-            ticks: { ...chartOptions.scales.x.ticks, stepSize: 1 },
-        },
-        y: {
-            ...chartOptions.scales.y,
-            stacked: true,
-        },
-    },
-};
-
 export const TeamWorkloadBarCard = ({ load }: { load: AssigneeLoad[] }) => {
+    const tickColor = useChartTickColor();
+
     if (load.length === 0) {
         return (
             <ChartCard title="Team Workload" subtitle="Tasks per assignee (critical vs normal)">
@@ -233,6 +200,41 @@ export const TeamWorkloadBarCard = ({ load }: { load: AssigneeLoad[] }) => {
             </ChartCard>
         );
     }
+
+    const workloadOptions: ChartOptions<'bar'> = {
+        ...chartOptions,
+        indexAxis: 'y',
+        plugins: {
+            ...chartOptions.plugins,
+            legend: {
+                display: true,
+                position: 'top',
+                labels: {
+                    boxWidth: 10,
+                    boxHeight: 10,
+                    borderRadius: 2,
+                    useBorderRadius: true,
+                    font: { size: 10, family: 'system-ui' },
+                    color: tickColor,
+                    padding: 12,
+                },
+            },
+        },
+        scales: {
+            ...chartOptions.scales,
+            x: {
+                ...chartOptions.scales.x,
+                stacked: true,
+                beginAtZero: true,
+                grid: { display: true, color: 'rgba(148, 163, 184, 0.1)' },
+                ticks: { ...chartOptions.scales.x.ticks, stepSize: 1 },
+            },
+            y: {
+                ...chartOptions.scales.y,
+                stacked: true,
+            },
+        },
+    };
 
     const data = {
         labels: load.map(entry => formatAssigneeName(entry.assignee)),

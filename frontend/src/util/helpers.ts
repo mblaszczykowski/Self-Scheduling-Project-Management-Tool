@@ -80,11 +80,6 @@ export function getImageUrl(path?: string | null): string | null {
     return `${config.API_BASE_URL}${path}`;
 }
 
-export const formatDate = (dateString?: string | null): string => {
-    if (!dateString) return '';
-    return toDateString(dateString);
-};
-
 export const formatAssigneeName = (email?: string | null): string => {
     if (!email) return '';
     const local = email.split('@')[0];
@@ -107,14 +102,14 @@ export const splitFullName = (name?: string | null): { firstname: string; lastna
 export const formatDateTime = (dateString?: string | null): string => {
     if (!dateString) return '';
     const parsed = new Date(dateString);
-    return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleString();
+    return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleString('en-US');
 };
 
 export const formatShortDate = (date: MaybeDate): string => {
     if (date === null || date === undefined) return NO_DATE;
     const parsed = new Date(date);
     if (Number.isNaN(parsed.getTime())) return NO_DATE;
-    return parsed.toLocaleDateString(undefined, {
+    return parsed.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
     });
@@ -124,7 +119,7 @@ export const formatLongDate = (date: MaybeDate): string => {
     if (date === null || date === undefined) return NO_DATE;
     const parsed = new Date(date);
     if (Number.isNaN(parsed.getTime())) return NO_DATE;
-    return parsed.toLocaleDateString(undefined, {
+    return parsed.toLocaleDateString('en-US', {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
@@ -330,17 +325,15 @@ export const getAvatarInitials = (user?: AvatarSubject | null): string => {
 
 export const calculateTaskPosition = (startDate: MaybeDate, dueDate: MaybeDate, timelineStart: DateInput) => {
     const dayWidth = TIMELINE_CONSTANTS.DAY_WIDTH;
-    // A task with no dates has no bar. Returning a zero-width bar at the origin beats the NaN
-    // margin the old signature produced, which React renders as no style at all.
-    if (startDate === null || startDate === undefined || dueDate === null || dueDate === undefined) {
+    const startDay = dayIndex(startDate);
+    const dueDay = dayIndex(dueDate);
+    const timelineStartDay = dayIndex(timelineStart);
+    if (startDay === null || dueDay === null || timelineStartDay === null) {
         return { marginLeft: 0, width: 0 };
     }
-    const start = new Date(startDate);
-    const due = new Date(dueDate);
-    const tlStart = new Date(timelineStart);
 
-    const daysOffset = Math.round((start.getTime() - tlStart.getTime()) / MS_PER_DAY);
-    const durationDays = Math.round((due.getTime() - start.getTime()) / MS_PER_DAY) + 1;
+    const daysOffset = startDay - timelineStartDay;
+    const durationDays = dueDay - startDay + 1;
 
     return {
         marginLeft: daysOffset * dayWidth,

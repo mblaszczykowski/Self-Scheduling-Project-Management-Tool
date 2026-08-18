@@ -187,6 +187,23 @@ class AccessGuardTest {
                     .isInstanceOf(ResourceNotFoundException.class)
                     .hasMessage("Project not found");
         }
+
+        @Test
+        @DisplayName("hides the project from a stranger with zero access behind exactly the same not-found as a nonexistent key")
+        void hidesTheProjectFromAStrangerWithZeroAccess() {
+            when(projectRepository.findByProjectKeyWithOwnerAndMembers("PROJ"))
+                    .thenReturn(Optional.of(project));
+            when(projectRepository.findByProjectKeyWithOwnerAndMembers("GHOST"))
+                    .thenReturn(Optional.empty());
+
+            var strangerResult = catchThrowable(() -> accessGuard.getOwnedProject("PROJ", stranger.getId()));
+            var missingResult = catchThrowable(() -> accessGuard.getOwnedProject("GHOST", stranger.getId()));
+
+            assertThat(strangerResult)
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .isNotInstanceOf(AuthorizationException.class);
+            assertThat(strangerResult).hasMessage(missingResult.getMessage());
+        }
     }
 
     @Nested
@@ -265,14 +282,14 @@ class AccessGuardTest {
         }
 
         @Test
-        @DisplayName("hides a task in a project the caller cannot see behind a not-found")
+        @DisplayName("hides a task in a project the caller cannot see behind exactly the same not-found as a missing id")
         void hidesATaskInAnInaccessibleProject() {
             Task task = TestEntityFactory.createTask(100, 1, project);
             when(taskRepository.findById(100)).thenReturn(Optional.of(task));
 
             assertThatThrownBy(() -> accessGuard.getAccessibleTaskById(100, stranger.getId()))
                     .isInstanceOf(ResourceNotFoundException.class)
-                    .hasMessage("Project not found");
+                    .hasMessage("Task not found");
         }
 
         @Test
@@ -283,6 +300,21 @@ class AccessGuardTest {
             assertThatThrownBy(() -> accessGuard.getAccessibleTaskById(404, owner.getId()))
                     .isInstanceOf(ResourceNotFoundException.class)
                     .hasMessage("Task not found");
+        }
+
+        @Test
+        @DisplayName("reports an inaccessible task with exactly the same message as a missing one")
+        void reportsAnInaccessibleTaskWithTheSameMessageAsAMissingOne() {
+            Task task = TestEntityFactory.createTask(100, 1, project);
+            when(taskRepository.findById(100)).thenReturn(Optional.of(task));
+            when(taskRepository.findById(404)).thenReturn(Optional.empty());
+
+            var inaccessible = catchThrowable(() -> accessGuard.getAccessibleTaskById(100, stranger.getId()));
+            var missing = catchThrowable(() -> accessGuard.getAccessibleTaskById(404, stranger.getId()));
+
+            assertThat(inaccessible).isInstanceOf(ResourceNotFoundException.class);
+            assertThat(missing).isInstanceOf(ResourceNotFoundException.class);
+            assertThat(inaccessible).hasMessage(missing.getMessage());
         }
     }
 

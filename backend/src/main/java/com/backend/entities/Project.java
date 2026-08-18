@@ -65,7 +65,7 @@ public class Project {
     )
     private Set<User> members = new HashSet<>();
 
-    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "project")
     private List<Task> tasks = new ArrayList<>();
 
     @ManyToMany

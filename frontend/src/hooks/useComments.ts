@@ -59,7 +59,6 @@ export function useComments(taskId: number | null) {
         };
     }, [load]);
 
-    /** Replaces one comment wherever it sits in the reply tree. */
     const replaceInTree = useCallback((updated: Comment) => {
         const replace = (list: Comment[]): Comment[] => list.map((comment) => {
             if (comment.id === updated.id) return { ...updated, replies: comment.replies };

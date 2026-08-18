@@ -124,7 +124,7 @@ const ProjectsPage = () => {
     const filterRef = useRef<HTMLDivElement | null>(null);
     useClickOutside(filterRef, closeFilterDropdown);
 
-    const { displayProjects, startResize, shouldPreventClick } =
+    const { displayProjects, startResize, shouldPreventClick, draggingTaskKey } =
         useTaskResizePreview({ processedProjects, updateTaskSchedule });
 
     const { filteredTasks, filteredTaskIds, filteredProjectKeys, hasActiveFilters } = useTaskFiltering({
@@ -323,6 +323,7 @@ const ProjectsPage = () => {
                             <TimelineView
                                 processedProjects={displayProjects}
                                 allTasks={allTasks}
+                                draggingTaskKey={draggingTaskKey}
                                 taskKeyMap={taskKeyToTaskMap}
                                 projectKeyToProject={projectKeyToProject}
                                 filteredTaskIds={filteredTaskIds}

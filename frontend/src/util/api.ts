@@ -41,8 +41,6 @@ interface RetryableConfig extends InternalAxiosRequestConfig {
     _skipRefresh?: boolean;
 }
 
-// ── CSRF ──
-
 const readCookie = (name: string): string | null => {
     if (!document.cookie) return null;
     for (const entry of document.cookie.split('; ')) {
@@ -72,8 +70,6 @@ api.interceptors.request.use((requestConfig) => {
     }
     return requestConfig;
 });
-
-// ── Access-token refresh ──
 
 let refreshPromise: Promise<unknown> | null = null;
 
@@ -129,8 +125,6 @@ api.interceptors.response.use(
     }
 );
 
-// ── Helpers ──
-
 const body = <T>(response: AxiosResponse<T>): T => response.data;
 
 const multipart = (data: unknown, attachments: File[], dataKey: string): FormData => {
@@ -142,8 +136,6 @@ const multipart = (data: unknown, attachments: File[], dataKey: string): FormDat
 
 const MULTIPART: AxiosRequestConfig = { headers: { 'Content-Type': 'multipart/form-data' } };
 
-// ── Auth ──
-
 export const login = (email: string, password: string) =>
     api.post<{ message: string; userId: number; email: string; name: string }>(
         '/api/auth/login', { email, password }).then(body);
@@ -152,8 +144,6 @@ export const logout = () => api.post<void>('/api/auth/logout').then(body);
 
 export const register = (payload: RegistrationPayload) =>
     api.post<{ message: string; userId: number; email: string }>('/api/users', payload).then(body);
-
-// ── Current user ──
 
 export const getCurrentUser = () => api.get<CurrentUser>('/api/users/me').then(body);
 
@@ -178,8 +168,6 @@ export const updateEmailPreferences = (preferences: EmailPreferencesPayload) =>
 export const lookupUserByEmail = (email: string) =>
     api.get<User>('/api/users/lookup', { params: { email } }).then(body);
 
-// ── Projects ──
-
 export const getProjects = (page = 0, size = 100) =>
     api.get<Paged<Project>>('/api/projects', { params: { page, size } }).then(body);
 
@@ -196,8 +184,6 @@ export const updateProject = (projectKey: string, payload: ProjectPayload, attac
 
 export const deleteProject = (projectKey: string) =>
     api.delete<void>(`/api/projects/${encodeURIComponent(projectKey)}`).then(body);
-
-// ── Tasks ──
 
 export const createTask = (projectKey: string, payload: TaskPayload, attachments: File[] = []) =>
     api.post<Task>(`/api/projects/${encodeURIComponent(projectKey)}/tasks`,
@@ -224,8 +210,6 @@ export const deleteTask = (projectKey: string, taskKey: string) =>
     api.delete<void>(
         `/api/projects/${encodeURIComponent(projectKey)}/tasks/${encodeURIComponent(taskKey)}`)
         .then(body);
-
-// ── Comments ──
 
 export const getComments = (taskId: number, page = 0, size = 50) =>
     api.get<Paged<Comment>>(`/api/tasks/${taskId}/comments`, { params: { page, size } }).then(body);
@@ -256,12 +240,8 @@ export const reactToComment = (taskId: number, commentId: number, type: Reaction
     api.post<Comment>(`/api/tasks/${taskId}/comments/${commentId}/reactions`, null, { params: { type } })
         .then(body);
 
-// ── Activities ──
-
 export const getTaskActivities = (taskId: number, page = 0, size = 50) =>
     api.get<Paged<Activity>>(`/api/tasks/${taskId}/activities`, { params: { page, size } }).then(body);
-
-// ── Notifications ──
 
 export const getNotifications = (page = 0, size = 50) =>
     api.get<Paged<Notification>>('/api/notifications', { params: { page, size } }).then(body);
@@ -273,12 +253,8 @@ export const getUnreadNotificationCount = () =>
 export const markNotificationsAsRead = (notificationIds: number[]) =>
     api.post<void>('/api/notifications/mark-as-read', notificationIds).then(body);
 
-// ── Search ──
-
 export const globalSearch = (query: string) =>
     api.get<SearchResults>('/api/search', { params: { q: query } }).then(body);
-
-// ── Schedule optimization ──
 
 export const simulateOptimization = (request: OptimizationRequest) =>
     api.post<OptimizationResult>('/api/optimization/simulate', request).then(body);

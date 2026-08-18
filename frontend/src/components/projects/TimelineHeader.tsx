@@ -56,7 +56,7 @@ const TimelineHeader = ({
                     style={{ width: `${daysInMonth * DAY_WIDTH}px` }}
                 >
                     <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 px-3 py-2 bg-slate-50/50 dark:bg-slate-800/30 tracking-wide">
-                        {monthDate.toLocaleDateString('default', { month: 'short' }).toUpperCase()} {year}
+                        {monthDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()} {year}
                     </div>
                     <div className="flex">{days}</div>
                 </div>

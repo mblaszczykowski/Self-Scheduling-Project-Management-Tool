@@ -1,4 +1,4 @@
-import React, { useEffect, useId } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { HiOutlineExclamation } from 'react-icons/hi';
 
 interface ConfirmDialogProps {
@@ -27,6 +27,18 @@ const ConfirmDialog = ({
     const dialogId = useId();
     const titleId = `${dialogId}-title`;
     const descriptionId = `${dialogId}-description`;
+
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        previousFocusRef.current = document.activeElement as HTMLElement | null;
+        dialogRef.current?.focus();
+        return () => {
+            previousFocusRef.current?.focus();
+        };
+    }, [isOpen]);
 
     // Escape dismisses the dialog. It is caught in the capture phase and stopped there because the
     // modal underneath (TaskProjectModal, PreviewModal) also listens on document, and only the
@@ -65,6 +77,8 @@ const ConfirmDialog = ({
             onClick={onClose}
         >
             <div
+                ref={dialogRef}
+                tabIndex={-1}
                 className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-scale-in"
                 onClick={e => e.stopPropagation()}
                 role="alertdialog"

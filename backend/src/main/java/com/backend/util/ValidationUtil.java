@@ -3,12 +3,9 @@ package com.backend.util;
 import com.backend.exception.ValidationException;
 import java.util.regex.Pattern;
 
-public class ValidationUtil {
+public final class ValidationUtil {
 
-    public static final int MAX_SUMMARY_LENGTH = 200;
-    public static final int MAX_DESCRIPTION_LENGTH = 5000;
     public static final int MAX_COMMENT_LENGTH = 10000;
-    public static final int MAX_PROJECT_KEY_LENGTH = 10;
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
             "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
@@ -18,6 +15,9 @@ public class ValidationUtil {
     private static final Pattern SPECIAL_CHAR_PATTERN = Pattern.compile(
             "[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]"
     );
+
+    private ValidationUtil() {
+    }
 
     public static boolean isNullOrEmpty(String str) {
         return str == null || str.trim().isEmpty();
@@ -64,18 +64,6 @@ public class ValidationUtil {
 
         if (password.contains(" ")) {
             throw new ValidationException("Password must not contain spaces");
-        }
-    }
-
-    public static void validateSummaryAndDescription(String summary, String description) {
-        if (isNullOrEmpty(summary)) {
-            throw new ValidationException("Summary is required");
-        }
-        if (summary.length() > MAX_SUMMARY_LENGTH) {
-            throw new ValidationException("Summary exceeds maximum length of " + MAX_SUMMARY_LENGTH + " characters");
-        }
-        if (description != null && description.length() > MAX_DESCRIPTION_LENGTH) {
-            throw new ValidationException("Description exceeds maximum length of " + MAX_DESCRIPTION_LENGTH + " characters");
         }
     }
 

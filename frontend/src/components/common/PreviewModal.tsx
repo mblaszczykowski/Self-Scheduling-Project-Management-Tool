@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { HiOutlineDownload, HiOutlineX } from 'react-icons/hi';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 
@@ -15,6 +15,17 @@ interface PreviewModalProps {
 
 const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
     const [isVisible, setIsVisible] = useAnimateIn();
+
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
+
+    useEffect(() => {
+        previousFocusRef.current = document.activeElement as HTMLElement | null;
+        dialogRef.current?.focus();
+        return () => {
+            previousFocusRef.current?.focus();
+        };
+    }, []);
 
     const handleClose = useCallback(() => {
         setIsVisible(false);
@@ -33,6 +44,8 @@ const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
 
     return (
         <div
+            ref={dialogRef}
+            tabIndex={-1}
             className={`fixed inset-0 bg-black/50 flex justify-center items-center z-[80] transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
             onClick={handleClose}
             role="dialog"
