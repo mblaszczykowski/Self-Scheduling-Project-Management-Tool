@@ -39,19 +39,9 @@ public record TaskSnapshot(
                 task.getDueDate(),
                 task.getSummary(),
                 task.getDescription(),
-                splitLabels(task.getLabels()),
+                EntityMapper.parseLabels(task.getLabels()),
                 EntityMapper.extractDependencyKeys(task),
                 List.copyOf(task.getAttachments())
         );
-    }
-
-    private static List<String> splitLabels(String labels) {
-        if (labels == null || labels.isBlank()) {
-            return List.of();
-        }
-        return java.util.Arrays.stream(labels.split(","))
-                .map(String::trim)
-                .filter(label -> !label.isEmpty())
-                .toList();
     }
 }

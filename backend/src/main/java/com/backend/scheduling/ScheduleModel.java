@@ -1,6 +1,7 @@
 package com.backend.scheduling;
 
 import com.backend.dtos.TaskDTO;
+import com.backend.entities.TaskPriority;
 import com.backend.entities.TaskStatus;
 
 import java.time.LocalDate;
@@ -35,8 +36,6 @@ public final class ScheduleModel {
     /** Statuses that mean the work is finished; these are constraints, not decisions. */
     private static final Set<TaskStatus> TERMINAL_STATUSES =
             Set.of(TaskStatus.DONE, TaskStatus.RELEASED, TaskStatus.WITHDRAWN);
-
-    private static final int DEFAULT_PRIORITY_WEIGHT = 5; // MEDIUM
 
     private ScheduleModel() {}
 
@@ -95,7 +94,7 @@ public final class ScheduleModel {
         // Fixed tasks may sit in the past; movable work cannot be scheduled backwards in time.
         int releaseOffset = fixed ? originalStart : Math.max(0, originalStart);
 
-        int weight = dto.priority() != null ? dto.priority().getWeight() : DEFAULT_PRIORITY_WEIGHT;
+        int weight = dto.priority() != null ? dto.priority().getWeight() : TaskPriority.MEDIUM.getWeight();
 
         return new ScheduleTask(dto.taskKey(), duration, releaseOffset, originalStart, dueOffset,
                 weight, dto.assignee(), dto.dependencyKeys(), fixed);

@@ -13,6 +13,10 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
+    @Modifying
+    @Query("UPDATE RefreshToken r SET r.consumedAt = :now WHERE r.tokenHash = :tokenHash AND r.consumedAt IS NULL")
+    int markConsumedIfUnconsumed(@Param("tokenHash") String tokenHash, @Param("now") Instant now);
+
     // Bulk deletes rather than derived deletes: RefreshToken has no children and no cascades,
     // so there is nothing for per-entity removal to do, and the derived form loaded every
     // matching row first. Backed by idx_refresh_token_expiry / idx_refresh_user.

@@ -177,7 +177,7 @@ public class EntityMapper {
         return task.getDependencies().stream().map(Task::getTaskKey).sorted().toList();
     }
 
-    private static List<String> parseLabels(String labelsString) {
+    public static List<String> parseLabels(String labelsString) {
         if (labelsString == null || labelsString.isBlank()) {
             return List.of();
         }

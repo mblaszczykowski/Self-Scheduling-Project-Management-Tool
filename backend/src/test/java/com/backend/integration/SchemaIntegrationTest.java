@@ -167,7 +167,6 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
         assertThat(projectRepository.findByProjectKeyWithOwnerAndMembers("SCHEMA")).isPresent();
         assertThat(projectRepository.findByProjectKeyWithLock("SCHEMA")).isPresent();
         assertThat(projectRepository.findByProjectKeyIn(List.of("SCHEMA"))).hasSize(1);
-        assertThat(projectRepository.findAllAccessibleByUser(owner.getId())).hasSize(1);
         assertThat(projectRepository.findAllAccessibleByUserPaged(member.getId(), PageRequest.of(0, 10))
                 .getTotalElements()).isEqualTo(1);
         assertThat(projectRepository.doUsersShareProject(owner.getId(), member.getId())).isTrue();
@@ -253,6 +252,8 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
         entityManager.flush();
 
         assertThat(refreshTokenRepository.findByTokenHash("hash-1")).isPresent();
+        assertThat(refreshTokenRepository.markConsumedIfUnconsumed("hash-1", Instant.now())).isEqualTo(1);
+        assertThat(refreshTokenRepository.markConsumedIfUnconsumed("hash-1", Instant.now())).isZero();
         assertThat(refreshTokenRepository.deleteExpired(Instant.now())).isEqualTo(1);
         assertThat(refreshTokenRepository.deleteFamily("family-1")).isZero();
         assertThat(refreshTokenRepository.deleteAllForUser(owner.getId())).isZero();

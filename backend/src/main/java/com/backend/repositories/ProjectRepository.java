@@ -37,17 +37,6 @@ public interface ProjectRepository extends JpaRepository<Project, Integer> {
             "ORDER BY p.projectKey")
     List<Project> findByProjectKeyIn(@Param("keys") List<String> keys);
 
-    // Ordering is part of the query, not left to the caller's Pageable: LIMIT/OFFSET over an
-    // unordered relation can return one project twice and omit another between pages, and even
-    // the unpaged list would reorder itself between refreshes.
-    @Query("SELECT DISTINCT p FROM Project p " +
-            "LEFT JOIN FETCH p.owner " +
-            "LEFT JOIN FETCH p.members " +
-            "WHERE p.owner.id = :userId OR p.id IN " +
-            "(SELECT p2.id FROM Project p2 JOIN p2.members m2 WHERE m2.id = :userId) " +
-            "ORDER BY p.projectKey")
-    List<Project> findAllAccessibleByUser(@Param("userId") Integer userId);
-
     // Do NOT fetch the members collection here: a to-many JOIN FETCH combined with a Pageable
     // forces Hibernate to load the whole result set and paginate in memory (HHH000104). Only the
     // to-one owner is fetched (pagination-safe); members are batch-loaded lazily during mapping.

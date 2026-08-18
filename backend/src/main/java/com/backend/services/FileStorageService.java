@@ -8,7 +8,9 @@ import com.backend.repositories.StoredFileRepository;
 import com.backend.util.FileValidationConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.stereotype.Service;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -43,9 +45,12 @@ public class FileStorageService {
 
     private final Path fileStorageLocation;
     private final StoredFileRepository storedFileRepository;
+    private final DataSize maxFileSize;
 
-    public FileStorageService(AppProperties appProperties, StoredFileRepository storedFileRepository) {
+    public FileStorageService(AppProperties appProperties, StoredFileRepository storedFileRepository,
+                              MultipartProperties multipartProperties) {
         this.storedFileRepository = storedFileRepository;
+        this.maxFileSize = multipartProperties.getMaxFileSize();
         this.fileStorageLocation = Paths.get(appProperties.getStorage().getUploadDir())
                 .toAbsolutePath().normalize();
         try {
@@ -199,8 +204,9 @@ public class FileStorageService {
         if (!FileValidationConstants.ALLOWED_EXTENSIONS.contains(extension)) {
             throw new ValidationException("File type not allowed: " + extension);
         }
-        if (file.getSize() > FileValidationConstants.MAX_FILE_SIZE) {
-            throw new ValidationException("File size exceeds maximum allowed size of 5 MB");
+        if (file.getSize() > maxFileSize.toBytes()) {
+            throw new ValidationException(
+                    "File size exceeds maximum allowed size of " + maxFileSize.toMegabytes() + " MB");
         }
         var expectedMagic = FileValidationConstants.MAGIC_BYTES_BY_EXTENSION.get(extension);
         if (expectedMagic != null) {

@@ -2,6 +2,7 @@ package com.backend.filter;
 
 import com.backend.config.CookieProperties;
 import com.backend.config.JwtProperties;
+import com.backend.web.CookieFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -44,6 +45,7 @@ class CsrfProtectionFilterTest {
             .build();
 
     private CookieProperties cookieProperties;
+    private CookieFactory cookieFactory;
     private CsrfProtectionFilter filter;
     private MockHttpServletRequest request;
     private MockHttpServletResponse response;
@@ -72,6 +74,7 @@ class CsrfProtectionFilterTest {
         cookieProperties = new CookieProperties();
         cookieProperties.setSecure(false);
         cookieProperties.setSameSite("Lax");
+        cookieFactory = new CookieFactory(cookieProperties);
         filter = filterWithRefreshTokenLifetime(REFRESH_TOKEN_TTL);
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();
@@ -82,7 +85,7 @@ class CsrfProtectionFilterTest {
         var jwtProperties = new JwtProperties("a-test-secret-of-at-least-32-characters",
                 ACCESS_TOKEN_TTL, refreshTokenExpiration, Duration.ofSeconds(30),
                 "flowlink", "flowlink-web");
-        return new CsrfProtectionFilter(objectMapper, cookieProperties, jwtProperties);
+        return new CsrfProtectionFilter(objectMapper, cookieFactory, jwtProperties);
     }
 
     private void requestOf(String method, String path) {

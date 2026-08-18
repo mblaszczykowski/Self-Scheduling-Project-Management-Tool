@@ -226,6 +226,7 @@ class TokenServiceTest {
             var stored = new RefreshToken("old-hash", user, "family-1", now.minusSeconds(60),
                     now.plusSeconds(3600));
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
+            when(refreshTokenRepository.markConsumedIfUnconsumed(anyString(), any())).thenReturn(1);
             when(userRepository.getReferenceById(7)).thenReturn(user);
 
             var result = tokenService.rotateRefreshToken("presented-token");
@@ -245,8 +246,8 @@ class TokenServiceTest {
             var now = Instant.now();
             var stored = new RefreshToken("old-hash", user, "family-1", now.minusSeconds(60),
                     now.plusSeconds(3600));
-            stored.markConsumed();
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
+            when(refreshTokenRepository.markConsumedIfUnconsumed(anyString(), any())).thenReturn(0);
 
             var result = tokenService.rotateRefreshToken("already-used-token");
 
@@ -263,6 +264,7 @@ class TokenServiceTest {
             var stored = new RefreshToken("old-hash", user, "family-1", now.minusSeconds(60),
                     now.minusSeconds(1));
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
+            when(refreshTokenRepository.markConsumedIfUnconsumed(anyString(), any())).thenReturn(1);
 
             var result = tokenService.rotateRefreshToken("expired-token");
 
@@ -280,6 +282,7 @@ class TokenServiceTest {
             var stored = new RefreshToken("old-hash", user, "family-1",
                     now.minus(Duration.ofDays(2)), now.plusSeconds(3600));
             when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
+            when(refreshTokenRepository.markConsumedIfUnconsumed(anyString(), any())).thenReturn(1);
 
             var result = shortSessionService.rotateRefreshToken("still-valid-but-old-session");
 

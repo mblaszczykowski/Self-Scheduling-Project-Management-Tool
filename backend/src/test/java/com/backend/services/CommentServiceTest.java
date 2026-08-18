@@ -594,6 +594,27 @@ class CommentServiceTest {
         }
 
         @Test
+        @DisplayName("also unlinks the attachments of every reply in the deleted comment's subtree")
+        void shouldUnlinkReplyAttachmentsToo() {
+            var comment = TestEntityFactory.createComment(1, task, author);
+            comment.addAttachments(List.of("/files/parent.png"));
+            var reply = TestEntityFactory.createComment(2, task, author);
+            reply.setParentComment(comment);
+            reply.addAttachments(List.of("/files/reply.png"));
+            when(commentRepository.findByIdWithTaskAndProject(1)).thenReturn(Optional.of(comment));
+            when(userService.getRequiredUserById(1)).thenReturn(author);
+            when(commentRepository.findRepliesByParentIdsWithDetails(List.of(1)))
+                    .thenReturn(List.of(reply));
+
+            commentService.deleteComment(100, 1, 1);
+
+            ArgumentCaptor<Collection<String>> captor = ArgumentCaptor.captor();
+            verify(fileStorageService).deleteFilesSilently(captor.capture());
+            assertThat(captor.getValue())
+                    .containsExactlyInAnyOrder("/files/parent.png", "/files/reply.png");
+        }
+
+        @Test
         @DisplayName("keeps the row deleted even when unlinking the files fails")
         void shouldNotFailTheDeleteWhenUnlinkingFails() {
             var comment = TestEntityFactory.createComment(1, task, author);

@@ -133,7 +133,12 @@ public class CommentService {
         var author = userService.getRequiredUserById(userId);
         taskActivityService.logCommentDeleted(comment.getTask(), author);
 
-        var attachments = List.copyOf(comment.getAttachments());
+        var attachments = new ArrayList<>(comment.getAttachments());
+        for (var replies : batchLoadReplies(List.of(comment)).values()) {
+            for (var reply : replies) {
+                attachments.addAll(reply.getAttachments());
+            }
+        }
         commentRepository.delete(comment);
         AfterCommit.run("delete attachments of comment " + commentId,
                 () -> fileStorageService.deleteFilesSilently(attachments));

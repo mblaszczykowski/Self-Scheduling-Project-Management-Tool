@@ -1,13 +1,12 @@
 package com.backend.filter;
 
-import com.backend.config.CookieProperties;
 import com.backend.config.JwtProperties;
 import com.backend.config.PublicEndpoints;
+import com.backend.web.CookieFactory;
 import com.backend.web.FilterResponseUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -16,7 +15,6 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -24,6 +22,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.Base64;
 
 /**
@@ -45,15 +44,15 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final ObjectMapper objectMapper;
-    private final CookieProperties cookieProperties;
-    private final long cookieMaxAgeSeconds;
+    private final CookieFactory cookieFactory;
+    private final Duration cookieMaxAge;
 
     public CsrfProtectionFilter(ObjectMapper objectMapper,
-                                CookieProperties cookieProperties,
+                                CookieFactory cookieFactory,
                                 JwtProperties jwtProperties) {
         this.objectMapper = objectMapper;
-        this.cookieProperties = cookieProperties;
-        this.cookieMaxAgeSeconds = jwtProperties.refreshTokenExpiration().toSeconds();
+        this.cookieFactory = cookieFactory;
+        this.cookieMaxAge = jwtProperties.refreshTokenExpiration();
     }
 
     @Override
@@ -102,26 +101,12 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
         if (readCsrfCookie(request) != null) {
             return;
         }
-        var cookie = ResponseCookie.from(CSRF_COOKIE_NAME, generateCsrfToken())
-                .path("/")
-                .httpOnly(false) // must be readable by the SPA to be echoed back
-                .secure(cookieProperties.isSecure())
-                .maxAge(cookieMaxAgeSeconds)
-                .sameSite(cookieProperties.getSameSite())
-                .build();
+        var cookie = cookieFactory.build(CSRF_COOKIE_NAME, generateCsrfToken(), cookieMaxAge, false);
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     private static String readCsrfCookie(HttpServletRequest request) {
-        if (request.getCookies() == null) {
-            return null;
-        }
-        for (Cookie cookie : request.getCookies()) {
-            if (CSRF_COOKIE_NAME.equals(cookie.getName())) {
-                return cookie.getValue();
-            }
-        }
-        return null;
+        return CookieFactory.read(request, CSRF_COOKIE_NAME).orElse(null);
     }
 
     private static String generateCsrfToken() {

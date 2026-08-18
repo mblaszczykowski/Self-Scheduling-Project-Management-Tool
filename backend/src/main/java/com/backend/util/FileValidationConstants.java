@@ -7,7 +7,6 @@ public final class FileValidationConstants {
 
     private FileValidationConstants() {}
 
-    public static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
     public static final int MAX_ATTACHMENTS_PER_REQUEST = 10;
 
     /** Bytes of a file that must be read to identify its type — the longest magic prefix. */

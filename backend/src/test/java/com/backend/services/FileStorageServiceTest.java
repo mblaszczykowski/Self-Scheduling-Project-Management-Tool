@@ -12,6 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
+import org.springframework.util.unit.DataSize;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -41,7 +43,9 @@ class FileStorageServiceTest {
     void setUp(@TempDir Path uploadDir) {
         var properties = new AppProperties();
         properties.getStorage().setUploadDir(uploadDir.toString());
-        fileStorage = new FileStorageService(properties, storedFileRepository);
+        var multipartProperties = new MultipartProperties();
+        multipartProperties.setMaxFileSize(DataSize.ofMegabytes(5));
+        fileStorage = new FileStorageService(properties, storedFileRepository, multipartProperties);
     }
 
     private static StoredFile ownedBy(String name, Integer projectId) {

@@ -137,7 +137,7 @@ public class TokenService {
             return RotationResult.failed(INVALID_REFRESH_TOKEN);
         }
 
-        if (stored.isConsumed()) {
+        if (refreshTokenRepository.markConsumedIfUnconsumed(stored.getTokenHash(), now) == 0) {
             // Someone is replaying a token that was already exchanged. Either it leaked or the
             // legitimate client raced with itself; either way the safe move is to end the family.
             log.warn("Refresh token replay detected for user {} (family {}) - revoking family",
@@ -145,6 +145,7 @@ public class TokenService {
             refreshTokenRepository.deleteFamily(stored.getFamilyId());
             return RotationResult.failed(INVALID_REFRESH_TOKEN);
         }
+        stored.markConsumed();
 
         if (stored.isExpired(now)) {
             refreshTokenRepository.deleteFamily(stored.getFamilyId());
