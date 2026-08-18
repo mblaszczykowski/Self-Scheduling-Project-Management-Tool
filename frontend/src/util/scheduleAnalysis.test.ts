@@ -161,10 +161,11 @@ describe('computeResourceConflicts', () => {
             assignee: 'alice@x.com',
             task1: 'A-1',
             task2: 'A-2',
-            overlapDays: 2,
+            overlapDays: 3,
             involvesCritical: true,
         });
-        expect(result.conflicts[1].overlapDays).toBe(1);
+        // B-1 06-01..06-05 and B-2 06-03..06-04 share 06-03 and 06-04.
+        expect(result.conflicts[1].overlapDays).toBe(2);
     });
 
     test('counts the conflicts that touch the critical path', () => {
@@ -174,10 +175,26 @@ describe('computeResourceConflicts', () => {
     test('back-to-back tasks are not a conflict', () => {
         const backToBack = [
             task({ taskKey: 'C-1', assignee: 'carol@x.com', startDate: '2024-06-01', dueDate: '2024-06-05' }),
-            task({ taskKey: 'C-2', assignee: 'carol@x.com', startDate: '2024-06-05', dueDate: '2024-06-09' }),
+            task({ taskKey: 'C-2', assignee: 'carol@x.com', startDate: '2024-06-06', dueDate: '2024-06-09' }),
         ];
 
         expect(computeResourceConflicts(backToBack).totalConflicts).toBe(0);
+    });
+
+    // Due dates are inclusive, so a task ending on the 5th and one starting on the 5th both want
+    // carol that day. The optimizer agrees — its decoder occupies [start, start + duration) with
+    // an inclusive duration, so it refuses to place the second task on that boundary day — and
+    // the dashboard used to disagree with it, reporting zero conflicts for a board the scheduler
+    // considered infeasible.
+    test('sharing only the boundary day is still a double-booking', () => {
+        const touching = [
+            task({ taskKey: 'C-1', assignee: 'carol@x.com', startDate: '2024-06-01', dueDate: '2024-06-05' }),
+            task({ taskKey: 'C-2', assignee: 'carol@x.com', startDate: '2024-06-05', dueDate: '2024-06-09' }),
+        ];
+
+        const result = computeResourceConflicts(touching);
+        expect(result.totalConflicts).toBe(1);
+        expect(result.conflicts[0].overlapDays).toBe(1);
     });
 
     test('three mutually overlapping tasks yield all three pairs', () => {

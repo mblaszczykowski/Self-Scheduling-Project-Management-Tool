@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { toDateString } from '../util/helpers';
+import { addDays } from '../util/helpers';
 import { showToast } from '../util/toast';
 import { useTimelineResize } from './useTimelineResize';
 import { TIMELINE_CONSTANTS } from '../config/timelineConstants';
@@ -55,11 +55,7 @@ export function useTaskResizePreview({ processedProjects, updateTaskSchedule }: 
             };
         }
 
-        const shift = (date: string) => {
-            const shifted = new Date(date);
-            shifted.setDate(shifted.getDate() + deltaDays);
-            return toDateString(shifted);
-        };
+        const shift = (date: string) => addDays(date, deltaDays);
 
         if (side === 'left') {
             const next = shift(draft.startDate);

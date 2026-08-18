@@ -82,12 +82,17 @@ export const computeResourceConflicts = (allTasks: EnrichedTask[]): ResourceConf
         entries.sort((a, b) => a.start - b.start);
         for (let i = 0; i < entries.length; i++) {
             for (let j = i + 1; j < entries.length; j++) {
-                // Sorted by start: once entry j starts at/after entry i ends, no later entry can
-                // overlap i either.
-                if (entries[j].start >= entries[i].end) break;
-                const overlapDays = Math.ceil(
-                    (Math.min(entries[i].end, entries[j].end) - entries[j].start) / MS_PER_DAY
-                );
+                // Sorted by start: once entry j starts after entry i ends, no later entry can
+                // overlap i either. Strictly after, because the end is inclusive — a task
+                // starting the day another one is due shares that day with it.
+                if (entries[j].start > entries[i].end) break;
+                // Both ends are inclusive, as everywhere else in the app: two tasks that meet
+                // on a single day are a real double-booking, and the exclusive form scored that
+                // as no conflict at all while under-counting every genuine overlap by a day.
+                const overlapDays = Math.floor(
+                    (Math.min(entries[i].end, entries[j].end)
+                        - Math.max(entries[i].start, entries[j].start)) / MS_PER_DAY
+                ) + 1;
                 if (overlapDays > 0) {
                     conflicts.push({
                         assignee,

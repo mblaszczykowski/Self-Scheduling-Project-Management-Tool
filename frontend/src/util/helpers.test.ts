@@ -182,6 +182,11 @@ describe('safeNextPath', () => {
         '//evil.com',
         '/\\evil.com',
         '/\\/evil.com',
+        // Dot segments resolve before the pathname exists, so these pass an origin check and
+        // still come back protocol-relative.
+        '/..//evil.com',
+        '/.//evil.com',
+        '/a/../..//evil.com',
         'https://evil.com/login',
         // eslint-disable-next-line no-script-url -- the point of the test is that this is refused
         'javascript:alert(1)',

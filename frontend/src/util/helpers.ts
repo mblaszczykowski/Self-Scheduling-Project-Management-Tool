@@ -31,6 +31,36 @@ export const toDateString = (date: DateInput): string => {
     return `${d.getFullYear()}-${month}-${day}`;
 };
 
+/**
+ * A calendar day as an integer, so day arithmetic never touches a clock.
+ *
+ * A date-only string parses as UTC midnight, while {@code new Date()} is local — comparing the two
+ * directly shifts the day for everyone west of Greenwich, which is how a task became overdue at
+ * 20:00 the evening before its due date. {@link toDateString} already resolves each form to the
+ * calendar date a person would read off it; this turns that into a number so differences and
+ * comparisons are exact.
+ */
+export const dayIndex = (date: DateInput): number | null => {
+    const iso = toDateString(date);
+    if (!iso) return null;
+    return Math.round(Date.UTC(
+        Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)),
+    ) / MS_PER_DAY);
+};
+
+/**
+ * Calendar-day arithmetic on a date-only string, staying in UTC throughout.
+ *
+ * Mutating a UTC-parsed date with local setters — {@code d.setDate(d.getDate() + 1)} — is the
+ * trap: in New York that returns the same day back, so dragging a timeline bar one day did
+ * nothing at all.
+ */
+export const addDays = (date: string, days: number): string => {
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return new Date(parsed.getTime() + days * MS_PER_DAY).toISOString().slice(0, 10);
+};
+
 export const getImageUrl = (path?: string | null): string | null => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
@@ -82,16 +112,21 @@ export const formatLongDate = (date: DateInput): string => {
 };
 
 export const isOverdue = (dueDate?: string | Date | null, progress = 0): boolean => {
-    if (!dueDate) return false;
-    return new Date(dueDate) < new Date() && progress < 100;
+    if (!dueDate || progress >= 100) return false;
+    const due = dayIndex(dueDate);
+    // Due dates are inclusive everywhere else in the app, so a task due today is not late until
+    // tomorrow. Comparing instants made it late from midnight UTC on its own due date.
+    return due !== null && due < (dayIndex(new Date()) ?? 0);
 };
 
 export const isUpcomingDeadline = (dueDate?: DateInput | null, daysThreshold = UPCOMING_DEADLINE_DAYS): boolean => {
     if (!dueDate) return false;
-    const due = new Date(dueDate);
-    const today = new Date();
-    const diffDays = Math.ceil((due.getTime() - today.getTime()) / MS_PER_DAY);
-    return diffDays <= daysThreshold && diffDays >= 0;
+    const due = dayIndex(dueDate);
+    const today = dayIndex(new Date());
+    if (due === null || today === null) return false;
+    // Whole days apart, so the window does not widen or narrow with the time of day.
+    const diffDays = due - today;
+    return diffDays >= 0 && diffDays <= daysThreshold;
 };
 
 /**
@@ -331,6 +366,10 @@ export const safeNextPath = (search: string, fallback = '/dashboard'): string =>
     try {
         const target = new URL(raw, window.location.origin);
         if (target.origin !== window.location.origin) return fallback;
+        // Checking the origin is not enough on its own. Dot segments resolve away *before* the
+        // pathname is produced, so `/..//evil.com` resolves to this origin and still hands back
+        // `//evil.com` — protocol-relative, and off-site the moment anything navigates to it.
+        if (target.pathname.startsWith('//')) return fallback;
         return target.pathname + target.search + target.hash;
     } catch {
         return fallback;

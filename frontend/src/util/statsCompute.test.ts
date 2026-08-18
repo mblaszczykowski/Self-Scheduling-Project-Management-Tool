@@ -108,8 +108,10 @@ describe('computeCriticalPathTimeline', () => {
 
     const result = computeCriticalPathTimeline(projects);
 
+    // Inclusive of both endpoints, like calculateDuration: P1 runs 06-01 through 06-21 (21 days),
+    // P2 runs 06-01 through 06-06 (6). The exclusive form reported a same-day path as 0 days.
     test('spans the critical tasks only, longest path first', () => {
-        expect(result.map(p => [p.projectKey, p.criticalPathDays])).toEqual([['P1', 20], ['P2', 5]]);
+        expect(result.map(p => [p.projectKey, p.criticalPathDays])).toEqual([['P1', 21], ['P2', 6]]);
     });
 
     test('a project with no critical tasks is left out', () => {

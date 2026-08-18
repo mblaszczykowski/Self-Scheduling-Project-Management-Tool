@@ -213,8 +213,13 @@ const TaskListView = ({
                                             // A real button rather than a handler on the <th>, so sorting is
                                             // reachable by keyboard; it carries the cell padding so the mouse
                                             // target stays the whole header cell.
+                                            // `uppercase` is repeated here on purpose: Tailwind's preflight
+                                            // sets `button { text-transform: none }`, and an explicit
+                                            // declaration beats the value inherited from the <th>, so the
+                                            // sortable headings dropped to title case while the plain one
+                                            // stayed upper.
                                             <button type="button" onClick={() => onSort(field)}
-                                                className="w-full px-4 py-2.5 flex items-center gap-1 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
+                                                className="w-full px-4 py-2.5 flex items-center gap-1 uppercase cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
                                                 {heading}
                                             </button>
                                         )}

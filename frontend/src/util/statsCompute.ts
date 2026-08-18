@@ -1,4 +1,4 @@
-import { MS_PER_DAY } from './helpers';
+import { dayIndex, MS_PER_DAY } from './helpers';
 import { schedulePercentElapsed, timeOf } from './scheduleAnalysis';
 import { EnrichedTask, ProcessedProject } from '../types';
 
@@ -75,8 +75,10 @@ export const computeCriticalPathTimeline = (projects: ProcessedProject[]): Criti
 
         const starts = criticalTasks.map(t => timeOf(t.startDate)).filter((t): t is number => t !== null);
         const dues = criticalTasks.map(t => timeOf(t.dueDate)).filter((t): t is number => t !== null);
+        // Inclusive, matching calculateDuration: a critical path that starts and ends on the
+        // same day is one day long, not zero.
         const criticalPathDays = starts.length > 0 && dues.length > 0
-            ? Math.ceil((Math.max(...dues) - Math.min(...starts)) / MS_PER_DAY)
+            ? Math.round((Math.max(...dues) - Math.min(...starts)) / MS_PER_DAY) + 1
             : 0;
         const delayedCritical = criticalTasks.filter(t => t.isDelayed).length;
 
@@ -96,12 +98,16 @@ export const computeCriticalPathTimeline = (projects: ProcessedProject[]): Criti
 const DEADLINE_HORIZON_DAYS = 7;
 
 export const computeUpcomingCriticalDeadlines = (criticalTasksList: EnrichedTask[], today: Date): EnrichedTask[] => {
-    const horizon = today.getTime() + DEADLINE_HORIZON_DAYS * MS_PER_DAY;
+    // Whole calendar days: comparing a UTC-parsed due date against a local timestamp dropped
+    // today's own deadlines west of Greenwich and made the window a day shorter east of it.
+    const todayIndex = dayIndex(today);
+    if (todayIndex === null) return [];
 
     return criticalTasksList
         .filter(task => {
-            const due = timeOf(task.dueDate);
-            return due !== null && due >= today.getTime() && due <= horizon && task.progress < 100;
+            const due = dayIndex(task.dueDate);
+            return due !== null && due >= todayIndex
+                && due <= todayIndex + DEADLINE_HORIZON_DAYS && task.progress < 100;
         })
         .sort((a, b) => (timeOf(a.dueDate) ?? 0) - (timeOf(b.dueDate) ?? 0));
 };

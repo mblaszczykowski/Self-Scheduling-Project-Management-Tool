@@ -29,10 +29,16 @@ function LoginForm({ onToggleForm }: { onToggleForm: () => void }) {
     // without their labels pointing at each other's inputs.
     const uid = useId();
 
+    // Resolved on the first render, because the effect below strips the query string: reading it
+    // at submit time meant `next` was always already gone, so the one flow that sets it — an
+    // expired session — never actually returned anyone to where they were interrupted.
+    const [returnTo] = useState(() => safeNextPath(window.location.search));
+
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         if (params.get('expired') === 'true') {
             showToast('Your session has expired. Please sign in again.', 'info');
+            // Cleaned so a refresh does not announce the expiry a second time.
             window.history.replaceState({}, '', '/login');
         }
     }, []);
@@ -42,9 +48,8 @@ function LoginForm({ onToggleForm }: { onToggleForm: () => void }) {
             await login(values.email, values.password);
             const fetchedUser = await getCurrentUser();
             setUser(fetchedUser);
-            // Return the user to wherever the expired session interrupted them — but only if that
-            // is somewhere on this site. `?next=` is attacker-supplied whenever the login link is.
-            navigate(safeNextPath(window.location.search), { replace: true });
+            // Validated on mount; `?next=` is attacker-supplied whenever the login link is.
+            navigate(returnTo, { replace: true });
         } catch (err) {
             showToast(getErrorMessage(err, 'Login failed. Check your credentials.'));
 
