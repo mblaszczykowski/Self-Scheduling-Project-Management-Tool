@@ -16,9 +16,21 @@ import java.util.PriorityQueue;
  * <p>At every step it takes the highest-priority task whose predecessors are <em>all</em> already
  * placed, and puts it at the earliest day that satisfies its release date, its predecessors'
  * finish times, and its assignee's availability. Because a task is only ever considered once all
- * of its predecessors are final, the result is precedence-feasible by construction — no repair
- * pass, no possibility of a high-priority successor slipping in front of a low-priority
- * predecessor.
+ * of its predecessors are final, the result is precedence-feasible by construction among the
+ * <em>movable</em> tasks — no repair pass, no possibility of a high-priority successor slipping in
+ * front of a low-priority predecessor.
+ *
+ * <p><strong>Fixed successors are outside that guarantee.</strong> A completed task, or an anchor
+ * pulled in from another project, is pinned to the dates it already has; the scheme places it
+ * first and never moves it. So it constrains its own successors, and it consumes its assignee's
+ * capacity, but it imposes no deadline on a movable <em>predecessor</em> — this is a forward-only
+ * scheme with no notion of a latest finish, so it cannot pull a predecessor back to land in front
+ * of something already pinned. When a board says a finished task depends on unfinished work, or
+ * an anchor depends on a task being rescheduled, the emitted plan can therefore show the
+ * predecessor finishing after the successor starts. That state is already inconsistent before the
+ * optimizer sees it, and honouring it would mean a deadline-aware scheme with backtracking rather
+ * than a repair pass bolted onto this one. {@code SchedulingInvariantsTest} pins the behaviour so
+ * the limitation stays visible.
  *
  * <p>Stateless and therefore safe to share.
  *
@@ -36,7 +48,8 @@ public final class SsgsDecoder {
     }
 
     /**
-     * @param graph  the problem; fixed tasks act as immovable precedence and resource constraints
+     * @param graph  the problem; fixed tasks pin their own dates, constrain their successors and
+     *               consume their assignee's capacity, but never constrain a movable predecessor
      * @param rule   the order in which eligible tasks are chosen
      * @throws ValidationException if some task can never become eligible (a cycle the graph
      *                             construction did not already reject)
@@ -158,9 +171,19 @@ public final class SsgsDecoder {
                        Map<String, Placement> placements,
                        Map<String, BitSet> resourceUsage) {
         placements.put(task.key(), toPlacement(task, start));
-        if (task.hasAssignee()) {
-            resourceUsage.computeIfAbsent(task.assignee(), key -> new BitSet())
-                    .set(Math.max(0, start), Math.max(0, start) + task.duration());
+        if (!task.hasAssignee()) {
+            return;
+        }
+        // Clip the busy interval to the planning window instead of sliding it forward. A fixed
+        // task can start before day 0 — that is what a completed task is — and clamping both ends
+        // moved it into the present: work that finished five weeks ago was recorded as occupying
+        // its assignee from today for its whole duration, so the decoder scheduled around a person
+        // who was in fact free. Anything that ended before today now occupies nothing, and work
+        // straddling today occupies only the part that is still ahead.
+        int from = Math.max(0, start);
+        int to = start + task.duration();
+        if (to > from) {
+            resourceUsage.computeIfAbsent(task.assignee(), key -> new BitSet()).set(from, to);
         }
     }
 

@@ -359,6 +359,152 @@ class SchedulingInvariantsTest {
         }
     }
 
+    // ======================== The edge of the guarantee ========================
+
+    @Nested
+    @DisplayName("What precedence feasibility does and does not cover")
+    class PrecedenceLimits {
+
+        /**
+         * Documents a real limitation rather than asserting desired behaviour. The scheme is
+         * forward-only: it places a task at the earliest feasible day and has no notion of a
+         * latest finish, so it cannot pull a predecessor back to land in front of a successor
+         * that is already pinned. A board where a finished task depends on unfinished work is
+         * inconsistent before the optimizer runs; this pins what the optimizer does with it, so
+         * that changing the answer has to be a deliberate decision.
+         */
+        @Test
+        @DisplayName("a fixed successor does not pull its movable predecessor earlier")
+        void fixedSuccessorDoesNotConstrainItsPredecessor() {
+            var tasks = List.of(
+                    task("P-1").from("2026-01-05").to("2026-01-20").build(),
+                    task("P-2").from("2025-12-01").to("2025-12-05")
+                            .status(TaskStatus.DONE).progress(100).dependsOn("P-1").build());
+
+            var outcome = scheduling.optimize(tasks, List.of(), TODAY, 0.8, 0.2);
+
+            var predecessor = outcome.chosen().placements().get("P-1");
+            var successor = outcome.chosen().placements().get("P-2");
+            assertThat(successor.start())
+                    .as("the completed task stays exactly where it happened, %d days before today",
+                            35)
+                    .isEqualTo(-35);
+            assertThat(successor.start())
+                    .as("so it necessarily starts before its predecessor finishes")
+                    .isLessThan(predecessor.end());
+        }
+
+        @Test
+        @DisplayName("but among movable tasks precedence is absolute, even against priority")
+        void movablePrecedenceStillHolds() {
+            var tasks = List.of(
+                    task("P-1").from("2026-01-05").to("2026-01-08")
+                            .priority(TaskPriority.LOWEST).build(),
+                    task("P-2").from("2026-01-05").to("2026-01-08")
+                            .priority(TaskPriority.HIGHEST).dependsOn("P-1").build());
+
+            var outcome = scheduling.optimize(tasks, List.of(), TODAY, 0.8, 0.2);
+
+            assertPrecedenceFeasible(outcome);
+        }
+    }
+
+    // ======================== Honest normalisation ========================
+
+    @Nested
+    @DisplayName("The horizon actually bounds what it normalises")
+    class Normalisation {
+
+        /**
+         * H used to be {@code max(max d_j, sum p_j)}, which ignores release dates. Work that
+         * cannot start until day 42 then finished past H, and because every task here shares one
+         * due date equal to the old H, {@code WT_max = sum(w_j * max(0, H - d_j))} collapsed to
+         * zero — so the tardiness term hit its divide-by-zero fallback and scored a schedule with
+         * 45 units of weighted tardiness as perfect.
+         */
+        @Test
+        @DisplayName("a plan with real tardiness cannot score a perfect tardiness objective")
+        void tardinessIsNeverNormalisedAway() {
+            var tasks = List.of(
+                    task("P-1").from("2026-02-16").to("2026-02-19").build(),
+                    task("P-2").from("2026-02-16").to("2026-02-19").dependsOn("P-1").build(),
+                    task("P-3").from("2026-02-16").to("2026-02-19").dependsOn("P-2").build());
+
+            // alpha = 1 puts the whole objective on tardiness, so Z is the tardiness term alone.
+            var outcome = scheduling.optimize(tasks, List.of(), TODAY, 1.0, 0.0);
+
+            assertThat(outcome.chosenMetrics().weightedTardiness()).isGreaterThan(0);
+            assertThat(outcome.chosenMetrics().objectiveValue())
+                    .as("weighted tardiness of %s must not score zero",
+                            outcome.chosenMetrics().weightedTardiness())
+                    .isGreaterThan(0);
+        }
+
+        @Test
+        @DisplayName("the makespan term is a ratio, not something the clamp has to rescue")
+        void makespanStaysWithinTheHorizon() {
+            // Released 42 days out, three days each, chained: the chain cannot finish before
+            // day 51, so an H that stopped at the last due date was not a bound at all.
+            var tasks = List.of(
+                    task("P-1").from("2026-02-16").to("2026-02-19").build(),
+                    task("P-2").from("2026-02-16").to("2026-02-19").dependsOn("P-1").build(),
+                    task("P-3").from("2026-02-16").to("2026-02-19").dependsOn("P-2").build());
+            var horizon = ScheduleObjective.Horizon.of(
+                    ScheduleModel.build(tasks, List.of(), TODAY).scheduleTasks(),
+                    new AppProperties().getOptimization().getMinHorizonDays());
+
+            var outcome = scheduling.optimize(tasks, List.of(), TODAY, 0.0, 1.0);
+
+            assertThat(outcome.chosenMetrics().makespan()).isLessThanOrEqualTo(horizon.length());
+            assertThat(outcome.chosenMetrics().objectiveValue()).isBetween(0.0, 1.0);
+        }
+    }
+
+    // ======================== Work that already happened ========================
+
+    @Nested
+    @DisplayName("Completed work does not consume present capacity")
+    class PastWork {
+
+        /**
+         * The busy-day interval was written as {@code set(max(0, start), max(0, start) + p)},
+         * which slid a task that ran entirely in the past forward onto day 0 instead of clipping
+         * it away. A ten-day task finished five weeks ago booked its assignee solid for the next
+         * ten days, and the optimizer dutifully scheduled around someone who was free.
+         */
+        @Test
+        @DisplayName("a task finished weeks ago leaves its assignee free today")
+        void completedPastWorkDoesNotBlockToday() {
+            var tasks = List.of(
+                    task("P-1").from("2025-12-01").to("2025-12-10")
+                            .assignedTo("dev@x").status(TaskStatus.DONE).progress(100).build(),
+                    task("P-2").from("2026-01-05").to("2026-01-06").assignedTo("dev@x").build());
+
+            var outcome = scheduling.optimize(tasks, List.of(), TODAY, 0.8, 0.2);
+
+            assertThat(outcome.chosen().placements().get("P-2").start())
+                    .as("nothing occupies dev@x today, so P-2 keeps its start")
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("work straddling today still blocks the part that is ahead")
+        void straddlingWorkStillBlocksItsRemainder() {
+            // Fixed, started three days ago, ten days long: days 0..6 are genuinely still busy.
+            var anchors = List.of(
+                    task("OTHER-1").from("2026-01-02").to("2026-01-11")
+                            .assignedTo("dev@x").build());
+            var tasks = List.of(
+                    task("P-1").from("2026-01-05").to("2026-01-06").assignedTo("dev@x").build());
+
+            var outcome = scheduling.optimize(tasks, anchors, TODAY, 0.8, 0.2);
+
+            assertThat(outcome.chosen().placements().get("P-1").start())
+                    .as("dev@x is committed until the anchor finishes")
+                    .isPositive();
+        }
+    }
+
     // ======================== Determinism ========================
 
     @Test
