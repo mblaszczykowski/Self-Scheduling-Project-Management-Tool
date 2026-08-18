@@ -121,7 +121,7 @@ const projectProgressOptions: ChartOptions<'bar'> = {
             grid: { display: true, color: 'rgba(148, 163, 184, 0.1)' },
         },
     },
-} as ChartOptions<'bar'>;
+};
 
 export const ProjectProgressCard = ({ completion }: { completion: ProjectCompletion[] }) => (
     <ChartCard title="Project Progress" subtitle="Overall completion">
@@ -161,7 +161,7 @@ const completionTrendOptions: ChartOptions<'line'> = {
             ticks: { ...chartOptions.scales.y.ticks, stepSize: 1 },
         },
     },
-} as ChartOptions<'line'>;
+};
 
 export const CompletionTrendCard = ({ trend }: { trend: CompletionWeek[] }) => {
     const surfaceColor = useChartSurfaceColor();

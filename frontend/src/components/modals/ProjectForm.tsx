@@ -25,7 +25,6 @@ interface ProjectFormProps {
     onAddAttachments: (files: File[]) => void;
     onRemoveAttachment: (attachment: Attachment) => void;
     onAddMember: (email: string, values: ModalFormValues, setFieldValue: SetFieldValue) => void;
-    emailLoading: boolean;
     emailError: string;
 }
 
@@ -44,7 +43,6 @@ const ProjectForm = ({
     onAddAttachments,
     onRemoveAttachment,
     onAddMember,
-    emailLoading,
     emailError
 }: ProjectFormProps) => {
     const isOwner = modalMode === 'create'
@@ -97,14 +95,18 @@ const ProjectForm = ({
 
                     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
                         <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Team Members</label>
-                        {values.members?.length > 0 && (
-                            <div className="space-y-2 mb-3">
-                                {values.members.map((m, i) => {
-                                    const isMemberOwner =
-                                        project?.owner?.id === m.id;
+                        {values.memberEmails.length > 0 && (
+                            <ul className="space-y-2 mb-3">
+                                {values.memberEmails.map((email) => {
+                                    // The form carries addresses (that is all the server reads);
+                                    // names come from the loaded project when it has them.
+                                    const known = project?.members.find(
+                                        (candidate) => candidate.email === email,
+                                    );
+                                    const isMemberOwner = project?.owner?.email === email;
                                     return (
-                                        <div
-                                            key={m.id || m.email || i}
+                                        <li
+                                            key={email}
                                             className={
                                                 'flex items-center justify-between py-2 px-3'
                                                 + ' bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700'
@@ -112,21 +114,19 @@ const ProjectForm = ({
                                             }
                                         >
                                             <div className="flex items-center gap-2.5">
-                                                <Avatar user={m} size="sm" className="rounded-lg" />
+                                                <Avatar user={known} size="sm" className="rounded-lg" />
                                                 <div className="min-w-0">
                                                     <div className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">
-                                                        {m.firstname
-                                                            ? `${m.firstname} ${m.lastname}`
-                                                            : m.email}
+                                                        {known ? `${known.firstname} ${known.lastname}` : email}
                                                         {isMemberOwner && (
-                                                            <span className="ml-1.5 text-xs text-slate-400">
+                                                            <span className="ml-1.5 text-xs text-slate-400 dark:text-slate-500">
                                                                 (Owner)
                                                             </span>
                                                         )}
                                                     </div>
-                                                    {m.firstname && (
-                                                        <div className="text-xs text-slate-400 truncate">
-                                                            {m.email}
+                                                    {known && (
+                                                        <div className="text-xs text-slate-400 dark:text-slate-500 truncate">
+                                                            {email}
                                                         </div>
                                                     )}
                                                 </div>
@@ -134,26 +134,28 @@ const ProjectForm = ({
                                             {isOwner && !isMemberOwner && (
                                                 <button
                                                     type="button"
+                                                    aria-label={`Remove ${known ? `${known.firstname} ${known.lastname}` : email}`}
                                                     onClick={() => setFieldValue(
-                                                        'members',
-                                                        values.members.filter(
-                                                            (_, idx) => idx !== i
+                                                        'memberEmails',
+                                                        values.memberEmails.filter(
+                                                            (candidate) => candidate !== email,
                                                         ),
                                                     )}
                                                     className={
-                                                        'text-xs text-red-500 opacity-0'
-                                                        + ' group-hover:opacity-100 font-medium'
+                                                        'text-xs text-red-500 dark:text-red-400 opacity-0'
+                                                        + ' group-hover:opacity-100 focus-visible:opacity-100 font-medium'
                                                         + ' transition-opacity'
                                                     }
                                                 >
                                                     Remove
                                                 </button>
                                             )}
-                                        </div>
+                                        </li>
                                     );
                                 })}
-                            </div>
+                            </ul>
                         )}
+
                         {isOwner && (
                             <div className="flex gap-2">
                                 <Field
@@ -167,7 +169,6 @@ const ProjectForm = ({
                                     onClick={() => onAddMember(
                                         values.newUserEmail, values, setFieldValue,
                                     )}
-                                    disabled={emailLoading}
                                     className={
                                         'px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg'
                                         + ' hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors text-sm'

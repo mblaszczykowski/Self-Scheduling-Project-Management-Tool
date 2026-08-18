@@ -1,8 +1,8 @@
-import React, { useContext, useEffect, useRef, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Form, Formik, FormikHelpers, FormikProps } from 'formik';
 import { HiOutlineTrash } from 'react-icons/hi';
-import { AuthContext } from '../../context/AuthContext';
-import { ProjectsContext } from '../../context/ProjectsContext';
+import { useAuth } from '../../context/AuthContext';
+import { useProjects } from '../../context/ProjectsContext';
 import TaskForm from './TaskForm';
 import ProjectForm from './ProjectForm';
 import ConfirmDialog from './ConfirmDialog';
@@ -11,21 +11,20 @@ import useAttachments from '../../hooks/useAttachments';
 import useModalFormInit from '../../hooks/useModalFormInit';
 import { getErrorMessage } from '../../util/helpers';
 import { showToast } from '../../util/toast';
-import { Project, Task, ModalFormValues, Attachment, TaskDTO, ProjectDTO } from '../../types';
-
-type ModalType = 'task' | 'project';
-type ModalMode = 'create' | 'edit' | 'view';
+import {
+    Attachment, ModalFormValues, ModalMode, ModalType, Project, ProjectPayload, Task, TaskPayload,
+} from '../../types';
 
 interface TaskProjectModalProps {
     modalType: ModalType;
     modalMode: ModalMode;
     project?: Project | null;
     task?: Task | null;
-    onClose: (didSave?: boolean) => void;
+    onClose: () => void;
 }
 
 const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: TaskProjectModalProps) => {
-    const { user } = useContext(AuthContext);
+    const { user } = useAuth();
     const {
         projects,
         createTask,
@@ -34,7 +33,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
         createProject,
         updateProject,
         deleteProject,
-    } = useContext(ProjectsContext);
+    } = useProjects();
 
     const { attachments, setAttachments, handleAddAttachments, handleRemoveAttachment } = useAttachments();
     const { initialValues, validationSchema, dependencies, setDependencies } = useModalFormInit({
@@ -43,7 +42,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
 
     const modalRef = useRef<HTMLDivElement>(null);
     const formikRef = useRef<FormikProps<ModalFormValues>>(null);
-    const [emailState, setEmailState] = useState({ loading: false, error: '' });
+    const [emailError, setEmailError] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [uiState, setUiState] = useState({
         isVisible: false, deleteConfirmOpen: false,
@@ -72,9 +71,9 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
         }
     }, [onClose, uiState.isDirty, modalMode]);
 
-    const handleForceClose = useCallback((didSave = false) => {
+    const handleForceClose = useCallback(() => {
         setUiState(prev => ({ ...prev, closeConfirmOpen: false, isVisible: false }));
-        setTimeout(() => onClose(didSave), 150);
+        setTimeout(onClose, 150);
     }, [onClose]);
 
     useClickOutside(modalRef, handleCloseAttempt);
@@ -98,7 +97,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                     setSubmitting(false);
                     return;
                 }
-                const taskDTO: TaskDTO = {
+                const payload: TaskPayload = {
                     summary: values.summary,
                     description: values.description,
                     status: values.status,
@@ -112,30 +111,31 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                     attachments: attachments.existing,
                 };
                 if (modalMode === 'create') {
-                    await createTask(projectKey, taskDTO, attachments.new);
+                    await createTask(projectKey, payload, attachments.new);
                     showToast('Task created', 'success');
                 } else {
-                    await updateTask(projectKey, task.taskKey, taskDTO, attachments.new);
+                    await updateTask(projectKey, task.taskKey, payload, attachments.new);
                     showToast('Task updated', 'success');
                 }
             } else {
-                const projectDTO: ProjectDTO = {
-                    projectKey: values.projectKey.toUpperCase(),
+                const payload: ProjectPayload = {
+                    // The key is immutable after creation, so an edit resubmits the existing one.
+                    projectKey: (project?.projectKey ?? values.projectKey).toUpperCase(),
                     summary: values.summary,
                     description: values.description,
-                    members: values.members.map(u => ({ email: u.email })),
+                    memberEmails: values.memberEmails,
                     dependencies,
                     attachments: attachments.existing,
                 };
                 if (modalMode === 'create') {
-                    await createProject(projectDTO, attachments.new);
+                    await createProject(payload, attachments.new);
                     showToast('Project created', 'success');
                 } else {
-                    await updateProject(project.projectKey, projectDTO, attachments.new);
+                    await updateProject(project.projectKey, payload, attachments.new);
                     showToast('Project updated', 'success');
                 }
             }
-            handleForceClose(true);
+            handleForceClose();
         } catch (err) {
             showToast(getErrorMessage(err, 'Failed to save'), 'error');
         } finally {
@@ -148,13 +148,13 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
         setUiState(prev => ({ ...prev, deleteConfirmOpen: false }));
         try {
             if (modalType === 'task' && modalMode === 'edit') {
-                await deleteTask(project?.projectKey || task?.projectKey, task.taskKey);
+                await deleteTask(project?.projectKey ?? task.projectKey, task.taskKey);
                 showToast('Task deleted', 'success');
             } else if (modalType === 'project' && modalMode === 'edit') {
                 await deleteProject(project.projectKey);
                 showToast('Project deleted', 'success');
             }
-            handleForceClose(true);
+            handleForceClose();
         } catch (err) {
             showToast(getErrorMessage(err, 'Failed to delete'), 'error');
         }
@@ -180,17 +180,17 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
         if (!normalizedEmail) return;
 
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-            setEmailState(prev => ({ ...prev, error: 'Invalid email format' }));
+            setEmailError('Invalid email format');
             return;
         }
 
-        if (values.members.some(u => u.email === normalizedEmail)) {
-            setEmailState(prev => ({ ...prev, error: 'Already added' }));
+        if (values.memberEmails.includes(normalizedEmail)) {
+            setEmailError('Already added');
             return;
         }
 
-        setEmailState(prev => ({ ...prev, error: '' }));
-        setFieldValue('members', [...values.members, { email: normalizedEmail }]);
+        setEmailError('');
+        setFieldValue('memberEmails', [...values.memberEmails, normalizedEmail]);
         setFieldValue('newUserEmail', '');
     };
 
@@ -280,8 +280,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                                         onAddAttachments={onAddAttachments}
                                         onRemoveAttachment={onRemoveAttachment}
                                         onAddMember={handleAddMember}
-                                        emailLoading={emailState.loading}
-                                        emailError={emailState.error}
+                                        emailError={emailError}
                                     />
                                 )}
                             </Form>
@@ -349,7 +348,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
             <ConfirmDialog
                 isOpen={uiState.closeConfirmOpen}
                 onClose={() => setUiState(prev => ({ ...prev, closeConfirmOpen: false }))}
-                onConfirm={() => handleForceClose(false)}
+                onConfirm={handleForceClose}
                 title="Discard unsaved changes?"
                 message="Your changes haven't been saved. If you close now, all edits will be lost."
                 confirmText="Discard"

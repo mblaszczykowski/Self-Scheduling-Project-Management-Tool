@@ -141,7 +141,7 @@ credentialed CORS preflight does not accept wildcards, so a mismatch blocks ever
 cd backend
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 
-mvn test                                  # everything except the `experiment` tag
+mvn test                                  # the whole suite
 mvn test -Dtest=AuthServiceTest           # one class
 mvn test -Dtest='*ServiceTest'            # a pattern
 mvn test -Dtest=SchemaIntegrationTest -DfailIfNoSpecifiedTests=false
@@ -160,16 +160,6 @@ help finding the socket, and its resource-reaper sidecar may not start at all:
 export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
 export TESTCONTAINERS_RYUK_DISABLED=true
 ```
-
-Surefire is configured with `<excludedGroups>experiment</excludedGroups>`. The tag is reserved for
-scheduling benchmark harnesses, which print report tables rather than asserting, so they must not
-gate a build. Lift the exclusion to run them:
-
-```bash
-mvn test -Dgroups=experiment -DexcludedGroups=
-```
-
-No test carries the tag at the moment, so that command currently selects nothing.
 
 ### Frontend
 

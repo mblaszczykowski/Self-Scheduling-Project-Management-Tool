@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useId } from 'react';
 import { HiOutlineExclamation } from 'react-icons/hi';
 
 interface ConfirmDialogProps {
@@ -22,6 +22,26 @@ const ConfirmDialog = ({
     cancelText = 'Cancel',
     variant = 'danger'
 }: ConfirmDialogProps) => {
+    // TaskProjectModal renders two of these at once, so the aria targets have to be unique per
+    // instance: a fixed id would point every dialog at the first one's heading.
+    const dialogId = useId();
+    const titleId = `${dialogId}-title`;
+    const descriptionId = `${dialogId}-description`;
+
+    // Escape dismisses the dialog. It is caught in the capture phase and stopped there because the
+    // modal underneath (TaskProjectModal, PreviewModal) also listens on document, and only the
+    // topmost dialog should react to the key.
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return;
+            e.stopPropagation();
+            onClose();
+        };
+        document.addEventListener('keydown', onKeyDown, true);
+        return () => document.removeEventListener('keydown', onKeyDown, true);
+    }, [isOpen, onClose]);
+
     if (!isOpen) return null;
 
     const variantStyles = {
@@ -49,8 +69,8 @@ const ConfirmDialog = ({
                 onClick={e => e.stopPropagation()}
                 role="alertdialog"
                 aria-modal="true"
-                aria-labelledby="confirm-dialog-title"
-                aria-describedby="confirm-dialog-description"
+                aria-labelledby={titleId}
+                aria-describedby={descriptionId}
             >
                 <div className="px-6 pt-6 pb-4">
                     <div className="flex items-start gap-4">
@@ -58,10 +78,10 @@ const ConfirmDialog = ({
                             <HiOutlineExclamation className={`w-5 h-5 ${styles.iconColor}`} />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h3 id="confirm-dialog-title" className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                            <h3 id={titleId} className="text-base font-semibold text-slate-900 dark:text-slate-100">
                                 {title}
                             </h3>
-                            <p id="confirm-dialog-description" className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                            <p id={descriptionId} className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
                                 {message}
                             </p>
                         </div>

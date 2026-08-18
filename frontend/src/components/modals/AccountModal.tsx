@@ -3,13 +3,13 @@ import { useAnimateIn } from '../../hooks/useAnimateIn';
 import Modal from 'react-modal';
 import { ErrorMessage, Field, Form, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
-import { updateUser, updateEmailPreferences } from '../../util/api';
+import { updateEmailPreferences, updateProfile } from '../../util/api';
 import { getImageUrl, getErrorMessage } from '../../util/helpers';
 import { showToast } from '../../util/toast';
 import Avatar from '../common/Avatar';
 import { CloseIcon } from '../common/Icons';
 import { inputClass } from '../common/formHelpers';
-import { User, ErrorLike } from '../../types';
+import { ApiFieldError, CurrentUser, ErrorLike } from '../../types';
 
 interface AccountFormValues {
     firstname: string;
@@ -79,9 +79,9 @@ const EmailToggle = ({ label, description, checked, onChange, disabled }: EmailT
 );
 
 interface AccountModalProps {
-    user: User;
+    user: CurrentUser;
     onClose: () => void;
-    onUpdateUser?: (user: User) => void;
+    onUpdateUser: (user: CurrentUser) => void;
 }
 
 const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
@@ -90,10 +90,10 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
     );
     const [isVisible, setIsVisible] = useAnimateIn();
     const [emailPrefs, setEmailPrefs] = useState<EmailPrefs>({
-        emailNotificationsEnabled: user.emailNotificationsEnabled ?? true,
-        emailOnTaskAssigned: user.emailOnTaskAssigned ?? true,
-        emailOnCommentReply: user.emailOnCommentReply ?? true,
-        emailOnProjectInvitation: user.emailOnProjectInvitation ?? true,
+        emailNotificationsEnabled: user.emailNotificationsEnabled,
+        emailOnTaskAssigned: user.emailOnTaskAssigned,
+        emailOnCommentReply: user.emailOnCommentReply,
+        emailOnProjectInvitation: user.emailOnProjectInvitation,
     });
     const [emailPrefsSaving, setEmailPrefsSaving] = useState(false);
 
@@ -102,43 +102,46 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
         setTimeout(onClose, 200);
     }, [onClose, setIsVisible]);
 
-    const initialValues = {
-        firstname: user.firstname || '',
-        lastname: user.lastname || '',
-        email: user.email || '',
+    const initialValues: AccountFormValues = {
+        firstname: user.firstname,
+        lastname: user.lastname,
+        email: user.email,
         currentPassword: '',
         newPassword: '',
         confirmNewPassword: '',
         profilePicture: null as File | null,
     };
 
-    const handleSubmit = async (values: AccountFormValues, { setSubmitting, setErrors }: FormikHelpers<AccountFormValues>) => {
-        const formData = new FormData();
-        formData.append('firstname', values.firstname);
-        formData.append('lastname', values.lastname);
-        formData.append('email', values.email);
-
-        if (values.currentPassword && values.newPassword) {
-            formData.append('currentPassword', values.currentPassword);
-            formData.append('newPassword', values.newPassword);
-        }
-
-        if (values.profilePicture) {
-            formData.append('profilePicture', values.profilePicture);
-        }
-
+    const handleSubmit = async (
+        values: AccountFormValues,
+        { setSubmitting, setErrors }: FormikHelpers<AccountFormValues>,
+    ) => {
         try {
-            const updatedUser = await updateUser(formData);
-            onUpdateUser?.(updatedUser);
-            showToast('Account updated', 'success');
+            // currentPassword is sent whenever it was filled in: the server requires it for a
+            // password change and, since login is by email, for an email change too.
+            const updatedUser = await updateProfile({
+                firstname: values.firstname,
+                lastname: values.lastname,
+                email: values.email,
+                currentPassword: values.currentPassword || undefined,
+                newPassword: values.newPassword || undefined,
+            }, values.profilePicture);
+
+            onUpdateUser(updatedUser);
+            showToast(values.newPassword
+                ? 'Account updated. Other devices have been signed out.'
+                : 'Account updated', 'success');
             handleClose();
         } catch (err) {
-            console.error('Error updating user:', err);
-            const errors = (err as ErrorLike).response?.data?.errors;
-            if (errors) {
-                setErrors(errors);
+            // Field-level failures are attached to the fields that caused them rather than being
+            // flattened into one toast.
+            const fieldErrors = (err as ErrorLike).response?.data?.fieldErrors;
+            if (fieldErrors && fieldErrors.length > 0) {
+                setErrors(Object.fromEntries(
+                    fieldErrors.map((fieldError: ApiFieldError) => [fieldError.field, fieldError.message]),
+                ));
             } else {
-                showToast(getErrorMessage(err, 'Failed to update account'), 'error');
+                showToast(getErrorMessage(err, 'Could not update your account'), 'error');
             }
         } finally {
             setSubmitting(false);
@@ -154,7 +157,6 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
             onUpdateUser?.(updatedUser);
         } catch (err) {
             setEmailPrefs(emailPrefs);
-            console.error('Error updating email preferences:', err);
         } finally {
             setEmailPrefsSaving(false);
         }
@@ -242,7 +244,9 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                                             onChange={(e) => handleProfilePictureChange(e, setFieldValue)}
                                             className="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4
                                             file:rounded-lg file:border-0 file:text-sm file:font-medium
-                                            file:bg-slate-900 file:text-white hover:file:bg-slate-800 file:cursor-pointer file:transition-all"
+                                            file:bg-slate-900 file:text-white hover:file:bg-slate-800
+                                            dark:file:bg-white dark:file:text-slate-900 dark:hover:file:bg-slate-100
+                                            file:cursor-pointer file:transition-all"
                                         />
                                     </label>
                                 </div>
@@ -377,7 +381,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all text-sm font-medium disabled:opacity-50"
+                                    className="flex-1 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-all text-sm font-medium disabled:opacity-50"
                                 >
                                     {isSubmitting ? 'Saving...' : 'Save Changes'}
                                 </button>

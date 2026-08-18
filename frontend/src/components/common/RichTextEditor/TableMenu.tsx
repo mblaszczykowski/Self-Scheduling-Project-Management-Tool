@@ -37,7 +37,7 @@ const TableMenu = ({ editor }: { editor: Editor | null }) => {
                     Delete Column
                 </button>
             </div>
-            <div className="w-px h-5 bg-slate-300" />
+            <div className="w-px h-5 bg-slate-300 dark:bg-slate-600" />
             <div className="flex items-center gap-1">
                 <button type="button" onClick={chain('addRowBefore')} className={normalBtn}>
                     {'\u2191'} Row
@@ -54,9 +54,11 @@ const TableMenu = ({ editor }: { editor: Editor | null }) => {
                 type="button"
                 onClick={chain('deleteTable')}
                 className={
-                    'px-4 py-1.5 text-xs font-semibold text-red-600'
-                    + ' hover:text-white bg-white hover:bg-red-600'
-                    + ' border border-red-300 hover:border-red-600'
+                    'px-4 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400'
+                    + ' hover:text-white dark:hover:text-white'
+                    + ' bg-white dark:bg-slate-800 hover:bg-red-600 dark:hover:bg-red-600'
+                    + ' border border-red-300 dark:border-red-800'
+                    + ' hover:border-red-600 dark:hover:border-red-600'
                     + ' rounded-lg transition-all duration-150'
                     + ' active:scale-95 shadow-sm'
                 }

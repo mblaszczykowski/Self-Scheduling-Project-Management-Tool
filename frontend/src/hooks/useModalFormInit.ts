@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import * as Yup from 'yup';
-import { formatDateTime, formatDate, MS_PER_DAY, toDateString } from '../util/helpers';
-import { Project, Task, User, ModalFormValues, AttachmentsState, ProjectDependency } from '../types';
+import { formatDate, formatDateTime, MS_PER_DAY, toDateString } from '../util/helpers';
+import {
+    AttachmentsState, CurrentUser, ModalFormValues, ModalMode, ModalType, Project, Task,
+} from '../types';
 
-const defaultValues: ModalFormValues = {
+const DEFAULT_VALUES: ModalFormValues = {
     projectKey: '', summary: '', description: '', status: 'TODO',
     startDate: '', dueDate: '', assignee: '', duration: 1, progress: 0,
     priority: 'MEDIUM', labels: '', created: '', updated: '',
-    reporter: '', members: [], newUserEmail: '',
+    memberEmails: [], newUserEmail: '',
 };
 
-const taskValidationSchema = Yup.object().shape({
+const TASK_SCHEMA = Yup.object().shape({
     projectKey: Yup.string().required('Project is required.'),
     summary: Yup.string().required('Task summary is required.'),
     startDate: Yup.date().required('Start date is required.'),
@@ -19,115 +21,99 @@ const taskValidationSchema = Yup.object().shape({
         .min(Yup.ref('startDate'), 'Due date cannot be before start date.'),
 });
 
-const buildProjectValidationSchema = (modalMode: string | null) =>
-    Yup.object().shape(
-        modalMode === 'create'
-            ? {
-                projectKey: Yup.string().max(4, 'Max 4 characters.').required('Project key is required.'),
-                summary: Yup.string().required('Project name is required.')
-            }
-            : { summary: Yup.string().required('Project name is required.') }
-    );
+const projectSchema = (modalMode: ModalMode | null) => Yup.object().shape(
+    modalMode === 'create'
+        ? {
+            // Mirrors the server's own rule, so the form rejects what the API would reject.
+            projectKey: Yup.string()
+                .max(10, 'Max 10 characters.')
+                .matches(/^[A-Z][A-Z0-9]*$/, 'Uppercase letters and digits, starting with a letter.')
+                .required('Project key is required.'),
+            summary: Yup.string().required('Project name is required.'),
+        }
+        : { summary: Yup.string().required('Project name is required.') }
+);
 
-interface UseModalFormInitOptions {
-    modalType: 'task' | 'project' | null;
-    modalMode: 'create' | 'edit' | 'view' | null;
+interface Options {
+    modalType: ModalType;
+    modalMode: ModalMode;
     project: Project | null;
     task: Task | null;
-    user: User | null;
-    setAttachments: (a: AttachmentsState) => void;
+    user: CurrentUser | null;
+    setAttachments: (attachments: AttachmentsState) => void;
 }
 
-/**
- * Builds initialValues, validationSchema, and dependencies state
- * based on modalType / modalMode / project / task.
- */
-const useModalFormInit = ({ modalType, modalMode, project, task, user, setAttachments }: UseModalFormInitOptions) => {
+const inclusiveDays = (startDate?: string | null, dueDate?: string | null): number => {
+    if (!startDate || !dueDate) return 1;
+    const start = new Date(startDate).getTime();
+    const due = new Date(dueDate).getTime();
+    if (Number.isNaN(start) || Number.isNaN(due)) return 1;
+    return Math.max(1, Math.floor((due - start) / MS_PER_DAY) + 1);
+};
+
+/** Builds the form's initial values, its validation schema, and the dependency list. */
+const useModalFormInit = ({ modalType, modalMode, project, task, user, setAttachments }: Options) => {
     const [dependencies, setDependencies] = useState<string[]>([]);
-    const [initialValues, setInitialValues] = useState<ModalFormValues>(defaultValues);
+    const [initialValues, setInitialValues] = useState<ModalFormValues>(DEFAULT_VALUES);
 
     useEffect(() => {
         const today = toDateString(new Date());
 
         if (modalType === 'task') {
-            if (modalMode === 'edit' && task) {
-                const deps = task.dependencyKeys || [];
-                setDependencies(deps);
-
-                let duration = 1;
-                if (task.startDate && task.dueDate) {
-                    const startMs = new Date(task.startDate).getTime();
-                    const dueMs = new Date(task.dueDate).getTime();
-                    const diff = Math.floor((dueMs - startMs) / MS_PER_DAY) + 1;
-                    duration = Math.max(diff, 1);
-                }
-
+            if (modalMode !== 'create' && task) {
+                setDependencies(task.dependencyKeys);
                 setInitialValues({
-                    projectKey: task.projectKey || '',
-                    summary: task.summary || '',
-                    description: task.description || '',
-                    status: task.status || 'TODO',
+                    ...DEFAULT_VALUES,
+                    projectKey: task.projectKey,
+                    summary: task.summary,
+                    description: task.description ?? '',
+                    status: task.status,
                     startDate: formatDate(task.startDate),
                     dueDate: formatDate(task.dueDate),
-                    assignee: task.assignee || '',
-                    duration,
-                    progress: task.progress || 0,
-                    priority: task.priority || 'MEDIUM',
-                    labels: task.labels?.join(' ') || '',
+                    assignee: task.assignee ?? '',
+                    duration: inclusiveDays(task.startDate, task.dueDate),
+                    progress: task.progress,
+                    priority: task.priority,
+                    labels: task.labels.join(' '),
                     created: formatDateTime(task.created),
                     updated: formatDateTime(task.updated),
-                    reporter: user?.email || '',
-                    members: [],
-                    newUserEmail: '',
                 });
-                setAttachments({ existing: task.attachments || [], new: [] });
-            } else {
-                setDependencies([]);
-                setInitialValues(prev => ({
-                    ...prev,
-                    projectKey: project?.projectKey || '',
-                    summary: '', description: '', status: 'TODO',
-                    startDate: today, dueDate: today, assignee: '',
-                    duration: 1, progress: 0, priority: 'MEDIUM', labels: '',
-                    created: new Date().toLocaleString(),
-                    updated: new Date().toLocaleString(),
-                    reporter: user?.email || '',
-                }));
-                setAttachments({ existing: [], new: [] });
-            }
-        } else if (modalType === 'project') {
-            if (modalMode === 'edit' && project) {
-                setDependencies((project.dependencies || []).map(
-                    (d: ProjectDependency) => (typeof d === 'string' ? d : d.projectKey ?? '')
-                ));
-                setInitialValues({
-                    projectKey: project.projectKey || '',
-                    summary: project.summary || '',
-                    description: project.description || '',
-                    members: project.members || [],
-                    newUserEmail: '',
-                    status: 'TODO', startDate: '', dueDate: '', assignee: '',
-                    duration: 1, progress: 0, priority: 'MEDIUM', labels: '',
-                    created: '', updated: '', reporter: user?.email || '',
-                });
-                setAttachments({ existing: project.attachments || [], new: [] });
+                setAttachments({ existing: task.attachments, new: [] });
             } else {
                 setDependencies([]);
                 setInitialValues({
-                    projectKey: '', summary: '', description: '',
-                    members: user ? [user] : [], newUserEmail: '',
-                    status: 'TODO', startDate: '', dueDate: '', assignee: '',
-                    duration: 1, progress: 0, priority: 'MEDIUM', labels: '',
-                    created: '', updated: '', reporter: user?.email || '',
+                    ...DEFAULT_VALUES,
+                    projectKey: project?.projectKey ?? '',
+                    startDate: today,
+                    dueDate: today,
                 });
                 setAttachments({ existing: [], new: [] });
             }
+            return;
+        }
+
+        if (modalMode !== 'create' && project) {
+            setDependencies(project.dependencies);
+            setInitialValues({
+                ...DEFAULT_VALUES,
+                projectKey: project.projectKey,
+                summary: project.summary,
+                description: project.description ?? '',
+                memberEmails: project.members.map((member) => member.email),
+            });
+            setAttachments({ existing: project.attachments, new: [] });
+        } else {
+            setDependencies([]);
+            setInitialValues({
+                ...DEFAULT_VALUES,
+                // The creator is a member of their own project from the start.
+                memberEmails: user ? [user.email] : [],
+            });
+            setAttachments({ existing: [], new: [] });
         }
     }, [modalType, modalMode, project, task, user, setAttachments]);
 
-    const validationSchema = modalType === 'task'
-        ? taskValidationSchema
-        : buildProjectValidationSchema(modalMode);
+    const validationSchema = modalType === 'task' ? TASK_SCHEMA : projectSchema(modalMode);
 
     return { initialValues, validationSchema, dependencies, setDependencies };
 };

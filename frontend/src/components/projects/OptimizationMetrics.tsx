@@ -101,14 +101,18 @@ interface OptimizationMetricsProps {
     optimizedMetrics?: OptimizationMetricsData;
     suggestions?: OptimizationSuggestion[];
     suggestionsCount: number;
+    /** Label of the ordering rule that won, shown so the proposal can justify itself. */
+    chosenRule?: string | null;
+    /** Tasks with no dates, which the optimizer could not place. Named so the counts add up. */
+    skippedTaskKeys?: string[];
     onAccept: () => void;
     onReject: () => void;
     isApplying: boolean;
 }
 
 const OptimizationMetrics = ({
-    originalMetrics, optimizedMetrics, suggestions,
-    suggestionsCount, onAccept, onReject, isApplying,
+    originalMetrics, optimizedMetrics, suggestions, suggestionsCount,
+    chosenRule, skippedTaskKeys, onAccept, onReject, isApplying,
 }: OptimizationMetricsProps) => {
     const [mounted, setMounted] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
@@ -145,7 +149,9 @@ const OptimizationMetrics = ({
     const conflictsBefore = originalMetrics.resourceConflicts;
     const conflictsAfter = optimizedMetrics.resourceConflicts;
     const conflictsResolved = conflictsBefore - conflictsAfter;
-    const infeasible = conflictsBefore > 0;
+    // The server owns this judgement; the conflict count is only how it explains itself.
+    const infeasible = !originalMetrics.feasible;
+    const skippedCount = skippedTaskKeys?.length ?? 0;
     const onTimeBefore = originalMetrics.tasksOnTime;
     const onTimeAfter = optimizedMetrics.tasksOnTime;
     const totalTasks = optimizedMetrics.totalTasks;
@@ -174,13 +180,34 @@ const OptimizationMetrics = ({
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-                                        Schedule Optimization Ready
-                                    </h3>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                                            Schedule Optimization Ready
+                                        </h3>
+                                        {chosenRule && (
+                                            <span
+                                                className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-slate-600"
+                                                title="Several ordering rules were tried; this one produced the best schedule."
+                                            >
+                                                {chosenRule}
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-sm text-slate-500 dark:text-slate-400">
                                         {suggestionsCount} of {suggestions?.length || 0} tasks rescheduled
                                         {summary.affectedPeople > 0 && (
                                             <> &middot; {summary.affectedPeople} {summary.affectedPeople === 1 ? 'person' : 'people'} affected</>
+                                        )}
+                                        {skippedCount > 0 && (
+                                            <>
+                                                {' '}&middot;{' '}
+                                                <span
+                                                    className="underline decoration-dotted underline-offset-2 cursor-help"
+                                                    title={`Needs a start and a due date: ${skippedTaskKeys?.join(', ')}`}
+                                                >
+                                                    {skippedCount} skipped
+                                                </span>
+                                            </>
                                         )}
                                     </p>
                                 </div>
@@ -328,23 +355,27 @@ const OptimizationMetrics = ({
                             label="Tasks late"
                             before={lateBefore}
                             after={lateAfter}
+                            infeasible={infeasible}
                         />
                         <BeforeAfter
                             label="Tasks on time"
                             before={onTimeBefore}
                             after={onTimeAfter}
                             lowerIsBetter={false}
+                            infeasible={infeasible}
                         />
                         <BeforeAfter
                             label="Weighted delay"
                             before={originalMetrics.weightedTardiness}
                             after={optimizedMetrics.weightedTardiness}
+                            infeasible={infeasible}
                         />
                         <BeforeAfter
                             label="Total duration"
                             before={originalMetrics.makespan}
                             after={optimizedMetrics.makespan}
                             unit="d"
+                            infeasible={infeasible}
                         />
                     </div>
 

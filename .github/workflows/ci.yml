@@ -15,6 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Java 21 specifically: the build targets 21, and Mockito's bytecode instrumentation
+      # fails on JVMs it has no support for, so a newer JDK breaks the mock-based tests.
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -22,10 +24,17 @@ jobs:
           java-version: 21
           cache: maven
 
+      # The integration tests start a real postgres:16-alpine through Testcontainers. The
+      # ubuntu-latest runner image ships a running Docker daemon, so no service container or
+      # setup action is needed - this step only fails fast with a clear message if that ever
+      # stops being true.
+      - name: Verify Docker is available for Testcontainers
+        run: docker info > /dev/null
+
       - name: Run tests
         run: mvn test -B
 
-  frontend-build:
+  frontend:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -43,14 +52,46 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # react-scripts build type-checks only the modules it bundles, so test files and any
+      # unreferenced module escape it entirely. tsc over the whole project does not.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test -- --watchAll=false
+
       - name: Build
         run: npm run build
 
-  docker-build:
+  secret-scan:
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-build]
     steps:
       - uses: actions/checkout@v4
 
+      # A signing key was committed in plaintext once in this repository's history, so the guard
+      # against it happening again is mechanical rather than a review habit.
+      #
+      # This scans the checked-out tree, not the git history. The two historical findings cannot
+      # be removed without rewriting published history, and a permanently red check is a check
+      # nobody reads. To audit history on demand:
+      #   docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --redact -v
+      - name: Scan working tree for secrets
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            dir /repo --redact --verbose --no-banner
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend, secret-scan]
+    steps:
+      - uses: actions/checkout@v4
+
+      # docker-compose.yml declares JWT_SECRET and POSTGRES_PASSWORD as required, so compose
+      # refuses to interpolate the file without them - even for a build. The images are built
+      # and never started here, so throwaway values are enough; generating them keeps a
+      # secret-shaped literal out of this file.
       - name: Build Docker images
-        run: docker compose build
+        run: |
+          export JWT_SECRET="$(openssl rand -base64 48)"
+          export POSTGRES_PASSWORD="$(openssl rand -base64 24)"
+          docker compose build

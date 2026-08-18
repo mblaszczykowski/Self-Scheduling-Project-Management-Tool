@@ -4,12 +4,22 @@
 // learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
 
-// Mock window.location
+// Mock window.location so a test can assert on a redirect instead of navigating jsdom away.
+// Every field a real Location exposes is present: code that reads origin or search to make a
+// security decision must see a realistic value here, not undefined, or the test proves nothing.
 delete window.location;
 window.location = {
-    href: '',
+    href: 'http://localhost/',
+    origin: 'http://localhost',
+    protocol: 'http:',
+    host: 'localhost',
+    hostname: 'localhost',
+    port: '',
     pathname: '/',
+    search: '',
+    hash: '',
     assign: jest.fn(),
+    replace: jest.fn(),
     reload: jest.fn(),
 };
 

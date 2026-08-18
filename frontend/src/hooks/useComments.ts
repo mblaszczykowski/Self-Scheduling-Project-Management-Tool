@@ -51,6 +51,10 @@ export function useComments(taskId: number | null) {
         load();
         return () => {
             // Any response still in flight belongs to the previous task.
+            // Reading the ref at cleanup time is the point, not a mistake: the lint rule guards
+            // against capturing a DOM node that has since changed, but this is a counter, and
+            // copying it into a local would increment a snapshot and stop invalidating anything.
+            // eslint-disable-next-line react-hooks/exhaustive-deps
             requestIdRef.current++;
         };
     }, [load]);

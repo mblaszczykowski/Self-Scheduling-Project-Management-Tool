@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { HiOutlineExclamationCircle } from 'react-icons/hi';
 import AuthPage from './pages/AuthPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -11,6 +12,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { checkUserAuth } from './util/api';
 import PageTransition from './components/common/PageTransition';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import EmptyState from './components/common/EmptyState';
 import { CurrentUser } from './types';
 
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
@@ -33,6 +35,29 @@ const LoadingSpinner = () => (
         </div>
     </div>
 );
+
+const NotFoundPage = () => {
+    const navigate = useNavigate();
+    const { user } = useAuth();
+    // A signed-out visitor has no dashboard to return to — ProtectedRoute would only bounce them on
+    // to the login screen — so offer that destination directly instead of a link that misleads.
+    const [target, label] = user ? ['/dashboard', 'Back to dashboard'] : ['/login', 'Go to sign in'];
+
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+            <div className="text-center">
+                <p className="text-xs font-semibold tracking-[0.2em] text-slate-400 dark:text-slate-500">404</p>
+                <EmptyState
+                    icon={HiOutlineExclamationCircle}
+                    title="Page not found"
+                    description="This address does not match any page in FlowLink. It may have moved, or the link may be mistyped."
+                    action={() => navigate(target, { replace: true })}
+                    actionLabel={label}
+                />
+            </div>
+        </div>
+    );
+};
 
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
     const { user } = useAuth();
@@ -121,7 +146,9 @@ function AppRoutes() {
                 />
                 <Route path="/timeline" element={<Navigate to="/projects" replace />} />
                 <Route path="/list" element={<Navigate to="/projects" replace />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
+                {/* An unknown address used to be redirected to "/", which silently hid the user's
+                    mistake and, once signed in, dumped them on the dashboard as if nothing was wrong. */}
+                <Route path="*" element={<NotFoundPage />} />
             </Routes>
         </div>
     );

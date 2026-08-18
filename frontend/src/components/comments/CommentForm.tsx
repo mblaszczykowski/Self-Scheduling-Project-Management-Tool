@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ErrorMessage, Field, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
-import { HiOutlinePlus, HiOutlineX, HiOutlineDocument, HiOutlineDocumentText } from 'react-icons/hi';
-import { getFileInfo, revokeFileUrl } from '../../util/helpers';
+import { HiOutlinePlus } from 'react-icons/hi';
+import { revokeFileUrl } from '../../util/helpers';
+import AttachmentThumbnail from '../common/AttachmentThumbnail';
+import { Attachment } from '../../types';
 
 export interface CommentFormValues {
     content: string;
@@ -39,49 +41,9 @@ const CommentForm = ({
         setLocalAttachments(prev => [...prev, ...files]);
     };
 
-    const handleRemoveLocalAttachment = (attachment: File) => {
+    const handleRemoveLocalAttachment = (attachment: Attachment) => {
         revokeFileUrl(attachment);
         setLocalAttachments(prev => prev.filter(f => f !== attachment));
-    };
-
-    const renderLocalAttachmentPreview = (attachment: File, idx: number) => {
-        const { url, fileName, fileType } = getFileInfo(attachment);
-
-        return (
-            <div
-                key={`${fileName}-${idx}`}
-                className="relative group cursor-pointer"
-            >
-                {fileType === 'image' ? (
-                    <img
-                        src={url}
-                        alt={fileName}
-                        className="h-8 w-8 object-cover rounded border border-slate-200 dark:border-slate-700 hover:border-slate-300 transition-colors"
-                    />
-                ) : fileType === 'pdf' ? (
-                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 hover:border-slate-300 transition-colors">
-                        <HiOutlineDocumentText className="w-2.5 h-2.5 text-red-500" />
-                        <span className="text-xs text-slate-500 truncate max-w-[50px]">{fileName}</span>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 hover:border-slate-300 transition-colors">
-                        <HiOutlineDocument className="w-2.5 h-2.5 text-slate-400" />
-                        <span className="text-xs text-slate-500 truncate max-w-[50px]">{fileName}</span>
-                    </div>
-                )}
-                <button
-                    type="button"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveLocalAttachment(attachment);
-                    }}
-                    className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-slate-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Remove"
-                >
-                    <HiOutlineX className="w-2 h-2" />
-                </button>
-            </div>
-        );
     };
 
     const handleFormSubmit = (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>) => {
@@ -128,19 +90,28 @@ const CommentForm = ({
 
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                            {localAttachments.map((f, idx) =>
-                                renderLocalAttachmentPreview(f, idx)
-                            )}
+                            {localAttachments.map((file, idx) => (
+                                <AttachmentThumbnail
+                                    key={`${file.name}-${idx}`}
+                                    attachment={file}
+                                    variant="compact"
+                                    onRemove={handleRemoveLocalAttachment}
+                                />
+                            ))}
+                            {/* sr-only rather than hidden: display:none takes the input out of the
+                                tab order, which made attaching a file mouse-only. The label shows
+                                the focus the clipped input receives. */}
                             <label
-                                className="cursor-pointer flex items-center justify-center w-6 h-6 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                className="relative cursor-pointer flex items-center justify-center w-6 h-6 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-within:ring-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400"
                                 title="Attach file"
                             >
                                 <HiOutlinePlus className="w-3 h-3 text-slate-400" />
+                                <span className="sr-only">Attach file</span>
                                 <input
                                     type="file"
                                     multiple
                                     onChange={handleAddLocalAttachments}
-                                    className="hidden"
+                                    className="sr-only"
                                 />
                             </label>
                         </div>

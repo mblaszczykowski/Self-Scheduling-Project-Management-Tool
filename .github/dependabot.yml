@@ -1,0 +1,64 @@
+version: 2
+
+updates:
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - backend
+    groups:
+      # Spring Boot's starters are version-managed by the parent POM, so bumping them
+      # individually produces PRs that conflict with each other.
+      spring-boot:
+        patterns:
+          - org.springframework.boot:*
+      test-dependencies:
+        patterns:
+          - org.testcontainers:*
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - frontend
+    groups:
+      # These ship as a matched set; one-at-a-time bumps break the peer ranges.
+      react:
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
+      tiptap:
+        patterns:
+          - "@tiptap/*"
+      types:
+        patterns:
+          - "@types/*"
+      testing-library:
+        patterns:
+          - "@testing-library/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - ci
+
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /frontend
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - docker

@@ -317,5 +317,25 @@ export const daysBetween = (date1: DateInput, date2: DateInput): number => {
     return Math.round((utc2 - utc1) / MS_PER_DAY);
 };
 
+/**
+ * Where to send the user after they sign in, taken from `?next=`.
+ *
+ * Resolved with the URL parser against our own origin rather than checked with string prefixes:
+ * browsers treat a backslash in an http(s) URL as a slash, so `/\evil.com` starts with exactly one
+ * "/" — passing any `startsWith('//')` guard — and still navigates off-site. Whatever does not
+ * resolve back to this origin is discarded, which leaves `?next=` useless as a phishing hop.
+ */
+export const safeNextPath = (search: string, fallback = '/dashboard'): string => {
+    const raw = new URLSearchParams(search).get('next');
+    if (!raw) return fallback;
+    try {
+        const target = new URL(raw, window.location.origin);
+        if (target.origin !== window.location.origin) return fallback;
+        return target.pathname + target.search + target.hash;
+    } catch {
+        return fallback;
+    }
+};
+
 export const STATUS_CONFIG = STATUS_STYLES;
 export const PRIORITY_CONFIG = PRIORITY_STYLES;

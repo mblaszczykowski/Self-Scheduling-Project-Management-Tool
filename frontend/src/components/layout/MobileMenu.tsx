@@ -19,25 +19,11 @@ export default function MobileMenu({
     onOpenAccountModal,
     onLogoutClick
 }: MobileMenuProps) {
-    const MobileNavLink = ({ to, children }: { to: string; children: React.ReactNode }) => (
-        <Link
-            to={to}
-            className={`block py-2.5 px-3 text-sm font-medium rounded-lg transition-colors ${
-                location.pathname === to
-                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-            }`}
-            onClick={onClose}
-        >
-            {children}
-        </Link>
-    );
-
     return (
         <nav id="mobile-menu" role="navigation" aria-label="Mobile navigation" className="xl:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-[slideDown_0.2s_ease-out]">
             <div className="px-6 py-4 space-y-1">
-                <MobileNavLink to="/dashboard">Dashboard</MobileNavLink>
-                <MobileNavLink to="/projects">Projects</MobileNavLink>
+                <MobileNavLink to="/dashboard" isActive={location.pathname === '/dashboard'} onClick={onClose}>Dashboard</MobileNavLink>
+                <MobileNavLink to="/projects" isActive={location.pathname === '/projects'} onClick={onClose}>Projects</MobileNavLink>
 
                 <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
                     <MobileMenuButton onClick={() => { onClose(); onCreateProject(); }} icon={<BoxIcon />}>Create Project</MobileMenuButton>
@@ -50,6 +36,25 @@ export default function MobileMenu({
                 </div>
             </div>
         </nav>
+    );
+}
+
+// Declared at module scope on purpose: a component defined inside MobileMenu's body is a fresh
+// component type on every render, so React tears the links down and rebuilds them instead of
+// updating them, dropping their DOM state and restarting the menu's slide-in.
+function MobileNavLink({ to, isActive, onClick, children }: { to: string; isActive: boolean; onClick: () => void; children: React.ReactNode }) {
+    return (
+        <Link
+            to={to}
+            className={`block py-2.5 px-3 text-sm font-medium rounded-lg transition-colors ${
+                isActive
+                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+            }`}
+            onClick={onClick}
+        >
+            {children}
+        </Link>
     );
 }
 

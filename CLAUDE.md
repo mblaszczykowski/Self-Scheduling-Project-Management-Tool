@@ -41,8 +41,8 @@ mvn clean package          # build the jar
 ```
 
 `mvn test` starts a real `postgres:16-alpine` container via Testcontainers for the classes under
-`src/test/java/com/backend/integration/`. Surefire excludes the `experiment` JUnit tag; lift it
-with `mvn test -Dgroups=experiment -DexcludedGroups=`.
+`src/test/java/com/backend/integration/`. Everything else is a plain unit test; nothing is
+excluded from the build.
 
 ### Frontend
 

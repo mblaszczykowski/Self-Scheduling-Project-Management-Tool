@@ -42,8 +42,8 @@ export const useDashboardStats = ({ processedProjects, allTasks, taskKeyToTaskMa
 
         return {
             ...computeTaskCounts(allTasks),
-            ...criticalHealth,
-            ...computeBlockedTasks(allTasks, taskKeyToTaskMap),
+            criticalHealth,
+            blocked: computeBlockedTasks(allTasks, taskKeyToTaskMap),
             criticalPathTimeline: computeCriticalPathTimeline(processedProjects),
             crossProjectDeps: computeCrossProjectDependencies(processedProjects),
             upcomingCriticalDeadlines: computeUpcomingCriticalDeadlines(criticalHealth.criticalTasksList, today),

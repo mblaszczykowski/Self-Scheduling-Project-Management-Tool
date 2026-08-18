@@ -31,6 +31,9 @@ const GhostTaskBar = ({ task, taskPosition, suggestion, timelineStart, onTooltip
     const arrowStartX = taskPosition.marginLeft + taskPosition.width;
     const arrowEndX = ghostPos.marginLeft;
     const goesRight = ghostCenter > origCenter;
+    // Where the connector stops, 2px short of the ghost bar: the line ends here and the
+    // arrowhead points at it.
+    const arrowTipX = goesRight ? arrowEndX - 2 : arrowEndX + ghostPos.width + 2;
 
     return (
         <>
@@ -45,19 +48,21 @@ const GhostTaskBar = ({ task, taskPosition, suggestion, timelineStart, onTooltip
                     <line
                         x1={goesRight ? arrowStartX + 2 : taskPosition.marginLeft - 2}
                         y1="50%"
-                        x2={goesRight ? arrowEndX - 2 : arrowEndX + ghostPos.width + 2}
+                        x2={arrowTipX}
                         y2="50%"
                         stroke="rgba(96,165,250,0.35)"
                         strokeWidth="1"
                         strokeDasharray="3 2"
                     />
+                    {/* `points` takes no percentages, so the 5x6 head is drawn at a local y of
+                        0..6 and the transform drops it onto the line's 50% centreline. */}
                     <polygon
                         points={goesRight
-                            ? `${arrowEndX - 2},${0} ${arrowEndX + 2},${0} ${arrowEndX},${0}`
-                            : `${arrowEndX + ghostPos.width + 2},${0} ${arrowEndX + ghostPos.width - 2},${0} ${arrowEndX + ghostPos.width},${0}`
+                            ? `${arrowTipX - 5},0 ${arrowTipX - 5},6 ${arrowTipX},3`
+                            : `${arrowTipX + 5},0 ${arrowTipX + 5},6 ${arrowTipX},3`
                         }
                         fill="rgba(96,165,250,0.4)"
-                        style={{ transform: 'translateY(calc(50% - 0px))' }}
+                        style={{ transform: 'translateY(calc(50% - 3px))' }}
                     />
                 </svg>
             )}
@@ -118,7 +123,7 @@ const TimelineTaskBar = ({
 
     return (
         <div
-            className="flex relative-container group"
+            className="flex"
             style={{ width: `${timelineWidth}px` }}
         >
             <div
@@ -132,15 +137,19 @@ const TimelineTaskBar = ({
                 }}
             >
                 {sidebarCollapsed ? (
-                    <div className="p-2 flex items-center justify-center">
+                    <div className="px-1 py-2 flex items-center justify-center">
+                        {/* The collapsed sidebar is 48px wide, so the key is shrunk and clipped
+                            rather than allowed to spill over the timeline; the title carries it
+                            in full. */}
                         <span
-                            className={`text-xs font-bold ${
+                            className={`text-[10px] font-bold truncate min-w-0 ${
                                 task.isCritical
-                                    ? 'text-red-600'
-                                    : 'text-slate-500'
+                                    ? 'text-red-600 dark:text-red-400'
+                                    : 'text-slate-500 dark:text-slate-400'
                             }`}
+                            title={task.taskKey}
                         >
-                            {task.id}
+                            {task.taskKey}
                         </span>
                     </div>
                 ) : (

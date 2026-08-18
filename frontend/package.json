@@ -5,9 +5,6 @@
   "dependencies": {
     "@tailwindcss/typography": "^0.5.15",
     "@tanstack/react-query": "^5.101.2",
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^13.5.0",
     "@tiptap/extension-character-count": "^3.18.0",
     "@tiptap/extension-color": "^3.18.0",
     "@tiptap/extension-highlight": "^3.18.0",
@@ -44,7 +41,12 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "lint": "eslint src --ext .ts,.tsx,.js",
+    "typecheck": "tsc --noEmit",
     "eject": "react-scripts eject"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "eslintConfig": {
     "extends": [
@@ -65,6 +67,8 @@
     ]
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^18.19.130",
     "@types/react": "^18.3.31",

@@ -88,8 +88,16 @@ function NotificationItem({ notification, onClose, onMarkSingleRead }: { notific
 
 interface NotificationDropdownProps {
     notifications: Notification[];
+    /**
+     * The server's count, which is what the badge shows.
+     *
+     * The list is one page; counting unread entries in it under-reported as soon as a user had
+     * more notifications than fit on that page.
+     */
+    unreadCount: number;
     isOpen: boolean;
-    onToggle: () => void;
+    /** Named for what it does: the close path runs through onMarkAsRead + onClose. */
+    onOpen: () => void;
     onClose: () => void;
     onMarkAsRead: () => void;
     onMarkSingleRead: (id: number) => void;
@@ -97,8 +105,9 @@ interface NotificationDropdownProps {
 
 export default function NotificationDropdown({
     notifications,
+    unreadCount,
     isOpen,
-    onToggle,
+    onOpen,
     onClose,
     onMarkAsRead,
     onMarkSingleRead,
@@ -114,14 +123,13 @@ export default function NotificationDropdown({
         }
         return { unreadNotifications: unread, readNotifications: read };
     }, [notifications]);
-    const unreadCount = unreadNotifications.length;
 
     const handleBellClick = async () => {
         if (isOpen) {
             await onMarkAsRead();
             onClose();
         } else {
-            onToggle();
+            onOpen();
         }
     };
 

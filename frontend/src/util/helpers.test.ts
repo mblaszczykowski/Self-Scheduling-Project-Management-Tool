@@ -5,6 +5,8 @@ import {
     isOverdue,
     isUpcomingDeadline,
     calculateDuration,
+    formatDuration,
+    safeNextPath,
     daysBetween,
     getFileTypeFromPath,
     getAvatarInitials,
@@ -80,11 +82,26 @@ describe('isUpcomingDeadline', () => {
 });
 
 describe('calculateDuration', () => {
-    test('inclusive day span', () => {
-        expect(calculateDuration('2024-01-01', '2024-01-05')).toBe(4);
+    test('counts both endpoints, so a task due the day it starts lasts one day', () => {
+        expect(calculateDuration('2024-01-01', '2024-01-01')).toBe(1);
+        expect(calculateDuration('2024-01-01', '2024-01-05')).toBe(5);
     });
-    test('missing dates return N/A', () => {
-        expect(calculateDuration(null, '2024-01-05')).toBe('N/A');
+    // 0 rather than a sentinel string: callers compare and sum durations, and only the
+    // formatter decides how "unknown" reads on screen.
+    test('is zero when the span is unknown or nonsensical', () => {
+        expect(calculateDuration(null, '2024-01-05')).toBe(0);
+        expect(calculateDuration('2024-01-05', undefined)).toBe(0);
+        expect(calculateDuration('not-a-date', '2024-01-05')).toBe(0);
+        expect(calculateDuration('2024-01-05', '2024-01-01')).toBe(0);
+    });
+});
+
+describe('formatDuration', () => {
+    test('renders a known span in days', () => {
+        expect(formatDuration(5)).toBe('5d');
+    });
+    test('renders an unknown span as N/A', () => {
+        expect(formatDuration(0)).toBe('N/A');
     });
 });
 
@@ -144,5 +161,39 @@ describe('status/priority config', () => {
         Object.values(PRIORITY_CONFIG).forEach(cfg => {
             expect(cfg.hex).toMatch(/^#[0-9a-f]{6}$/i);
         });
+    });
+});
+
+describe('safeNextPath', () => {
+    test('keeps a same-origin path, with its query and hash', () => {
+        expect(safeNextPath('?next=%2Fprojects%3Fview%3Dtimeline%23WEB-1'))
+            .toBe('/projects?view=timeline#WEB-1');
+    });
+
+    test('falls back when there is nothing to return to', () => {
+        expect(safeNextPath('')).toBe('/dashboard');
+        expect(safeNextPath('?expired=true')).toBe('/dashboard');
+        expect(safeNextPath('?next=')).toBe('/dashboard');
+    });
+
+    // Every one of these resolves to an off-site origin in a real browser. The backslash forms are
+    // the interesting ones: they start with a single "/", so a startsWith('//') guard lets them by.
+    test.each([
+        '//evil.com',
+        '/\\evil.com',
+        '/\\/evil.com',
+        'https://evil.com/login',
+        // eslint-disable-next-line no-script-url -- the point of the test is that this is refused
+        'javascript:alert(1)',
+    ])('refuses to hand the session off to %s', (hostile) => {
+        expect(safeNextPath(`?next=${encodeURIComponent(hostile)}`)).toBe('/dashboard');
+    });
+
+    test('a percent-encoded backslash is a literal path segment, not an escape', () => {
+        expect(safeNextPath('?next=%2F%255Cevil.com')).toBe('/%5Cevil.com');
+    });
+
+    test('honours an explicit fallback', () => {
+        expect(safeNextPath('?next=//evil.com', '/login')).toBe('/login');
     });
 });

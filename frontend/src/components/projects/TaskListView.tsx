@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { formatShortDate, daysBetween, STATUS_CONFIG, PRIORITY_CONFIG, MS_PER_DAY, formatAssigneeName } from '../../util/helpers';
 import { EmptyState } from '../common';
 import { SortAscIcon, SortDescIcon } from '../common/Icons';
@@ -35,9 +35,8 @@ const getProgressColor = (task: EnrichedTask) => {
     return 'bg-slate-300 dark:bg-slate-600';
 };
 
-const computeScheduleHealth = (task: EnrichedTask) => {
+const computeScheduleHealth = (task: EnrichedTask, now: Date) => {
     if (!task.startDate || !task.dueDate || task.progress >= 100) return null;
-    const now = new Date();
     const start = new Date(task.startDate);
     const due = new Date(task.dueDate);
     if (now < start) return { status: 'not-started', label: 'Not started', expected: 0 };
@@ -59,17 +58,20 @@ const healthColor: Record<string, string> = {
     'not-started': 'text-slate-400 dark:text-slate-500',
 };
 
-const getBlockingInfo = (task: EnrichedTask, taskKeyToTaskMap: TaskKeyMap) => {
-    if (!task.dependencies?.length) return null;
+const getBlockingInfo = (task: EnrichedTask, taskKeyToTaskMap: TaskKeyMap, now: Date) => {
+    if (task.dependencies.length === 0) return null;
     const blockers = task.dependencies
-        .map(depKey => taskKeyToTaskMap?.get(depKey))
-        .filter((dep): dep is EnrichedTask => !!dep && dep.progress < 100);
+        .map((dependencyKey) => taskKeyToTaskMap.get(dependencyKey))
+        .filter((dependency): dependency is EnrichedTask =>
+            !!dependency && dependency.progress < 100);
     if (blockers.length === 0) return null;
+
+    // Most overdue first, then least complete; the task key keeps the order total.
+    const NO_DUE_DATE = Number.MAX_SAFE_INTEGER;
     blockers.sort((a, b) => {
-        const aOverdue = a.dueDate ? daysBetween(new Date(), a.dueDate) : 999;
-        const bOverdue = b.dueDate ? daysBetween(new Date(), b.dueDate) : 999;
-        if (aOverdue !== bOverdue) return aOverdue - bOverdue;
-        return a.progress - b.progress;
+        const aDue = a.dueDate ? daysBetween(now, a.dueDate) : NO_DUE_DATE;
+        const bDue = b.dueDate ? daysBetween(now, b.dueDate) : NO_DUE_DATE;
+        return aDue - bDue || a.progress - b.progress || a.taskKey.localeCompare(b.taskKey);
     });
     return { blockers, worst: blockers[0], count: blockers.length };
 };
@@ -126,7 +128,6 @@ interface TaskInsight {
 
 const TaskListView = ({
     filteredTasks,
-    processedProjects,
     taskKeyToTaskMap,
     projectKeyToProject,
     sortField,
@@ -135,35 +136,33 @@ const TaskListView = ({
     onSort,
     onTaskClick,
 }: TaskListViewProps) => {
-    const allProjectTasks = useMemo(() => processedProjects.flatMap(p => p.tasks || []), [processedProjects]);
-
     const taskInsights = useMemo(() => {
-        // One O(n) pass to count dependents per task key, instead of scanning all
-        // tasks for every row (was O(filtered × all)).
+        // One pass over every known task to count dependents per key, rather than scanning them
+        // all again for each rendered row.
         const dependentsCount = new Map<string, number>();
-        allProjectTasks.forEach(t => {
-            t.dependencies?.forEach(depKey => {
-                dependentsCount.set(depKey, (dependentsCount.get(depKey) || 0) + 1);
+        taskKeyToTaskMap.forEach((task) => {
+            task.dependencies.forEach((dependencyKey) => {
+                dependentsCount.set(dependencyKey, (dependentsCount.get(dependencyKey) ?? 0) + 1);
             });
         });
 
-        const map = new Map<string, TaskInsight>();
-        filteredTasks.forEach(task => {
-            map.set(task.taskKey, {
-                blocking: getBlockingInfo(task, taskKeyToTaskMap),
-                dependents: dependentsCount.get(task.taskKey) || 0,
-                health: computeScheduleHealth(task),
+        // "Now" is read once per recomputation rather than per row per helper.
+        const now = new Date();
+        const insights = new Map<string, TaskInsight>();
+        filteredTasks.forEach((task) => {
+            insights.set(task.taskKey, {
+                blocking: getBlockingInfo(task, taskKeyToTaskMap, now),
+                dependents: dependentsCount.get(task.taskKey) ?? 0,
+                health: computeScheduleHealth(task, now),
             });
         });
-        return map;
-    }, [filteredTasks, taskKeyToTaskMap, allProjectTasks]);
+        return insights;
+    }, [filteredTasks, taskKeyToTaskMap]);
 
-    /** Navigate to a dependency task (find its project, open modal) */
-    const handleDepClick = (dep: EnrichedTask) => {
-        const depProject = projectKeyToProject?.get(dep.projectKey)
-            || processedProjects.find(p => p.tasks?.some(t => t.taskKey === dep.taskKey));
-        if (depProject) onTaskClick(depProject, dep);
-    };
+    const handleDepClick = useCallback((dependency: EnrichedTask) => {
+        const project = projectKeyToProject.get(dependency.projectKey);
+        if (project) onTaskClick(project, dependency);
+    }, [projectKeyToProject, onTaskClick]);
 
     const columns = [
         ['taskKey', 'Task', 'min-w-[280px]'],
@@ -196,30 +195,62 @@ const TaskListView = ({
                             {columns.map(([field, label, width]) => {
                                 const isSorted = sortField === field;
                                 const nonsortable = field === 'labels';
+                                const heading = (
+                                    <>
+                                        {label}
+                                        {isSorted && (sortOrder === 'asc' ? <SortAscIcon className="w-3 h-3" /> : <SortDescIcon className="w-3 h-3" />)}
+                                    </>
+                                );
                                 return (
-                                    <th key={field} onClick={() => !nonsortable && onSort(field)}
-                                        className={`px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider ${!nonsortable ? 'hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer' : ''} select-none ${width} ${isSorted ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'} transition-colors`}>
-                                        <div className="flex items-center gap-1">
-                                            {label}
-                                            {isSorted && (sortOrder === 'asc' ? <SortAscIcon className="w-3 h-3" /> : <SortDescIcon className="w-3 h-3" />)}
-                                        </div>
+                                    // aria-sort tells assistive tech which column the order is keyed on and in
+                                    // which direction; only the sortable columns advertise it.
+                                    <th key={field}
+                                        aria-sort={nonsortable ? undefined : isSorted ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+                                        className={`text-left text-[11px] font-semibold uppercase tracking-wider ${nonsortable ? 'px-4 py-2.5' : ''} select-none ${width} ${isSorted ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'} transition-colors`}>
+                                        {nonsortable ? (
+                                            <div className="flex items-center gap-1">{heading}</div>
+                                        ) : (
+                                            // A real button rather than a handler on the <th>, so sorting is
+                                            // reachable by keyboard; it carries the cell padding so the mouse
+                                            // target stays the whole header cell.
+                                            <button type="button" onClick={() => onSort(field)}
+                                                className="w-full px-4 py-2.5 flex items-center gap-1 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
+                                                {heading}
+                                            </button>
+                                        )}
                                     </th>
                                 );
                             })}
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredTasks.map((task, index) => {
-                            const project = projectKeyToProject?.get(task.projectKey)
-                                || processedProjects.find(p => p.projectKey === task.projectKey);
+                        {filteredTasks.map((task) => {
+                            const project = projectKeyToProject.get(task.projectKey);
                             const due = relativeDue(task.dueDate, task.status, task.progress);
                             const insights = taskInsights.get(task.taskKey)
                                 ?? { blocking: null, dependents: 0, health: null };
                             const { blocking, dependents, health } = insights;
-                            const assigneeMember = project?.members?.find(m => m.email === task.assignee);
+                            const assigneeMember = project?.members
+                                .find((member) => member.email === task.assignee);
 
                             return (
-                                <tr key={task.taskKey} onClick={() => onTaskClick(project, task)}
+                                // The row stays a table row rather than taking role="button": overriding the
+                                // role would drop it out of the table's row/rowgroup structure and break table
+                                // navigation. tabIndex + aria-label + Enter/Space give it the keyboard path.
+                                <tr key={task.taskKey}
+                                    tabIndex={0}
+                                    aria-label={`Open task ${task.taskKey}: ${task.summary}`}
+                                    onClick={() => onTaskClick(project, task)}
+                                    onKeyDown={(e) => {
+                                        // The dependency chips inside the row are focusable too and their Enter
+                                        // press bubbles up here; only act when the row itself holds focus, so
+                                        // opening a chip does not also open this task.
+                                        if (e.target !== e.currentTarget) return;
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault(); // Space would otherwise scroll the page
+                                            onTaskClick(project, task);
+                                        }
+                                    }}
                                     className={`border-b border-slate-100 dark:border-slate-700/40 hover:bg-blue-50/40 dark:hover:bg-slate-700/30 cursor-pointer transition-colors group ${task.isCritical && task.isDelayed ? 'bg-red-50/30 dark:bg-red-950/10' : ''}`}>
 
                                     {/* ── Task ── */}
@@ -287,7 +318,7 @@ const TaskListView = ({
                                             <span className={due.cls} title={task.dueDate ? formatShortDate(task.dueDate) : ''}>{due.text}</span>
                                         </div>
                                         <div className="flex items-center gap-2 mt-0.5">
-                                            {task.duration !== 'N/A' && (
+                                            {task.duration > 0 && (
                                                 <span className="text-[10px] text-slate-400 dark:text-slate-500">{task.duration}d span</span>
                                             )}
                                             {task.startDate && task.dueDate && task.progress < 100 && (() => {

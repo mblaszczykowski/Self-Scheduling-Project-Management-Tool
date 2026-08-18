@@ -1,154 +1,50 @@
 -- ============================================================================
--- FlowLink — Dane demonstracyjne do pracy magisterskiej
+-- FlowLink demo data
 -- ============================================================================
 --
--- Skrypt tworzy spójny zestaw danych demonstracyjnych zgodny ze scenariuszem
--- opisanym w rozdziale 5 pracy ("Studium demonstracyjne"):
+-- A realistic portfolio for product demos, manual testing and screenshots:
 --
---   * 1 konto managera + 3 konta wykonawców (K = 3 zasoby)
---   * 3 projekty IT (e-commerce, mobile, B2B API)
---   * 45 zadań (15 na projekt) z rozkładem priorytetów 10/20/40/20/10 %
---   * 15 zależności kolejnościowych (~33 % zadań)
---   * 8 statusów cyklu życia zadania używanych w demo (BACKLOG, GATHERING_INTEREST,
---     TODO, IN_PROGRESS, TO_REVIEW, TO_TEST, IN_TEST, READY_TO_MERGE, DONE)
---     — pełen przekrój workflow widoczny w widoku TaskListView
---   * ~15 par konfliktów zasobowych w 6 świadomie zaprojektowanych klastrach (A–F)
---     — gotowy materiał demonstracyjny dla optymalizatora
---   * komentarze, reakcje, powiadomienia — dla wzbogacenia widoków
+--   * 1 portfolio manager account + 3 contributor accounts
+--   * 3 projects (ECOM / MAPP / B2B)
+--   * 45 tasks (15 per project) across eight of the workflow statuses
+--   * 15 precedence dependencies
+--   * threaded comments, reactions and notifications
 --
--- KONTO DEMO DO LOGOWANIA:
---   Email:  demo@flowlink.pl
---   Hasło:  Demo1234!
+-- The three contributors are members of all three projects, so the projects compete for the
+-- same people. The overlapping assignments are deliberate: they are the resource conflicts the
+-- schedule optimizer is meant to resolve, which is what makes "Optimize Schedule" show
+-- something on a fresh install.
 --
--- Identyczne hasło (Demo1234!) dla kont wykonawców:
---   piotr.kowalski@flowlink.pl
---   marta.wisniewska@flowlink.pl
---   tomasz.lewandowski@flowlink.pl
+-- Sign in as demo@flowlink.pl / Demo1234!  (same password for every seeded account).
 --
--- Hash BCrypt (cost=10) powyższego hasła:
---   $2b$10$mpV2p05Dv44wn2ELzedN6.q4zy9xoNyyHXoGm46kmX5TIQTpqpNzO
--- Wygenerowany przez:
---   python3 -c 'import bcrypt; print(bcrypt.hashpw(b"Demo1234!", bcrypt.gensalt(10)).decode())'
+-- Run it against a database whose schema Flyway has already created:
 --
--- URUCHAMIANIE:
---   psql -U postgres -d flowlink -f demo-seed.sql
+--   psql -U postgres -d flowlink -f backend/scripts/db/demo-seed.sql
 --
--- PONOWNE URUCHOMIENIE:
---   Skrypt jest w pełni powtarzalny. Na samym początku (sekcja 0)
---   wykonywane jest pełne czyszczenie wszystkich danych demo, a potem
---   wszystko jest ładowane od zera. Możesz więc uruchomić optymalizację
---   w aplikacji (zmiany w bazie), a kolejnym odpaleniem tego skryptu
---   wrócić do stanu bazowego i powtórzyć demo.
+-- Idempotent: section 0 deletes everything this script owns before re-inserting it, so running
+-- it again after an optimization run restores the starting state. It contains no DDL - Flyway
+-- owns the schema, and a seed script that alters constraints will silently undo a migration.
 --
--- UWAGA: Hash hasła wygenerowany lokalnie i zweryfikowany — działa
--- z Spring Security BCryptPasswordEncoder (akceptuje zarówno prefiks $2a$
--- jak i $2b$). Hasło `Demo1234!` spełnia politykę walidacji `ValidationUtil`:
--- minimum 8 znaków, duża i mała litera, cyfra, znak specjalny.
---
--- ============================================================================
--- PRZEWIDYWANE WYNIKI OPTYMALIZACJI (narracyjny scenariusz dla pracy)
--- ============================================================================
--- Seed został zaprojektowany tak, by demonstrować tezę pracy krystalicznie:
---   * zadania HIGHEST/HIGH mają zarezerwowane sloty bez kolizji,
---   * konflikty zasobowe skumulowane są w zadaniach LOW/LOWEST,
---   * przesunięcia po optymalizacji są monotonicznie rosnące względem
---     priorytetu (HIGHEST = 0 dni → LOWEST = kilkanaście dni).
---
--- Spodziewane metryki po uruchomieniu "Optimize Schedule":
---   Konflikty zasobowe       :  ~12-15   →  0     (eliminacja 100 %)
---   Zadania przesunięte      :  ok.  15-20 / 40   (nie 40/40)
---   Średnie przesunięcie     :  ok.  5-8  dni
---   Maksymalne przesunięcie  :  ok.  15-20 dni    (dla LOW/LOWEST)
---   Zadania HIGH/HIGHEST     :  0 dni przesunięcia  (5 + 9 = 14 zadań)
---   Zadania MEDIUM           :  drobne przesunięcia (1-5 dni, 2-3 zadania)
---   Zadania LOW              :  10-15 dni przesunięcia
---   Zadania LOWEST           :  15-20 dni przesunięcia
---   Terminowość HIGH/HIGHEST :  100 %
---   Ogólna terminowość       :  >= 90 %
---
--- Horyzont scenariusza: 2026-05-31 → 2026-07-26 (57 dni kalendarzowych).
--- Kompaktowy układ pozwala zmieścić cały wykres Gantta na jednym zrzucie.
---
--- Kluczowe klastry konfliktów (gotowy materiał do "Show what changes"):
---   Klaster A (23.05 – 27.05, Marta) : ECOM-11, MAPP-12, B2B-9, B2B-12
---     — cztery zadania LOW nakładające się na Martę (5 par konfliktów).
---   Klaster B (07.06 – 09.06, Marta) : ECOM-10, B2B-13, B2B-14
---     — trzy zadania LOWEST, dwa eksporty danych + odświeżenie kontaktu.
---   Klaster C (06.06 – 07.06, Tomasz): MAPP-11, MAPP-13 + B2B-10 (MEDIUM)
---     — zadania LOW/LOWEST vs MEDIUM, LOW/LOWEST się przesuną.
---   Konflikt D (24.05 – 26.05, Piotr): ECOM-7 (MEDIUM) vs B2B-8 (MEDIUM)
---     — pokazuje, że MEDIUM też potrafią się przesunąć, ale niewiele.
---   Konflikt E (04.05 – 07.05, Tomasz): ECOM-6 (LOW) vs B2B-5 (HIGH)
---     — modelowy przykład: HIGH zachowuje swoją pozycję, LOW przesuwa się.
---   Konflikt F (30.04 – 01.05, Piotr): MAPP-2 (HIGH) vs B2B-3 (MEDIUM)
---     — kolejny dowód protekcji HIGH: MEDIUM ustępuje.
+-- See DEMO-SEED-README.md for the account table, what to click, and how to change the password.
 -- ============================================================================
 
 BEGIN;
 
 -- ============================================================================
--- 0a. NAPRAWA CHECK-CONSTRAINTÓW DLA ENUMÓW
+-- 0.  RESET - back to the starting state
 -- ============================================================================
--- Hibernate z ddl-auto=update generuje CHECK-constrainty dla kolumn enum
--- (np. notifications.type, tasks.status), ale NIE aktualizuje ich, gdy
--- w kodzie Java pojawią się nowe wartości enum. W efekcie INSERT z nową
--- wartością (np. 'TASK_COMMENT' dodane do enum NotificationType po pierwszym
--- starcie aplikacji) zostaje odrzucony.
+-- Always active: every run first deletes the demo accounts (@flowlink.pl) and the ECOM / MAPP /
+-- B2B projects with everything under them, then re-inserts them. So the usual loop is:
 --
--- Poniższy blok DROP + ADD constraint synchronizuje check-constrainty
--- z aktualnym stanem enumów Java. Jest bezpieczny — DROP IF EXISTS działa
--- nawet gdy constraint nie istnieje.
-
-ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
-ALTER TABLE notifications ADD CONSTRAINT notifications_type_check
-  CHECK (type IN (
-    'PROJECT_INVITATION','PROJECT_UPDATED','MEMBER_REMOVED',
-    'TASK_ASSIGNED','TASK_UPDATED','TASK_COMMENT','TASK_DELETED',
-    'COMMENT_REPLY','COMMENT_REACTION'
-  ));
-
-ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_status_check;
-ALTER TABLE tasks ADD CONSTRAINT tasks_status_check
-  CHECK (status IN (
-    'BACKLOG','GATHERING_INTEREST','TODO','WITHDRAWN',
-    'IN_PROGRESS','TO_REVIEW','TO_TEST','IN_TEST',
-    'READY_TO_MERGE','READY_TO_DEPLOY','RELEASED','DONE'
-  ));
-
-ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_priority_check;
-ALTER TABLE tasks ADD CONSTRAINT tasks_priority_check
-  CHECK (priority IN ('LOWEST','LOW','MEDIUM','HIGH','HIGHEST'));
-
-ALTER TABLE comment_reactions DROP CONSTRAINT IF EXISTS comment_reactions_type_check;
-ALTER TABLE comment_reactions ADD CONSTRAINT comment_reactions_type_check
-  CHECK (type IN ('LIKE','DISLIKE'));
-
-ALTER TABLE task_activities DROP CONSTRAINT IF EXISTS task_activities_type_check;
-ALTER TABLE task_activities ADD CONSTRAINT task_activities_type_check
-  CHECK (type IN (
-    'CREATED','STATUS_CHANGED','PRIORITY_CHANGED','ASSIGNEE_CHANGED',
-    'PROGRESS_CHANGED','DATES_CHANGED','SUMMARY_CHANGED','DESCRIPTION_CHANGED',
-    'LABELS_CHANGED','DEPENDENCIES_CHANGED','ATTACHMENTS_CHANGED',
-    'COMMENT_ADDED','COMMENT_DELETED'
-  ));
-
-
--- ============================================================================
--- 0.  CZYSZCZENIE — powrót do stanu bazowego
--- ============================================================================
--- Sekcja jest AKTYWNA (nie jest zakomentowana) — każde uruchomienie skryptu
--- najpierw usuwa wszystkie dane demo (konta @flowlink.pl oraz projekty
--- ECOM / MAPP / B2B wraz z ich zawartością), a następnie wstawia je od nowa.
+--   1. Run this script to load the demo data.
+--   2. Optimize a schedule in the app, which writes new dates to the database.
+--   3. Run it again to get the starting state back and repeat.
 --
--- Dzięki temu możesz:
---   1. Odpalić skrypt, żeby załadować dane demo.
---   2. Uruchomić optymalizację w aplikacji (zmiany zapisują się w bazie).
---   3. Ponownie odpalić ten skrypt — wraca stan bazowy, a optymalizację
---      można powtórzyć na świeżych danych.
---
--- Kolejność DELETE uwzględnia klucze obce (dziecko → rodzic).
+-- The DELETEs are ordered child -> parent. Most of these foreign keys cascade now, so several
+-- statements are belt-and-braces; they are kept because the script must also work against a
+-- database that predates those migrations.
 
--- Załączniki (jeśli użytkownik coś dodał przez UI)
+-- Attachments (anything added through the UI)
 DELETE FROM comment_attachments
 WHERE comment_id IN (
   SELECT c.id FROM comments c
@@ -165,7 +61,7 @@ DELETE FROM project_attachments
 WHERE project_id IN (
   SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'));
 
--- Reakcje na komentarze
+-- Comment reactions
 DELETE FROM comment_reactions
 WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.pl')
    OR comment_id IN (
@@ -174,25 +70,25 @@ WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.pl')
        JOIN projects p ON t.project_id = p.id
      WHERE p.project_key IN ('ECOM','MAPP','B2B'));
 
--- Komentarze (self-ref parent_comment_id znika razem z całym zestawem)
+-- Comments (the self-referencing parent_comment_id goes with the whole set)
 DELETE FROM comments
 WHERE author_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.pl')
    OR task_id IN (
      SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
      WHERE p.project_key IN ('ECOM','MAPP','B2B'));
 
--- Powiadomienia
+-- Notifications
 DELETE FROM notifications
 WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.pl');
 
--- Aktywność zadań (historia zmian)
+-- Task activity (change history)
 DELETE FROM task_activities
 WHERE author_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.pl')
    OR task_id IN (
      SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
      WHERE p.project_key IN ('ECOM','MAPP','B2B'));
 
--- Zależności zadań
+-- Task dependencies
 DELETE FROM task_dependencies
 WHERE task_id IN (
      SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
@@ -201,35 +97,35 @@ WHERE task_id IN (
      SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
      WHERE p.project_key IN ('ECOM','MAPP','B2B'));
 
--- Zadania
+-- Tasks
 DELETE FROM tasks
 WHERE project_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'));
 
--- Członkowie projektów
+-- Project members
 DELETE FROM project_members
 WHERE project_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'))
    OR user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.pl');
 
--- Zależności między projektami (jeśli utworzone w UI)
+-- Project-to-project dependencies (if any were created in the UI)
 DELETE FROM project_dependencies
 WHERE project_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'))
    OR dependency_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'));
 
--- Tokeny odświeżające (JWT refresh) — żeby stare sesje nie wisiały
+-- Refresh tokens, so old sessions do not survive the reset
 DELETE FROM refresh_tokens
 WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.pl');
 
--- Projekty
+-- Projects
 DELETE FROM projects WHERE project_key IN ('ECOM','MAPP','B2B');
 
--- Użytkownicy demo
+-- Demo accounts
 DELETE FROM users WHERE email LIKE '%@flowlink.pl';
 
 
 -- ============================================================================
--- 1.  UŻYTKOWNICY
+-- 1.  ACCOUNTS
 -- ============================================================================
--- Hash BCrypt (cost=10) dla hasła "Demo1234!":
+-- BCrypt hash (cost 10) of the password "Demo1234!":
 --   $2b$10$mpV2p05Dv44wn2ELzedN6.q4zy9xoNyyHXoGm46kmX5TIQTpqpNzO
 
 INSERT INTO users (first_name, last_name, email, password,
@@ -252,40 +148,47 @@ ON CONFLICT (email) DO NOTHING;
 
 
 -- ============================================================================
--- 2.  PROJEKTY
+-- 2.  PROJECTS
 -- ============================================================================
--- next_task_number = 16 — po wstawieniu 15 zadań kolejne z API otrzyma nr 16.
+-- next_task_number = 16: after the 15 seeded tasks, the next one created through the API gets
+-- number 16.
+--
+-- created/updated are NOT NULL (migration V3), so they must be supplied here - the entity fills
+-- them in via @PrePersist, which a plain INSERT never runs.
 
-INSERT INTO projects (project_key, summary, description, next_task_number, owner_id)
+INSERT INTO projects (project_key, summary, description, next_task_number, owner_id,
+                      created, updated)
 SELECT 'ECOM',
        'Redesign platformy e-commerce',
        'Kompleksowa modernizacja sklepu internetowego: nowy UX/UI, optymalizacja wydajności, wdrożenie nowego koszyka zakupowego oraz integracja z bramką płatności Stripe. Cel: wzrost konwersji o minimum 15 % w ciągu pierwszego kwartału po wdrożeniu.',
-       16, u.id
+       16, u.id, NOW(), NOW()
 FROM users u WHERE u.email = 'demo@flowlink.pl'
 ON CONFLICT (project_key) DO NOTHING;
 
-INSERT INTO projects (project_key, summary, description, next_task_number, owner_id)
+INSERT INTO projects (project_key, summary, description, next_task_number, owner_id,
+                      created, updated)
 SELECT 'MAPP',
        'Aplikacja mobilna iOS/Android',
        'Natywna aplikacja mobilna towarzysząca platformie webowej. Funkcje: logowanie biometryczne (FaceID/TouchID), push-notyfikacje o zamówieniach, tryb offline z lokalnym cache oraz skanowanie kodów kreskowych produktów.',
-       16, u.id
+       16, u.id, NOW(), NOW()
 FROM users u WHERE u.email = 'demo@flowlink.pl'
 ON CONFLICT (project_key) DO NOTHING;
 
-INSERT INTO projects (project_key, summary, description, next_task_number, owner_id)
+INSERT INTO projects (project_key, summary, description, next_task_number, owner_id,
+                      created, updated)
 SELECT 'B2B',
        'Integracja z API partnerów hurtowych',
        'Udostępnienie publicznego REST API dla partnerów B2B. OAuth2 z JWT, webhooks dla zdarzeń zamówień, rate limiting, dokumentacja OpenAPI 3.0, panel administracyjny dla partnerów oraz eksport danych w formatach CSV i XML (EDI).',
-       16, u.id
+       16, u.id, NOW(), NOW()
 FROM users u WHERE u.email = 'demo@flowlink.pl'
 ON CONFLICT (project_key) DO NOTHING;
 
 
 -- ============================================================================
--- 3.  CZŁONKOWIE PROJEKTÓW
+-- 3.  PROJECT MEMBERSHIP
 -- ============================================================================
--- Wszyscy trzej wykonawcy pracują w każdym z trzech projektów — dzięki temu
--- algorytm MORCPSP operuje na wspólnej puli zasobów (K = 3).
+-- All three contributors belong to all three projects, so the optimizer sees one shared pool of
+-- three people rather than three independent plans.
 
 INSERT INTO project_members (project_id, user_id)
 SELECT p.id, u.id
@@ -299,9 +202,9 @@ ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
--- 4.  ZADANIA — PROJEKT ECOM (e-commerce)
+-- 4.  TASKS - ECOM (e-commerce replatform)
 -- ============================================================================
--- Rozkład priorytetów: 2 HIGHEST, 3 HIGH, 6 MEDIUM, 3 LOW, 1 LOWEST.
+-- Priority mix: 2 HIGHEST, 3 HIGH, 6 MEDIUM, 3 LOW, 1 LOWEST.
 
 INSERT INTO tasks (project_id, task_number, summary, description,
                    status, priority, start_date, due_date, progress,
@@ -378,9 +281,9 @@ ON CONFLICT (project_id, task_number) DO NOTHING;
 
 
 -- ============================================================================
--- 5.  ZADANIA — PROJEKT MAPP (mobile)
+-- 5.  TASKS - MAPP (mobile app)
 -- ============================================================================
--- Rozkład priorytetów: 2 HIGHEST, 3 HIGH, 6 MEDIUM, 3 LOW, 1 LOWEST.
+-- Priority mix: 2 HIGHEST, 3 HIGH, 6 MEDIUM, 3 LOW, 1 LOWEST.
 
 INSERT INTO tasks (project_id, task_number, summary, description,
                    status, priority, start_date, due_date, progress,
@@ -457,9 +360,9 @@ ON CONFLICT (project_id, task_number) DO NOTHING;
 
 
 -- ============================================================================
--- 6.  ZADANIA — PROJEKT B2B (API partnerów)
+-- 6.  TASKS - B2B (partner API)
 -- ============================================================================
--- Rozkład priorytetów: 1 HIGHEST, 3 HIGH, 6 MEDIUM, 3 LOW, 2 LOWEST.
+-- Priority mix: 1 HIGHEST, 3 HIGH, 6 MEDIUM, 3 LOW, 2 LOWEST.
 
 INSERT INTO tasks (project_id, task_number, summary, description,
                    status, priority, start_date, due_date, progress,
@@ -536,12 +439,11 @@ ON CONFLICT (project_id, task_number) DO NOTHING;
 
 
 -- ============================================================================
--- 6a. NORMALIZACJA DAT `updated` DLA ZADAŃ UKOŃCZONYCH
+-- 6a. SPREAD `updated` OVER TIME FOR COMPLETED TASKS
 -- ============================================================================
--- Bez tej operacji wszystkie DONE-zadania mają `updated = NOW()` (moment seedowania),
--- przez co wykres "Completion Trend" pokazuje pojedynczy słupek w bieżącym tygodniu.
--- Ustawiamy `updated` na due_date + 1 dzień, dzięki temu ukończenia rozkładają się
--- na kilka tygodni wstecz (zgodnie z datami ukończenia projektów ECOM/MAPP/B2B).
+-- Otherwise every DONE task carries `updated = NOW()` (the moment of seeding) and the dashboard's
+-- completion trend collapses into a single bar in the current week. Setting `updated` to
+-- due_date + 1 day spreads completions across the weeks the projects actually ran.
 
 UPDATE tasks
 SET updated = (due_date::timestamp) + INTERVAL '1 day'
@@ -550,7 +452,7 @@ WHERE status = 'DONE'
 
 
 -- ============================================================================
--- 7.  ZALEŻNOŚCI MIĘDZYZADANIOWE (15 szt., ~33 % zadań)
+-- 7.  TASK DEPENDENCIES (15 edges, covering about a third of the tasks)
 -- ============================================================================
 
 INSERT INTO task_dependencies (task_id, dependency_id)
@@ -582,14 +484,12 @@ ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
--- 8.  KOMENTARZE
+-- 8.  COMMENTS
 -- ============================================================================
--- Komentarze identyfikujemy później jednoznacznie przez trójkę
---   (task, author, poziom_wątku)
--- — w ramach tego seed-a każda taka kombinacja jest unikalna.
--- Dzięki temu nie musimy używać PL/pgSQL ani znaczników w treści komentarza.
+-- Later statements identify a comment by (task, author, thread level), which is unique within
+-- this data set. That avoids needing PL/pgSQL blocks or marker strings in the comment bodies.
 
--- Komentarz C1 — ECOM-3 (Wireframes), autor: Piotr, top-level
+-- Comment C1 - ECOM-3 (wireframes), author Piotr, top level
 INSERT INTO comments (content, task_id, author_id, timestamp)
 SELECT
   'Wersja beta wireframów jest gotowa — proszę designerów o review do końca tygodnia. Kluczowe pytanie: czy zostawiamy sticky CTA w karcie produktu?',
@@ -606,7 +506,7 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 3
     WHERE c.task_id = t.id AND c.author_id = u.id AND c.parent_comment_id IS NULL
   );
 
--- Komentarz C2 — odpowiedź pod C1 (ECOM-3), autor: Marta
+-- Comment C2 - reply to C1 (ECOM-3), author Marta
 INSERT INTO comments (content, task_id, author_id, parent_comment_id, timestamp)
 SELECT
   'Obejrzałam, wygląda dobrze. Sticky CTA zostawmy — w analityce mieliśmy +7 % konwersji po jego wprowadzeniu w v1. Uwagi szczegółowe dodałam w pliku Figma.',
@@ -636,7 +536,7 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 3
     WHERE c.task_id = t.id AND c.author_id = u.id AND c.parent_comment_id IS NOT NULL
   );
 
--- Komentarz C3 — ECOM-8 (Koszyk), autor: Tomasz, top-level
+-- Comment C3 - ECOM-8 (shopping cart), author Tomasz, top level
 INSERT INTO comments (content, task_id, author_id, timestamp)
 SELECT
   'Pytanie do decyzji biznesowej — integrujemy się ze Stripe Checkout (hostowany) czy Stripe Elements (w naszym UI)? Elements daje większą kontrolę nad stylem, Checkout jest szybszy do wdrożenia.',
@@ -653,7 +553,7 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 8
     WHERE c.task_id = t.id AND c.author_id = u.id AND c.parent_comment_id IS NULL
   );
 
--- Komentarz C4 — B2B-4 (OAuth), autor: Piotr, top-level
+-- Comment C4 - B2B-4 (OAuth), author Piotr, top level
 INSERT INTO comments (content, task_id, author_id, timestamp)
 SELECT
   'Zatwierdzona decyzja: OAuth2 Client Credentials + JWT z krótkim TTL (15 min), rotacja kluczy raz na kwartał. Spring Authorization Server 1.2.',
@@ -670,7 +570,7 @@ WHERE p.project_key = 'B2B' AND t.task_number = 4
     WHERE c.task_id = t.id AND c.author_id = u.id AND c.parent_comment_id IS NULL
   );
 
--- Komentarz C5 — MAPP-5 (Ekran logowania), autor: Marta, top-level
+-- Comment C5 - MAPP-5 (sign-in screen), author Marta, top level
 INSERT INTO comments (content, task_id, author_id, timestamp)
 SELECT
   'Dopasuję flow do decyzji z MAPP-4 (biometria). Najpierw email/hasło, po pierwszym logowaniu propozycja włączenia FaceID/TouchID.',
@@ -689,11 +589,11 @@ WHERE p.project_key = 'MAPP' AND t.task_number = 5
 
 
 -- ============================================================================
--- 9.  REAKCJE NA KOMENTARZE
+-- 9.  COMMENT REACTIONS
 -- ============================================================================
--- Każda reakcja znajduje komentarz po trójce (projekt, nr zadania, autor, poziom).
+-- Each reaction locates its comment by (project, task number, author, thread level).
 
--- LIKE na C1 (Anna)
+-- LIKE on C1 (Anna)
 INSERT INTO comment_reactions (type, comment_id, user_id)
 SELECT 'LIKE', c.id, reactor.id
 FROM comments c
@@ -707,7 +607,7 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 3
   AND reactor.email = 'demo@flowlink.pl'
 ON CONFLICT DO NOTHING;
 
--- LIKE na C1 (Marta)
+-- LIKE on C1 (Marta)
 INSERT INTO comment_reactions (type, comment_id, user_id)
 SELECT 'LIKE', c.id, reactor.id
 FROM comments c
@@ -721,7 +621,7 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 3
   AND reactor.email = 'marta.wisniewska@flowlink.pl'
 ON CONFLICT DO NOTHING;
 
--- LIKE na C2 (Piotr — Piotr lubi odpowiedź Marty)
+-- LIKE on C2 (Piotr likes Marta's reply)
 INSERT INTO comment_reactions (type, comment_id, user_id)
 SELECT 'LIKE', c.id, reactor.id
 FROM comments c
@@ -735,7 +635,7 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 3
   AND reactor.email = 'piotr.kowalski@flowlink.pl'
 ON CONFLICT DO NOTHING;
 
--- LIKE na C4 (Anna)
+-- LIKE on C4 (Anna)
 INSERT INTO comment_reactions (type, comment_id, user_id)
 SELECT 'LIKE', c.id, reactor.id
 FROM comments c
@@ -749,7 +649,7 @@ WHERE p.project_key = 'B2B' AND t.task_number = 4
   AND reactor.email = 'demo@flowlink.pl'
 ON CONFLICT DO NOTHING;
 
--- LIKE na C5 (Anna)
+-- LIKE on C5 (Anna)
 INSERT INTO comment_reactions (type, comment_id, user_id)
 SELECT 'LIKE', c.id, reactor.id
 FROM comments c
@@ -765,11 +665,10 @@ ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
--- 10. POWIADOMIENIA DLA MANAGERA (Anny)
+-- 10. NOTIFICATIONS FOR THE MANAGER (Anna)
 -- ============================================================================
 
--- Każde powiadomienie chronione jest guardem NOT EXISTS dopasowującym po
--- (user_id, message) — ponowne uruchomienie skryptu nie zduplikuje wpisów.
+-- Each row is guarded by NOT EXISTS on (user_id, message), so a re-run cannot duplicate it.
 
 INSERT INTO notifications (user_id, message, type, is_read, link, timestamp)
 SELECT u.id,
@@ -838,24 +737,47 @@ WHERE u.email = 'demo@flowlink.pl'
                     AND n.message = 'Zadanie ECOM-3 zostało zaktualizowane (status: IN_PROGRESS, postęp: 50 %)');
 
 
+-- ============================================================================
+-- 11. OPTIMISTIC LOCK VERSIONS
+-- ============================================================================
+-- User, Project, Task and Comment are all @Version entities. Hibernate seeds a new entity's
+-- version to 0; a row inserted by hand leaves the column NULL, and the first update the
+-- application makes to such a row fails while incrementing null. Do what the ORM would have done.
+
+UPDATE users SET version = 0
+WHERE version IS NULL AND email LIKE '%@flowlink.pl';
+
+UPDATE projects SET version = 0
+WHERE version IS NULL AND project_key IN ('ECOM','MAPP','B2B');
+
+UPDATE tasks SET version = 0
+WHERE version IS NULL
+  AND project_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'));
+
+UPDATE comments SET version = 0
+WHERE version IS NULL
+  AND task_id IN (SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
+                  WHERE p.project_key IN ('ECOM','MAPP','B2B'));
+
+
 COMMIT;
 
 
 -- ============================================================================
--- PODSUMOWANIE (wykonaj ręcznie po zakończeniu, żeby zobaczyć statystyki)
+-- SUMMARY (run by hand afterwards to check what was loaded)
 -- ============================================================================
 -- SELECT
---   (SELECT COUNT(*) FROM users     WHERE email LIKE '%@flowlink.pl')           AS uzytkownicy,
---   (SELECT COUNT(*) FROM projects  WHERE project_key IN ('ECOM','MAPP','B2B')) AS projekty,
+--   (SELECT COUNT(*) FROM users     WHERE email LIKE '%@flowlink.pl')           AS accounts,
+--   (SELECT COUNT(*) FROM projects  WHERE project_key IN ('ECOM','MAPP','B2B')) AS projects,
 --   (SELECT COUNT(*) FROM tasks t JOIN projects p ON t.project_id = p.id
---          WHERE p.project_key IN ('ECOM','MAPP','B2B'))                        AS zadania,
+--          WHERE p.project_key IN ('ECOM','MAPP','B2B'))                        AS tasks,
 --   (SELECT COUNT(*) FROM task_dependencies td
 --          JOIN tasks t ON td.task_id = t.id
 --          JOIN projects p ON t.project_id = p.id
---          WHERE p.project_key IN ('ECOM','MAPP','B2B'))                        AS zaleznosci,
+--          WHERE p.project_key IN ('ECOM','MAPP','B2B'))                        AS dependencies,
 --   (SELECT COUNT(*) FROM comments c
 --          JOIN tasks t ON c.task_id = t.id
 --          JOIN projects p ON t.project_id = p.id
---          WHERE p.project_key IN ('ECOM','MAPP','B2B'))                        AS komentarze,
+--          WHERE p.project_key IN ('ECOM','MAPP','B2B'))                        AS comments,
 --   (SELECT COUNT(*) FROM notifications n JOIN users u ON n.user_id = u.id
---          WHERE u.email = 'demo@flowlink.pl')                                  AS powiadomienia;
+--          WHERE u.email = 'demo@flowlink.pl')                                  AS notifications;

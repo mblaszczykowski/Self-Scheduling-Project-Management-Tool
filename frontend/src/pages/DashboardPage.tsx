@@ -1,4 +1,4 @@
-import React, { Suspense, useContext, useEffect, useMemo, useCallback } from 'react';
+import React, { Suspense, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLogout } from '../hooks/useLogout';
 import {
@@ -6,20 +6,21 @@ import {
     LinearScale, LineElement, PointElement, TimeScale, Title, Tooltip,
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import { AuthContext } from '../context/AuthContext';
-import { ProjectsContext } from '../context/ProjectsContext';
+import { useAuth } from '../context/AuthContext';
+import { useProjects } from '../context/ProjectsContext';
 import Header from '../components/layout/Header';
 import { DashboardSkeleton } from '../components/common/Skeleton';
-import { BoxIcon, PlusIcon, AlertTriangleIcon } from '../components/common/Icons';
+import { BoxIcon, AlertTriangleIcon } from '../components/common/Icons';
+import EmptyState from '../components/common/EmptyState';
 import { SectionHeader } from '../components/dashboard/ChartComponents';
 import DashboardHero from '../components/dashboard/DashboardHero';
 import ProjectCard from '../components/dashboard/ProjectCard';
 import AnalyticsSection from '../components/dashboard/AnalyticsSection';
+import { useEnrichedProjects } from '../hooks/useEnrichedProjects';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 import { useModal } from '../hooks/useModal';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 import ErrorBoundary from '../components/common/ErrorBoundary';
-import { computeProjectDateRange } from '../util/projectUtils';
 
 // Lazy so TipTap (loaded by the modal's rich-text editor) stays out of the page bundle.
 const TaskProjectModal = React.lazy(() => import('../components/modals/TaskProjectModal'));
@@ -31,14 +32,14 @@ ChartJS.register(
 
 const DashboardPage = () => {
     const navigate = useNavigate();
-    const { user } = useContext(AuthContext);
-    const { projects, projectsLoading, projectsError, refreshProjects } = useContext(ProjectsContext);
+    const { user } = useAuth();
+    const { projects, projectsLoading, projectsError, retryProjects } = useProjects();
     const handleLogout = useLogout();
 
     const {
         open: modalOpen, type: modalType, mode: modalMode,
         project: currentProject, task: currentTask,
-        openModal, closeModal: baseCloseModal,
+        openModal, closeModal,
     } = useModal();
 
     useEffect(() => {
@@ -50,25 +51,14 @@ const DashboardPage = () => {
         { key: 'p', handler: () => openModal('project', 'create') },
     ]);
 
-    const stats = useDashboardStats(projects);
-
-    const processedProjects = useMemo(() => {
-        return projects.map(project => {
-            const { projectStartDate, projectDueDate } = computeProjectDateRange(project.tasks);
-            return { ...project, projectStartDate, projectDueDate };
-        });
-    }, [projects]);
-
-    const closeModal = useCallback((didSave = false) => {
-        baseCloseModal();
-        if (didSave) refreshProjects();
-    }, [baseCloseModal, refreshProjects]);
+    const enriched = useEnrichedProjects(projects);
+    const stats = useDashboardStats(enriched);
+    const { processedProjects } = enriched;
 
     const completionByProject = useMemo(
         () => new Map(stats.projectCompletion.map(p => [p.projectKey, p.completionPercentage])),
         [stats.projectCompletion]
     );
-    const getProjectCompletion = (projectKey: string) => completionByProject.get(projectKey) || 0;
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -81,25 +71,25 @@ const DashboardPage = () => {
             {projectsLoading && <DashboardSkeleton />}
 
             {!projectsLoading && projectsError && (
-                <div className="px-6 lg:px-10 py-16 text-center">
-                    <div className="w-14 h-14 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center mx-auto mb-4">
-                        <AlertTriangleIcon className="w-7 h-7 text-red-600 dark:text-red-400" />
-                    </div>
-                    <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1">Failed to load projects</h3>
-                    <p className="text-slate-500 dark:text-slate-400 mb-4">{projectsError}</p>
-                    <button
-                        onClick={refreshProjects}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
-                    >
-                        Try Again
-                    </button>
-                </div>
+                <EmptyState
+                    icon={AlertTriangleIcon}
+                    tone="danger"
+                    title="Failed to load projects"
+                    description={projectsError}
+                    action={retryProjects}
+                    actionLabel="Try Again"
+                />
             )}
 
             {!projectsLoading && !projectsError && (
                 <>
                     <ErrorBoundary level="section" resetKey="dashboard-hero">
-                        <DashboardHero user={user} stats={stats} />
+                        <DashboardHero
+                            user={user}
+                            criticalCount={stats.criticalTasks}
+                            delayedCount={stats.delayedTasks}
+                            upcomingCriticalCount={stats.upcomingCriticalDeadlines.length}
+                        />
                     </ErrorBoundary>
 
                     <div className="px-6 lg:px-10 py-8">
@@ -116,14 +106,22 @@ const DashboardPage = () => {
                                             <ProjectCard
                                                 key={project.projectKey}
                                                 project={project}
-                                                completionPercentage={getProjectCompletion(project.projectKey)}
+                                                completionPercentage={completionByProject.get(project.projectKey) ?? 0}
                                                 animationDelay={index * 50}
                                                 onEditProject={(p) => openModal('project', 'edit', p)}
                                             />
                                         ))}
                                     </div>
                                 ) : (
-                                    <EmptyProjectsState onCreateProject={() => openModal('project', 'create')} />
+                                    <EmptyState
+                                        variant="table"
+                                        icon={BoxIcon}
+                                        title="No projects yet"
+                                        description="Create your first project to get started"
+                                        action={() => openModal('project', 'create')}
+                                        actionLabel="Create Project"
+                                        className="bg-white dark:bg-slate-800 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700"
+                                    />
                                 )}
                             </section>
 
@@ -151,22 +149,5 @@ const DashboardPage = () => {
         </div>
     );
 };
-
-const EmptyProjectsState = ({ onCreateProject }: { onCreateProject: () => void }) => (
-    <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700">
-        <div className="w-14 h-14 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center mx-auto mb-4">
-            <BoxIcon className="w-7 h-7 text-slate-400" />
-        </div>
-        <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1">No projects yet</h3>
-        <p className="text-slate-500 dark:text-slate-400 mb-4">Create your first project to get started</p>
-        <button
-            onClick={onCreateProject}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
-        >
-            <PlusIcon />
-            Create Project
-        </button>
-    </div>
-);
 
 export default DashboardPage;

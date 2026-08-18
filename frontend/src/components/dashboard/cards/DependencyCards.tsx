@@ -223,7 +223,7 @@ const workloadOptions: ChartOptions<'bar'> = {
             stacked: true,
         },
     },
-} as ChartOptions<'bar'>;
+};
 
 export const TeamWorkloadBarCard = ({ load }: { load: AssigneeLoad[] }) => {
     if (load.length === 0) {

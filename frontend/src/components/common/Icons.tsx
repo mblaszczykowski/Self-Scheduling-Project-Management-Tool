@@ -1,6 +1,13 @@
 import React from 'react';
 
-export const CalendarIcon = ({ className = "w-4 h-4", ...props }) => (
+/**
+ * Every icon spreads its remaining props onto the <svg> it renders, so the props type has to be
+ * the full SVG element surface — otherwise `aria-hidden`, `focusable`, `role` or an event handler
+ * is rejected at the call site even though it reaches the DOM node correctly.
+ */
+type IconProps = React.SVGProps<SVGSVGElement>;
+
+export const CalendarIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -11,7 +18,7 @@ export const CalendarIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const CalendarDotIcon = ({ className = "w-4 h-4", ...props }) => (
+export const CalendarDotIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -23,7 +30,7 @@ export const CalendarDotIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const AlertTriangleIcon = ({ className = "w-4 h-4", ...props }) => (
+export const AlertTriangleIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -35,7 +42,7 @@ export const AlertTriangleIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const AlertTriangleFilledIcon = ({ className = "w-3 h-3", ...props }) => (
+export const AlertTriangleFilledIcon = ({ className = "w-3 h-3", ...props }: IconProps) => (
     <svg className={className} fill="currentColor" viewBox="0 0 20 20" {...props}>
         <path
             fillRule="evenodd"
@@ -47,7 +54,7 @@ export const AlertTriangleFilledIcon = ({ className = "w-3 h-3", ...props }) => 
     </svg>
 );
 
-export const ClockIcon = ({ className = "w-4 h-4", ...props }) => (
+export const ClockIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -58,7 +65,7 @@ export const ClockIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const TrendingUpIcon = ({ className = "w-4 h-4", ...props }) => (
+export const TrendingUpIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -69,7 +76,7 @@ export const TrendingUpIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const CheckCircleIcon = ({ className = "w-4 h-4", ...props }) => (
+export const CheckCircleIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -80,7 +87,7 @@ export const CheckCircleIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const UserIcon = ({ className = "w-4 h-4", ...props }) => (
+export const UserIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -91,7 +98,7 @@ export const UserIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const TagIcon = ({ className = "w-4 h-4", ...props }) => (
+export const TagIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -103,7 +110,7 @@ export const TagIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const FlagIcon = ({ className = "w-4 h-4", ...props }) => (
+export const FlagIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -114,7 +121,7 @@ export const FlagIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const FolderIcon = ({ className = "w-4 h-4", ...props }) => (
+export const FolderIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -125,7 +132,7 @@ export const FolderIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const SearchIcon = ({ className = "w-4 h-4", ...props }) => (
+export const SearchIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -136,7 +143,7 @@ export const SearchIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const UserCircleIcon = ({ className = "w-4 h-4", ...props }) => (
+export const UserCircleIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -148,19 +155,19 @@ export const UserCircleIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const CloseIcon = ({ className = "w-4 h-4", ...props }) => (
+export const CloseIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
 );
 
-export const PlusIcon = ({ className = "w-4 h-4", ...props }) => (
+export const PlusIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
     </svg>
 );
 
-export const BoxIcon = ({ className = "w-4 h-4", ...props }) => (
+export const BoxIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -172,7 +179,7 @@ export const BoxIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const ChartBarIcon = ({ className = "w-4 h-4", ...props }) => (
+export const ChartBarIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -184,7 +191,7 @@ export const ChartBarIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const ListIcon = ({ className = "w-4 h-4", ...props }) => (
+export const ListIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -195,25 +202,25 @@ export const ListIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const ChevronRightIcon = ({ className = "w-4 h-4", ...props }) => (
+export const ChevronRightIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
     </svg>
 );
 
-export const SortAscIcon = ({ className = "w-3.5 h-3.5", ...props }) => (
+export const SortAscIcon = ({ className = "w-3.5 h-3.5", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
     </svg>
 );
 
-export const SortDescIcon = ({ className = "w-3.5 h-3.5", ...props }) => (
+export const SortDescIcon = ({ className = "w-3.5 h-3.5", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
     </svg>
 );
 
-export const ThumbsUpIcon = ({ className = "w-3.5 h-3.5", filled = false, ...props }) => (
+export const ThumbsUpIcon = ({ className = "w-3.5 h-3.5", filled = false, ...props }: IconProps & { filled?: boolean }) => (
     <svg
         className={className}
         fill={filled ? "currentColor" : "none"}
@@ -232,7 +239,7 @@ export const ThumbsUpIcon = ({ className = "w-3.5 h-3.5", filled = false, ...pro
     </svg>
 );
 
-export const ThumbsDownIcon = ({ className = "w-3.5 h-3.5", filled = false, ...props }) => (
+export const ThumbsDownIcon = ({ className = "w-3.5 h-3.5", filled = false, ...props }: IconProps & { filled?: boolean }) => (
     <svg
         className={className}
         fill={filled ? "currentColor" : "none"}
@@ -251,7 +258,7 @@ export const ThumbsDownIcon = ({ className = "w-3.5 h-3.5", filled = false, ...p
     </svg>
 );
 
-export const ClipboardIcon = ({ className = "w-4 h-4", ...props }) => (
+export const ClipboardIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -263,7 +270,7 @@ export const ClipboardIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const LogoutIcon = ({ className = "w-4 h-4", ...props }) => (
+export const LogoutIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -274,7 +281,7 @@ export const LogoutIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const LightningIcon = ({ className = "w-4 h-4", ...props }) => (
+export const LightningIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -285,7 +292,7 @@ export const LightningIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const BlockedIcon = ({ className = "w-4 h-4", ...props }) => (
+export const BlockedIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -296,7 +303,7 @@ export const BlockedIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const ChevronsLeftIcon = ({ className = "w-4 h-4", ...props }) => (
+export const ChevronsLeftIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"
@@ -307,7 +314,7 @@ export const ChevronsLeftIcon = ({ className = "w-4 h-4", ...props }) => (
     </svg>
 );
 
-export const UsersIcon = ({ className = "w-4 h-4", ...props }) => (
+export const UsersIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
         <path
             strokeLinecap="round"

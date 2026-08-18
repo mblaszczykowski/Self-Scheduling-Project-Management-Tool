@@ -97,7 +97,9 @@ const AttachmentUploader = ({
                         {newAttachments.map(f => renderAttachmentPreview(f))}
                     </div>
                 )}
-                <label htmlFor={inputId} className="cursor-pointer flex flex-col items-center justify-center gap-1 py-5 px-3">
+                {/* sr-only rather than hidden below: display:none takes the input out of the tab
+                    order, which made uploading mouse-only. */}
+                <label htmlFor={inputId} className="relative cursor-pointer flex flex-col items-center justify-center gap-1 py-5 px-3 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400">
                     <HiOutlineCloudUpload className="w-5 h-5 text-slate-300 dark:text-slate-600" />
                     <span className="text-sm text-slate-400 dark:text-slate-500">{label}</span>
                     <span className="text-xs text-slate-300 dark:text-slate-600">Max 5MB per file</span>
@@ -107,7 +109,7 @@ const AttachmentUploader = ({
                         multiple
                         onChange={handleFileChange}
                         accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.svg,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z"
-                        className="hidden"
+                        className="sr-only"
                     />
                 </label>
             </div>

@@ -115,16 +115,6 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <!-- The scheduling research harnesses print report tables and assert nothing;
-                         they are kept for reproducing the study but must not gate a build.
-                         Run them with: mvn test -Dgroups=experiment -DexcludedGroups= -->
-                    <excludedGroups>experiment</excludedGroups>
-                </configuration>
-            </plugin>
         </plugins>
     </build>
 </project>

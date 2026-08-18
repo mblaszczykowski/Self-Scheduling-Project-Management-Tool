@@ -44,6 +44,10 @@ export const PROJECTS_QUERY_KEY = ['projects'] as const;
 /** One page big enough for a real portfolio; the server clamps it to its own maximum. */
 const PROJECTS_PAGE_SIZE = 100;
 
+// One shared instance: `?? []` would mint a new array on every render while the query is loading
+// or failed, changing the context value's identity and re-rendering every consumer in the app.
+const NO_PROJECTS: Project[] = [];
+
 export const ProjectsProvider = ({ children }: { children: React.ReactNode }) => {
     const { user } = useAuth();
     const queryClient = useQueryClient();
@@ -56,7 +60,7 @@ export const ProjectsProvider = ({ children }: { children: React.ReactNode }) =>
         enabled: !!user,
     });
 
-    const projects = data?.content ?? [];
+    const projects = data?.content ?? NO_PROJECTS;
     const projectsError = error ? getErrorMessage(error, 'Failed to load projects') : null;
 
     // Drop cached projects on logout so a different account cannot briefly see them.

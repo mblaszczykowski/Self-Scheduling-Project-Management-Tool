@@ -1,123 +1,149 @@
-# FlowLink — skrypt demonstracyjny
+# Demo data
 
-Plik `demo-seed.sql` wypełnia bazę danych kompletem danych dopasowanych do **studium demonstracyjnego opisanego w rozdziale 5 pracy magisterskiej** (sekcja *Studium demonstracyjne — pełny cykl optymalizacji w aplikacji*).
+`demo-seed.sql` fills an empty FlowLink database with a realistic portfolio: four accounts, three
+projects, 45 tasks with dependencies, threaded comments, reactions and notifications. It exists so
+a fresh install has something to show — for a product demo, a screenshot, or manual testing of a
+change against data that looks like a real plan rather than three rows.
 
-## Dane logowania
+The tasks are deliberately over-committed: the same three people are assigned across all three
+projects, and their assignments overlap in time. Those overlaps are the resource conflicts the
+schedule optimizer resolves, so **Optimize Schedule** has something meaningful to do immediately
+after seeding.
 
-| Email                                | Hasło          | Rola w scenariuszu                |
-|--------------------------------------|----------------|-----------------------------------|
-| `demo@flowlink.pl`                   | `Demo1234!`  | Manager portfela (Anna Nowak) — **login demo** |
-| `piotr.kowalski@flowlink.pl`         | `Demo1234!`  | Senior Developer (Piotr Kowalski)  |
-| `marta.wisniewska@flowlink.pl`       | `Demo1234!`  | Mid Developer (Marta Wiśniewska)   |
-| `tomasz.lewandowski@flowlink.pl`     | `Demo1234!`  | Full-stack Developer (Tomasz Lewandowski) |
+## Accounts
 
-> **Uwaga**: Hasło `Demo1234!` spełnia politykę `ValidationUtil` (≥8 znaków, duża i mała litera, cyfra, znak specjalny). Hash BCrypt (cost=10, prefiks `$2b$`) został wygenerowany lokalnie i zweryfikowany — akceptowany przez Spring Security `BCryptPasswordEncoder`.
+Every account uses the password `Demo1234!`.
 
-## Co znajduje się w seed-data
+| Email | Role in the data |
+|---|---|
+| `demo@flowlink.pl` | Portfolio manager (Anna Nowak). **Sign in as this one** — she owns all three projects and receives the notifications. |
+| `piotr.kowalski@flowlink.pl` | Contributor (Piotr Kowalski) |
+| `marta.wisniewska@flowlink.pl` | Contributor (Marta Wiśniewska) |
+| `tomasz.lewandowski@flowlink.pl` | Contributor (Tomasz Lewandowski) |
 
-| Pozycja                         | Ilość |
-|---------------------------------|-------|
-| Użytkownicy                     | 4     |
-| Projekty (`ECOM`, `MAPP`, `B2B`) | 3     |
-| Zadania (15 × 3)                | 45    |
-| Zależności kolejnościowe        | 15    |
-| Komentarze (z wątkami)          | 5     |
-| Reakcje LIKE                    | 5     |
-| Powiadomienia dla managera      | 6     |
+`Demo1234!` satisfies the registration policy enforced by `ValidationUtil`: at least 8 characters,
+an upper-case letter, a lower-case letter, a digit, a special character, and no spaces. The stored
+BCrypt hash (cost 10, `$2b$` prefix) is accepted by `BCryptPasswordEncoder`.
 
-### Rozkład priorytetów (zgodny z rozdziałem 5)
+These are demonstration credentials in a committed file. Do not load this data into any deployment
+that is reachable from the internet.
 
-| Priorytet  | Liczba | Udział |
-|------------|--------|--------|
-| HIGHEST    | 5      | 11 %   |
-| HIGH       | 9      | 20 %   |
-| MEDIUM     | 18     | 40 %   |
-| LOW        | 9      | 20 %   |
-| LOWEST     | 4      |  9 %   |
-| **Razem**  | 45     | 100 %  |
+## What it contains
 
-### Struktura projektów
+| | Count |
+|---|---|
+| Accounts | 4 |
+| Projects (`ECOM`, `MAPP`, `B2B`) | 3 |
+| Tasks (15 per project) | 45 |
+| Task dependencies | 15 |
+| Comments (including one reply) | 5 |
+| Reactions | 5 |
+| Notifications for the manager | 6 |
 
-1. **ECOM** — *Redesign platformy e-commerce* (15 zadań od audytu UX po release 2.0)
-2. **MAPP** — *Aplikacja mobilna iOS/Android* (15 zadań od research stacku po publikację w sklepach)
-3. **B2B** — *Integracja z API partnerów hurtowych* (15 zadań od analizy wymagań po publikację API v1.0)
+Priority mix across the 45 tasks: 5 HIGHEST, 9 HIGH, 18 MEDIUM, 9 LOW, 4 LOWEST. Eight statuses are
+represented — `BACKLOG` (34, the bulk of the planned work), plus one each of
+`GATHERING_INTEREST`, `TODO`, `TO_REVIEW`, `TO_TEST`, `IN_TEST` and `READY_TO_MERGE`, and 5 `DONE`
+— so the list and board views show more than a single column.
 
-Wszystkie projekty dzielą **tę samą pulę trzech developerów** — co generuje konflikty zasobowe (około 35–40 kolizji przy pierwotnym harmonogramie), będące materiałem wejściowym dla optymalizatora MORCPSP.
+The projects:
 
-## Uruchamianie
+1. **ECOM** — e-commerce platform redesign, 15 tasks from a UX audit through to a 2.0 release.
+2. **MAPP** — iOS/Android companion app, 15 tasks from stack research through to store submission.
+3. **B2B** — partner wholesale API, 15 tasks from requirements through to a public API v1.0.
 
-### Opcja 1: PostgreSQL CLI
+## Prerequisites
 
-```bash
-cd backend/src/main/resources
-psql -U postgres -d flowlink -f demo-seed.sql
-```
+The database must already have the schema. Flyway creates it on the first backend start, so run the
+application once (or `docker compose up`) before seeding.
 
-### Opcja 2: Z poziomu IntelliJ / DBeaver / pgAdmin
+The script contains **no DDL**. Flyway owns the schema; a seed script that alters tables or
+constraints silently undoes a migration.
 
-Otwórz plik `demo-seed.sql` i uruchom go jako zapytanie przeciwko bazie `flowlink`.
+## Running it
 
-### Opcja 3: Automatyczne uruchamianie przy starcie Spring Boota
-
-Dodaj do `application.properties`:
-
-```properties
-spring.sql.init.mode=always
-spring.sql.init.data-locations=classpath:demo-seed.sql
-spring.jpa.defer-datasource-initialization=true
-```
-
-> Uwaga: pamiętaj aby wyłączyć te linie po pierwszym uruchomieniu, inaczej seed będzie próbował się wkonać przy każdym starcie aplikacji (ON CONFLICT zapobiega duplikacji, ale niepotrzebnie obciąża start).
-
-## Ponowne uruchomienie / resetowanie
-
-Skrypt jest w pełni **powtarzalny**. Na samym początku (sekcja 0 *CZYSZCZENIE*) wykonuje pełny reset wszystkich danych demo:
-
-- usuwa konta `@flowlink.pl`
-- usuwa projekty `ECOM`, `MAPP`, `B2B` wraz z ich zadaniami, zależnościami, komentarzami, reakcjami, powiadomieniami i załącznikami
-- usuwa tokeny odświeżające powiązane z demo-userami
-- usuwa wpisy z logu aktywności (`task_activities`)
-
-Dzięki temu typowy scenariusz pracy wygląda tak:
-
-1. Uruchamiasz `demo-seed.sql` — otrzymujesz stan bazowy (konflikty zasobowe, 45 zadań).
-2. Logujesz się jako `demo@flowlink.pl`, klikasz *Optimize Schedule* → sugestie się zapisują.
-3. (Opcjonalnie) akceptujesz sugestie — harmonogram w bazie się zmienia.
-4. Chcesz powtórzyć demo → **ponownie uruchamiasz `demo-seed.sql`** i wracasz do stanu 1.
-
-Żadnych dodatkowych kroków ani odkomentowywania — sekcja czyszcząca działa zawsze.
-
-## Zmiana hasła
-
-Jeśli chcesz użyć innego hasła, wygeneruj nowy hash BCrypt i podmień go we wszystkich 4 miejscach w `demo-seed.sql`:
+### psql
 
 ```bash
-# macOS / Linux (wymaga htpasswd z apache2-utils)
-htpasswd -bnBC 10 "" "Demo1234!" | tr -d ':\n'
-
-# Alternatywa (Python, zawsze dostępne)
-python3 -c 'import bcrypt; print(bcrypt.hashpw(b"Demo1234!", bcrypt.gensalt(10)).decode())'
+psql -U postgres -d flowlink -f backend/scripts/db/demo-seed.sql
 ```
 
-Otrzymany napis (zaczyna się od `$2a$10$...` lub `$2y$10$...`) wklej zamiast `$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.c8H/ebTmAFPAQDW7Aq`.
+Run it from the repository root — the path above is relative to it. If the backend runs under
+Docker Compose, the database port is not published, so either publish it for one session:
 
-## Jak to wygląda w aplikacji
+```bash
+docker compose run --rm --publish 5432:5432 db
+psql -h localhost -U postgres -d flowlink -f backend/scripts/db/demo-seed.sql
+```
 
-Po zalogowaniu jako `demo@flowlink.pl`:
+or pipe the file straight into the running container:
 
-- **Dashboard** (`/dashboard`) — sekcja powitalna z liczbą projektów (3), zadań (45), zadań bliskich terminu; sekcja analityczna z wykresami.
-- **Widok projektów** (`/projects`) — timeline Gantta z 45 zadaniami rozłożonymi na 3 wierszach projektów; widoczne nakładające się paski (konflikty); zależności jako krzywe strzałki.
-- **Przycisk *Optimize Schedule*** w nagłówku timeline'u uruchamia algorytm MORCPSP (SSGS) — pojawiają się ghost bars i panel metryk.
-- **Bell powiadomień** w headerze pokazuje 3 nieprzeczytane + 3 przeczytane powiadomienia.
-- **Widoki zadań** — klikając w pasek otwiera się modal z komentarzami (zwłaszcza ECOM-3 z wątkiem) i historią.
+```bash
+docker compose exec -T db psql -U postgres -d flowlink < backend/scripts/db/demo-seed.sql
+```
 
-## Powiązanie z pracą magisterską
+### A GUI client
 
-Ten zestaw danych jest **zgodny ze scenariuszem opisanym w rozdz. 5**, sekcja *Studium demonstracyjne*:
+Open `demo-seed.sql` in DataGrip, DBeaver or pgAdmin and execute it as a script against the
+`flowlink` database.
 
-- $N = 45$ zadań, $Q = 3$ projekty, $K = 3$ zasoby ✓
-- rozkład priorytetów 10/20/40/20/10 % ✓
-- ~33 % zadań z zależnością wewnątrzprojektową ✓
-- horyzont ~50 dni roboczych (2026-04-20 → 2026-06-22) ✓
+## Re-running and resetting
 
-Metryki przed/po optymalizacji z tego zestawu można wstawić w miejscach oznaczonych `[wstawić ...]` w tabeli `tab:demo-summary` w pracy.
+The script is idempotent. Section 0 deletes everything it owns — the `@flowlink.pl` accounts and
+the `ECOM` / `MAPP` / `B2B` projects with all their tasks, dependencies, comments, reactions,
+notifications, attachments and activity history — before re-inserting it. The whole thing runs in
+one transaction, so a failure leaves the database untouched.
+
+That makes the demo repeatable:
+
+1. Run the script. You get the baseline: 45 tasks with overlapping assignments.
+2. Sign in as `demo@flowlink.pl` and use **Optimize Schedule**. Proposed dates appear as ghost bars
+   with a metrics panel.
+3. Apply the suggestions. The schedule in the database changes.
+4. Run the script again to return to step 1.
+
+It only touches its own rows. Other accounts and projects in the same database are left alone.
+
+## Changing the password
+
+Generate a new BCrypt hash and replace all four occurrences of the existing one in
+`demo-seed.sql`:
+
+```bash
+# Python
+python3 -c 'import bcrypt; print(bcrypt.hashpw(b"NewPassword1!", bcrypt.gensalt(10)).decode())'
+
+# or htpasswd, from apache2-utils
+htpasswd -bnBC 10 "" "NewPassword1!" | tr -d ':\n'
+```
+
+Any of the `$2a$`, `$2b$` or `$2y$` prefixes is accepted. The new password must satisfy the
+policy above or the accounts will exist but be unable to sign in through a normal registration
+path.
+
+## What to look at in the app
+
+Signed in as `demo@flowlink.pl`:
+
+- **Dashboard** — project and task counts, upcoming deadlines, and analytics charts. Completed
+  tasks are backdated so the completion trend spans several weeks instead of one bar.
+- **Projects** — the Gantt timeline with 45 bars across three project rows. Overlapping bars on the
+  same assignee are the resource conflicts; dependencies are drawn as arrows.
+- **Optimize Schedule** in the timeline header — runs the optimizer and shows proposed dates
+  alongside the current ones, with before/after metrics.
+- **Notifications** — six entries for the manager, three unread.
+- **Task detail** — open `ECOM-3` for a comment thread with a reply and reactions.
+
+## Maintenance
+
+If you change an entity or add a migration, re-check this script. Two things it has to keep in
+step with the schema:
+
+- Columns that became `NOT NULL` (for example `projects.created` / `projects.updated` in `V3`) must
+  be supplied by the INSERT — a plain INSERT does not run the entity's `@PrePersist`.
+- `@Version` columns must not be left NULL. Section 11 sets them to `0`, which is what Hibernate
+  writes for a newly persisted entity; a NULL version makes the application fail the first time it
+  updates that row.
+
+To verify a change, apply the migrations to an empty database and run the script twice — the second
+run must succeed and leave the same row counts. The commented-out summary query at the end of the
+file prints them.

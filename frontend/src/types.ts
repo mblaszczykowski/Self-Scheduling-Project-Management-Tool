@@ -241,7 +241,8 @@ export interface ModalFormValues {
     labels: string;
     created: string;
     updated: string;
-    members: User[];
+    /** Member email addresses — the only part of a member the server ever reads. */
+    memberEmails: string[];
     newUserEmail: string;
 }
 

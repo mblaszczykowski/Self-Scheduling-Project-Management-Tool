@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { ErrorMessage, Field } from 'formik';
+import React, { useId, useMemo, useState } from 'react';
+import { ErrorMessage, Field, useFormikContext } from 'formik';
 import {
     HiOutlineChevronDown,
     HiOutlineX,
@@ -19,10 +19,12 @@ type FormikChange = FormikProps<ModalFormValues>['handleChange'];
    Sidebar building blocks
    ═══════════════════════════════════════════════════════════ */
 
+const propLabelClass = 'w-24 shrink-0 text-sm font-medium text-slate-600 dark:text-slate-300';
+
 /* ── Row with hover highlight + reveal chevron ── */
-const PropRow = ({ label, children }: { label: React.ReactNode; children: React.ReactNode }) => (
+const PropRow = ({ label, htmlFor, children }: { label: React.ReactNode; htmlFor: string; children: React.ReactNode }) => (
     <div className="group/row flex items-center gap-3 min-h-[40px] -mx-2.5 px-2.5 rounded-lg hover:bg-white dark:hover:bg-slate-800/50 transition-colors hover:shadow-sm">
-        <span className="w-24 shrink-0 text-sm font-medium text-slate-600 dark:text-slate-300">{label}</span>
+        <label htmlFor={htmlFor} className={propLabelClass}>{label}</label>
         <div className="flex-1 min-w-0">{children}</div>
     </div>
 );
@@ -181,6 +183,18 @@ const TaskForm = ({
     const [activeActivityTab, setActiveActivityTab] = useState('comments');
     const allTasks = projects.flatMap(p => p.tasks || []);
 
+    // Ids are namespaced per instance so two forms on one page can't hand each other's
+    // labels to the wrong control.
+    const uid = useId();
+    const idFor = (name: string) => `${uid}-${name}`;
+
+    // The sidebar fields are rendered inside the modal's <Formik>, so the error state is read
+    // from context rather than threaded through props. ErrorMessage renders nothing until a
+    // field is both touched and invalid — aria-describedby only points at it under the same
+    // condition, so it never references a missing element.
+    const { errors, touched } = useFormikContext<ModalFormValues>();
+    const hasError = (name: 'projectKey' | 'startDate' | 'dueDate') => !!(touched[name] && errors[name]);
+
     const assignee = useMemo(() => {
         if (!values.assignee || !project?.members) return null;
         return project.members.find(m => m.email === values.assignee);
@@ -241,10 +255,12 @@ const TaskForm = ({
 
                 {/* ══ Details ══ */}
                 <SidebarSection title="Details">
-                    <PropRow label="Project">
+                    <PropRow label="Project" htmlFor={idFor('projectKey')}>
                         <div className="relative">
-                            <Field as="select" id="projectKey" name="projectKey"
+                            <Field as="select" id={idFor('projectKey')} name="projectKey"
                                 disabled={modalMode === 'edit'}
+                                aria-invalid={hasError('projectKey')}
+                                aria-describedby={hasError('projectKey') ? idFor('projectKey-error') : undefined}
                                 className={`${sidebarSelectClass} ${modalMode === 'edit' ? 'opacity-60 cursor-default' : ''}`}
                             >
                                 <option value="">Select project</option>
@@ -252,17 +268,17 @@ const TaskForm = ({
                             </Field>
                             <SelectChevron />
                         </div>
-                        <ErrorMessage name="projectKey" component="div" className="text-red-500 text-xs mt-0.5 pl-0.5" />
+                        <ErrorMessage name="projectKey" component="div" id={idFor('projectKey-error')} className="text-red-500 text-xs mt-0.5 pl-0.5" />
                     </PropRow>
 
                     {/* Status — colored pill with invisible select overlay */}
-                    <PropRow label="Status">
+                    <PropRow label="Status" htmlFor={idFor('status')}>
                         <div className="relative cursor-pointer group/pill">
                             <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${STATUS_PILL_BG[values.status] || 'bg-slate-100'} ${STATUS_PILL_TEXT[values.status] || 'text-slate-600'}`}>
                                 <span className={`w-[7px] h-[7px] rounded-full ring-1 ring-current/20 ${STATUS_CONFIG[values.status as keyof typeof STATUS_CONFIG]?.dot || 'bg-slate-400'}`} />
                                 {STATUS_CONFIG[values.status as keyof typeof STATUS_CONFIG]?.label || values.status}
                             </div>
-                            <Field as="select" id="status" name="status"
+                            <Field as="select" id={idFor('status')} name="status"
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
                                 {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
                                     <option key={key} value={key}>{cfg.label}</option>
@@ -272,13 +288,13 @@ const TaskForm = ({
                     </PropRow>
 
                     {/* Priority — colored pill */}
-                    <PropRow label="Priority">
+                    <PropRow label="Priority" htmlFor={idFor('priority')}>
                         <div className="relative cursor-pointer group/pill">
                             <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${PRIORITY_PILL_BG[values.priority] || 'bg-slate-100'} ${PRIORITY_PILL_TEXT[values.priority] || 'text-slate-600'}`}>
                                 <span className="text-xs leading-none">{PRIORITY_CONFIG[values.priority as keyof typeof PRIORITY_CONFIG]?.icon}</span>
                                 {PRIORITY_CONFIG[values.priority as keyof typeof PRIORITY_CONFIG]?.label || values.priority}
                             </div>
-                            <Field as="select" id="priority" name="priority"
+                            <Field as="select" id={idFor('priority')} name="priority"
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
                                 {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => (
                                     <option key={key} value={key}>{cfg.label}</option>
@@ -288,26 +304,20 @@ const TaskForm = ({
                     </PropRow>
 
                     {/* Assignee — avatar + name */}
-                    <PropRow label="Assignee">
+                    <PropRow label="Assignee" htmlFor={idFor('assignee')}>
                         <div className="relative">
                             {assignee && (
                                 <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none z-10">
                                     <Avatar user={assignee} size="xs" />
                                 </div>
                             )}
-                            <Field as="select" id="assignee" name="assignee"
+                            <Field as="select" id={idFor('assignee')} name="assignee"
                                 className={`${sidebarSelectClass} ${assignee ? 'pl-8' : ''}`}>
                                 <option value="">Unassigned</option>
                                 {project?.members?.map(u => <option key={u.id} value={u.email}>{u.firstname} {u.lastname}</option>)}
                             </Field>
                             <SelectChevron />
                         </div>
-                    </PropRow>
-
-                    <PropRow label="Reporter">
-                        <span className="text-sm font-medium text-slate-600 dark:text-slate-300 truncate block pl-0.5">
-                            {values.reporter || '—'}
-                        </span>
                     </PropRow>
                 </SidebarSection>
 
@@ -316,8 +326,10 @@ const TaskForm = ({
                     {/* Date cells */}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
-                            <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide block mb-1">Start</span>
-                            <Field type="date" id="startDate" name="startDate"
+                            <label htmlFor={idFor('startDate')} className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide block mb-1">Start</label>
+                            <Field type="date" id={idFor('startDate')} name="startDate"
+                                aria-invalid={hasError('startDate')}
+                                aria-describedby={hasError('startDate') ? idFor('startDate-error') : undefined}
                                 className="text-sm font-medium text-slate-800 dark:text-slate-200 bg-transparent focus:outline-none w-full cursor-pointer"
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                     handleChange(e);
@@ -325,14 +337,16 @@ const TaskForm = ({
                                         setFieldValue('duration', Math.max(daysBetween(e.target.value, values.dueDate) + 1, 1));
                                 }}
                             />
-                            <ErrorMessage name="startDate" component="div" className="text-red-500 text-xs mt-0.5" />
+                            <ErrorMessage name="startDate" component="div" id={idFor('startDate-error')} className="text-red-500 text-xs mt-0.5" />
                         </div>
                         <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
                             <div className="flex items-center gap-1 mb-1">
-                                <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide">Due</span>
+                                <label htmlFor={idFor('dueDate')} className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide">Due</label>
                                 <DueBadge date={values.dueDate} />
                             </div>
-                            <Field type="date" id="dueDate" name="dueDate"
+                            <Field type="date" id={idFor('dueDate')} name="dueDate"
+                                aria-invalid={hasError('dueDate')}
+                                aria-describedby={hasError('dueDate') ? idFor('dueDate-error') : undefined}
                                 className="text-sm font-medium text-slate-800 dark:text-slate-200 bg-transparent focus:outline-none w-full cursor-pointer"
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                     handleChange(e);
@@ -340,13 +354,13 @@ const TaskForm = ({
                                         setFieldValue('duration', Math.max(daysBetween(values.startDate, e.target.value) + 1, 1));
                                 }}
                             />
-                            <ErrorMessage name="dueDate" component="div" className="text-red-500 text-xs mt-0.5" />
+                            <ErrorMessage name="dueDate" component="div" id={idFor('dueDate-error')} className="text-red-500 text-xs mt-0.5" />
                         </div>
                     </div>
 
-                    <PropRow label="Duration">
+                    <PropRow label="Duration" htmlFor={idFor('duration')}>
                         <div className="flex items-center gap-1.5">
-                            <Field type="number" id="duration" name="duration" min="1"
+                            <Field type="number" id={idFor('duration')} name="duration" min="1"
                                 className={`${sidebarInputClass} w-16 tabular-nums text-center`}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                     const dur = Math.max(1, parseInt(e.target.value, 10) || 1);
@@ -362,7 +376,7 @@ const TaskForm = ({
                     </PropRow>
 
                     {/* Progress — ring + gradient bar */}
-                    <PropRow label="Progress">
+                    <PropRow label="Progress" htmlFor={idFor('progress')}>
                         <div className="flex items-center gap-3">
                             <ProgressRing value={values.progress} />
                             <div className="flex-1">
@@ -376,7 +390,7 @@ const TaskForm = ({
                                                 : 'linear-gradient(90deg, #3b82f6, #60a5fa)',
                                         }}
                                     />
-                                    <Field type="range" id="progress" name="progress" min="0" max="100"
+                                    <Field type="range" id={idFor('progress')} name="progress" min="0" max="100"
                                         className="absolute inset-0 w-full opacity-0 cursor-pointer" />
                                 </div>
                             </div>
@@ -386,19 +400,19 @@ const TaskForm = ({
 
                 {/* ══ Tracking ══ */}
                 <SidebarSection title="Tracking">
-                    <PropRow label="Labels">
-                        <Field type="text" id="labels" name="labels" placeholder="Add labels..."
+                    <PropRow label="Labels" htmlFor={idFor('labels')}>
+                        <Field type="text" id={idFor('labels')} name="labels" placeholder="Add labels..."
                             className={sidebarInputClass} />
                     </PropRow>
 
                     {/* Dependencies — list with status dots + hover remove */}
                     <div>
                         <div className="flex items-center gap-3 min-h-[40px] -mx-2.5 px-2.5">
-                            <span className="w-24 shrink-0 text-sm font-medium text-slate-600 dark:text-slate-300">
+                            <label htmlFor={idFor('dependencies')} className={propLabelClass}>
                                 Depends on{depTasks.length > 0 ? ` · ${depTasks.length}` : ''}
-                            </span>
+                            </label>
                             <div className="flex-1 min-w-0 relative">
-                                <select className={sidebarSelectClass}
+                                <select id={idFor('dependencies')} className={sidebarSelectClass}
                                     onChange={e => {
                                         const key = e.target.value;
                                         if (key && !dependencies.includes(key)) setDependencies(prev => [...prev, key]);

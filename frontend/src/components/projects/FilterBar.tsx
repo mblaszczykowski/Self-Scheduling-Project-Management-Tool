@@ -49,6 +49,12 @@ const FilterBar = ({
             .map(v => ({ value: v, label: v })),
     [allTasks]);
 
+    // Derived once because both the visible chip and the button's accessible name need it —
+    // an aria-label replaces the rendered text, so the active value has to be part of it.
+    const activeProjectLabel = projectKeyFilter
+        ? projects.find(p => p.projectKey === projectKeyFilter)?.summary || projectKeyFilter
+        : null;
+
     const statusOptions = Object.keys(STATUS_CONFIG)
         .map(k => ({ value: k, label: STATUS_CONFIG[k as keyof typeof STATUS_CONFIG].label }));
 
@@ -99,11 +105,13 @@ const FilterBar = ({
                         onClick={() => onFilterDropdownToggle('project')}
                         onMouseEnter={(e) => handleButtonMouseEnter(e, 'Project')}
                         onMouseLeave={onFilterTooltipHide}
+                        aria-label={activeProjectLabel ? `Project filter: ${activeProjectLabel}` : 'Filter by project'}
+                        aria-expanded={openFilterDropdown === 'project'}
                         className={filterButtonClass(!!projectKeyFilter)}
                     >
                         <FolderIcon className={iconClass} />
-                        {projectKeyFilter && (
-                            <span className="text-xs">{projects.find(p => p.projectKey === projectKeyFilter)?.summary || projectKeyFilter}</span>
+                        {activeProjectLabel && (
+                            <span className="text-xs">{activeProjectLabel}</span>
                         )}
                     </button>
                     {openFilterDropdown === 'project' && (
@@ -130,41 +138,48 @@ const FilterBar = ({
 
                 <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
 
-                {dynamicFilters.map(({ field, label, icon, options }) => (
-                    <div key={field} className="relative">
-                        <button
-                            onClick={() => onFilterDropdownToggle(field)}
-                            onMouseEnter={(e) => handleButtonMouseEnter(e, label)}
-                            onMouseLeave={onFilterTooltipHide}
-                            className={filterButtonClass(!!filters[field] && filters[field] !== 'All')}
-                        >
-                            {icon}
-                            {(filters[field] && filters[field] !== 'All') && (
-                                <span className="text-xs">{options.find(o => o.value === filters[field])?.label || filters[field]}</span>
-                            )}
-                        </button>
-                        {openFilterDropdown === field && (
-                            <div className={`${dropdownClass} min-w-[180px] max-h-72 overflow-y-auto`}>
-                                <div className="px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-700">
-                                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
-                                </div>
-                                <div className="py-1">
-                                    <button
-                                        onClick={() => { onFilterChange(field, 'All'); onFilterDropdownToggle(null); }}
-                                        className={dropdownOptionClass(!filters[field] || filters[field] === 'All')}
-                                    >All</button>
-                                    {options.map(opt => (
+                {dynamicFilters.map(({ field, label, icon, options }) => {
+                    const activeValue = filters[field] && filters[field] !== 'All'
+                        ? options.find(o => o.value === filters[field])?.label || filters[field]
+                        : null;
+                    return (
+                        <div key={field} className="relative">
+                            <button
+                                onClick={() => onFilterDropdownToggle(field)}
+                                onMouseEnter={(e) => handleButtonMouseEnter(e, label)}
+                                onMouseLeave={onFilterTooltipHide}
+                                aria-label={activeValue ? `${label} filter: ${activeValue}` : `Filter by ${label.toLowerCase()}`}
+                                aria-expanded={openFilterDropdown === field}
+                                className={filterButtonClass(!!activeValue)}
+                            >
+                                {icon}
+                                {activeValue && (
+                                    <span className="text-xs">{activeValue}</span>
+                                )}
+                            </button>
+                            {openFilterDropdown === field && (
+                                <div className={`${dropdownClass} min-w-[180px] max-h-72 overflow-y-auto`}>
+                                    <div className="px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-700">
+                                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
+                                    </div>
+                                    <div className="py-1">
                                         <button
-                                            key={opt.value}
-                                            onClick={() => { onFilterChange(field, opt.value); onFilterDropdownToggle(null); }}
-                                            className={dropdownOptionClass(filters[field] === opt.value)}
-                                        >{opt.label}</button>
-                                    ))}
+                                            onClick={() => { onFilterChange(field, 'All'); onFilterDropdownToggle(null); }}
+                                            className={dropdownOptionClass(!filters[field] || filters[field] === 'All')}
+                                        >All</button>
+                                        {options.map(opt => (
+                                            <button
+                                                key={opt.value}
+                                                onClick={() => { onFilterChange(field, opt.value); onFilterDropdownToggle(null); }}
+                                                className={dropdownOptionClass(filters[field] === opt.value)}
+                                            >{opt.label}</button>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
+                            )}
+                        </div>
+                    );
+                })}
 
                 {dateFilters.map(({ field, label, icon }) => (
                     <div key={field} className="relative">
@@ -172,6 +187,8 @@ const FilterBar = ({
                             onClick={() => onFilterDropdownToggle(field)}
                             onMouseEnter={(e) => handleButtonMouseEnter(e, label)}
                             onMouseLeave={onFilterTooltipHide}
+                            aria-label={filters[field] ? `${label} filter: ${filters[field]}` : `Filter by ${label.toLowerCase()}`}
+                            aria-expanded={openFilterDropdown === field}
                             className={filterButtonClass(!!filters[field])}
                         >
                             {icon}
@@ -186,6 +203,7 @@ const FilterBar = ({
                                 </div>
                                 <input
                                     type="date"
+                                    aria-label={label}
                                     value={filters[field] || ''}
                                     onChange={e => {
                                         onFilterChange(field, e.target.value);
@@ -212,6 +230,8 @@ const FilterBar = ({
                         onClick={() => onFilterDropdownToggle('search')}
                         onMouseEnter={(e) => handleButtonMouseEnter(e, 'Search')}
                         onMouseLeave={onFilterTooltipHide}
+                        aria-label={searchInput ? `Search filter: ${searchInput}` : 'Search tasks'}
+                        aria-expanded={openFilterDropdown === 'search'}
                         className={filterButtonClass(!!searchInput)}
                     >
                         <SearchIcon className={iconClass} />
@@ -227,6 +247,7 @@ const FilterBar = ({
                             <input
                                 type="text"
                                 placeholder="Search tasks..."
+                                aria-label="Search tasks"
                                 data-search-input
                                 value={searchInput}
                                 onChange={e => onSearchInputChange(e.target.value)}
@@ -241,6 +262,8 @@ const FilterBar = ({
                     onClick={onAssignedToMeChange}
                     onMouseEnter={(e) => handleButtonMouseEnter(e, 'My Tasks')}
                     onMouseLeave={onFilterTooltipHide}
+                    aria-label="Show only tasks assigned to me"
+                    aria-pressed={assignedToMe}
                     className={filterButtonClass(assignedToMe)}
                 >
                     <UserCircleIcon className={iconClass} />
@@ -254,6 +277,7 @@ const FilterBar = ({
                             onClick={onClearAllFilters}
                             onMouseEnter={(e) => handleButtonMouseEnter(e, 'Clear all filters')}
                             onMouseLeave={onFilterTooltipHide}
+                            aria-label="Clear all filters"
                             className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
                         >
                             <CloseIcon />
