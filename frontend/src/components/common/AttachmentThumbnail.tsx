@@ -43,6 +43,9 @@ const AttachmentThumbnail = ({
     variant = 'default',
 }: AttachmentThumbnailProps) => {
     const { url, fileName, fileType } = getFileInfo(attachment);
+    // getFileInfo only withholds a URL when there is no attachment to show, and a thumbnail
+    // without one would render a broken image.
+    if (!url) return null;
 
     const handleRemove = (e: React.MouseEvent) => {
         e.stopPropagation();

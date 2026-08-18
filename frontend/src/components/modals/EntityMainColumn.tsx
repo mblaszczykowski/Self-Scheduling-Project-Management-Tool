@@ -7,7 +7,7 @@ import { Attachment } from '../../types';
 interface EntityMainColumnProps {
     values: { summary?: string; description?: string };
     setFieldValue: (field: string, value: unknown, shouldValidate?: boolean) => void;
-    entityKey?: string;
+    entityKey?: string | null;
     namePlaceholder?: string;
     descPlaceholder?: string;
     attachmentInputId?: string;
@@ -47,9 +47,9 @@ const EntityMainColumn = ({
             </div>
             <div className="flex justify-between mt-1.5">
                 <ErrorMessage name="summary" component="div" className="text-red-500 text-xs" />
-                {values.summary?.length > 160 && (
-                    <span className={`text-xs tabular-nums ${values.summary?.length > 180 ? 'text-amber-500' : 'text-slate-400'}`}>
-                        {values.summary.length}/200
+                {(values.summary?.length ?? 0) > 160 && (
+                    <span className={`text-xs tabular-nums ${(values.summary?.length ?? 0) > 180 ? 'text-amber-500' : 'text-slate-400'}`}>
+                        {values.summary?.length ?? 0}/200
                     </span>
                 )}
             </div>

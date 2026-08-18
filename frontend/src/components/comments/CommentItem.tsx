@@ -6,7 +6,7 @@ import { splitFullName } from '../../util/helpers';
 import Avatar from '../common/Avatar';
 import { ThumbsUpIcon, ThumbsDownIcon } from '../common/Icons';
 import CommentForm, { CommentFormValues } from './CommentForm';
-import { Comment } from '../../types';
+import { Comment, ReactionType } from '../../types';
 
 const MAX_REPLY_DEPTH = 4;
 
@@ -22,7 +22,7 @@ export interface CommentItemProps {
     onHandleUpdateComment: (comment: Comment, values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, attachments: File[]) => void;
     onHandleAddComment: (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, parentCommentId: number | null, attachments: File[]) => void;
     onHandleDeleteComment: (commentId: number) => void;
-    onHandleReactToComment: (commentId: number, reactionType: string) => void;
+    onHandleReactToComment: (commentId: number, reactionType: ReactionType) => void;
     renderAttachmentPreview: (attachment: string, idx: number) => React.ReactNode;
 }
 

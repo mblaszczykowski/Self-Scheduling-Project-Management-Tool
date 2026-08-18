@@ -22,7 +22,8 @@ const keyframes = `
 }
 `;
 
-const fmtDate = (d?: string) => (d ? formatShortDate(d) : '—');
+// formatShortDate renders its own placeholder for a missing date, so this is just the alias.
+const fmtDate = formatShortDate;
 
 const fmtNum = (v: number, decimals = 1): string => {
     if (typeof v !== 'number') return String(v);

@@ -12,9 +12,9 @@ import { TaskKeyMap, TaskListViewProps } from './types';
 
 const TERMINAL_STATUSES = new Set(['DONE', 'RELEASED', 'WITHDRAWN']);
 
-const relativeDue = (dueDate?: string, status?: string, progress = 0) => {
+const relativeDue = (dueDate?: string | null, status?: string | null, progress = 0) => {
     if (!dueDate) return { text: '—', cls: 'text-slate-400' };
-    if (TERMINAL_STATUSES.has(status) || progress >= 100) {
+    if ((status && TERMINAL_STATUSES.has(status)) || progress >= 100) {
         return { text: formatShortDate(dueDate), cls: 'text-slate-500 dark:text-slate-400' };
     }
     const diff = daysBetween(new Date(), dueDate);
@@ -77,7 +77,7 @@ const getBlockingInfo = (task: EnrichedTask, taskKeyToTaskMap: TaskKeyMap, now: 
 };
 
 /** Mini timeline showing elapsed vs remaining */
-const ScheduleBar = ({ startDate, dueDate, progress }: { startDate?: string; dueDate?: string; progress: number }) => {
+const ScheduleBar = ({ startDate, dueDate, progress }: { startDate?: string | null; dueDate?: string | null; progress: number }) => {
     if (!startDate || !dueDate) return null;
     const now = new Date();
     const start = new Date(startDate);

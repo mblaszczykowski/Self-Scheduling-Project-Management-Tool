@@ -49,7 +49,7 @@ export type TaskKeyMap = Map<string, EnrichedTask>;
 export type ExpandedProjects = Record<string, boolean>;
 export type FilteredTaskIds = Set<number>;
 export type FilteredProjectKeys = Set<string>;
-export type DivRef = RefObject<HTMLDivElement | null>;
+export type DivRef = RefObject<HTMLDivElement>;
 
 /**
  * Shared props threaded through the timeline (view -> row -> bar).

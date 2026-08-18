@@ -114,6 +114,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                     await createTask(projectKey, payload, attachments.new);
                     showToast('Task created', 'success');
                 } else {
+                    if (!task) throw new Error('No task to update');
                     await updateTask(projectKey, task.taskKey, payload, attachments.new);
                     showToast('Task updated', 'success');
                 }
@@ -131,6 +132,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                     await createProject(payload, attachments.new);
                     showToast('Project created', 'success');
                 } else {
+                    if (!project) throw new Error('No project to update');
                     await updateProject(project.projectKey, payload, attachments.new);
                     showToast('Project updated', 'success');
                 }
@@ -148,9 +150,11 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
         setUiState(prev => ({ ...prev, deleteConfirmOpen: false }));
         try {
             if (modalType === 'task' && modalMode === 'edit') {
+                if (!task) throw new Error('No task to delete');
                 await deleteTask(project?.projectKey ?? task.projectKey, task.taskKey);
                 showToast('Task deleted', 'success');
             } else if (modalType === 'project' && modalMode === 'edit') {
+                if (!project) throw new Error('No project to delete');
                 await deleteProject(project.projectKey);
                 showToast('Project deleted', 'success');
             }

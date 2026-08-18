@@ -155,7 +155,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
                 />
             )}
 
-            {accountModalOpen && (
+            {accountModalOpen && user && (
                 <AccountModal
                     user={user}
                     onClose={() => setAccountModalOpen(false)}

@@ -37,8 +37,8 @@ const projectSchema = (modalMode: ModalMode | null) => Yup.object().shape(
 interface Options {
     modalType: ModalType;
     modalMode: ModalMode;
-    project: Project | null;
-    task: Task | null;
+    project?: Project | null;
+    task?: Task | null;
     user: CurrentUser | null;
     setAttachments: (attachments: AttachmentsState) => void;
 }

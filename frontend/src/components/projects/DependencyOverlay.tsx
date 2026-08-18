@@ -189,7 +189,9 @@ const DependencyOverlay = ({
                 left: r.left - cr.left + sl,
                 cy: (r.top + r.bottom) / 2 - cr.top + st,
             };
-            barMap.set(bar.dataset.taskKey, info);
+            // dataset entries are optional by definition; a bar without a key cannot be a
+            // dependency endpoint, so it only goes into the positional list.
+            if (bar.dataset.taskKey) barMap.set(bar.dataset.taskKey, info);
             allBars.push(info);
         });
 

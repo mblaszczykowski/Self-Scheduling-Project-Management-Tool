@@ -11,6 +11,16 @@ export type AvatarSubject =
 
 type DateInput = string | number | Date;
 
+/**
+ * What the domain actually holds. Task and project dates are nullable on the server, so a helper
+ * typed to reject null is not stricter — it just pushes the null past the compiler and into
+ * `new Date(undefined)`, which is how "Invalid Date" ended up rendered on cards and timelines.
+ */
+export type MaybeDate = DateInput | null | undefined;
+
+/** What a date renders as when there is no date. */
+export const NO_DATE = '\u2014';
+
 export const MS_PER_DAY = 86400000;
 
 const UPCOMING_DEADLINE_DAYS = 4;
@@ -19,7 +29,8 @@ const UPCOMING_DEADLINE_DAYS = 4;
 // A date-only string is returned verbatim (no timezone shift); everything else
 // (Date, timestamp, datetime string) is formatted from local components so that
 // `new Date()` / drag-produced Dates map to the day the user actually sees.
-export const toDateString = (date: DateInput): string => {
+export const toDateString = (date: MaybeDate): string => {
+    if (date === null || date === undefined) return '';
     if (typeof date === 'string') {
         const match = date.match(/^\d{4}-\d{2}-\d{2}/);
         if (match) return match[0];
@@ -40,7 +51,7 @@ export const toDateString = (date: DateInput): string => {
  * calendar date a person would read off it; this turns that into a number so differences and
  * comparisons are exact.
  */
-export const dayIndex = (date: DateInput): number | null => {
+export const dayIndex = (date: MaybeDate): number | null => {
     const iso = toDateString(date);
     if (!iso) return null;
     return Math.round(Date.UTC(
@@ -61,13 +72,15 @@ export const addDays = (date: string, days: number): string => {
     return new Date(parsed.getTime() + days * MS_PER_DAY).toISOString().slice(0, 10);
 };
 
-export const getImageUrl = (path?: string | null): string | null => {
+export function getImageUrl(path: string): string;
+export function getImageUrl(path?: string | null): string | null;
+export function getImageUrl(path?: string | null): string | null {
     if (!path) return null;
     if (path.startsWith('http')) return path;
     return `${config.API_BASE_URL}${path}`;
-};
+}
 
-export const formatDate = (dateString?: string): string => {
+export const formatDate = (dateString?: string | null): string => {
     if (!dateString) return '';
     return toDateString(dateString);
 };
@@ -85,26 +98,33 @@ export const formatAssigneeName = (email?: string | null): string => {
 // Splits a "First Last" display name into { firstname, lastname } for <Avatar>.
 // Tolerates single-word and multi-word names (everything after the first token
 // becomes the last name).
-export const splitFullName = (name?: string): { firstname: string; lastname: string } => {
+export const splitFullName = (name?: string | null): { firstname: string; lastname: string } => {
     if (!name) return { firstname: '', lastname: '' };
     const parts = String(name).trim().split(/\s+/);
     return { firstname: parts[0] || '', lastname: parts.slice(1).join(' ') };
 };
 
-export const formatDateTime = (dateString?: string): string => {
+export const formatDateTime = (dateString?: string | null): string => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleString();
+    const parsed = new Date(dateString);
+    return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleString();
 };
 
-export const formatShortDate = (date: DateInput): string => {
-    return new Date(date).toLocaleDateString(undefined, {
+export const formatShortDate = (date: MaybeDate): string => {
+    if (date === null || date === undefined) return NO_DATE;
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return NO_DATE;
+    return parsed.toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
     });
 };
 
-export const formatLongDate = (date: DateInput): string => {
-    return new Date(date).toLocaleDateString(undefined, {
+export const formatLongDate = (date: MaybeDate): string => {
+    if (date === null || date === undefined) return NO_DATE;
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return NO_DATE;
+    return parsed.toLocaleDateString(undefined, {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
@@ -308,11 +328,16 @@ export const getAvatarInitials = (user?: AvatarSubject | null): string => {
     return 'U';
 };
 
-export const calculateTaskPosition = (startDate: DateInput, dueDate: DateInput, timelineStart: DateInput) => {
+export const calculateTaskPosition = (startDate: MaybeDate, dueDate: MaybeDate, timelineStart: DateInput) => {
+    const dayWidth = TIMELINE_CONSTANTS.DAY_WIDTH;
+    // A task with no dates has no bar. Returning a zero-width bar at the origin beats the NaN
+    // margin the old signature produced, which React renders as no style at all.
+    if (startDate === null || startDate === undefined || dueDate === null || dueDate === undefined) {
+        return { marginLeft: 0, width: 0 };
+    }
     const start = new Date(startDate);
     const due = new Date(dueDate);
     const tlStart = new Date(timelineStart);
-    const dayWidth = TIMELINE_CONSTANTS.DAY_WIDTH;
 
     const daysOffset = Math.round((start.getTime() - tlStart.getTime()) / MS_PER_DAY);
     const durationDays = Math.round((due.getTime() - start.getTime()) / MS_PER_DAY) + 1;
@@ -344,9 +369,13 @@ export const getErrorMessage = (err: unknown, defaultMessage = 'An unexpected er
     return e.message || defaultMessage;
 };
 
-export const daysBetween = (date1: DateInput, date2: DateInput): number => {
+export const daysBetween = (date1: MaybeDate, date2: MaybeDate): number => {
+    // No known dates, no known distance. Callers sum and compare these, so a NaN here would
+    // silently poison every total it reached.
+    if (date1 === null || date1 === undefined || date2 === null || date2 === undefined) return 0;
     const d1 = new Date(date1);
     const d2 = new Date(date2);
+    if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return 0;
     const utc1 = Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate());
     const utc2 = Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
     return Math.round((utc2 - utc1) / MS_PER_DAY);

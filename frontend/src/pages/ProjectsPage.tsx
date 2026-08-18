@@ -174,7 +174,7 @@ const ProjectsPage = () => {
     const hideFilterTooltip = useCallback(
         () => setFilterTooltip({ visible: false, x: 0, y: 0, text: '' }), []);
 
-    const toggleFilterDropdown = useCallback((field: string) => setFilterState((previous) => ({
+    const toggleFilterDropdown = useCallback((field: string | null) => setFilterState((previous) => ({
         ...previous,
         openFilterDropdown: previous.openFilterDropdown === field ? null : field,
     })), [setFilterState]);
@@ -199,7 +199,10 @@ const ProjectsPage = () => {
         ? openModal('task', 'edit', project, task)
         : openModal('task', 'create', project)), [openModal]);
     const openTaskFromList = useCallback(
-        (project: Project, task: Task) => openModal('task', 'edit', project, task), [openModal]);
+        // A dependency row can point at a task whose project is not on screen, so the project is
+        // optional here; openModal already treats a missing one as "no project context".
+        (project: Project | undefined, task: Task) =>
+            openModal('task', 'edit', project ?? null, task), [openModal]);
 
     const viewModes = useMemo(() => ['timeline', 'list'] as const, []);
 

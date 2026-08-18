@@ -6,6 +6,10 @@ import {
     isUpcomingDeadline,
     calculateDuration,
     formatDuration,
+    formatShortDate,
+    formatLongDate,
+    calculateTaskPosition,
+    NO_DATE,
     safeNextPath,
     daysBetween,
     getFileTypeFromPath,
@@ -200,5 +204,36 @@ describe('safeNextPath', () => {
 
     test('honours an explicit fallback', () => {
         expect(safeNextPath('?next=//evil.com', '/login')).toBe('/login');
+    });
+});
+
+// Task and project dates are nullable on the server. Before strictNullChecks these helpers were
+// typed to reject null and then handed it anyway, so `new Date(undefined)` reached the DOM and
+// cards rendered the literal string "Invalid Date".
+describe('missing dates', () => {
+    test('a date that is not there renders as a placeholder, not "Invalid Date"', () => {
+        expect(formatShortDate(null)).toBe(NO_DATE);
+        expect(formatShortDate(undefined)).toBe(NO_DATE);
+        expect(formatShortDate('not-a-date')).toBe(NO_DATE);
+        expect(formatLongDate(null)).toBe(NO_DATE);
+        expect(formatLongDate(undefined)).toBe(NO_DATE);
+    });
+
+    test('a real date still renders', () => {
+        expect(formatShortDate('2024-06-15')).not.toBe(NO_DATE);
+    });
+
+    // Callers sum and compare these, so a NaN would silently poison every total it reached.
+    test('an unknown span is zero days, never NaN', () => {
+        expect(daysBetween(null, '2024-06-15')).toBe(0);
+        expect(daysBetween('2024-06-15', undefined)).toBe(0);
+        expect(daysBetween('nonsense', '2024-06-15')).toBe(0);
+        expect(daysBetween('2024-06-01', '2024-06-08')).toBe(7);
+    });
+
+    test('a task with no dates gets no bar rather than a NaN-width one', () => {
+        const position = calculateTaskPosition(null, null, '2024-06-01');
+        expect(position).toEqual({ marginLeft: 0, width: 0 });
+        expect(Number.isNaN(position.width)).toBe(false);
     });
 });

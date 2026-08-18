@@ -50,10 +50,16 @@ const ProjectCard = ({
 
     const nextDeadline = useMemo(() => {
         const now = Date.now();
+        // flatMap rather than filter+sort: it carries the parsed timestamp out with the task, so
+        // the comparator neither re-parses the date nor has to re-establish that it exists.
         const upcoming = project.tasks
-            .filter(t => t.dueDate && new Date(t.dueDate).getTime() >= now && t.progress < 100)
-            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-        return upcoming[0] ?? null;
+            .flatMap(task => {
+                if (!task.dueDate || task.progress >= 100) return [];
+                const due = new Date(task.dueDate).getTime();
+                return due >= now ? [{ task, due }] : [];
+            })
+            .sort((a, b) => a.due - b.due);
+        return upcoming[0]?.task ?? null;
     }, [project.tasks]);
 
     const progressColor = completionPercentage === 100

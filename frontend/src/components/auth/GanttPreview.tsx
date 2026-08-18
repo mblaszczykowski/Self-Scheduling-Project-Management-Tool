@@ -66,7 +66,7 @@ const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
 export const GanttChart = () => {
     const [expanded, setExpanded] = useState<Record<string, boolean>>({ WEB: true, MOB: true });
     const [showOptimization, setShowOptimization] = useState(true);
-    const [hoveredTask, setHoveredTask] = useState(null);
+    const [hoveredTask, setHoveredTask] = useState<string | null>(null);
 
     const toggleProject = (key: string) => setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
 

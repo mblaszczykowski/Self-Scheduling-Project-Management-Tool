@@ -225,7 +225,7 @@ const TimelineTaskBar = ({
                         subtitle: task.taskKey,
                         status: STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.label ||
                             task.status,
-                        isCritical: task.isCritical,
+                        isCritical: task.isCritical ?? undefined,
                         dates: `${formatShortDate(task.startDate)} -> ${
                             formatShortDate(task.dueDate)
                         }`,

@@ -40,7 +40,7 @@ const FALLBACK = { icon: HiOutlineSwitchHorizontal, color: 'text-slate-500', bg:
 // Labels come from the shared status/priority config. This file used to re-type all seventeen of
 // them character-for-character, which is duplication waiting to drift.
 
-function formatValue(field: string, value: string | null | undefined) {
+function formatValue(field: string | null | undefined, value: string | null | undefined) {
     if (!value || value === 'null') return null;
     if (field === 'status') return STATUS_CONFIG[value as TaskStatus]?.label ?? value;
     if (field === 'priority') return PRIORITY_CONFIG[value as TaskPriority]?.label ?? value;

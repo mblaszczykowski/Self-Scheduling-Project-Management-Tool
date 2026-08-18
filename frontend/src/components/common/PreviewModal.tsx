@@ -27,7 +27,9 @@ const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
         return () => document.removeEventListener('keydown', onKeyDown);
     }, [handleClose]);
 
-    if (!preview) return null;
+    // A preview with no URL has nothing to show; the modal would render a broken image.
+
+    if (!preview || !preview.url) return null;
 
     return (
         <div

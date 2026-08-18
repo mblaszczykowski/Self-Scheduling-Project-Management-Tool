@@ -135,7 +135,7 @@ const DashboardPage = () => {
                 </>
             )}
 
-            {modalOpen && (
+            {modalOpen && modalType && modalMode && (
                 <Suspense fallback={null}>
                     <TaskProjectModal
                         modalType={modalType}
