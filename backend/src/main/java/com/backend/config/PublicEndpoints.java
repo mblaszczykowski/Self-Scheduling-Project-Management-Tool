@@ -5,8 +5,9 @@ import java.util.Set;
 /**
  * The deny-by-default authentication and CSRF policy, in one place.
  *
- * <p>Matching is exact on the raw request URI, which is fail-closed: a matrix-parameter or
- * encoding trick makes a path <em>less</em> likely to match an exemption, never more.
+ * <p>Matching is exact on the raw request URI for everything except the API docs subtree, which
+ * is fail-closed: a matrix-parameter or encoding trick makes a path <em>less</em> likely to match
+ * an exemption, never more.
  */
 public final class PublicEndpoints {
 
@@ -18,6 +19,8 @@ public final class PublicEndpoints {
     public static final String USERS = "/api/users";
     public static final String ERROR = "/error";
     public static final String ACTUATOR_HEALTH = "/actuator/health";
+    private static final String SWAGGER_UI_PREFIX = "/swagger-ui/";
+    private static final String API_DOCS_PREFIX = "/v3/api-docs";
 
     /**
      * Endpoints reachable without an access token.
@@ -43,7 +46,13 @@ public final class PublicEndpoints {
             // Registration is public; reading or updating the current user is not.
             return !USERS.equals(path) || "POST".equalsIgnoreCase(method);
         }
-        return ERROR.equals(path) || ACTUATOR_HEALTH.equals(path);
+        return ERROR.equals(path) || ACTUATOR_HEALTH.equals(path) || isApiDocsPath(path);
+    }
+
+    private static boolean isApiDocsPath(String path) {
+        return path.startsWith(SWAGGER_UI_PREFIX) || path.equals("/swagger-ui.html")
+                || path.equals(API_DOCS_PREFIX) || path.startsWith(API_DOCS_PREFIX + "/")
+                || path.equals(API_DOCS_PREFIX + ".yaml");
     }
 
     public static boolean isCsrfExempt(String path, String method) {

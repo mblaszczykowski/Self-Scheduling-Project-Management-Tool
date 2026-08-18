@@ -74,7 +74,12 @@ class JwtAuthenticationFilterTest {
                 "POST, /api/auth/refresh",
                 "POST, /api/users",
                 "GET,  /error",
-                "GET,  /actuator/health"
+                "GET,  /actuator/health",
+                "GET,  /swagger-ui.html",
+                "GET,  /swagger-ui/index.html",
+                "GET,  /v3/api-docs",
+                "GET,  /v3/api-docs.yaml",
+                "GET,  /v3/api-docs/swagger-config"
         })
         @DisplayName("pass straight through without a token being looked for")
         void publicEndpointsBypassAuthentication(String method, String path) throws Exception {
