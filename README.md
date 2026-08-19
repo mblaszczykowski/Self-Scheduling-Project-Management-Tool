@@ -17,9 +17,6 @@
 ![Task detail modal with a rich text editor, schedule, and a threaded comment discussion](docs/screenshots/task-detail.png)
 *Task detail — rich text description, schedule, and a threaded comment discussion.*
 
-![Analytics: status and priority distribution, project progress, completion trend and optimization opportunity score](docs/screenshots/analytics.png)
-*Analytics — status and priority breakdowns, completion trend, and optimization opportunity score.*
-
 FlowLink is a project and portfolio management application. It tracks projects, tasks and task
 dependencies, renders them on a Gantt-style timeline, and adds threaded comments with reactions,
 file attachments, real-time notifications and global search.
