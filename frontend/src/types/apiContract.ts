@@ -1,7 +1,9 @@
 import { components } from './api.generated';
 import {
-    Activity, Comment, CurrentUser, Notification, OptimizationMetrics, OptimizationResult,
-    OptimizationSuggestion, Project, Task, TaskPriority, TaskStatus, User,
+    Activity, AppliedSchedule, Comment, CurrentUser, LoginResponse, Notification,
+    OptimizationMetrics, OptimizationResult, OptimizationSuggestion, Project,
+    SearchCommentResult, SearchProjectResult, SearchTaskResult, Task, TaskPriority, TaskStatus,
+    UnreadCount, User,
 } from '../types';
 
 type Schemas = components['schemas'];
@@ -28,6 +30,16 @@ export type OptimizationMetricsFieldsExist =
 export type OptimizationSuggestionFieldsExist =
     KeysExistOn<keyof OptimizationSuggestion, Schemas['TaskScheduleSuggestionDTO']>;
 
+export type LoginResponseFieldsExist = KeysExistOn<keyof LoginResponse, Schemas['LoginResponse']>;
+export type UnreadCountFieldsExist = KeysExistOn<keyof UnreadCount, Schemas['UnreadCount']>;
+export type AppliedScheduleFieldsExist =
+    KeysExistOn<keyof AppliedSchedule, Schemas['AppliedSchedule']>;
+export type SearchProjectFieldsExist =
+    KeysExistOn<keyof SearchProjectResult, Schemas['ProjectResult']>;
+export type SearchTaskFieldsExist = KeysExistOn<keyof SearchTaskResult, Schemas['TaskResult']>;
+export type SearchCommentFieldsExist =
+    KeysExistOn<keyof SearchCommentResult, Schemas['CommentResult']>;
+
 export type TaskStatusMatches = Exactly<TaskStatus, NonNullable<Schemas['TaskDTO']['status']>>;
 export type TaskPriorityMatches = Exactly<TaskPriority, NonNullable<Schemas['TaskDTO']['priority']>>;
 
@@ -36,6 +48,9 @@ const assertions: [
     CurrentUserFieldsExist, NotificationFieldsExist, ActivityFieldsExist,
     OptimizationResultFieldsExist, OptimizationMetricsFieldsExist,
     OptimizationSuggestionFieldsExist, TaskStatusMatches, TaskPriorityMatches,
-] = [true, true, true, true, true, true, true, true, true, true, true, true];
+    LoginResponseFieldsExist, UnreadCountFieldsExist, AppliedScheduleFieldsExist,
+    SearchProjectFieldsExist, SearchTaskFieldsExist, SearchCommentFieldsExist,
+] = [true, true, true, true, true, true, true, true, true, true, true, true,
+    true, true, true, true, true, true];
 
 export default assertions;

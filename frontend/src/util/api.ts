@@ -2,10 +2,12 @@ import axios, { AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequ
 import config from '../config';
 import {
     Activity,
+    AppliedSchedule,
     ApplyOptimizationRequest,
     Comment,
     CurrentUser,
     EmailPreferencesPayload,
+    LoginResponse,
     Notification,
     OptimizationRequest,
     OptimizationResult,
@@ -18,6 +20,7 @@ import {
     SearchResults,
     Task,
     TaskPayload,
+    UnreadCount,
 } from '../types';
 
 const api = axios.create({
@@ -117,13 +120,13 @@ const multipart = (data: unknown, attachments: File[], dataKey: string): FormDat
 const MULTIPART: AxiosRequestConfig = { headers: { 'Content-Type': 'multipart/form-data' } };
 
 export const login = (email: string, password: string) =>
-    api.post<{ message: string; userId: number; email: string; name: string }>(
+    api.post<LoginResponse>(
         '/api/auth/login', { email, password }).then(body);
 
 export const logout = () => api.post<void>('/api/auth/logout').then(body);
 
 export const register = (payload: RegistrationPayload) =>
-    api.post<{ message: string; userId: number; email: string }>('/api/users', payload).then(body);
+    api.post<LoginResponse>('/api/users', payload).then(body);
 
 export const getCurrentUser = () => api.get<CurrentUser>('/api/users/me').then(body);
 
@@ -236,13 +239,13 @@ export const getNotifications = (page = 0, size = 50) =>
     api.get<Paged<Notification>>('/api/notifications', { params: { page, size } }).then(body);
 
 export const getUnreadNotificationCount = () =>
-    api.get<{ count: number }>('/api/notifications/unread-count').then(body);
+    api.get<UnreadCount>('/api/notifications/unread-count').then(body);
 
 export const markNotificationsAsRead = (notificationIds: number[]) =>
     api.post<void>('/api/notifications/mark-as-read', notificationIds).then(body);
 
 export const markAllNotificationsRead = () =>
-    api.post<{ count: number }>('/api/notifications/mark-all-read').then(body);
+    api.post<UnreadCount>('/api/notifications/mark-all-read').then(body);
 
 export const globalSearch = (query: string) =>
     api.get<SearchResults>('/api/search', { params: { q: query } }).then(body);
@@ -251,6 +254,6 @@ export const simulateOptimization = (request: OptimizationRequest) =>
     api.post<OptimizationResult>('/api/optimization/simulate', request).then(body);
 
 export const applyOptimization = (request: ApplyOptimizationRequest) =>
-    api.post<{ tasksUpdated: number }>('/api/optimization/apply', request).then(body);
+    api.post<AppliedSchedule>('/api/optimization/apply', request).then(body);
 
 export default api;

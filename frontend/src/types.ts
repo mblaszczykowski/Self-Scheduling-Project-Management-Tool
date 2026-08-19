@@ -308,6 +308,21 @@ export interface SearchResults {
     comments: SearchCommentResult[];
 }
 
+export interface LoginResponse {
+    message: string;
+    userId: number;
+    email: string;
+    name?: string | null;
+}
+
+export interface UnreadCount {
+    count: number;
+}
+
+export interface AppliedSchedule {
+    tasksUpdated: number;
+}
+
 export interface ApiFieldError {
     field: string;
     message: string;

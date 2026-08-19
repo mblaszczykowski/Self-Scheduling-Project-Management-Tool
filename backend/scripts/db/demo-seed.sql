@@ -124,7 +124,7 @@ INSERT INTO tasks (project_id, task_number, summary, description,
                    status, priority, start_date, due_date, progress,
                    assignee_id, labels, created, updated)
 SELECT p.id, v.tn, v.summary, v.description,
-       v.status, v.priority, v.sd::date, v.dd::date, v.progress,
+       v.status, v.priority, (CURRENT_DATE - 20 + v.sd_offset), (CURRENT_DATE - 20 + v.dd_offset), v.progress,
        (SELECT id FROM users WHERE email = v.assignee_email),
        v.labels, NOW(), NOW()
 FROM projects p,
@@ -189,7 +189,7 @@ FROM projects p,
        'Final production deploy during the maintenance window (Saturday 02:00), 48-hour metrics monitoring, rollback plan.',
        'BACKLOG',      'HIGHEST', '2026-07-25', '2026-07-26', 0,
        'daniel.brooks@flowlink.dev',       'devops,business-critical')
-) AS v(tn, summary, description, status, priority, sd, dd, progress, assignee_email, labels)
+) AS v(tn, summary, description, status, priority, sd_offset, dd_offset, progress, assignee_email, labels)
 WHERE p.project_key = 'ECOM'
 ON CONFLICT (project_id, task_number) DO NOTHING;
 
@@ -197,7 +197,7 @@ INSERT INTO tasks (project_id, task_number, summary, description,
                    status, priority, start_date, due_date, progress,
                    assignee_id, labels, created, updated)
 SELECT p.id, v.tn, v.summary, v.description,
-       v.status, v.priority, v.sd::date, v.dd::date, v.progress,
+       v.status, v.priority, (CURRENT_DATE - 20 + v.sd_offset), (CURRENT_DATE - 20 + v.dd_offset), v.progress,
        (SELECT id FROM users WHERE email = v.assignee_email),
        v.labels, NOW(), NOW()
 FROM projects p,
@@ -262,7 +262,7 @@ FROM projects p,
        'Preparing marketing assets, screenshots and descriptions, handling the review process, monitoring first-week ratings.',
        'BACKLOG',      'HIGH',    '2026-07-16', '2026-07-18', 0,
        'daniel.brooks@flowlink.dev',       'release,mobile,business-critical')
-) AS v(tn, summary, description, status, priority, sd, dd, progress, assignee_email, labels)
+) AS v(tn, summary, description, status, priority, sd_offset, dd_offset, progress, assignee_email, labels)
 WHERE p.project_key = 'MAPP'
 ON CONFLICT (project_id, task_number) DO NOTHING;
 
@@ -270,7 +270,7 @@ INSERT INTO tasks (project_id, task_number, summary, description,
                    status, priority, start_date, due_date, progress,
                    assignee_id, labels, created, updated)
 SELECT p.id, v.tn, v.summary, v.description,
-       v.status, v.priority, v.sd::date, v.dd::date, v.progress,
+       v.status, v.priority, (CURRENT_DATE - 20 + v.sd_offset), (CURRENT_DATE - 20 + v.dd_offset), v.progress,
        (SELECT id FROM users WHERE email = v.assignee_email),
        v.labels, NOW(), NOW()
 FROM projects p,
@@ -335,7 +335,7 @@ FROM projects p,
        'Final release, onboarding the first 3 pilot partners, monitoring the first 72 hours, team review.',
        'BACKLOG',      'HIGH',    '2026-07-22', '2026-07-24', 0,
        'daniel.brooks@flowlink.dev',       'release,backend,business-critical')
-) AS v(tn, summary, description, status, priority, sd, dd, progress, assignee_email, labels)
+) AS v(tn, summary, description, status, priority, sd_offset, dd_offset, progress, assignee_email, labels)
 WHERE p.project_key = 'B2B'
 ON CONFLICT (project_id, task_number) DO NOTHING;
 
