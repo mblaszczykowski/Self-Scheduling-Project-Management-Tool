@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as Yup from 'yup';
 import { formatDateTime, MS_PER_DAY, toDateString } from '../util/helpers';
 import {
@@ -12,13 +12,28 @@ const DEFAULT_VALUES: ModalFormValues = {
     memberEmails: [], newUserEmail: '',
 };
 
+// A date <input> yields '' when cleared. Yup's date type otherwise treats '' as an invalid date
+// rather than "no date" (it fails the ISO parse and lands on its own type-error), so this coerces
+// it to null before that check runs — the same "empty means absent" treatment applied to the
+// optional password fields in AccountModal, just via `.transform` instead of a plain function,
+// because a date's raw value has to survive to the cross-field check below.
+const emptyStringToNull = (value: unknown, originalValue: unknown) =>
+    (originalValue === '' ? null : value);
+
+// TaskRequest accepts both dates as null; its only cross-field rule is due-not-before-start,
+// which the backend itself treats as vacuously true when either side is missing. `dueDate`'s
+// `.min` is skipped by Yup whenever the (cast) value is null, so attaching it only when a raw
+// `startDate` is present is enough to mirror that exactly — a task with no dates, one date, or a
+// valid range all pass; only an inverted range with both dates set is rejected.
 const TASK_SCHEMA = Yup.object().shape({
     projectKey: Yup.string().required('Project is required.'),
     summary: Yup.string().required('Task summary is required.'),
-    startDate: Yup.date().required('Start date is required.'),
+    startDate: Yup.date().nullable().transform(emptyStringToNull),
     dueDate: Yup.date()
-        .required('Due date is required.')
-        .min(Yup.ref('startDate'), 'Due date cannot be before start date.'),
+        .nullable()
+        .transform(emptyStringToNull)
+        .when('startDate', ([startDate], schema) =>
+            (startDate ? schema.min(startDate, 'Due date cannot be before start date.') : schema)),
 });
 
 const projectSchema = (modalMode: ModalMode | null) => Yup.object().shape(
@@ -112,7 +127,11 @@ const useModalFormInit = ({ modalType, modalMode, project, task, user, setAttach
         }
     }, [modalType, modalMode, project, task, user, setAttachments]);
 
-    const validationSchema = modalType === 'task' ? TASK_SCHEMA : projectSchema(modalMode);
+    // Unlike TASK_SCHEMA (a stable module constant), projectSchema(modalMode) builds a fresh Yup
+    // object every call; memoizing keeps its identity stable across renders that don't change
+    // modalMode, matching what every consumer of `validationSchema` already assumes.
+    const memoizedProjectSchema = useMemo(() => projectSchema(modalMode), [modalMode]);
+    const validationSchema = modalType === 'task' ? TASK_SCHEMA : memoizedProjectSchema;
 
     return { initialValues, validationSchema, dependencies, setDependencies };
 };

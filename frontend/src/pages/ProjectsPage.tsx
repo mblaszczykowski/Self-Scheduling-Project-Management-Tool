@@ -83,11 +83,23 @@ const ProjectsPage = () => {
 
     const {
         handleFilterChange, handleProjectFilterChange, handleAssignedToMeChange,
-        handleSort, clearAllFilters, projectKeyFilter, closeFilterDropdown,
+        clearAllFilters, projectKeyFilter,
     } = useUrlSyncedFilters({
         filterState, setFilterState, setViewState,
-        processedProjects, navigate, location, openModal, setSortState,
+        processedProjects, navigate, location, openModal,
     });
+
+    const closeFilterDropdown = useCallback(
+        () => setFilterState(previous => ({ ...previous, openFilterDropdown: null })),
+        [setFilterState],
+    );
+
+    const handleSort = useCallback((field: string) => {
+        setSortState(previous => ({
+            field,
+            order: previous.field === field && previous.order === 'asc' ? 'desc' : 'asc',
+        }));
+    }, [setSortState]);
 
     const { optimization, handleOptimize, handleAcceptOptimization, handleRejectOptimization } =
         useScheduleOptimization({ processedProjects, onApplied: retryProjects });

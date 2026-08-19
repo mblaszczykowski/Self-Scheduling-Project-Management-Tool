@@ -88,9 +88,15 @@ export function useTaskResizePreview({ processedProjects, updateTaskSchedule }: 
             .finally(() => setPreview(null));
     }, [updateTaskSchedule]);
 
+    const handleResizeCancel = useCallback(() => {
+        draftRef.current = null;
+        setPreview(null);
+    }, []);
+
     const { startResize, shouldPreventClick } = useTimelineResize({
         onResizeMove: handleResizeMove,
         onResizeEnd: handleResizeEnd,
+        onResizeCancel: handleResizeCancel,
         dayWidth: TIMELINE_CONSTANTS.DAY_WIDTH,
     });
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { HiOutlineDownload, HiOutlineX } from 'react-icons/hi';
+import { HiOutlineDocument, HiOutlineDocumentText, HiOutlineDownload, HiOutlineX } from 'react-icons/hi';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 import { PreviewData } from '../../util/helpers';
 
@@ -8,11 +8,14 @@ interface PreviewModalProps {
     onClose: () => void;
 }
 
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
     const [isVisible, setIsVisible] = useAnimateIn();
 
     const dialogRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
+    const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         previousFocusRef.current = document.activeElement as HTMLElement | null;
@@ -24,11 +27,36 @@ const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
 
     const handleClose = useCallback(() => {
         setIsVisible(false);
-        setTimeout(onClose, 300);
+        closeTimerRef.current = setTimeout(onClose, 300);
     }, [onClose, setIsVisible]);
 
+    // A component unmounted mid-animation (e.g. the parent switches views) must not fire onClose
+    // against a caller that has already moved on.
+    useEffect(() => () => {
+        if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    }, []);
+
     useEffect(() => {
-        const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(); };
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                handleClose();
+                return;
+            }
+            // Minimal focus trap: Tab from the last focusable element wraps to the first, and
+            // Shift+Tab from the first wraps to the last.
+            if (e.key !== 'Tab' || !dialogRef.current) return;
+            const focusable = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        };
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
     }, [handleClose]);
@@ -50,7 +78,7 @@ const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
             <div className={`relative bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-[90vw] max-h-[90vh] overflow-hidden transition-all duration-300 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`} onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate max-w-md">{preview.fileName}</h3>
-                    <button onClick={handleClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Close">
+                    <button onClick={handleClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Close" aria-label="Close">
                         <HiOutlineX className="w-5 h-5 text-slate-500 dark:text-slate-400" />
                     </button>
                 </div>
@@ -58,7 +86,18 @@ const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
                     {preview.fileType === 'image' ? (
                         <img src={preview.url} alt={preview.fileName} className="max-h-[70vh] max-w-full rounded-lg shadow-lg" />
                     ) : (
-                        <iframe src={preview.url} title={preview.fileName} className="w-[80vw] h-[70vh] rounded-lg border border-slate-200 dark:border-slate-700" />
+                        // GET /files/{name} always sends Content-Disposition: attachment, which blocks
+                        // inline rendering in a navigation context, so a non-image preview in an
+                        // <iframe> shows a blank frame. Mirrors AttachmentThumbnail's non-image card.
+                        <div className="flex flex-col items-center justify-center gap-3 min-w-[20rem] px-10 py-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                            {preview.fileType === 'pdf'
+                                ? <HiOutlineDocumentText className="w-10 h-10 text-red-500" />
+                                : <HiOutlineDocument className="w-10 h-10 text-slate-400" />}
+                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 text-center break-all">{preview.fileName}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
+                                This file can&apos;t be previewed inline — use Download below to view it.
+                            </p>
+                        </div>
                     )}
                 </div>
                 <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-700 flex justify-end bg-white dark:bg-slate-800">

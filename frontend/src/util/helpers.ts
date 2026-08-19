@@ -126,8 +126,39 @@ export const formatLongDate = (date: MaybeDate): string => {
     });
 };
 
-export const isOverdue = (dueDate?: string | Date | null, progress = 0): boolean => {
-    if (!dueDate || progress >= 100) return false;
+/**
+ * Statuses that mean the work is finished, mirroring the scheduler's own TERMINAL_STATUSES in
+ * backend/src/main/java/com/backend/scheduling/ScheduleModel.java.
+ */
+export const TERMINAL_STATUSES: ReadonlySet<TaskStatus> = new Set<TaskStatus>([
+    'DONE', 'RELEASED', 'WITHDRAWN',
+]);
+
+/**
+ * Statuses that mean the work was actually delivered, as opposed to merely no longer active.
+ * WITHDRAWN is terminal but cancelled, so it must not count towards throughput or "completed"
+ * tallies the way DONE and RELEASED do.
+ */
+export const DELIVERED_STATUSES: ReadonlySet<TaskStatus> = new Set<TaskStatus>([
+    'DONE', 'RELEASED',
+]);
+
+/**
+ * The single answer to "is this task finished", meaning it is no longer active work. Status and
+ * progress are set independently, so a task can be DONE at 40% or at 100% without being DONE; both
+ * count as finished, and every caller must agree or the same task reads as overdue in one place and
+ * finished in another. For "was this delivered" — throughput, completion trends — use
+ * {@link DELIVERED_STATUSES} instead, which excludes cancelled work.
+ */
+export const isTaskComplete = (status?: TaskStatus | null, progress?: number | null): boolean =>
+    (!!status && TERMINAL_STATUSES.has(status)) || (progress ?? 0) >= 100;
+
+export const isOverdue = (
+    dueDate?: string | Date | null,
+    progress = 0,
+    status?: TaskStatus | null,
+): boolean => {
+    if (!dueDate || isTaskComplete(status, progress)) return false;
     const due = dayIndex(dueDate);
     // Due dates are inclusive everywhere else in the app, so a task due today is not late until
     // tomorrow. Comparing instants made it late from midnight UTC on its own due date.

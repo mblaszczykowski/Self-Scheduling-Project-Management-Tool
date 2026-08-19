@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { formatAssigneeName, daysBetween, formatShortDate } from '../../util/helpers';
+import { formatAssigneeName, formatShortDate } from '../../util/helpers';
+import { summarizeOptimization } from '../../util/optimizationSummary';
 import {
     OptimizationMetrics as OptimizationMetricsData,
     OptimizationSuggestion,
@@ -117,30 +118,10 @@ const OptimizationMetrics = ({
 
     useEffect(() => { setMounted(true); }, []);
 
-    const summary = useMemo(() => {
-        if (!suggestions) return null;
-        const shifted = suggestions.filter(s => s.wasShifted);
-
-        const byAssignee: Record<string, OptimizationSuggestion[]> = {};
-        let totalShiftDays = 0, maxShift = 0;
-
-        shifted.forEach(s => {
-            const key = s.assignee || 'Unassigned';
-            if (!byAssignee[key]) byAssignee[key] = [];
-            byAssignee[key].push(s);
-            const shift = Math.abs(daysBetween(s.originalStartDate, s.suggestedStartDate));
-            totalShiftDays += shift;
-            if (shift > maxShift) maxShift = shift;
-        });
-
-        return {
-            shifted,
-            byAssignee,
-            avgShift: shifted.length > 0 ? Math.round(totalShiftDays / shifted.length) : 0,
-            maxShift,
-            affectedPeople: Object.keys(byAssignee).filter(k => k !== 'Unassigned').length,
-        };
-    }, [suggestions]);
+    const summary = useMemo(
+        () => (suggestions ? summarizeOptimization(suggestions) : null),
+        [suggestions],
+    );
 
     if (!originalMetrics || !optimizedMetrics || !mounted || !summary) return null;
 
@@ -359,6 +340,7 @@ const OptimizationMetrics = ({
                             label="Weighted delay"
                             before={originalMetrics.weightedTardiness}
                             after={optimizedMetrics.weightedTardiness}
+                            unit=" pt·d"
                             infeasible={infeasible}
                         />
                         <BeforeAfter
@@ -398,12 +380,8 @@ const OptimizationMetrics = ({
                                     style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(148,163,184,0.2) transparent' }}
                                 >
                                     {[...summary.shifted]
-                                        .sort((a, b) =>
-                                            Math.abs(daysBetween(b.originalStartDate, b.suggestedStartDate)) -
-                                            Math.abs(daysBetween(a.originalStartDate, a.suggestedStartDate))
-                                        )
-                                        .map((s, i) => {
-                                            const shift = daysBetween(s.originalStartDate, s.suggestedStartDate);
+                                        .sort((a, b) => Math.abs(b.shiftDays) - Math.abs(a.shiftDays))
+                                        .map(({ suggestion: s, shiftDays: shift }, i) => {
                                             return (
                                                 <div key={s.taskKey}
                                                     className="grid grid-cols-[1fr_120px_120px_55px_50px_130px] gap-3 px-4 py-2.5 border-b border-slate-50 dark:border-slate-700/50 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors items-center"

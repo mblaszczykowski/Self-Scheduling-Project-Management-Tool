@@ -116,6 +116,12 @@ const TimelineTaskBar = ({
         task.dueDate,
         timelineStart
     );
+    // A task missing either date renders a zero-width bar at the timeline's left edge; its resize
+    // handles would still be hit-testable there with nothing visible to drag.
+    const hasFullSpan = !!task.startDate && !!task.dueDate;
+    const suggestion = optimization.showGhostBars
+        ? optimization.suggestionMap?.get(task.taskKey)
+        : undefined;
 
     const taskRowClass = `sticky left-0 z-10 bg-white dark:bg-slate-800/80 border-x border-b border-slate-200 dark:border-slate-700 hover:bg-blue-50/40 dark:hover:bg-slate-700/40 cursor-pointer transition-colors ${
         isLastTask ? 'rounded-b-xl' : ''
@@ -124,7 +130,7 @@ const TimelineTaskBar = ({
     return (
         <div
             className="flex"
-            style={{ width: `${timelineWidth}px` }}
+            style={{ width: `${sidebarWidth + timelineWidth}px` }}
         >
             <div
                 role="button"
@@ -253,46 +259,46 @@ const TimelineTaskBar = ({
                     onMouseMove={onTooltipMove}
                     onMouseLeave={onTooltipHide}
                 >
-                    <div
-                        className="absolute left-0 top-0 h-full w-2 cursor-w-resize"
-                        onMouseDown={e => {
-                            e.stopPropagation();
-                            onMouseDown(
-                                e,
-                                task.taskKey,
-                                project.projectKey,
-                                'left'
-                            );
-                        }}
-                    />
-                    <div
-                        className="absolute right-0 top-0 h-full w-2 cursor-e-resize"
-                        onMouseDown={e => {
-                            e.stopPropagation();
-                            onMouseDown(
-                                e,
-                                task.taskKey,
-                                project.projectKey,
-                                'right'
-                            );
-                        }}
-                    />
+                    {hasFullSpan && (
+                        <>
+                            <div
+                                className="absolute left-0 top-0 h-full w-2 cursor-w-resize"
+                                onPointerDown={e => {
+                                    e.stopPropagation();
+                                    onMouseDown(
+                                        e,
+                                        task.taskKey,
+                                        project.projectKey,
+                                        'left'
+                                    );
+                                }}
+                            />
+                            <div
+                                className="absolute right-0 top-0 h-full w-2 cursor-e-resize"
+                                onPointerDown={e => {
+                                    e.stopPropagation();
+                                    onMouseDown(
+                                        e,
+                                        task.taskKey,
+                                        project.projectKey,
+                                        'right'
+                                    );
+                                }}
+                            />
+                        </>
+                    )}
                 </div>
-                {optimization?.showGhostBars && (() => {
-                    const suggestion = optimization.suggestionMap?.get(task.taskKey);
-                    if (!suggestion) return null;
-                    return (
-                        <GhostTaskBar
-                            task={task}
-                            taskPosition={taskPosition}
-                            suggestion={suggestion}
-                            timelineStart={timelineStart}
-                            onTooltipShow={onTooltipShow}
-                            onTooltipMove={onTooltipMove}
-                            onTooltipHide={onTooltipHide}
-                        />
-                    );
-                })()}
+                {suggestion && (
+                    <GhostTaskBar
+                        task={task}
+                        taskPosition={taskPosition}
+                        suggestion={suggestion}
+                        timelineStart={timelineStart}
+                        onTooltipShow={onTooltipShow}
+                        onTooltipMove={onTooltipMove}
+                        onTooltipHide={onTooltipHide}
+                    />
+                )}
                 {task.isDelayed && (
                     <div
                         className="absolute flex items-center gap-1"

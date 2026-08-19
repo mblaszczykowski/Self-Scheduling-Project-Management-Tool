@@ -3,9 +3,11 @@ import { ErrorMessage, Field, Formik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import { HiOutlinePlus } from 'react-icons/hi';
 import { revokeFileUrl } from '../../util/helpers';
+import { showToast } from '../../util/toast';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import { Attachment } from '../../types';
 import { inputClass } from '../common/formHelpers';
+import { ATTACHMENT_ACCEPT, getAttachmentCountError, getFileValidationError } from '../../util/fileValidation';
 
 export interface CommentFormValues {
     content: string;
@@ -40,7 +42,23 @@ const CommentForm = ({
 
     const handleAddLocalAttachments = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
-        setLocalAttachments(prev => [...prev, ...files]);
+        e.target.value = '';
+        if (files.length === 0) return;
+        const countError = getAttachmentCountError(localAttachments.length, files.length);
+        if (countError) {
+            showToast(countError, 'error');
+            return;
+        }
+        const valid: File[] = [];
+        for (const file of files) {
+            const validationError = getFileValidationError(file);
+            if (validationError) {
+                showToast(validationError, 'error');
+            } else {
+                valid.push(file);
+            }
+        }
+        if (valid.length > 0) setLocalAttachments(prev => [...prev, ...valid]);
     };
 
     const handleRemoveLocalAttachment = (attachment: Attachment) => {
@@ -50,6 +68,10 @@ const CommentForm = ({
 
     const handleFormSubmit = (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>) => {
         onSubmit(values, actions, localAttachments);
+        // Revoke here, at the point the list is cleared: `localAttachmentsRef` is only kept in
+        // sync during render, so by the time the form unmounts it already reflects this empty
+        // array and the unmount cleanup below has nothing left to revoke.
+        localAttachments.forEach(revokeFileUrl);
         setLocalAttachments([]);
     };
 
@@ -111,6 +133,7 @@ const CommentForm = ({
                                     type="file"
                                     multiple
                                     onChange={handleAddLocalAttachments}
+                                    accept={ATTACHMENT_ACCEPT}
                                     className="sr-only"
                                 />
                             </label>

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { STATUS_CONFIG, PRIORITY_CONFIG } from '../../util/helpers';
 import {
     CheckCircleIcon, UserIcon, TagIcon, FlagIcon, AlertTriangleIcon,
@@ -8,6 +8,45 @@ import {
 import { FilterBarProps } from './types';
 
 const iconClass = "w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0";
+
+// Status, priority and the other fixed-option filters never change at runtime, so their option
+// lists and icons are built once here rather than on every keystroke in the search box.
+const STATUS_ICON = <CheckCircleIcon className={iconClass} />;
+const ASSIGNEE_ICON = <UserIcon className={iconClass} />;
+const LABELS_ICON = <TagIcon className={iconClass} />;
+const PRIORITY_ICON = <FlagIcon className={iconClass} />;
+const CRITICALITY_ICON = <AlertTriangleIcon className={iconClass} />;
+const TIME_STATUS_ICON = <ClockIcon className={iconClass} />;
+const START_DATE_ICON = <CalendarIcon className={iconClass} />;
+const DUE_DATE_ICON = <CalendarDotIcon className={iconClass} />;
+
+const STATUS_OPTIONS = Object.keys(STATUS_CONFIG)
+    .map(k => ({ value: k, label: STATUS_CONFIG[k as keyof typeof STATUS_CONFIG].label }));
+
+const PRIORITY_OPTIONS = Object.keys(PRIORITY_CONFIG)
+    .map(k => ({ value: k, label: PRIORITY_CONFIG[k as keyof typeof PRIORITY_CONFIG].label }));
+
+const CRITICALITY_OPTIONS = [
+    { value: 'Critical', label: 'Critical' },
+    { value: 'Non-Critical', label: 'Non-Critical' },
+];
+
+const TIME_STATUS_OPTIONS = [
+    { value: 'Delayed', label: 'Delayed' },
+    { value: 'Delayed by dependency', label: 'Delayed by dependency' },
+    { value: 'On Time', label: 'On Time' },
+    { value: 'Upcoming deadline', label: 'Upcoming deadline' },
+];
+
+const STATUS_FILTER = { field: 'status', label: 'Status', icon: STATUS_ICON, options: STATUS_OPTIONS };
+const PRIORITY_FILTER = { field: 'priority', label: 'Priority', icon: PRIORITY_ICON, options: PRIORITY_OPTIONS };
+const CRITICALITY_FILTER = { field: 'criticality', label: 'Criticality', icon: CRITICALITY_ICON, options: CRITICALITY_OPTIONS };
+const TIME_STATUS_FILTER = { field: 'delayed', label: 'Time Status', icon: TIME_STATUS_ICON, options: TIME_STATUS_OPTIONS };
+
+const DATE_FILTERS = [
+    { field: 'startDate', label: 'Start Date', icon: START_DATE_ICON },
+    { field: 'dueDate', label: 'Due Date', icon: DUE_DATE_ICON },
+];
 
 const FilterBar = ({
     projects,
@@ -55,33 +94,23 @@ const FilterBar = ({
         ? projects.find(p => p.projectKey === projectKeyFilter)?.summary || projectKeyFilter
         : null;
 
-    const statusOptions = Object.keys(STATUS_CONFIG)
-        .map(k => ({ value: k, label: STATUS_CONFIG[k as keyof typeof STATUS_CONFIG].label }));
-
-    const priorityOptions = Object.keys(PRIORITY_CONFIG)
-        .map(k => ({ value: k, label: PRIORITY_CONFIG[k as keyof typeof PRIORITY_CONFIG].label }));
-
     const dynamicFilters = [
-        { field: 'status', label: 'Status', icon: <CheckCircleIcon className={iconClass} />, options: statusOptions },
-        { field: 'assignee', label: 'Assignee', icon: <UserIcon className={iconClass} />, options: assigneeOptions },
-        { field: 'labels', label: 'Labels', icon: <TagIcon className={iconClass} />, options: labelOptions },
-        { field: 'priority', label: 'Priority', icon: <FlagIcon className={iconClass} />, options: priorityOptions },
-        { field: 'criticality', label: 'Criticality', icon: <AlertTriangleIcon className={iconClass} />, options: [
-            { value: 'Critical', label: 'Critical' },
-            { value: 'Non-Critical', label: 'Non-Critical' },
-        ]},
-        { field: 'delayed', label: 'Time Status', icon: <ClockIcon className={iconClass} />, options: [
-            { value: 'Delayed', label: 'Delayed' },
-            { value: 'Delayed by dependency', label: 'Delayed by dependency' },
-            { value: 'On Time', label: 'On Time' },
-            { value: 'Upcoming deadline', label: 'Upcoming deadline' },
-        ]},
+        STATUS_FILTER,
+        { field: 'assignee', label: 'Assignee', icon: ASSIGNEE_ICON, options: assigneeOptions },
+        { field: 'labels', label: 'Labels', icon: LABELS_ICON, options: labelOptions },
+        PRIORITY_FILTER,
+        CRITICALITY_FILTER,
+        TIME_STATUS_FILTER,
     ];
 
-    const dateFilters = [
-        { field: 'startDate', label: 'Start Date', icon: <CalendarIcon className={iconClass} /> },
-        { field: 'dueDate', label: 'Due Date', icon: <CalendarDotIcon className={iconClass} /> },
-    ];
+    useEffect(() => {
+        if (!openFilterDropdown) return;
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onFilterDropdownToggle(null);
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [openFilterDropdown, onFilterDropdownToggle]);
 
     const filterButtonClass = (isActive: boolean) =>
         'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-colors '
@@ -181,7 +210,7 @@ const FilterBar = ({
                     );
                 })}
 
-                {dateFilters.map(({ field, label, icon }) => (
+                {DATE_FILTERS.map(({ field, label, icon }) => (
                     <div key={field} className="relative">
                         <button
                             onClick={() => onFilterDropdownToggle(field)}

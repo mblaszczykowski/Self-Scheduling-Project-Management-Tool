@@ -5,9 +5,7 @@ import { showToast } from '../../util/toast';
 import PreviewModal from '../common/PreviewModal';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import { Attachment } from '../../types';
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'zip', 'rar', '7z'];
+import { ATTACHMENT_ACCEPT, getAttachmentCountError, getFileValidationError } from '../../util/fileValidation';
 
 interface AttachmentUploaderProps {
     existingAttachments?: string[];
@@ -38,13 +36,17 @@ const AttachmentUploader = ({
     }, []);
 
     const validateAndAdd = (files: File[]) => {
+        if (files.length === 0) return;
+        const countError = getAttachmentCountError(existingAttachments.length + newAttachments.length, files.length);
+        if (countError) {
+            showToast(countError, 'error');
+            return;
+        }
         const valid: File[] = [];
         for (const file of files) {
-            const ext = file.name.split('.').pop()?.toLowerCase();
-            if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
-                showToast(`File "${file.name}" has an unsupported file type`, 'error');
-            } else if (file.size > MAX_FILE_SIZE) {
-                showToast(`File "${file.name}" exceeds 5MB limit`, 'error');
+            const validationError = getFileValidationError(file);
+            if (validationError) {
+                showToast(validationError, 'error');
             } else {
                 valid.push(file);
             }
@@ -102,13 +104,13 @@ const AttachmentUploader = ({
                 <label htmlFor={inputId} className="relative cursor-pointer flex flex-col items-center justify-center gap-1 py-5 px-3 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400">
                     <HiOutlineCloudUpload className="w-5 h-5 text-slate-300 dark:text-slate-600" />
                     <span className="text-sm text-slate-400 dark:text-slate-500">{label}</span>
-                    <span className="text-xs text-slate-300 dark:text-slate-600">Max 5MB per file</span>
+                    <span className="text-xs text-slate-300 dark:text-slate-600">Max 5MB per file, up to 10 files</span>
                     <input
                         type="file"
                         id={inputId}
                         multiple
                         onChange={handleFileChange}
-                        accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.svg,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z"
+                        accept={ATTACHMENT_ACCEPT}
                         className="sr-only"
                     />
                 </label>

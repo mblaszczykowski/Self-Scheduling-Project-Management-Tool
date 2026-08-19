@@ -3,7 +3,7 @@ export const TIMELINE_CONSTANTS = {
     SIDEBAR_EXPANDED_WIDTH: 280,
     SIDEBAR_COLLAPSED_WIDTH: 48,
     TIMELINE_END_PADDING: 300,
-};
+} as const;
 
 export const getSidebarWidth = (isCollapsed: boolean) =>
     isCollapsed

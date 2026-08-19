@@ -5,7 +5,7 @@ import { useClickOutside } from '../../hooks/useClickOutside';
 import { globalSearch } from '../../util/api';
 import config from '../../config';
 import { SearchResults } from '../../types';
-import { STATUS_CONFIG } from '../../util/helpers';
+import { getErrorMessage, STATUS_CONFIG } from '../../util/helpers';
 
 // Status presentation comes from the shared config. The private map this replaced covered five
 // of the twelve statuses — one of which ("IN_REVIEW") is not a status at all — so seven real
@@ -14,6 +14,7 @@ import { STATUS_CONFIG } from '../../util/helpers';
 export default function SearchBar() {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResults | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
@@ -31,6 +32,7 @@ export default function SearchBar() {
     const performSearch = useCallback(async (searchQuery: string) => {
         if (searchQuery.trim().length < 2) {
             setResults(null);
+            setError(null);
             setIsOpen(false);
             return;
         }
@@ -42,10 +44,13 @@ export default function SearchBar() {
             // newer one's results (out-of-order guard).
             if (requestId !== requestIdRef.current) return;
             setResults(data);
+            setError(null);
             setIsOpen(true);
         } catch (err) {
             if (requestId !== requestIdRef.current) return;
             setResults(null);
+            setError(getErrorMessage(err, 'Search failed'));
+            setIsOpen(true);
         } finally {
             if (requestId === requestIdRef.current) setLoading(false);
         }
@@ -68,6 +73,7 @@ export default function SearchBar() {
         setIsOpen(false);
         setQuery('');
         setResults(null);
+        setError(null);
         setIsFocused(false);
         inputRef.current?.blur();
         navigate(path);
@@ -127,7 +133,15 @@ export default function SearchBar() {
                 )}
             </div>
 
-            {isOpen && (hasResults || hasNoResults) && (
+            {isOpen && error && (
+                <div className="absolute top-full mt-1.5 w-96 right-0 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden z-50">
+                    <div className="px-4 py-6 text-center text-sm text-red-600 dark:text-red-400">
+                        {error}
+                    </div>
+                </div>
+            )}
+
+            {isOpen && !error && (hasResults || hasNoResults) && (
                 <div className={`absolute top-full mt-1.5 w-96 right-0 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden z-50 max-h-[28rem] overflow-y-auto ${loading ? 'opacity-60' : ''} transition-opacity`}>
                     {hasNoResults && (
                         <div className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">

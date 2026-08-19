@@ -28,6 +28,7 @@ const task = (overrides: Partial<EnrichedTask> & Pick<EnrichedTask, 'taskKey'>):
     status: 'TODO',
     labels: [],
     dependencyKeys: [],
+    assigneeName: '',
     attachments: [],
     progress: 0,
     priority: 'MEDIUM',
@@ -53,83 +54,69 @@ const project = (projectKey: string, tasks: EnrichedTask[]): ProcessedProject =>
 const byKey = (tasks: EnrichedTask[]) => new Map(tasks.map(t => [t.taskKey, t]));
 
 describe('computeSlackDistribution', () => {
-    // A diamond: A ─┬─> B ─┬─> D
-    //               └─> C ─┘
-    // Durations 5 / 3 / 2 / 4. The forward pass puts D's early start at 8 (via B, the longer
-    // branch), so C — the shorter branch — is the only task with float.
-    const diamond = () => [
-        task({ taskKey: 'A', duration: 5, startDate: '2024-06-01', dueDate: '2024-06-06' }),
-        task({ taskKey: 'B', duration: 3, startDate: '2024-06-06', dueDate: '2024-06-09', dependencies: ['A'] }),
-        task({ taskKey: 'C', duration: 2, startDate: '2024-06-06', dueDate: '2024-06-08', dependencies: ['A'] }),
-        task({ taskKey: 'D', duration: 4, startDate: '2024-06-09', dueDate: '2024-06-13', dependencies: ['B', 'C'] }),
-    ];
+    // Float itself is computed server-side (CriticalPathAnalyzer) and arrives as `totalFloat`;
+    // what is under test here is the bucketing and which tasks are counted at all.
+    test('buckets each task by the float the server reported', () => {
+        const result = computeSlackDistribution([
+            task({ taskKey: 'A', totalFloat: 0, startDate: '2024-06-01', dueDate: '2024-06-06' }),
+            task({ taskKey: 'B', totalFloat: 2, startDate: '2024-06-01', dueDate: '2024-06-06' }),
+            task({ taskKey: 'C', totalFloat: 4, startDate: '2024-06-01', dueDate: '2024-06-06' }),
+            task({ taskKey: 'D', totalFloat: 8, startDate: '2024-06-01', dueDate: '2024-06-06' }),
+            task({ taskKey: 'E', totalFloat: 40, startDate: '2024-06-01', dueDate: '2024-06-06' }),
+        ]);
 
-    test('gives float only to the off-critical branch', () => {
-        const result = computeSlackDistribution(diamond());
-
-        expect(result.totalScheduled).toBe(4);
-        expect(result.zeroSlackCount).toBe(3);
-        // Slacks are A=0, B=0, C=1, D=0 → mean 0.25, rounded to 0.
-        expect(result.avgSlack).toBe(0);
+        expect(result.totalScheduled).toBe(5);
+        expect(result.zeroSlackCount).toBe(1);
+        expect(result.avgSlack).toBe(11);
         expect(result.buckets.map(b => [b.id, b.count])).toEqual([
-            ['none', 3],
+            ['none', 1],
             ['tight', 1],
-            ['moderate', 0],
-            ['comfortable', 0],
-            ['ample', 0],
+            ['moderate', 1],
+            ['comfortable', 1],
+            ['ample', 1],
         ]);
     });
 
-    test('an unscheduled predecessor does not constrain its successors', () => {
-        const withFinishedPredecessor = [
-            // Excluded from the pass by being complete; A depends on it all the same.
-            task({ taskKey: 'Z', duration: 30, progress: 100, startDate: '2024-05-01', dueDate: '2024-05-31' }),
-            ...diamond(),
-        ];
-        withFinishedPredecessor[1].dependencies = ['Z'];
+    test('ignores finished work, however its completion is expressed', () => {
+        const result = computeSlackDistribution([
+            task({ taskKey: 'OPEN', totalFloat: 0, startDate: '2024-06-01', dueDate: '2024-06-06' }),
+            task({ taskKey: 'AT_100', totalFloat: 5, progress: 100, startDate: '2024-06-01', dueDate: '2024-06-06' }),
+            task({ taskKey: 'DONE', totalFloat: 5, status: 'DONE', startDate: '2024-06-01', dueDate: '2024-06-06' }),
+            task({ taskKey: 'RELEASED', totalFloat: 5, status: 'RELEASED', startDate: '2024-06-01', dueDate: '2024-06-06' }),
+            task({ taskKey: 'WITHDRAWN', totalFloat: 5, status: 'WITHDRAWN', startDate: '2024-06-01', dueDate: '2024-06-06' }),
+        ]);
 
-        expect(computeSlackDistribution(withFinishedPredecessor)).toEqual(computeSlackDistribution(diamond()));
+        expect(result.totalScheduled).toBe(1);
+        expect(result.zeroSlackCount).toBe(1);
     });
 
-    test('independent tasks float out to the project finish', () => {
-        const tasks = [
-            task({ taskKey: 'SHORT', duration: 1, startDate: '2024-06-01', dueDate: '2024-06-02' }),
-            task({ taskKey: 'LONG', duration: 20, startDate: '2024-06-01', dueDate: '2024-06-21' }),
-        ];
+    test('ignores tasks the server reported no float for, and undated ones', () => {
+        const result = computeSlackDistribution([
+            task({ taskKey: 'COUNTED', totalFloat: 3, startDate: '2024-06-01', dueDate: '2024-06-06' }),
+            task({ taskKey: 'NO_FLOAT', startDate: '2024-06-01', dueDate: '2024-06-06' }),
+            task({ taskKey: 'NULL_FLOAT', totalFloat: null, startDate: '2024-06-01', dueDate: '2024-06-06' }),
+            task({ taskKey: 'UNDATED', totalFloat: 3 }),
+        ]);
 
-        const result = computeSlackDistribution(tasks);
+        expect(result.totalScheduled).toBe(1);
+        expect(result.buckets.find(b => b.id === 'moderate')?.count).toBe(1);
+    });
 
-        // The project finishes at 20; SHORT can start any time up to day 19.
+    test('treats a negative float as zero rather than bucketing it below none', () => {
+        const result = computeSlackDistribution([
+            task({ taskKey: 'LATE', totalFloat: -4, startDate: '2024-06-01', dueDate: '2024-06-06' }),
+        ]);
+
         expect(result.zeroSlackCount).toBe(1);
-        expect(result.avgSlack).toBe(10);
-        expect(result.buckets.find(b => b.id === 'ample')?.count).toBe(1);
+        expect(result.avgSlack).toBe(0);
         expect(result.buckets.find(b => b.id === 'none')?.count).toBe(1);
     });
 
-    test('a dependency cycle is skipped rather than hung on', () => {
-        const tasks = [
-            task({ taskKey: 'A', duration: 5, startDate: '2024-06-01', dueDate: '2024-06-06', dependencies: ['B'] }),
-            task({ taskKey: 'B', duration: 3, startDate: '2024-06-01', dueDate: '2024-06-04', dependencies: ['A'] }),
-            task({ taskKey: 'C', duration: 2, startDate: '2024-06-01', dueDate: '2024-06-03' }),
-        ];
+    test('reports an empty distribution when nothing is measurable', () => {
+        const result = computeSlackDistribution([task({ taskKey: 'UNDATED' })]);
 
-        const result = computeSlackDistribution(tasks);
-
-        expect(result.totalScheduled).toBe(3);
-        // Kahn's algorithm never reaches A or B, so they keep their initial slack of 0.
-        expect(result.zeroSlackCount).toBe(3);
-    });
-
-    test('tasks without both dates, or already complete, are not scheduled', () => {
-        const tasks = [
-            task({ taskKey: 'NO_START', dueDate: '2024-06-10' }),
-            task({ taskKey: 'NO_DUE', startDate: '2024-06-01' }),
-            task({ taskKey: 'DONE', progress: 100, startDate: '2024-06-01', dueDate: '2024-06-10' }),
-        ];
-
-        expect(computeSlackDistribution(tasks)).toEqual({
-            buckets: [], avgSlack: 0, zeroSlackCount: 0, totalScheduled: 0,
-        });
+        expect(result.totalScheduled).toBe(0);
+        expect(result.buckets).toEqual([]);
     });
 });
 
@@ -236,8 +223,12 @@ describe('computeScheduleHealth', () => {
         ]);
     });
 
-    test('an empty schedule divides by one rather than by zero', () => {
-        expect(computeScheduleHealth([], TODAY)).toMatchObject({ scheduleHealthScore: 0, totalActive: 0 });
+    // Nothing scheduled means nothing behind, so this reports healthy rather than 0% — the same
+    // convention computeCriticalPathHealth uses for an empty set. The two cards sat side by side
+    // reading 100% and 0% off the same empty portfolio before this agreed.
+    test('an empty schedule scores as healthy, not as critically behind', () => {
+        expect(computeScheduleHealth([], TODAY))
+            .toMatchObject({ scheduleHealthScore: 100, totalActive: 0 });
     });
 });
 
@@ -355,6 +346,18 @@ describe('computeCompletionTrend', () => {
         expect(trend).toHaveLength(8);
         expect(trend[7]).toEqual({ label: '6/11', count: 2 });
         expect(trend.slice(0, 7).every(w => w.count === 0)).toBe(true);
+    });
+
+    test('withdrawn work is not counted as completed', () => {
+        const tasks = [
+            task({ taskKey: 'DELIVERED', status: 'DONE', updated: '2024-06-11T10:00:00' }),
+            task({ taskKey: 'CANCELLED', status: 'WITHDRAWN', updated: '2024-06-11T10:00:00' }),
+        ];
+
+        // WITHDRAWN is terminal but cancelled; counting it would inflate "weekly completed tasks".
+        const trend = computeCompletionTrend(tasks, new Date('2024-06-11T12:00:00'));
+
+        expect(trend[7]).toEqual({ label: '6/11', count: 1 });
     });
 });
 

@@ -4,7 +4,6 @@ import { IconType } from 'react-icons';
 import { formatLongDate } from '../../util/helpers';
 import { CalendarIcon, AlertTriangleIcon, ClockIcon, TrendingUpIcon } from '../common/Icons';
 import { User } from '../../types';
-import '../common/Aurora.css';
 
 const quickActionClass = "inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors border border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500";
 
@@ -37,15 +36,6 @@ const DashboardHero = ({ user, criticalCount, delayedCount, upcomingCriticalCoun
 
     return (
         <div className="relative overflow-hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-            {/* Dimmer in dark mode: the same blobs that read as a tint on white glare on slate. */}
-            <div className="absolute inset-0 z-0 opacity-40 dark:opacity-20">
-                <div className="aurora-bg transform scale-110">
-                    <div className="aurora-blob aurora-blob-1" />
-                    <div className="aurora-blob aurora-blob-2" />
-                    <div className="aurora-blob aurora-blob-3" />
-                </div>
-            </div>
-
             <div className="relative z-10 px-6 lg:px-10 py-10 lg:py-12">
                 <div className="max-w-[1400px] mx-auto">
                     <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">

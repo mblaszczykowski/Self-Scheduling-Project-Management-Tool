@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { HiOutlineChevronDown, HiOutlineFolderOpen, HiOutlineClipboardList } from 'react-icons/hi';
 import { useClickOutside } from '../../hooks/useClickOutside';
 
@@ -19,7 +19,16 @@ export default function CreateMenu({
 }: CreateMenuProps) {
     const dropdownRef = useRef<HTMLDivElement | null>(null);
     const triggerRef = useRef<HTMLButtonElement | null>(null);
+    const menuRef = useRef<HTMLDivElement | null>(null);
     useClickOutside(dropdownRef, onClose);
+
+    // Real commands, unlike the notification list: a `menu` role needs a menuitem to land focus on
+    // when it opens, and arrow keys to move between them.
+    useEffect(() => {
+        if (!isOpen) return;
+        const firstItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
+        firstItem?.focus();
+    }, [isOpen]);
 
     const handleCreateProject = () => {
         onClose();
@@ -35,7 +44,17 @@ export default function CreateMenu({
         if (e.key === 'Escape') {
             onClose();
             triggerRef.current?.focus();
+            return;
         }
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+        if (items.length === 0) return;
+        e.preventDefault();
+        const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+        const nextIndex = e.key === 'ArrowDown'
+            ? (currentIndex + 1) % items.length
+            : (currentIndex - 1 + items.length) % items.length;
+        items[nextIndex].focus();
     };
 
     return (
@@ -52,9 +71,10 @@ export default function CreateMenu({
                 <HiOutlineChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
             {isOpen && (
-                <div role="menu" aria-label="Create options" className="absolute left-0 mt-1.5 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-50 overflow-hidden animate-[slideDown_0.2s_ease-out]">
+                <div ref={menuRef} role="menu" aria-label="Create options" className="absolute left-0 mt-1.5 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-50 overflow-hidden animate-[slideDown_0.2s_ease-out]">
                     <div className="py-1">
                         <button
+                            role="menuitem"
                             onClick={handleCreateProject}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                         >
@@ -62,6 +82,7 @@ export default function CreateMenu({
                             <span>New Project</span>
                         </button>
                         <button
+                            role="menuitem"
                             onClick={handleCreateTask}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                         >

@@ -33,7 +33,7 @@ interface HeaderProps {
 
 export default function Header({ onLogout, onCreateProject, onCreateTask }: HeaderProps) {
     const { user, setUser } = useAuth();
-    const { notifications, unreadCount, markAsRead } = useNotifications();
+    const { notifications, unreadCount, markAsRead, markAllAsRead, refreshNotifications } = useNotifications();
     const { theme, toggleTheme } = useTheme();
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [accountModalOpen, setAccountModalOpen] = useState(false);
@@ -49,17 +49,15 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
         onLogout();
     };
 
-    // Only the ids present when the click happened are acknowledged; a notification that arrives
-    // over the stream while the request is in flight must stay unread.
+    // Goes through the dedicated endpoint rather than the locally-loaded page, so it clears every
+    // unread notification server-side even when there are more than the page holds.
     const handleMarkNotificationsAsRead = useCallback(async () => {
-        const unreadIds = notifications.filter((n) => !n.isRead).map((n) => n.id);
-        if (unreadIds.length === 0) return;
         try {
-            await markAsRead(unreadIds);
+            await markAllAsRead();
         } catch (err) {
             console.error('Could not mark notifications as read', err);
         }
-    }, [notifications, markAsRead]);
+    }, [markAllAsRead]);
 
     const handleMarkSingleRead = useCallback(async (notificationId: number) => {
         try {
@@ -68,6 +66,13 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
             console.error('Could not mark the notification as read', err);
         }
     }, [markAsRead]);
+
+    // Re-syncs the list from the server whenever the dropdown opens, so a stream that missed a
+    // push (a reconnect gap, a slow tab) doesn't leave stale entries showing.
+    const handleOpenNotifications = useCallback(() => {
+        setNotificationsOpen(true);
+        refreshNotifications();
+    }, [refreshNotifications]);
 
     return (
         <header className="w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-50">
@@ -116,7 +121,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
                         notifications={notifications}
                         unreadCount={unreadCount}
                         isOpen={notificationsOpen}
-                        onOpen={() => setNotificationsOpen(true)}
+                        onOpen={handleOpenNotifications}
                         onClose={() => setNotificationsOpen(false)}
                         onMarkAsRead={handleMarkNotificationsAsRead}
                         onMarkSingleRead={handleMarkSingleRead}
@@ -133,7 +138,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
                         aria-expanded={mobileMenuOpen}
                         aria-controls="mobile-menu"
                         aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-                        className="xl:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus:outline-none transition-colors"
+                        className="xl:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 dark:focus-visible:ring-white transition-colors"
                     >
                         {mobileMenuOpen ? (
                             <HiOutlineX className="h-5 w-5 text-slate-500 dark:text-slate-400" aria-hidden="true" />

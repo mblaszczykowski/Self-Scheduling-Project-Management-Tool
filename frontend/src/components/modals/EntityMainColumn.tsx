@@ -60,6 +60,7 @@ const EntityMainColumn = ({
             <RichTextEditor
                 value={values.description || ''} onChange={val => setFieldValue('description', val)}
                 placeholder={descPlaceholder} minHeight="200px"
+                characterLimit={5000} showCharacterCount
             />
         </div>
 

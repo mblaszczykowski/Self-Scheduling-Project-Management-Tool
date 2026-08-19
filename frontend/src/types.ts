@@ -55,6 +55,8 @@ export interface Task {
     labels: string[];
     dependencyKeys: string[];
     isCritical?: boolean | null;
+    /** Total float in days from the server's critical-path pass; zero means on a critical path. */
+    totalFloat?: number | null;
     attachments: string[];
     created?: string | null;
     updated?: string | null;
@@ -71,6 +73,8 @@ export interface EnrichedTask extends Task {
     isDelayed: boolean;
     isUpcomingDeadline: boolean;
     isDelayedByDependency: boolean;
+    /** The assignee's real name, resolved against the project's members; falls back to the email. */
+    assigneeName: string;
 }
 
 /** Mirrors ProjectDTO. */
@@ -320,7 +324,8 @@ export interface SearchTaskResult {
     summary: string;
     status?: TaskStatus | null;
     priority?: TaskPriority | null;
-    assignee?: string | null;
+    /** The assignee's full name — search results carry a name, not the email other endpoints send. */
+    assigneeName?: string | null;
 }
 
 export interface SearchCommentResult {

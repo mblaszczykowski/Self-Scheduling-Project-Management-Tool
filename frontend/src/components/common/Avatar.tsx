@@ -44,7 +44,7 @@ const Avatar = ({ user, profilePicture, size = 'sm', className = '', onError: ex
         return (
             <img
                 src={src}
-                alt={user?.firstname ? `${user.firstname} ${user.lastname ?? ''}`.trim() : ''}
+                alt={user?.firstname ? `${user.firstname} ${user.lastname ?? ''}`.trim() : user?.email ?? ''}
                 className={`${container} rounded-full object-cover ${className}`}
                 onError={handleError}
             />

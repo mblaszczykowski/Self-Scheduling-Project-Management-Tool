@@ -7,7 +7,7 @@ import {
 import EntityMainColumn from './EntityMainColumn';
 import Comments from '../comments/Comments';
 import ActivityTab from '../comments/ActivityTab';
-import { STATUS_CONFIG, PRIORITY_CONFIG, daysBetween, addDays, MS_PER_DAY } from '../../util/helpers';
+import { STATUS_CONFIG, PRIORITY_CONFIG, daysBetween, addDays } from '../../util/helpers';
 import Avatar from '../common/Avatar';
 import { Project, Task, User, ModalFormValues, Attachment } from '../../types';
 import { FormikHelpers, FormikProps } from 'formik';
@@ -82,13 +82,32 @@ const ProgressRing = ({ value, size = 38, stroke = 3.5 }: { value: number; size?
 
 const DueBadge = ({ date }: { date?: string }) => {
     if (!date) return null;
-    const diff = Math.round((new Date(date).getTime() - new Date().getTime()) / MS_PER_DAY);
+    // Whole-calendar-day arithmetic, not instants: `daysBetween` compares the due date's own day
+    // to today's day in the same (UTC) frame, so the badge doesn't flip to "1d overdue" on a task
+    // due today just because it's already past midnight UTC.
+    const diff = daysBetween(new Date(), date);
     let text: string, cls: string;
     if (diff < 0)        { text = `${Math.abs(diff)}d overdue`; cls = 'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/50'; }
     else if (diff === 0)  { text = 'due today';  cls = 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/50'; }
     else if (diff <= 3)   { text = `in ${diff}d`; cls = 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/50'; }
     else return null;
     return <span className={`ml-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${cls} animate-pulse`}>{text}</span>;
+};
+
+// Mirrors the backend's own limits on TaskRequest.labels (max 10 labels, 20 chars each).
+const MAX_LABELS = 10;
+const MAX_LABEL_LENGTH = 20;
+
+const validateLabels = (value: string): string | undefined => {
+    const tokens = value.trim() ? value.trim().split(/\s+/) : [];
+    if (tokens.length > MAX_LABELS) {
+        return `A task can have at most ${MAX_LABELS} labels.`;
+    }
+    const tooLong = tokens.find(token => token.length > MAX_LABEL_LENGTH);
+    if (tooLong) {
+        return `Each label must be at most ${MAX_LABEL_LENGTH} characters ("${tooLong}" is too long).`;
+    }
+    return undefined;
 };
 
 const ACTIVITY_TABS = [
@@ -122,7 +141,10 @@ const TaskForm = ({
     entityKey,
 }: TaskFormProps) => {
     const [activeActivityTab, setActiveActivityTab] = useState('comments');
-    const allTasks = projects.flatMap(p => p.tasks || []);
+    // `.flatMap` builds a new array every render; without memoizing it, `depTasks` below — which
+    // depends on this array's identity — recomputed on every render regardless of whether
+    // `projects` had actually changed.
+    const allTasks = useMemo(() => projects.flatMap(p => p.tasks || []), [projects]);
 
     // Ids are namespaced per instance so two forms on one page can't hand each other's
     // labels to the wrong control.
@@ -331,7 +353,9 @@ const TaskForm = ({
                 <SidebarSection title="Tracking">
                     <PropRow label="Labels" htmlFor={idFor('labels')}>
                         <Field type="text" id={idFor('labels')} name="labels" placeholder="Add labels..."
+                            validate={validateLabels}
                             className={sidebarInputClass} />
+                        <ErrorMessage name="labels" component="div" className="text-red-500 text-xs mt-0.5 pl-0.5" />
                     </PropRow>
 
                     <div>

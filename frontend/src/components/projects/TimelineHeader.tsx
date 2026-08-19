@@ -8,6 +8,7 @@ const { DAY_WIDTH } = TIMELINE_CONSTANTS;
 const TimelineHeader = ({
     timelineStart,
     timelineEnd,
+    timelineWidth,
     sidebarWidth,
     sidebarCollapsed,
     processedProjects,
@@ -82,6 +83,7 @@ const TimelineHeader = ({
                     onClick={onSidebarToggle}
                     className="p-2 ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                    aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
                     <ChevronsLeftIcon className={`w-4 h-4 transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`} />
                 </button>
@@ -90,18 +92,16 @@ const TimelineHeader = ({
                         <span className="text-xs font-medium text-slate-400 dark:text-slate-500 tabular-nums">
                             {processedProjects.length} projects
                         </span>
-                        {onScrollToToday && (
-                            <button
-                                onClick={onScrollToToday}
-                                className="text-xs px-2.5 py-1 rounded-lg font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                            >
-                                Today
-                            </button>
-                        )}
-                        {!optimization?.result && (
+                        <button
+                            onClick={onScrollToToday}
+                            className="text-xs px-2.5 py-1 rounded-lg font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                        >
+                            Today
+                        </button>
+                        {!optimization.result && (
                             <button
                                 onClick={onOptimize}
-                                disabled={optimization?.loading}
+                                disabled={optimization.loading}
                                 className="group text-xs px-3 py-1 rounded-lg font-semibold transition-all duration-200 disabled:opacity-60 flex items-center gap-1.5 text-white"
                                 title="Optimize schedule (RCPSP solver)"
                                 style={{
@@ -109,7 +109,7 @@ const TimelineHeader = ({
                                     boxShadow: '0 1px 3px rgba(37,99,235,0.3)',
                                 }}
                             >
-                                {optimization?.loading ? (
+                                {optimization.loading ? (
                                     <>
                                         <svg className="animate-spin h-3 w-3 flex-shrink-0" viewBox="0 0 24 24" fill="none">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -132,7 +132,12 @@ const TimelineHeader = ({
                     </div>
                 )}
             </div>
-            <div className="flex-1 flex relative bg-white dark:bg-slate-800">{monthElements}</div>
+            <div
+                className="flex-1 flex relative bg-white dark:bg-slate-800"
+                style={{ width: `${timelineWidth}px`, minWidth: `${timelineWidth}px` }}
+            >
+                {monthElements}
+            </div>
         </div>
     );
 };

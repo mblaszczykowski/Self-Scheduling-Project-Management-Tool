@@ -22,6 +22,7 @@ const task = (overrides: Partial<EnrichedTask> & Pick<EnrichedTask, 'taskKey'>):
     status: 'TODO',
     labels: [],
     dependencyKeys: [],
+    assigneeName: '',
     attachments: [],
     progress: 0,
     priority: 'MEDIUM',
@@ -139,6 +140,16 @@ describe('computeUpcomingCriticalDeadlines', () => {
 
         expect(result.map(t => t.taskKey)).toEqual(['U1', 'U2']);
     });
+
+    test('a withdrawn task is finished even below 100%, so it is not an upcoming deadline', () => {
+        const criticalTasks = [
+            task({ taskKey: 'OPEN', dueDate: '2024-06-12', progress: 40 }),
+            task({ taskKey: 'CANCELLED', dueDate: '2024-06-12', status: 'WITHDRAWN', progress: 40 }),
+        ];
+
+        expect(computeUpcomingCriticalDeadlines(criticalTasks, TODAY).map(t => t.taskKey))
+            .toEqual(['OPEN']);
+    });
 });
 
 describe('computeBlockedTasks', () => {
@@ -162,6 +173,18 @@ describe('computeBlockedTasks', () => {
         const tasks = [task({ taskKey: 'H', dependencies: ['MISSING-1'] })];
 
         expect(computeBlockedTasks(tasks, byKey(tasks)).blockedTasks).toEqual([]);
+    });
+
+    test('a withdrawn dependency no longer blocks, and a withdrawn task is not itself blocked', () => {
+        const tasks = [
+            task({ taskKey: 'CANCELLED_DEP', status: 'WITHDRAWN', progress: 0 }),
+            task({ taskKey: 'WAITING', dependencies: ['CANCELLED_DEP'] }),
+            task({ taskKey: 'OPEN_DEP', progress: 10 }),
+            task({ taskKey: 'CANCELLED_SELF', status: 'WITHDRAWN', progress: 0, dependencies: ['OPEN_DEP'] }),
+        ];
+
+        // Cancelled work is finished work: it cannot hold anything up, and it cannot itself wait.
+        expect(computeBlockedTasks(tasks, byKey(tasks)).blockedTasks.map(t => t.taskKey)).toEqual([]);
     });
 });
 

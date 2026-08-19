@@ -2,7 +2,7 @@ import { useEffect, useRef, RefObject } from 'react';
 
 export const useClickOutside = (
     ref: RefObject<HTMLElement | null>,
-    onClickOutside: (e: MouseEvent) => void,
+    onClickOutside: (e: MouseEvent | TouchEvent) => void,
 ) => {
     // Keep the latest callback in a ref so the listener subscribes exactly once
     // (deps: [ref]) instead of re-adding whenever the caller passes a new
@@ -11,7 +11,7 @@ export const useClickOutside = (
     callbackRef.current = onClickOutside;
 
     useEffect(() => {
-        const handler = (e: MouseEvent) => {
+        const handler = (e: MouseEvent | TouchEvent) => {
             if (e.target instanceof Element && e.target.closest('[role="dialog"], [role="alertdialog"]')) {
                 return;
             }
@@ -20,6 +20,10 @@ export const useClickOutside = (
             }
         };
         document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
+        document.addEventListener('touchstart', handler);
+        return () => {
+            document.removeEventListener('mousedown', handler);
+            document.removeEventListener('touchstart', handler);
+        };
     }, [ref]);
 };

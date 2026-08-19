@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 import Modal from 'react-modal';
-import { ErrorMessage, Field, Form, Formik, FormikHelpers } from 'formik';
+import { ErrorMessage, Field, Form, Formik, FormikHelpers, FormikProps } from 'formik';
 import * as Yup from 'yup';
 import { updateEmailPreferences, updateProfile } from '../../util/api';
 import { getImageUrl, getErrorMessage } from '../../util/helpers';
@@ -9,6 +9,9 @@ import { showToast } from '../../util/toast';
 import Avatar from '../common/Avatar';
 import { CloseIcon } from '../common/Icons';
 import { inputClass } from '../common/formHelpers';
+import { withPasswordComplexity } from '../auth/passwordRules';
+import { ALLOWED_IMAGE_EXTENSIONS, IMAGE_ACCEPT, getFileValidationError } from '../../util/fileValidation';
+import ConfirmDialog from './ConfirmDialog';
 import { ApiFieldError, CurrentUser, ErrorLike } from '../../types';
 
 interface AccountFormValues {
@@ -37,9 +40,7 @@ const validationSchema = Yup.object().shape({
     firstname: Yup.string().required('First name is required'),
     lastname: Yup.string().required('Last name is required'),
     email: Yup.string().email('Invalid email').required('Email is required'),
-    newPassword: Yup.string()
-        .transform(emptyToUndefined)
-        .min(8, 'Password must be at least 8 characters'),
+    newPassword: withPasswordComplexity(Yup.string().transform(emptyToUndefined)),
     currentPassword: Yup.string()
         .transform(emptyToUndefined)
         .when('newPassword', {
@@ -48,7 +49,11 @@ const validationSchema = Yup.object().shape({
         }),
     confirmNewPassword: Yup.string()
         .transform(emptyToUndefined)
-        .oneOf([Yup.ref('newPassword'), undefined], 'Passwords must match'),
+        .oneOf([Yup.ref('newPassword'), undefined], 'Passwords must match')
+        .when('newPassword', {
+            is: (v: unknown) => !!v,
+            then: (schema: Yup.StringSchema) => schema.required('Please confirm your new password'),
+        }),
 });
 
 interface EmailToggleProps {
@@ -96,11 +101,28 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
         emailOnProjectInvitation: user.emailOnProjectInvitation,
     });
     const [emailPrefsSaving, setEmailPrefsSaving] = useState(false);
+    const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+    const formikRef = useRef<FormikProps<AccountFormValues>>(null);
 
-    const handleClose = React.useCallback(() => {
+    const emailTogglesDisabled = emailPrefsSaving || !emailPrefs.emailNotificationsEnabled;
+
+    // Closes unconditionally: used after a successful save and after the user confirms
+    // discarding unsaved changes, so neither path re-checks dirtiness.
+    const handleForceClose = React.useCallback(() => {
+        setCloseConfirmOpen(false);
         setIsVisible(false);
         setTimeout(onClose, 200);
     }, [onClose, setIsVisible]);
+
+    // Entry point for every user-initiated close (Escape, overlay click, the × button, Cancel):
+    // a dirty form is confirmed rather than discarded silently.
+    const handleCloseAttempt = React.useCallback(() => {
+        if (formikRef.current?.dirty) {
+            setCloseConfirmOpen(true);
+        } else {
+            handleForceClose();
+        }
+    }, [handleForceClose]);
 
     const initialValues: AccountFormValues = {
         firstname: user.firstname,
@@ -131,7 +153,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
             showToast(values.newPassword
                 ? 'Account updated. Other devices have been signed out.'
                 : 'Account updated', 'success');
-            handleClose();
+            handleForceClose();
         } catch (err) {
             // Field-level failures are attached to the fields that caused them rather than being
             // flattened into one toast.
@@ -167,13 +189,18 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
         setFieldValue: FormikHelpers<AccountFormValues>['setFieldValue'],
     ) => {
         const file = event.currentTarget.files?.[0];
-        if (file) {
-            if (profilePreview && profilePreview.startsWith('blob:')) {
-                URL.revokeObjectURL(profilePreview);
-            }
-            setProfilePreview(URL.createObjectURL(file));
-            setFieldValue('profilePicture', file);
+        if (!file) return;
+        const validationError = getFileValidationError(file, ALLOWED_IMAGE_EXTENSIONS);
+        if (validationError) {
+            showToast(validationError, 'error');
+            event.currentTarget.value = '';
+            return;
         }
+        if (profilePreview && profilePreview.startsWith('blob:')) {
+            URL.revokeObjectURL(profilePreview);
+        }
+        setProfilePreview(URL.createObjectURL(file));
+        setFieldValue('profilePicture', file);
     };
 
     const profilePreviewRef = React.useRef(profilePreview);
@@ -188,209 +215,223 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
     }, []);
 
     return (
-        <Modal
-            isOpen={true}
-            onRequestClose={handleClose}
-            contentLabel="Account Settings"
-            className={
-                'max-w-lg mx-auto mt-10 bg-white dark:bg-slate-900 rounded-xl shadow-2xl outline-none'
-                + ' z-[70] max-h-[90vh] overflow-y-auto transition-all duration-300 '
-                + (isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0')
-            }
-            overlayClassName={
-                'fixed inset-0 bg-black/50 flex items-center justify-center'
-                + ' z-[60] transition-opacity duration-300 '
-                + (isVisible ? 'opacity-100' : 'opacity-0')
-            }
-        >
-            <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-4 rounded-t-xl">
-                <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Account Settings</h2>
-                    <button
-                        onClick={handleClose}
-                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                        title="Close"
-                    >
-                        <CloseIcon className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-                    </button>
+        <>
+            <Modal
+                isOpen={true}
+                onRequestClose={handleCloseAttempt}
+                contentLabel="Account Settings"
+                className={
+                    'max-w-lg mx-auto mt-10 bg-white dark:bg-slate-900 rounded-xl shadow-2xl outline-none'
+                    + ' z-[70] max-h-[90vh] overflow-y-auto transition-all duration-300 '
+                    + (isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0')
+                }
+                overlayClassName={
+                    'fixed inset-0 bg-black/50 flex items-center justify-center'
+                    + ' z-[60] transition-opacity duration-300 '
+                    + (isVisible ? 'opacity-100' : 'opacity-0')
+                }
+            >
+                <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 py-4 rounded-t-xl">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Account Settings</h2>
+                        <button
+                            onClick={handleCloseAttempt}
+                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                            title="Close"
+                        >
+                            <CloseIcon className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            <div className="p-6">
-                <Formik
-                    initialValues={initialValues}
-                    validationSchema={validationSchema}
-                    onSubmit={handleSubmit}
-                >
-                    {({ isSubmitting, setFieldValue }) => (
-                        <Form className="space-y-5">
-                            <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl">
-                                <Avatar
-                                    user={user}
-                                    profilePicture={profilePreview}
-                                    size="lg"
-                                    className="ring-4 ring-white dark:ring-slate-800 shadow-lg"
-                                />
-                                <div className="flex-1">
-                                    <label className="block">
-                                        <span
-                                            className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block"
-                                        >
-                                            Profile Photo
-                                        </span>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => handleProfilePictureChange(e, setFieldValue)}
-                                            className="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4
-                                            file:rounded-lg file:border-0 file:text-sm file:font-medium
-                                            file:bg-slate-900 file:text-white hover:file:bg-slate-800
-                                            dark:file:bg-white dark:file:text-slate-900 dark:hover:file:bg-slate-100
-                                            file:cursor-pointer file:transition-all"
-                                        />
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="firstname" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                        First Name
-                                    </label>
-                                    <Field
-                                        type="text"
-                                        id="firstname"
-                                        name="firstname"
-                                        className={inputClass}
+                <div className="p-6">
+                    <Formik
+                        innerRef={formikRef}
+                        initialValues={initialValues}
+                        validationSchema={validationSchema}
+                        onSubmit={handleSubmit}
+                    >
+                        {({ isSubmitting, setFieldValue }) => (
+                            <Form className="space-y-5">
+                                <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl">
+                                    <Avatar
+                                        user={user}
+                                        profilePicture={profilePreview}
+                                        size="lg"
+                                        className="ring-4 ring-white dark:ring-slate-800 shadow-lg"
                                     />
-                                    <ErrorMessage name="firstname" component="div" className="text-red-500 text-xs mt-1" />
+                                    <div className="flex-1">
+                                        <label className="block">
+                                            <span
+                                                className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block"
+                                            >
+                                                Profile Photo
+                                            </span>
+                                            <input
+                                                type="file"
+                                                accept={IMAGE_ACCEPT}
+                                                onChange={(e) => handleProfilePictureChange(e, setFieldValue)}
+                                                className="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4
+                                                file:rounded-lg file:border-0 file:text-sm file:font-medium
+                                                file:bg-slate-900 file:text-white hover:file:bg-slate-800
+                                                dark:file:bg-white dark:file:text-slate-900 dark:hover:file:bg-slate-100
+                                                file:cursor-pointer file:transition-all"
+                                            />
+                                        </label>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label htmlFor="lastname" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                        Last Name
-                                    </label>
-                                    <Field
-                                        type="text"
-                                        id="lastname"
-                                        name="lastname"
-                                        className={inputClass}
-                                    />
-                                    <ErrorMessage name="lastname" component="div" className="text-red-500 text-xs mt-1" />
-                                </div>
-                            </div>
 
-                            <div>
-                                <label htmlFor="email" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                    Email
-                                </label>
-                                <Field
-                                    type="email"
-                                    id="email"
-                                    name="email"
-                                    className={inputClass}
-                                />
-                                <ErrorMessage name="email" component="div" className="text-red-500 text-xs mt-1" />
-                            </div>
-
-                            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                                <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Change Password</h3>
-                                <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label htmlFor="currentPassword" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                            Current Password
+                                        <label htmlFor="firstname" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                            First Name
                                         </label>
                                         <Field
-                                            type="password"
-                                            id="currentPassword"
-                                            name="currentPassword"
+                                            type="text"
+                                            id="firstname"
+                                            name="firstname"
                                             className={inputClass}
                                         />
-                                        <ErrorMessage name="currentPassword" component="div" className="text-red-500 text-xs mt-1" />
+                                        <ErrorMessage name="firstname" component="div" className="text-red-500 text-xs mt-1" />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label htmlFor="lastname" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                            Last Name
+                                        </label>
+                                        <Field
+                                            type="text"
+                                            id="lastname"
+                                            name="lastname"
+                                            className={inputClass}
+                                        />
+                                        <ErrorMessage name="lastname" component="div" className="text-red-500 text-xs mt-1" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label htmlFor="email" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                        Email
+                                    </label>
+                                    <Field
+                                        type="email"
+                                        id="email"
+                                        name="email"
+                                        className={inputClass}
+                                    />
+                                    <ErrorMessage name="email" component="div" className="text-red-500 text-xs mt-1" />
+                                </div>
+
+                                <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Change Password</h3>
+                                    <div className="space-y-4">
                                         <div>
-                                            <label htmlFor="newPassword" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                                New Password
+                                            <label htmlFor="currentPassword" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                                Current Password
                                             </label>
                                             <Field
                                                 type="password"
-                                                id="newPassword"
-                                                name="newPassword"
+                                                id="currentPassword"
+                                                name="currentPassword"
                                                 className={inputClass}
                                             />
-                                            <ErrorMessage name="newPassword" component="div" className="text-red-500 text-xs mt-1" />
+                                            <ErrorMessage name="currentPassword" component="div" className="text-red-500 text-xs mt-1" />
                                         </div>
-                                        <div>
-                                            <label htmlFor="confirmNewPassword" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                                Confirm Password
-                                            </label>
-                                            <Field
-                                                type="password"
-                                                id="confirmNewPassword"
-                                                name="confirmNewPassword"
-                                                className={inputClass}
-                                            />
-                                            <ErrorMessage name="confirmNewPassword" component="div" className="text-red-500 text-xs mt-1" />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label htmlFor="newPassword" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                                    New Password
+                                                </label>
+                                                <Field
+                                                    type="password"
+                                                    id="newPassword"
+                                                    name="newPassword"
+                                                    className={inputClass}
+                                                />
+                                                <ErrorMessage name="newPassword" component="div" className="text-red-500 text-xs mt-1" />
+                                            </div>
+                                            <div>
+                                                <label htmlFor="confirmNewPassword" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                                    Confirm Password
+                                                </label>
+                                                <Field
+                                                    type="password"
+                                                    id="confirmNewPassword"
+                                                    name="confirmNewPassword"
+                                                    className={inputClass}
+                                                />
+                                                <ErrorMessage name="confirmNewPassword" component="div" className="text-red-500 text-xs mt-1" />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                                <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Email Notifications</h3>
-                                <div className="space-y-3">
-                                    <EmailToggle
-                                        label="Email notifications enabled"
-                                        description="Master toggle for all email notifications"
-                                        checked={emailPrefs.emailNotificationsEnabled}
-                                        onChange={() => handleEmailPrefToggle('emailNotificationsEnabled')}
-                                        disabled={emailPrefsSaving}
-                                    />
-                                    <EmailToggle
-                                        label="Task assignments & updates"
-                                        description="Get notified when you are assigned to or a task changes"
-                                        checked={emailPrefs.emailOnTaskAssigned}
-                                        onChange={() => handleEmailPrefToggle('emailOnTaskAssigned')}
-                                        disabled={emailPrefsSaving || !emailPrefs.emailNotificationsEnabled}
-                                    />
-                                    <EmailToggle
-                                        label="Comment replies & reactions"
-                                        description="Get notified about replies and reactions to your comments"
-                                        checked={emailPrefs.emailOnCommentReply}
-                                        onChange={() => handleEmailPrefToggle('emailOnCommentReply')}
-                                        disabled={emailPrefsSaving || !emailPrefs.emailNotificationsEnabled}
-                                    />
-                                    <EmailToggle
-                                        label="Project invitations & updates"
-                                        description="Get notified about project invitations and changes"
-                                        checked={emailPrefs.emailOnProjectInvitation}
-                                        onChange={() => handleEmailPrefToggle('emailOnProjectInvitation')}
-                                        disabled={emailPrefsSaving || !emailPrefs.emailNotificationsEnabled}
-                                    />
+                                <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Email Notifications</h3>
+                                    <div className="space-y-3">
+                                        <EmailToggle
+                                            label="Email notifications enabled"
+                                            description="Master toggle for all email notifications"
+                                            checked={emailPrefs.emailNotificationsEnabled}
+                                            onChange={() => handleEmailPrefToggle('emailNotificationsEnabled')}
+                                            disabled={emailPrefsSaving}
+                                        />
+                                        <EmailToggle
+                                            label="Task assignments & updates"
+                                            description="Get notified when you are assigned to or a task changes"
+                                            checked={emailPrefs.emailOnTaskAssigned}
+                                            onChange={() => handleEmailPrefToggle('emailOnTaskAssigned')}
+                                            disabled={emailTogglesDisabled}
+                                        />
+                                        <EmailToggle
+                                            label="Comment replies & reactions"
+                                            description="Get notified about replies and reactions to your comments"
+                                            checked={emailPrefs.emailOnCommentReply}
+                                            onChange={() => handleEmailPrefToggle('emailOnCommentReply')}
+                                            disabled={emailTogglesDisabled}
+                                        />
+                                        <EmailToggle
+                                            label="Project invitations & updates"
+                                            description="Get notified about project invitations and changes"
+                                            checked={emailPrefs.emailOnProjectInvitation}
+                                            onChange={() => handleEmailPrefToggle('emailOnProjectInvitation')}
+                                            disabled={emailTogglesDisabled}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={handleClose}
-                                    className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="flex-1 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-all text-sm font-medium disabled:opacity-50"
-                                >
-                                    {isSubmitting ? 'Saving...' : 'Save Changes'}
-                                </button>
-                            </div>
-                        </Form>
-                    )}
-                </Formik>
-            </div>
-        </Modal>
+                                <div className="flex gap-3 pt-4">
+                                    <button
+                                        type="button"
+                                        onClick={handleCloseAttempt}
+                                        className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isSubmitting}
+                                        className="flex-1 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-all text-sm font-medium disabled:opacity-50"
+                                    >
+                                        {isSubmitting ? 'Saving...' : 'Save Changes'}
+                                    </button>
+                                </div>
+                            </Form>
+                        )}
+                    </Formik>
+                </div>
+            </Modal>
+
+            <ConfirmDialog
+                isOpen={closeConfirmOpen}
+                onClose={() => setCloseConfirmOpen(false)}
+                onConfirm={handleForceClose}
+                title="Discard unsaved changes?"
+                message="Your changes haven't been saved. If you close now, all edits will be lost."
+                confirmText="Discard"
+                cancelText="Keep editing"
+                variant="warning"
+            />
+        </>
     );
 };
 

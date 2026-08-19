@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { ChartOptions } from 'chart.js';
-import { ChartCard, chartOptions, useChartSurfaceColor } from '../ChartComponents';
+import { ChartCard, ICON_WELL_CLASS, chartOptions, useChartSurfaceColor, useChartTickColor } from '../ChartComponents';
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '../../../util/helpers';
 import { ChartBarIcon, TrendingUpIcon } from '../../common/Icons';
 import EmptyState from '../../common/EmptyState';
@@ -109,62 +109,80 @@ export const PriorityDistributionCard = ({ distribution }: { distribution: Prior
     );
 };
 
-const projectProgressOptions: ChartOptions<'bar'> = {
-    ...chartOptions,
-    indexAxis: 'y',
-    scales: {
-        ...chartOptions.scales,
-        x: {
-            ...chartOptions.scales.x,
-            beginAtZero: true,
-            max: 100,
-            grid: { display: true, color: 'rgba(148, 163, 184, 0.1)' },
-        },
-    },
-};
+export const ProjectProgressCard = ({ completion }: { completion: ProjectCompletion[] }) => {
+    const tickColor = useChartTickColor();
 
-export const ProjectProgressCard = ({ completion }: { completion: ProjectCompletion[] }) => (
-    <ChartCard title="Project Progress" subtitle="Overall completion">
-        <div className="h-56">
-            {completion.length > 0 ? (
-                <Bar
-                    data={{
-                        labels: completion.map(p => p.projectKey),
-                        datasets: [{
-                            data: completion.map(p => p.completionPercentage),
-                            backgroundColor: 'rgba(71, 85, 105, 0.8)',
-                            hoverBackgroundColor: 'rgba(51, 65, 85, 1)',
-                            borderRadius: 6,
-                            borderSkipped: false,
-                        }],
-                    }}
-                    options={projectProgressOptions}
-                />
-            ) : (
-                <EmptyState size="sm" icon={ChartBarIcon} title="No data" className="h-full" />
-            )}
-        </div>
-    </ChartCard>
-);
-
-const completionTrendOptions: ChartOptions<'line'> = {
-    ...chartOptions,
-    plugins: {
-        ...chartOptions.plugins,
-        legend: { display: false },
-    },
-    scales: {
-        ...chartOptions.scales,
-        y: {
-            ...chartOptions.scales.y,
-            beginAtZero: true,
-            ticks: { ...chartOptions.scales.y.ticks, stepSize: 1 },
+    // A module-level options object never changes identity, so react-chartjs-2 never re-runs
+    // chart.update() and the axis text keeps whichever theme was active at mount. Memoizing on the
+    // resolved tick colour gives the chart a fresh reference — and therefore an update — every time
+    // the theme actually changes.
+    const options = useMemo<ChartOptions<'bar'>>(() => ({
+        ...chartOptions,
+        indexAxis: 'y',
+        scales: {
+            ...chartOptions.scales,
+            x: {
+                ...chartOptions.scales.x,
+                ticks: { ...chartOptions.scales.x.ticks, color: tickColor },
+                beginAtZero: true,
+                max: 100,
+                grid: { display: true, color: 'rgba(148, 163, 184, 0.1)' },
+            },
+            y: {
+                ...chartOptions.scales.y,
+                ticks: { ...chartOptions.scales.y.ticks, color: tickColor },
+            },
         },
-    },
+    }), [tickColor]);
+
+    return (
+        <ChartCard title="Project Progress" subtitle="Overall completion">
+            <div className="h-56">
+                {completion.length > 0 ? (
+                    <Bar
+                        data={{
+                            labels: completion.map(p => p.projectKey),
+                            datasets: [{
+                                data: completion.map(p => p.completionPercentage),
+                                backgroundColor: 'rgba(71, 85, 105, 0.8)',
+                                hoverBackgroundColor: 'rgba(51, 65, 85, 1)',
+                                borderRadius: 6,
+                                borderSkipped: false,
+                            }],
+                        }}
+                        options={options}
+                        aria-label={`Bar chart of completion percentage for ${completion.length} project${completion.length === 1 ? '' : 's'}`}
+                    />
+                ) : (
+                    <EmptyState size="sm" icon={ChartBarIcon} title="No data" className="h-full" />
+                )}
+            </div>
+        </ChartCard>
+    );
 };
 
 export const CompletionTrendCard = ({ trend }: { trend: CompletionWeek[] }) => {
     const surfaceColor = useChartSurfaceColor();
+    const tickColor = useChartTickColor();
+
+    // Same fresh-reference requirement as ProjectProgressCard's options: without it, this card's
+    // axis text would also survive a theme toggle unchanged.
+    const options = useMemo<ChartOptions<'line'>>(() => ({
+        ...chartOptions,
+        plugins: {
+            ...chartOptions.plugins,
+            legend: { display: false },
+        },
+        scales: {
+            ...chartOptions.scales,
+            x: { ...chartOptions.scales.x, ticks: { ...chartOptions.scales.x.ticks, color: tickColor } },
+            y: {
+                ...chartOptions.scales.y,
+                beginAtZero: true,
+                ticks: { ...chartOptions.scales.y.ticks, color: tickColor, stepSize: 1 },
+            },
+        },
+    }), [tickColor]);
 
     if (!trend.some(week => week.count > 0)) {
         return (
@@ -194,7 +212,11 @@ export const CompletionTrendCard = ({ trend }: { trend: CompletionWeek[] }) => {
     return (
         <ChartCard title="Completion Trend" subtitle="Weekly completed tasks (8 weeks)">
             <div className="h-56">
-                <Line data={data} options={completionTrendOptions} />
+                <Line
+                    data={data}
+                    options={options}
+                    aria-label={`Line chart of weekly completed tasks over the past ${trend.length} weeks`}
+                />
             </div>
         </ChartCard>
     );
@@ -227,7 +249,7 @@ export const OptimizationOpportunityCard = ({ opportunity }: { opportunity: Opti
     return (
         <ChartCard title="Optimization Opportunity" subtitle="How much can the optimizer help">
             <div className="flex items-start gap-4 mb-4">
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${bgColor}`}>
+                <div className={`${ICON_WELL_CLASS} ${bgColor}`}>
                     <svg width={RING_SIZE} height={RING_SIZE} className="-rotate-90">
                         <circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} fill="none" strokeWidth={RING_STROKE}
                             className="text-slate-200 dark:text-slate-700" stroke="currentColor" />

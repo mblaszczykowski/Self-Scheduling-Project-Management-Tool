@@ -8,6 +8,7 @@ import { register, checkUserAuth } from '../../util/api';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../util/toast';
 import { getErrorMessage } from '../../util/helpers';
+import { PASSWORD_RULES, withPasswordComplexity } from './passwordRules';
 
 interface RegisterValues {
     firstname: string;
@@ -15,22 +16,6 @@ interface RegisterValues {
     email: string;
     password: string;
 }
-
-interface PasswordRule {
-    label: string;
-    test: (v: string) => boolean;
-}
-
-// Single source of truth for the password policy — used by both the Yup schema
-// and the live requirements checklist so they can't drift apart.
-const SPECIAL_CHAR = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/;
-const PASSWORD_RULES: PasswordRule[] = [
-    { label: '8+ characters', test: (v) => (v || '').length >= 8 },
-    { label: 'Uppercase letter', test: (v) => /[A-Z]/.test(v || '') },
-    { label: 'Lowercase letter', test: (v) => /[a-z]/.test(v || '') },
-    { label: 'Number', test: (v) => /\d/.test(v || '') },
-    { label: 'Special character', test: (v) => SPECIAL_CHAR.test(v || '') },
-];
 
 const validationSchema = Yup.object().shape({
     firstname: Yup.string()
@@ -44,15 +29,7 @@ const validationSchema = Yup.object().shape({
     email: Yup.string()
         .email('Invalid email address format.')
         .required('Email is required.'),
-    password: Yup.string()
-        .min(8, 'Password must be at least 8 characters.')
-        .max(128, 'Password must not exceed 128 characters.')
-        .matches(/[A-Z]/, 'Password must contain at least one uppercase letter.')
-        .matches(/[a-z]/, 'Password must contain at least one lowercase letter.')
-        .matches(/\d/, 'Password must contain at least one number.')
-        .matches(SPECIAL_CHAR, 'Password must contain at least one special character.')
-        .test('no-spaces', 'Password must not contain spaces.', value => !value?.includes(' '))
-        .required('Password is required.'),
+    password: withPasswordComplexity(Yup.string()).required('Password is required.'),
 });
 
 const PasswordRequirements = ({ id, password }: { id: string; password: string }) => {

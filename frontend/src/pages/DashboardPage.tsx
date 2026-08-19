@@ -1,5 +1,4 @@
-import React, { Suspense, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { Suspense, useMemo } from 'react';
 import { useLogout } from '../hooks/useLogout';
 import {
     ArcElement, BarElement, CategoryScale, Chart as ChartJS, Filler, Legend,
@@ -31,7 +30,6 @@ ChartJS.register(
 );
 
 const DashboardPage = () => {
-    const navigate = useNavigate();
     const { user } = useAuth();
     const { projects, projectsLoading, projectsError, retryProjects } = useProjects();
     const handleLogout = useLogout();
@@ -41,10 +39,6 @@ const DashboardPage = () => {
         project: currentProject, task: currentTask,
         openModal, closeModal,
     } = useModal();
-
-    useEffect(() => {
-        if (!user) navigate('/login');
-    }, [user, navigate]);
 
     useKeyboardShortcuts([
         { key: 'n', handler: () => openModal('task', 'create') },
@@ -83,7 +77,7 @@ const DashboardPage = () => {
 
             {!projectsLoading && !projectsError && (
                 <>
-                    <ErrorBoundary level="section" resetKey="dashboard-hero">
+                    <ErrorBoundary level="section" resetKey={stats}>
                         <DashboardHero
                             user={user}
                             criticalCount={stats.criticalTasks}
@@ -126,7 +120,7 @@ const DashboardPage = () => {
                             </section>
 
                             {processedProjects.length > 0 && (
-                                <ErrorBoundary level="section" resetKey="analytics">
+                                <ErrorBoundary level="section" resetKey={stats}>
                                     <AnalyticsSection stats={stats} />
                                 </ErrorBoundary>
                             )}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { EmptyState } from '../common';
+import EmptyState from '../common/EmptyState';
 import TimelineHeader from './TimelineHeader';
 import TimelineProjectRow from './TimelineProjectRow';
 import DependencyOverlay from './DependencyOverlay';
@@ -62,6 +62,7 @@ const TimelineView = ({
                 <TimelineHeader
                 timelineStart={timelineStart}
                 timelineEnd={timelineEnd}
+                timelineWidth={timelineWidth}
                 sidebarWidth={sidebarWidth}
                 sidebarCollapsed={sidebarCollapsed}
                 processedProjects={processedProjects}
@@ -83,6 +84,8 @@ const TimelineView = ({
                     filteredTaskIds={filteredTaskIds}
                     filteredProjectKeys={filteredProjectKeys}
                     hasActiveFilters={hasActiveFilters}
+                    sidebarWidth={sidebarWidth}
+                    sidebarCollapsed={sidebarCollapsed}
                 />
                 {visibleProjects.map((project) => (
                     <TimelineProjectRow

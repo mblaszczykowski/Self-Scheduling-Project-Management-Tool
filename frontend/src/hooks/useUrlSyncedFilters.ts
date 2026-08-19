@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
 import { NavigateFunction, Location } from 'react-router-dom';
+import config from '../config';
 import {
-    EnrichedTask, FilterState, ModalMode, ModalType, ProcessedProject, SortState, ViewState,
+    EnrichedTask, FilterState, ModalMode, ModalType, ProcessedProject, ViewState,
 } from '../types';
 
 interface UseUrlSyncedFiltersOptions {
@@ -12,12 +13,11 @@ interface UseUrlSyncedFiltersOptions {
     navigate: NavigateFunction;
     location: Location;
     openModal: (type: ModalType, mode: ModalMode, project: ProcessedProject, task: EnrichedTask) => void;
-    setSortState: Dispatch<SetStateAction<SortState>>;
 }
 
 export function useUrlSyncedFilters({
     filterState, setFilterState, setViewState,
-    processedProjects, navigate, location, openModal, setSortState,
+    processedProjects, navigate, location, openModal,
 }: UseUrlSyncedFiltersOptions) {
     const handledIssueRef = useRef<string | null>(null);
 
@@ -89,22 +89,17 @@ export function useUrlSyncedFilters({
     useEffect(() => {
         const timer = setTimeout(
             () => setFilterState(prev => ({ ...prev, searchQuery: prev.searchInput })),
-            300,
+            config.DEBOUNCE_DELAY,
         );
         return () => clearTimeout(timer);
     }, [filterState.searchInput, setFilterState]);
-
-    const closeFilterDropdown = useCallback(
-        () => setFilterState(prev => ({ ...prev, openFilterDropdown: null })),
-        [setFilterState],
-    );
 
     const clearAllFilters = useCallback(() => {
         setFilterState({
             filters: {}, searchInput: '', searchQuery: '',
             assignedToMe: false, openFilterDropdown: null,
         });
-        navigate('/projects');
+        navigate('/projects', { replace: true });
     }, [setFilterState, navigate]);
 
     const handleFilterChange = useCallback((field: string, value: string) => {
@@ -139,17 +134,10 @@ export function useUrlSyncedFilters({
         navigate({ search: params.toString() }, { replace: true });
     }, [filterState.assignedToMe, setFilterState, navigate, location.search]);
 
-    const handleSort = useCallback((field: string) => {
-        setSortState(prev => ({
-            field,
-            order: (prev.field === field && prev.order === 'asc' ? 'desc' : 'asc') as SortState['order'],
-        }));
-    }, [setSortState]);
-
     const projectKeyFilter = new URLSearchParams(location.search).get('projectKey');
 
     return {
         handleFilterChange, handleProjectFilterChange, handleAssignedToMeChange,
-        handleSort, clearAllFilters, projectKeyFilter, closeFilterDropdown,
+        clearAllFilters, projectKeyFilter,
     };
 }

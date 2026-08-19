@@ -79,9 +79,12 @@ export function useTimelineViewport({ processedProjects, suggestions }: Options)
             }
         }
 
-        const timelineWidth =
-            Math.round((timelineEnd.getTime() - timelineStart.getTime()) / MS_PER_DAY) * DAY_WIDTH
-            + TIMELINE_END_PADDING;
+        // Inclusive day count spanned by the two whole-month bounds above, matching the day-cell
+        // count TimelineHeader sums from the same months.
+        const totalDays =
+            Math.round((timelineEnd.getTime() - timelineStart.getTime()) / MS_PER_DAY) + 1;
+        // The shared day-area width: both TimelineHeader and the body rows apply this unmodified.
+        const timelineWidth = totalDays * DAY_WIDTH + TIMELINE_END_PADDING;
 
         return { timelineStart, timelineEnd, timelineWidth };
     }, [processedProjects, suggestions]);

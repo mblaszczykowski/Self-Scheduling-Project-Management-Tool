@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
-import { calculateDuration, isOverdue, isUpcomingDeadline } from '../util/helpers';
+import {
+    calculateDuration, formatAssigneeName, isOverdue, isTaskComplete, isUpcomingDeadline,
+} from '../util/helpers';
 import { computeProjectDateRange, computeProjectProgress } from '../util/projectUtils';
 import { EnrichedTask, ProcessedProject, Project } from '../types';
 
@@ -25,12 +27,29 @@ export function useEnrichedProjects(projects: Project[]) {
         const projectKeyToProject = new Map<string, ProcessedProject>();
 
         const processedProjects: ProcessedProject[] = projects.map((project) => {
+            // The API sends the assignee as an email; the project's member list is the only place
+            // their real name is available, so it is resolved once here rather than guessed from
+            // the address at each render site.
+            const nameByEmail = new Map<string, string>();
+            for (const member of project.members ?? []) {
+                if (member.email) nameByEmail.set(member.email, `${member.firstname} ${member.lastname}`.trim());
+            }
+            if (project.owner?.email) {
+                nameByEmail.set(project.owner.email,
+                    `${project.owner.firstname} ${project.owner.lastname}`.trim());
+            }
+
             const enrichedTasks: EnrichedTask[] = (project.tasks ?? []).map((task) => {
                 const progress = task.progress ?? 0;
-                const delayed = isOverdue(task.dueDate, progress);
+                const delayed = isOverdue(task.dueDate, progress, task.status);
+
+                const assigneeName = task.assignee
+                    ? nameByEmail.get(task.assignee) || formatAssigneeName(task.assignee)
+                    : '';
 
                 const enriched: EnrichedTask = {
                     ...task,
+                    assigneeName,
                     projectKey: project.projectKey,
                     projectSummary: project.summary,
                     duration: calculateDuration(task.startDate, task.dueDate),
@@ -38,7 +57,8 @@ export function useEnrichedProjects(projects: Project[]) {
                     dependencies: task.dependencyKeys ?? [],
                     progress,
                     isDelayed: delayed,
-                    isUpcomingDeadline: !delayed && isUpcomingDeadline(task.dueDate),
+                    isUpcomingDeadline: !delayed && !isTaskComplete(task.status, progress)
+                        && isUpcomingDeadline(task.dueDate),
                     isDelayedByDependency: false,
                 };
 

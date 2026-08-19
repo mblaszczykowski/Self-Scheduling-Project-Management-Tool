@@ -1,4 +1,4 @@
-import { dayIndex, MS_PER_DAY } from './helpers';
+import { dayIndex, isTaskComplete, MS_PER_DAY } from './helpers';
 import { schedulePercentElapsed, timeOf } from './scheduleAnalysis';
 import { EnrichedTask, ProcessedProject } from '../types';
 
@@ -36,7 +36,7 @@ export const computeCriticalPathHealth = (allTasks: EnrichedTask[], today: Date)
 
     // Due soon, unfinished, and already behind where its own dates say it should be.
     const criticalAtRisk = criticalTasksList.filter(t => {
-        if (!t.isUpcomingDeadline || t.progress >= 100) return false;
+        if (!t.isUpcomingDeadline || isTaskComplete(t.status, t.progress)) return false;
         const expected = schedulePercentElapsed(t, today) ?? ASSUMED_EXPECTED_PROGRESS;
         return t.progress < expected;
     });
@@ -103,7 +103,8 @@ export const computeUpcomingCriticalDeadlines = (criticalTasksList: EnrichedTask
         .filter(task => {
             const due = dayIndex(task.dueDate);
             return due !== null && due >= todayIndex
-                && due <= todayIndex + DEADLINE_HORIZON_DAYS && task.progress < 100;
+                && due <= todayIndex + DEADLINE_HORIZON_DAYS
+                && !isTaskComplete(task.status, task.progress);
         })
         .sort((a, b) => (timeOf(a.dueDate) ?? 0) - (timeOf(b.dueDate) ?? 0));
 };
@@ -115,10 +116,11 @@ export interface BlockedTasks {
 
 export const computeBlockedTasks = (allTasks: EnrichedTask[], taskByKey: Map<string, EnrichedTask>): BlockedTasks => {
     const blockedTasks = allTasks.filter(task => {
-        if (task.progress >= 100) return false;
+        if (isTaskComplete(task.status, task.progress)) return false;
         return task.dependencies.some(depKey => {
             const dep = taskByKey.get(depKey);
-            return dep !== undefined && dep.progress < 100;
+            // A cancelled or finished predecessor no longer blocks anything.
+            return dep !== undefined && !isTaskComplete(dep.status, dep.progress);
         });
     });
 

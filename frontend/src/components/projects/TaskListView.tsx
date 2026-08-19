@@ -1,50 +1,15 @@
 import React, { useCallback, useMemo } from 'react';
-import { formatShortDate, daysBetween, STATUS_CONFIG, PRIORITY_CONFIG, MS_PER_DAY, formatAssigneeName } from '../../util/helpers';
-import { EmptyState } from '../common';
+import {
+    formatShortDate, daysBetween, isTaskComplete, STATUS_CONFIG, PRIORITY_CONFIG,
+} from '../../util/helpers';
+import {
+    computeScheduleHealth, computeVelocityNeeded, getBlockingInfo, getProgressColor, relativeDue,
+} from '../../util/taskListDisplay';
+import EmptyState from '../common/EmptyState';
 import { SortAscIcon, SortDescIcon } from '../common/Icons';
 import Avatar from '../common/Avatar';
 import { EnrichedTask } from '../../types';
-import { TaskKeyMap, TaskListViewProps } from './types';
-
-const TERMINAL_STATUSES = new Set(['DONE', 'RELEASED', 'WITHDRAWN']);
-
-const relativeDue = (dueDate?: string | null, status?: string | null, progress = 0) => {
-    if (!dueDate) return { text: '—', cls: 'text-slate-400' };
-    if ((status && TERMINAL_STATUSES.has(status)) || progress >= 100) {
-        return { text: formatShortDate(dueDate), cls: 'text-slate-500 dark:text-slate-400' };
-    }
-    const diff = daysBetween(new Date(), dueDate);
-    if (diff < -1) return { text: `${Math.abs(diff)}d overdue`, cls: 'text-red-600 dark:text-red-400 font-semibold' };
-    if (diff === -1) return { text: 'Yesterday', cls: 'text-red-600 dark:text-red-400 font-semibold' };
-    if (diff === 0) return { text: 'Today', cls: 'text-amber-600 dark:text-amber-400 font-semibold' };
-    if (diff === 1) return { text: 'Tomorrow', cls: 'text-amber-600 dark:text-amber-400' };
-    if (diff <= 3) return { text: `in ${diff}d`, cls: 'text-amber-600 dark:text-amber-400' };
-    if (diff <= 7) return { text: `in ${diff}d`, cls: 'text-slate-700 dark:text-slate-300' };
-    return { text: formatShortDate(dueDate), cls: 'text-slate-500 dark:text-slate-400' };
-};
-
-const getProgressColor = (task: EnrichedTask) => {
-    if (task.progress >= 100) return 'bg-green-500';
-    if (task.isDelayed) return 'bg-red-400';
-    if (task.isUpcomingDeadline && task.progress < 80) return 'bg-amber-400';
-    if (task.progress >= 50) return 'bg-blue-500';
-    return 'bg-slate-300 dark:bg-slate-600';
-};
-
-const computeScheduleHealth = (task: EnrichedTask, now: Date) => {
-    if (!task.startDate || !task.dueDate || task.progress >= 100) return null;
-    const start = new Date(task.startDate);
-    const due = new Date(task.dueDate);
-    if (now < start) return { status: 'not-started', label: 'Not started', expected: 0 };
-    const totalDays = Math.max((due.getTime() - start.getTime()) / MS_PER_DAY, 1);
-    const elapsed = (now.getTime() - start.getTime()) / MS_PER_DAY;
-    const expected = Math.min(Math.round((elapsed / totalDays) * 100), 100);
-    const gap = expected - task.progress;
-    if (gap > 30) return { status: 'critical', label: `${gap}% behind`, expected };
-    if (gap > 15) return { status: 'behind', label: `${gap}% behind`, expected };
-    if (gap > 0) return { status: 'slight', label: `${gap}% behind`, expected };
-    return { status: 'on-track', label: 'On track', expected };
-};
+import { TaskListViewProps } from './types';
 
 const healthColor: Record<string, string> = {
     'critical': 'text-red-600 dark:text-red-400',
@@ -54,23 +19,15 @@ const healthColor: Record<string, string> = {
     'not-started': 'text-slate-400 dark:text-slate-500',
 };
 
-const getBlockingInfo = (task: EnrichedTask, taskKeyToTaskMap: TaskKeyMap, now: Date) => {
-    if (task.dependencies.length === 0) return null;
-    const blockers = task.dependencies
-        .map((dependencyKey) => taskKeyToTaskMap.get(dependencyKey))
-        .filter((dependency): dependency is EnrichedTask =>
-            !!dependency && dependency.progress < 100);
-    if (blockers.length === 0) return null;
-
-    // Most overdue first, then least complete; the task key keeps the order total.
-    const NO_DUE_DATE = Number.MAX_SAFE_INTEGER;
-    blockers.sort((a, b) => {
-        const aDue = a.dueDate ? daysBetween(now, a.dueDate) : NO_DUE_DATE;
-        const bDue = b.dueDate ? daysBetween(now, b.dueDate) : NO_DUE_DATE;
-        return aDue - bDue || a.progress - b.progress || a.taskKey.localeCompare(b.taskKey);
-    });
-    return { blockers, worst: blockers[0], count: blockers.length };
-};
+const columns = [
+    ['taskKey', 'Task', 'min-w-[280px]'],
+    ['status', 'Status', 'w-28'],
+    ['priority', 'Pri', 'w-14'],
+    ['assignee', 'Assignee', 'w-40'],
+    ['startDate', 'Schedule', 'w-56'],
+    ['progress', 'Progress', 'w-44'],
+    ['dependencies', 'Dependencies', 'min-w-[240px]'],
+];
 
 /** Mini timeline showing elapsed vs remaining */
 const ScheduleBar = ({ startDate, dueDate, progress }: { startDate?: string | null; dueDate?: string | null; progress: number }) => {
@@ -103,7 +60,7 @@ const DepChip = ({ dep, onClick, overdue }: { dep: EnrichedTask; onClick: (dep: 
         }`}
         title={`${dep.taskKey}: ${dep.summary} — ${dep.progress}% done${overdue ? ' (OVERDUE)' : ''}\nClick to open`}
     >
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dep.progress >= 100 ? 'bg-green-500' : overdue ? 'bg-red-500' : 'bg-blue-500'}`} />
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isTaskComplete(dep.status, dep.progress) ? 'bg-green-500' : overdue ? 'bg-red-500' : 'bg-blue-500'}`} />
         {dep.taskKey}
         <span className="font-sans text-[10px] opacity-60">{dep.progress}%</span>
     </button>
@@ -153,16 +110,6 @@ const TaskListView = ({
         if (project) onTaskClick(project, dependency);
     }, [projectKeyToProject, onTaskClick]);
 
-    const columns = [
-        ['taskKey', 'Task', 'min-w-[280px]'],
-        ['status', 'Status', 'w-28'],
-        ['priority', 'Pri', 'w-14'],
-        ['assignee', 'Assignee', 'w-40'],
-        ['startDate', 'Schedule', 'w-56'],
-        ['progress', 'Progress', 'w-44'],
-        ['dependencies', 'Dependencies', 'min-w-[240px]'],
-    ];
-
     if (filteredTasks.length === 0) {
         const emptyTitle = hasActiveFilters ? 'No matching tasks' : 'No tasks yet';
         const emptyDescription = hasActiveFilters
@@ -174,6 +121,8 @@ const TaskListView = ({
             </div>
         );
     }
+
+    const now = new Date();
 
     return (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-grow flex flex-col">
@@ -220,7 +169,8 @@ const TaskListView = ({
                     <tbody>
                         {filteredTasks.map((task) => {
                             const project = projectKeyToProject.get(task.projectKey);
-                            const due = relativeDue(task.dueDate, task.status, task.progress);
+                            const due = relativeDue(task.dueDate, task.status, task.progress, now);
+                            const velocity = computeVelocityNeeded(task, now);
                             const insights = taskInsights.get(task.taskKey)
                                 ?? { blocking: null, dependents: 0, health: null };
                             const { blocking, dependents, health } = insights;
@@ -293,7 +243,7 @@ const TaskListView = ({
                                                         {task.assignee.charAt(0).toUpperCase()}
                                                     </div>
                                                 )}
-                                                <span className="text-sm text-slate-700 dark:text-slate-300 truncate">{formatAssigneeName(task.assignee)}</span>
+                                                <span className="text-sm text-slate-700 dark:text-slate-300 truncate">{task.assigneeName}</span>
                                             </div>
                                         ) : (
                                             <span className="text-xs text-slate-300 dark:text-slate-600">Unassigned</span>
@@ -310,20 +260,12 @@ const TaskListView = ({
                                             {task.duration > 0 && (
                                                 <span className="text-[10px] text-slate-400 dark:text-slate-500">{task.duration}d span</span>
                                             )}
-                                            {task.startDate && task.dueDate && task.progress < 100 && (() => {
-                                                const daysLeft = daysBetween(new Date(), task.dueDate);
-                                                const remaining = 100 - task.progress;
-                                                if (daysLeft > 0 && remaining > 0) {
-                                                    const velocity = Math.round(remaining / daysLeft);
-                                                    return (
-                                                        <span className={`text-[10px] ${velocity > 15 ? 'text-amber-500 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`}
-                                                            title={`Need ${velocity}% progress per day to finish on time`}>
-                                                            {velocity}%/day needed
-                                                        </span>
-                                                    );
-                                                }
-                                                return null;
-                                            })()}
+                                            {velocity !== null && (
+                                                <span className={`text-[10px] ${velocity > 15 ? 'text-amber-500 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`}
+                                                    title={`Need ${velocity}% progress per day to finish on time`}>
+                                                    {velocity}%/day needed
+                                                </span>
+                                            )}
                                         </div>
                                         <ScheduleBar startDate={task.startDate} dueDate={task.dueDate} progress={task.progress} />
                                     </td>
@@ -331,7 +273,7 @@ const TaskListView = ({
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2.5">
                                             <div className="flex-1 h-[6px] bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden relative">
-                                                {health && health.expected > 0 && task.progress < 100 && (
+                                                {health && health.expected > 0 && !isTaskComplete(task.status, task.progress) && (
                                                     <div className="absolute top-0 h-full w-[2px] bg-slate-400/40 dark:bg-slate-500/40 z-10 rounded"
                                                         style={{ left: `${Math.min(health.expected, 100)}%` }}
                                                         title={`Expected: ${health.expected}%`} />
@@ -340,7 +282,7 @@ const TaskListView = ({
                                                     style={{ width: `${Math.min(task.progress, 100)}%` }} />
                                             </div>
                                             <span className={`text-xs font-semibold tabular-nums w-8 text-right ${
-                                                task.progress >= 100 ? 'text-green-600 dark:text-green-400' : 'text-slate-600 dark:text-slate-300'
+                                                isTaskComplete(task.status, task.progress) ? 'text-green-600 dark:text-green-400' : 'text-slate-600 dark:text-slate-300'
                                             }`}>{task.progress}%</span>
                                         </div>
                                         {health && health.status !== 'on-track' && health.status !== 'not-started' && (
@@ -437,9 +379,9 @@ const FooterStats = React.memo(({ tasks }: { tasks: EnrichedTask[] }) => {
         const critical = tasks.filter(t => t.isCritical).length;
         const overdue = tasks.filter(t => t.isDelayed).length;
         const blocked = tasks.filter(t => t.isDelayedByDependency && !t.isDelayed).length;
-        const done = tasks.filter(t => t.progress >= 100).length;
+        const done = tasks.filter(t => isTaskComplete(t.status, t.progress)).length;
         const inProgress = tasks.filter(t => t.status === 'IN_PROGRESS').length;
-        const unassigned = tasks.filter(t => !t.assignee && t.progress < 100).length;
+        const unassigned = tasks.filter(t => !t.assignee && !isTaskComplete(t.status, t.progress)).length;
         const avgProgress = tasks.length > 0 ? Math.round(tasks.reduce((s, t) => s + t.progress, 0) / tasks.length) : 0;
         return { critical, overdue, blocked, done, inProgress, unassigned, avgProgress };
     }, [tasks]);
@@ -457,7 +399,7 @@ const FooterStats = React.memo(({ tasks }: { tasks: EnrichedTask[] }) => {
     return (
         <>
             {items.map((item, i) => (
-                <span key={i} className={`text-[10px] font-medium ${item.cls}`}>
+                <span key={item.label} className={`text-[10px] font-medium ${item.cls}`}>
                     {i > 0 && <span className="text-slate-200 dark:text-slate-700 mr-1">·</span>}
                     {item.label}
                 </span>

@@ -1,6 +1,6 @@
 /* Auth Landing Page */
 
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
+/* Instrument Serif and DM Sans are already imported app-wide by index.css; no need to repeat it here. */
 
 .auth-page {
     font-family: 'DM Sans', system-ui, sans-serif;

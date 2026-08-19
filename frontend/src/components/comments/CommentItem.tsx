@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FormikHelpers } from 'formik';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 import { formatDistanceToNow } from 'date-fns';
@@ -53,7 +53,7 @@ export interface CommentItemProps {
     onHandleUpdateComment: (comment: Comment, values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, attachments: File[]) => void;
     onHandleAddComment: (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, parentCommentId: number | null, attachments: File[]) => void;
     onHandleDeleteComment: (commentId: number) => void;
-    onHandleReactToComment: (commentId: number, reactionType: ReactionType) => void;
+    onHandleReactToComment: (commentId: number, reactionType: ReactionType) => void | Promise<void>;
     renderAttachmentPreview: (attachment: string, idx: number) => React.ReactNode;
 }
 
@@ -75,6 +75,20 @@ const CommentItem = React.memo(({
     const [isVisible] = useAnimateIn();
     const commentRef = useRef<HTMLDivElement | null>(null);
     const isHighlighted = highlightCommentId === comment.id;
+    // A second click before the first reaction request resolves would fire two independent
+    // requests whose out-of-order resolution could leave the displayed state diverged from the
+    // server; this ignores clicks while one is already in flight.
+    const [reactionPending, setReactionPending] = useState(false);
+
+    const handleReact = async (reactionType: ReactionType) => {
+        if (reactionPending) return;
+        setReactionPending(true);
+        try {
+            await onHandleReactToComment(comment.id, reactionType);
+        } finally {
+            setReactionPending(false);
+        }
+    };
 
     useEffect(() => {
         if (!isHighlighted || !commentRef.current) return;
@@ -159,20 +173,20 @@ const CommentItem = React.memo(({
                                 <ReactionButton
                                     type="LIKE"
                                     active={comment.likedByCurrentUser}
-                                    disabled={comment.dislikedByCurrentUser}
+                                    disabled={comment.dislikedByCurrentUser || reactionPending}
                                     activeClass="text-slate-800 dark:text-slate-200 font-medium"
                                     count={comment.likeCount}
                                     icon={ThumbsUpIcon}
-                                    onClick={() => onHandleReactToComment(comment.id, 'LIKE')}
+                                    onClick={() => handleReact('LIKE')}
                                 />
                                 <ReactionButton
                                     type="DISLIKE"
                                     active={comment.dislikedByCurrentUser}
-                                    disabled={comment.likedByCurrentUser}
+                                    disabled={comment.likedByCurrentUser || reactionPending}
                                     activeClass="text-red-500 font-medium"
                                     count={comment.dislikeCount}
                                     icon={ThumbsDownIcon}
-                                    onClick={() => onHandleReactToComment(comment.id, 'DISLIKE')}
+                                    onClick={() => handleReact('DISLIKE')}
                                 />
                                 {level < MAX_REPLY_DEPTH ? (
                                     <button

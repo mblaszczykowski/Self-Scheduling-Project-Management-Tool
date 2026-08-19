@@ -2,7 +2,9 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { getTaskActivities } from '../../util/api';
 import { IconType } from 'react-icons';
-import { formatAssigneeName, PRIORITY_CONFIG, splitFullName, STATUS_CONFIG } from '../../util/helpers';
+import {
+    formatAssigneeName, getErrorMessage, PRIORITY_CONFIG, splitFullName, STATUS_CONFIG,
+} from '../../util/helpers';
 import Avatar from '../common/Avatar';
 import { Activity, ActivityType, TaskPriority, TaskStatus } from '../../types';
 import {
@@ -19,7 +21,9 @@ import {
     HiOutlineFlag,
 } from 'react-icons/hi';
 
-const TYPE_CONFIG: Partial<Record<ActivityType, { icon: IconType; color: string; bg: string }>> = {
+// A full Record, not a Partial: a forgotten key here now fails to compile instead of silently
+// falling back to FALLBACK's neutral icon, which is how COMMENT_EDITED went unstyled before.
+const TYPE_CONFIG: Record<ActivityType, { icon: IconType; color: string; bg: string }> = {
     CREATED:              { icon: HiOutlinePlus, color: 'text-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-900/40' },
     STATUS_CHANGED:       { icon: HiOutlineSwitchHorizontal, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/40' },
     PRIORITY_CHANGED:     { icon: HiOutlineFlag, color: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/40' },
@@ -32,6 +36,7 @@ const TYPE_CONFIG: Partial<Record<ActivityType, { icon: IconType; color: string;
     DEPENDENCIES_CHANGED: { icon: HiOutlineLink, color: 'text-indigo-500', bg: 'bg-indigo-100 dark:bg-indigo-900/40' },
     ATTACHMENTS_CHANGED:  { icon: HiOutlineLink, color: 'text-teal-500', bg: 'bg-teal-100 dark:bg-teal-900/40' },
     COMMENT_ADDED:        { icon: HiOutlineChatAlt2, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/40' },
+    COMMENT_EDITED:       { icon: HiOutlinePencil, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/40' },
     COMMENT_DELETED:      { icon: HiOutlineTrash, color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/40' },
 };
 
@@ -65,6 +70,8 @@ function ActivityDescription({ activity }: { activity: Activity }) {
             return <span>{name} created this task</span>;
         case 'COMMENT_ADDED':
             return <span>{name} added a comment</span>;
+        case 'COMMENT_EDITED':
+            return <span>{name} edited a comment</span>;
         case 'COMMENT_DELETED':
             return <span>{name} deleted a comment</span>;
         case 'STATUS_CHANGED':
@@ -106,17 +113,20 @@ function ActivityDescription({ activity }: { activity: Activity }) {
 export default function ActivityTab({ taskId }: { taskId: number }) {
     const [activities, setActivities] = useState<Activity[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const requestIdRef = useRef(0);
 
     const fetchActivities = useCallback(async () => {
         const requestId = ++requestIdRef.current;
         setLoading(true);
+        setError(null);
         try {
             const page = await getTaskActivities(taskId);
             if (requestId !== requestIdRef.current) return;
             setActivities(page.content);
         } catch (err) {
             if (requestId !== requestIdRef.current) return;
+            setError(getErrorMessage(err, 'Could not load history'));
         } finally {
             if (requestId === requestIdRef.current) setLoading(false);
         }
@@ -131,6 +141,20 @@ export default function ActivityTab({ taskId }: { taskId: number }) {
             <div className="py-8 text-center">
                 <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-200 dark:border-slate-700 border-t-slate-500 dark:border-t-slate-400 mx-auto" />
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Loading history...</p>
+            </div>
+        );
+    }
+
+    if (error !== null) {
+        return (
+            <div className="py-6 text-center">
+                <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
+                <button
+                    onClick={fetchActivities}
+                    className="mt-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                >
+                    Retry
+                </button>
             </div>
         );
     }

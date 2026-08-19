@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Bar } from 'react-chartjs-2';
 import { ChartOptions } from 'chart.js';
-import { ChartCard, chartOptions, useChartTickColor } from '../ChartComponents';
+import { ChartCard, ICON_WELL_CLASS, chartOptions, useChartTickColor } from '../ChartComponents';
 import { formatAssigneeName } from '../../../util/helpers';
 import { LightningIcon, BlockedIcon, TrendingUpIcon, UsersIcon } from '../../common/Icons';
 import EmptyState from '../../common/EmptyState';
@@ -71,7 +71,7 @@ export const DependencyChainCard = ({ analysis }: { analysis: DependencyChainAna
                         Longest dependency chain
                     </div>
                 </div>
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${
+                <div className={`${ICON_WELL_CLASS} ${
                     isDeep ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-slate-100 dark:bg-slate-700'
                 }`}>
                     <LightningIcon className={`w-7 h-7 ${
@@ -131,7 +131,7 @@ export const BlockedTasksCard = ({ blocked }: { blocked: BlockedTasks }) => {
                         {blocked.blockedCriticalTasks.length} are critical
                     </div>
                 </div>
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${
+                <div className={`${ICON_WELL_CLASS} ${
                     hasBlocked ? 'bg-red-100 dark:bg-red-900/30' : 'bg-slate-100 dark:bg-slate-700'
                 }`}>
                     <BlockedIcon className={`w-7 h-7 ${hasBlocked ? 'text-red-600 dark:text-red-400' : 'text-slate-400 dark:text-slate-500'}`} />
@@ -261,7 +261,11 @@ export const TeamWorkloadBarCard = ({ load }: { load: AssigneeLoad[] }) => {
     return (
         <ChartCard title="Team Workload" subtitle="Tasks per assignee (critical vs normal)">
             <div className="h-56">
-                <Bar data={data} options={workloadOptions} />
+                <Bar
+                    data={data}
+                    options={workloadOptions}
+                    aria-label={`Bar chart of critical versus normal task counts for ${load.length} assignee${load.length === 1 ? '' : 's'}`}
+                />
             </div>
         </ChartCard>
     );

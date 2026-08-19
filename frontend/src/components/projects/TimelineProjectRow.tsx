@@ -44,9 +44,11 @@ const TimelineProjectRow = ({
 
     const tasksToRender = hasActiveFilters ? projectFilteredTasks : project.tasks;
 
+    const rowWidth = sidebarWidth + timelineWidth;
+
     return (
         <div className="relative">
-            <div className="flex group" style={{ width: `${timelineWidth}px` }}>
+            <div className="flex group" style={{ width: `${rowWidth}px` }}>
                 <div
                     className={sidebarBaseClass}
                     style={{ minWidth: `${sidebarWidth}px`, width: `${sidebarWidth}px` }}
@@ -73,6 +75,7 @@ const TimelineProjectRow = ({
                                     onClick={() => onToggleExpand(project.projectKey)}
                                     className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 transition-colors flex-shrink-0"
                                     title={isExpanded ? 'Collapse tasks' : 'Expand tasks'}
+                                    aria-label={isExpanded ? 'Collapse tasks' : 'Expand tasks'}
                                 >
                                     <ChevronRightIcon
                                         className={`w-3.5 h-3.5 transition-transform ${
@@ -122,6 +125,7 @@ const TimelineProjectRow = ({
                                     onClick={() => onOpenTaskModal(project, null)}
                                     className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
                                     title="Add task"
+                                    aria-label="Add task"
                                 >
                                     <PlusIcon className="w-3.5 h-3.5" />
                                 </button>
@@ -132,12 +136,22 @@ const TimelineProjectRow = ({
                 <div className="flex-1 flex items-center relative">
                     {project.projectStartDate && project.projectDueDate && (
                         <div
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Open project ${project.projectKey}: ${project.summary}`}
                             className="absolute h-1.5 rounded-[2px] bg-slate-300 dark:bg-slate-600 cursor-pointer hover:bg-slate-400 dark:hover:bg-slate-500 transition-colors"
                             style={calculateTaskPosition(
                                 project.projectStartDate,
                                 project.projectDueDate,
                                 timelineStart
                             )}
+                            onClick={() => onOpenProjectModal(project)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    onOpenProjectModal(project);
+                                }
+                            }}
                             onMouseEnter={(e) => onTooltipShow(e, {
                                 type: 'project',
                                 title: project.summary,

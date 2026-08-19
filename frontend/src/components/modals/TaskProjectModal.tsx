@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Form, Formik, FormikHelpers, FormikProps } from 'formik';
+import * as Yup from 'yup';
 import { HiOutlineTrash } from 'react-icons/hi';
 import { useAuth } from '../../context/AuthContext';
 import { useProjects } from '../../context/ProjectsContext';
 import TaskForm from './TaskForm';
 import ProjectForm from './ProjectForm';
-import ConfirmDialog from './ConfirmDialog';
+import ConfirmDialog, { trapFocus } from './ConfirmDialog';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import useAttachments from '../../hooks/useAttachments';
 import useModalFormInit from '../../hooks/useModalFormInit';
@@ -14,6 +15,10 @@ import { showToast } from '../../util/toast';
 import {
     Attachment, ModalFormValues, ModalMode, ModalType, Project, ProjectPayload, Task, TaskPayload,
 } from '../../types';
+
+// The one definition of "a valid email address" on the client, so a member email is held to the
+// same standard as every other email field in the app (they all validate with Yup's `.email()`).
+const EMAIL_SCHEMA = Yup.string().email();
 
 interface TaskProjectModalProps {
     modalType: ModalType;
@@ -68,9 +73,10 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
     }, []);
 
     const handleCloseAttempt = useCallback(() => {
-        const formTouched = formikRef.current?.touched && Object.keys(formikRef.current.touched).length > 0;
-        const formDirty = formikRef.current?.dirty && formTouched;
-        const isDirty = formDirty || uiState.isDirty;
+        // `touched` is populated by onBlur, so requiring it here missed every edit made through
+        // a control that never blurs in normal use (the Status/Priority <select> overlays, the
+        // Progress range) — Formik's own `dirty` already tracks any value change and is enough.
+        const isDirty = formikRef.current?.dirty || uiState.isDirty;
         if (isDirty) {
             setUiState(prev => ({ ...prev, closeConfirmOpen: true }));
         } else {
@@ -86,12 +92,18 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
 
     useClickOutside(modalRef, handleCloseAttempt);
 
-    // Close on Escape (parity with the react-modal based AccountModal).
+    // Close on Escape (parity with the react-modal based AccountModal), and keep Tab from
+    // leaving the dialog into the obscured page behind it. Skipped while a ConfirmDialog is
+    // open on top: that dialog traps focus within itself instead.
     useEffect(() => {
-        const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') handleCloseAttempt(); };
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') { handleCloseAttempt(); return; }
+            if (uiState.deleteConfirmOpen || uiState.closeConfirmOpen) return;
+            if (modalRef.current) trapFocus(modalRef.current, e);
+        };
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
-    }, [handleCloseAttempt]);
+    }, [handleCloseAttempt, uiState.deleteConfirmOpen, uiState.closeConfirmOpen]);
 
     const handleSubmit = async (values: ModalFormValues, { setSubmitting }: FormikHelpers<ModalFormValues>) => {
         if (isSaving) return;
@@ -191,7 +203,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
         const normalizedEmail = email.toLowerCase().trim();
         if (!normalizedEmail) return;
 
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        if (!EMAIL_SCHEMA.isValidSync(normalizedEmail)) {
             setEmailError('Invalid email format');
             return;
         }

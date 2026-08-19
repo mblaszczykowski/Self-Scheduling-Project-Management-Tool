@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Link, Location } from 'react-router-dom';
 import { BoxIcon, ClipboardIcon, UserIcon, LogoutIcon } from '../common/Icons';
+import { useClickOutside } from '../../hooks/useClickOutside';
 
 interface MobileMenuProps {
     location: Location;
@@ -19,8 +20,19 @@ export default function MobileMenu({
     onOpenAccountModal,
     onLogoutClick
 }: MobileMenuProps) {
+    const menuRef = useRef<HTMLElement | null>(null);
+    useClickOutside(menuRef, onClose);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
     return (
-        <nav id="mobile-menu" role="navigation" aria-label="Mobile navigation" className="xl:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-[slideDown_0.2s_ease-out]">
+        <nav ref={menuRef} id="mobile-menu" role="navigation" aria-label="Mobile navigation" className="xl:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-[slideDown_0.2s_ease-out]">
             <div className="px-6 py-4 space-y-1">
                 <MobileNavLink to="/dashboard" isActive={location.pathname === '/dashboard'} onClick={onClose}>Dashboard</MobileNavLink>
                 <MobileNavLink to="/projects" isActive={location.pathname === '/projects'} onClick={onClose}>Projects</MobileNavLink>

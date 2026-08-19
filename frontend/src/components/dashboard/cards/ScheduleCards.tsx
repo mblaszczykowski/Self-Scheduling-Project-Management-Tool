@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChartCard } from '../ChartComponents';
+import { ChartCard, ICON_WELL_CLASS } from '../ChartComponents';
 import { formatAssigneeName, formatShortDate } from '../../../util/helpers';
 import { CheckCircleIcon, ChartBarIcon, ClockIcon, TrendingUpIcon, UsersIcon } from '../../common/Icons';
 import EmptyState from '../../common/EmptyState';
@@ -32,7 +32,7 @@ export const CriticalPathHealthCard = ({ health }: { health: CriticalPathHealth 
                         {health.criticalTasksList.length} critical tasks
                     </div>
                 </div>
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${tintBg}`}>
+                <div className={`${ICON_WELL_CLASS} ${tintBg}`}>
                     <CheckCircleIcon className={`w-7 h-7 ${tintText}`} />
                 </div>
             </div>
@@ -53,6 +53,17 @@ const StatRow = ({ label, value, color }: { label: string; value: number; color:
 );
 
 export const ScheduleHealthCard = ({ health }: { health: ScheduleHealth }) => {
+    // With nothing active to measure, the score formula floors at 0 — which reads as a critical
+    // schedule rather than the true "no schedule to grade yet" state. A neutral empty state avoids
+    // showing a red 0% next to Critical Path Health's own empty-portfolio default of a green 100%.
+    if (health.totalActive === 0) {
+        return (
+            <ChartCard title="Schedule Health" subtitle="Progress vs time elapsed">
+                <EmptyState size="sm" icon={ClockIcon} title="Nothing scheduled yet" />
+            </ChartCard>
+        );
+    }
+
     const score = health.scheduleHealthScore;
     const tintText = score >= 75 ? 'text-green-600 dark:text-green-400'
         : score >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400';
@@ -68,7 +79,7 @@ export const ScheduleHealthCard = ({ health }: { health: ScheduleHealth }) => {
                         {health.totalActive} active tasks tracked
                     </div>
                 </div>
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${tintBg}`}>
+                <div className={`${ICON_WELL_CLASS} ${tintBg}`}>
                     <ClockIcon className={`w-7 h-7 ${tintText}`} />
                 </div>
             </div>
@@ -217,7 +228,7 @@ export const ResourceConflictsCard = ({ conflicts }: { conflicts: ResourceConfli
                         {conflicts.affectedAssignees.length} people over-allocated
                     </div>
                 </div>
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${
+                <div className={`${ICON_WELL_CLASS} ${
                     hasConflicts ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30'
                 }`}>
                     <UsersIcon className={`w-7 h-7 ${hasConflicts ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`} />

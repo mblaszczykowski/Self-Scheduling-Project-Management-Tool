@@ -1,4 +1,4 @@
-import { RefObject, MouseEvent as ReactMouseEvent } from 'react';
+import { RefObject, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { EnrichedTask, ProcessedProject, Project } from '../../types';
 import { OptimizationState } from '../../hooks/useScheduleOptimization';
 
@@ -38,7 +38,7 @@ export type TooltipHideHandler = () => void;
 export type OpenProjectModalHandler = (project: ProcessedProject) => void;
 export type OpenTaskModalHandler = (project: ProcessedProject, task: EnrichedTask | null) => void;
 export type ResizeMouseDownHandler = (
-    e: ReactMouseEvent,
+    e: ReactPointerEvent,
     taskKey: string,
     projectKey: string,
     side: ResizeSide,
@@ -94,6 +94,8 @@ export interface TimelineViewProps {
 export interface TimelineHeaderProps {
     timelineStart: Date;
     timelineEnd: Date;
+    /** Shared day-area pixel width, identical to what the body rows use, so the two never desync. */
+    timelineWidth: number;
     sidebarWidth: number;
     sidebarCollapsed: boolean;
     processedProjects: ProcessedProject[];
@@ -152,6 +154,11 @@ export interface DependencyOverlayProps {
     filteredTaskIds: FilteredTaskIds;
     filteredProjectKeys: FilteredProjectKeys;
     hasActiveFilters: boolean;
+    /** Not read directly — included so a sidebar toggle forces a recompute of the arrows' screen
+     *  coordinates, which otherwise go stale until some other layout change happens to fire the
+     *  ResizeObserver. */
+    sidebarWidth: number;
+    sidebarCollapsed: boolean;
 }
 
 export interface TaskListViewProps {

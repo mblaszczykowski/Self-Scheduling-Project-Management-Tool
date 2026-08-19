@@ -1,4 +1,4 @@
-import { MS_PER_DAY } from './helpers';
+import { DELIVERED_STATUSES, MS_PER_DAY, isTaskComplete } from './helpers';
 import { EnrichedTask, ProcessedProject, TaskPriority, TaskStatus } from '../types';
 
 // Scheduling analysis behind the dashboard's cards: resource contention, schedule health, the CPM
@@ -66,7 +66,7 @@ export const computeResourceConflicts = (allTasks: EnrichedTask[]): ResourceConf
         const assignee = task.assignee;
         const start = timeOf(task.startDate);
         const end = timeOf(task.dueDate);
-        if (!assignee || start === null || end === null || task.progress >= 100) continue;
+        if (!assignee || start === null || end === null || isTaskComplete(task.status, task.progress)) continue;
 
         const entries = schedulePerAssignee.get(assignee);
         const entry: ScheduleEntry = { taskKey: task.taskKey, start, end, isCritical: task.isCritical === true };
@@ -133,8 +133,8 @@ export interface ScheduleHealth {
     worstBehind: BehindTask[];
 }
 
-const SLIGHTLY_BEHIND_GAP = 15;
-const BEHIND_GAP = 30;
+export const SLIGHTLY_BEHIND_GAP = 15;
+export const BEHIND_GAP = 30;
 
 /** Progress against time elapsed, per unfinished task with a planned span. */
 export const computeScheduleHealth = (allTasks: EnrichedTask[], today: Date): ScheduleHealth => {
@@ -142,7 +142,7 @@ export const computeScheduleHealth = (allTasks: EnrichedTask[], today: Date): Sc
     const behindTasks: BehindTask[] = [];
 
     for (const task of allTasks) {
-        if (task.progress >= 100) continue;
+        if (isTaskComplete(task.status, task.progress)) continue;
         const elapsed = schedulePercentElapsed(task, today);
         if (elapsed === null) continue;
 
@@ -161,8 +161,12 @@ export const computeScheduleHealth = (allTasks: EnrichedTask[], today: Date): Sc
         }
     }
 
-    // Slightly-behind work counts as partial credit; anything worse counts for nothing.
-    const score = Math.round(((onTrack + notStarted + slightlyBehind * 0.7) / (totalActive || 1)) * 100);
+    // Slightly-behind work counts as partial credit; anything worse counts for nothing. With
+    // nothing scheduled there is nothing behind, which scores as healthy rather than as 0% —
+    // matching computeCriticalPathHealth, which already reports 100 for an empty set.
+    const score = totalActive === 0
+        ? 100
+        : Math.round(((onTrack + notStarted + slightlyBehind * 0.7) / totalActive) * 100);
     behindTasks.sort((a, b) => b.gap - a.gap);
 
     return {
@@ -225,7 +229,7 @@ export const computeDependencyChainAnalysis = (
     const bottlenecks: Bottleneck[] = [];
     dependentCounts.forEach((dependentCount, taskKey) => {
         const task = taskByKey.get(taskKey);
-        if (!task || task.progress >= 100) return;
+        if (!task || isTaskComplete(task.status, task.progress)) return;
         bottlenecks.push({
             taskKey,
             summary: task.summary,
@@ -265,7 +269,7 @@ export const computeProjectVelocity = (projects: ProcessedProject[], today: Date
 
         for (const task of project.tasks) {
             const due = timeOf(task.dueDate);
-            if (!task.startDate || due === null || task.progress >= 100) continue;
+            if (!task.startDate || due === null || isTaskComplete(task.status, task.progress)) continue;
 
             activeTasks++;
             const daysLeft = Math.max(0, (due - today.getTime()) / MS_PER_DAY);
@@ -333,7 +337,6 @@ export interface CompletionWeek {
     count: number;
 }
 
-const COMPLETED_STATUSES = new Set<TaskStatus>(['DONE', 'RELEASED']);
 const TREND_WEEKS = 8;
 
 /** Tasks completed per week over the trailing eight weeks, oldest bucket first. */
@@ -350,7 +353,9 @@ export const computeCompletionTrend = (allTasks: EnrichedTask[], today: Date): C
     });
 
     for (const task of allTasks) {
-        if (!COMPLETED_STATUSES.has(task.status)) continue;
+        // Delivered, not merely terminal: a withdrawn task is cancelled work and counting it
+        // would inflate the weekly completed figure the card reports.
+        if (!DELIVERED_STATUSES.has(task.status)) continue;
         const updated = timeOf(task.updated);
         if (updated === null) continue;
         const week = weeks.find(w => updated >= w.start && updated <= w.end);
@@ -383,92 +388,26 @@ const SLACK_RANGES: Array<{ id: SlackBucketId; label: string; min: number; max: 
     { id: 'ample', label: '10+ days', min: 11, max: Infinity },
 ];
 
-interface CpmNode {
-    duration: number;
-    deps: string[];
-    successors: string[];
-    earliestFinish: number;
-    latestStart: number;
-    slack: number;
-}
-
 const EMPTY_SLACK: SlackDistribution = { buckets: [], avgSlack: 0, zeroSlackCount: 0, totalScheduled: 0 };
 
 /**
- * Total float per unfinished scheduled task, via a critical-path forward/backward pass.
+ * Total float per unfinished scheduled task, as reported by the server.
  *
- * Dependencies on unscheduled tasks are dropped rather than treated as zero-duration predecessors:
- * a task nobody planned cannot constrain the plan. Kahn's algorithm gives the topological order and
- * silently leaves cyclic tasks out of it, which is what keeps a bad dependency graph from hanging
- * the pass — those tasks simply keep their initial slack of 0.
+ * The float itself is not derived here. The API computes it with the same critical-path pass that
+ * decides `isCritical`, over the model the optimizer actually uses — per project rather than across
+ * the whole portfolio, honouring each task's release date, and discounting duration by the progress
+ * already made. A second pass on this side had none of that and disagreed with the badge the same
+ * task carried everywhere else, so this now only buckets what the server sends.
  */
 export const computeSlackDistribution = (allTasks: EnrichedTask[]): SlackDistribution => {
-    const scheduled = allTasks.filter(t => t.startDate && t.dueDate && t.progress < 100);
-    if (scheduled.length === 0) return EMPTY_SLACK;
+    const slackValues = allTasks
+        .filter(task => task.startDate && task.dueDate
+            && !isTaskComplete(task.status, task.progress)
+            && typeof task.totalFloat === 'number')
+        .map(task => Math.max(0, task.totalFloat as number));
 
-    const scheduledKeys = new Set(scheduled.map(t => t.taskKey));
-    const nodes = new Map<string, CpmNode>();
-    for (const task of scheduled) {
-        nodes.set(task.taskKey, {
-            // `duration` is the inclusive day count `useEnrichedProjects` already derived; the floor
-            // keeps a task with unparseable dates from collapsing the pass.
-            duration: Math.max(task.duration, 1),
-            deps: task.dependencies.filter(d => scheduledKeys.has(d)),
-            successors: [],
-            earliestFinish: 0,
-            latestStart: 0,
-            slack: 0,
-        });
-    }
+    if (slackValues.length === 0) return EMPTY_SLACK;
 
-    const inDegree = new Map<string, number>();
-    nodes.forEach((node, key) => {
-        inDegree.set(key, node.deps.length);
-        for (const dep of node.deps) nodes.get(dep)?.successors.push(key);
-    });
-
-    // Forward pass in topological order (Kahn).
-    const ready = [...nodes.keys()].filter(key => inDegree.get(key) === 0);
-    const order: string[] = [];
-    while (ready.length > 0) {
-        const key = ready.shift();
-        if (key === undefined) break;
-        order.push(key);
-        const node = nodes.get(key);
-        if (!node) continue;
-        for (const successor of node.successors) {
-            const remaining = (inDegree.get(successor) ?? 0) - 1;
-            inDegree.set(successor, remaining);
-            if (remaining === 0) ready.push(successor);
-        }
-    }
-
-    const earliestStartOf = new Map<string, number>();
-    for (const key of order) {
-        const node = nodes.get(key);
-        if (!node) continue;
-        let earliestStart = 0;
-        for (const dep of node.deps) {
-            earliestStart = Math.max(earliestStart, nodes.get(dep)?.earliestFinish ?? 0);
-        }
-        earliestStartOf.set(key, earliestStart);
-        node.earliestFinish = earliestStart + node.duration;
-    }
-
-    // Backward pass over the same order, reversed.
-    const projectFinish = Math.max(...[...nodes.values()].map(n => n.earliestFinish));
-    for (let i = order.length - 1; i >= 0; i--) {
-        const key = order[i];
-        const node = nodes.get(key);
-        if (!node) continue;
-        const latestFinish = node.successors.length === 0
-            ? projectFinish
-            : Math.min(...node.successors.map(s => nodes.get(s)?.latestStart ?? projectFinish));
-        node.latestStart = latestFinish - node.duration;
-        node.slack = Math.max(0, node.latestStart - (earliestStartOf.get(key) ?? 0));
-    }
-
-    const slackValues = [...nodes.values()].map(n => n.slack);
     const zeroSlackCount = slackValues.filter(s => s === 0).length;
     const avgSlack = Math.round(slackValues.reduce((sum, s) => sum + s, 0) / slackValues.length);
 
@@ -480,7 +419,7 @@ export const computeSlackDistribution = (allTasks: EnrichedTask[]): SlackDistrib
         })),
         avgSlack,
         zeroSlackCount,
-        totalScheduled: scheduled.length,
+        totalScheduled: slackValues.length,
     };
 };
 
@@ -548,7 +487,7 @@ export const computeAssigneeLoad = (allTasks: EnrichedTask[]): AssigneeLoad[] =>
 
     for (const task of allTasks) {
         const assignee = task.assignee;
-        if (!assignee || task.progress >= 100) continue;
+        if (!assignee || isTaskComplete(task.status, task.progress)) continue;
 
         let load = loadByAssignee.get(assignee);
         if (!load) {

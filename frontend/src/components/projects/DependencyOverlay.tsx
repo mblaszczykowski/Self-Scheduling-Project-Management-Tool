@@ -168,6 +168,8 @@ const DependencyOverlay = ({
     filteredTaskIds,
     filteredProjectKeys,
     hasActiveFilters,
+    sidebarWidth,
+    sidebarCollapsed,
 }: DependencyOverlayProps) => {
     const [arrows, setArrows] = useState<Arrow[]>([]);
     const [dims, setDims] = useState({ w: 0, h: 0 });
@@ -233,8 +235,13 @@ const DependencyOverlay = ({
             d: buildArrowPath(a.sx, a.sy, a.ex, a.ey, allBars),
         })));
         setDims({ w: el.scrollWidth, h: el.scrollHeight });
+        // sidebarWidth/sidebarCollapsed are not read here: the arrows are measured from the DOM,
+        // and toggling the sidebar moves every bar without changing the scroll container's own box,
+        // so the ResizeObserver never fires. They are dependencies so the measurement re-runs.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [containerRef, allTasks, draggingTaskKey, taskKeyMap, expandedProjects,
-        projectKeyToProject, filteredTaskIds, filteredProjectKeys, hasActiveFilters]);
+        projectKeyToProject, filteredTaskIds, filteredProjectKeys, hasActiveFilters,
+        sidebarWidth, sidebarCollapsed]);
 
     useEffect(() => {
         const id = requestAnimationFrame(compute);

@@ -157,7 +157,7 @@ export default function NotificationDropdown({
                 aria-expanded={isOpen}
                 aria-haspopup="true"
                 aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
-                className="relative p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none transition-colors"
+                className="relative p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 dark:focus-visible:ring-white transition-colors"
                 onClick={handleBellClick}
             >
                 <HiOutlineBell className="h-[18px] w-[18px] text-slate-500 dark:text-slate-400" aria-hidden="true" />
@@ -169,7 +169,7 @@ export default function NotificationDropdown({
             </button>
             {isOpen && (
                 <div
-                    role="menu"
+                    role="group"
                     aria-label="Notifications"
                     className="absolute right-0 mt-2 w-[420px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-[slideDown_0.2s_ease-out]"
                 >

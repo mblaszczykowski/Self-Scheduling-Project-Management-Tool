@@ -29,6 +29,9 @@ export const ChartCard = ({ title, subtitle, children, className = "" }: { title
     );
 };
 
+/** The icon well shared by every card that pairs a metric with a tinted icon badge. */
+export const ICON_WELL_CLASS = 'w-14 h-14 rounded-xl flex items-center justify-center shrink-0';
+
 /**
  * The card's own background colour, for chart marks that have to punch through the surface they
  * sit on (doughnut segment borders). Canvas cannot read a Tailwind class, so the theme has to be

@@ -73,6 +73,22 @@ api.interceptors.request.use((requestConfig) => {
 let refreshPromise: Promise<unknown> | null = null;
 
 /**
+ * Rotates the session, at most once at a time.
+ *
+ * Every caller shares one in-flight request. Refresh tokens are single-use and presenting a
+ * consumed one is treated as replay, which revokes the whole token family — so two refreshes racing
+ * each other would sign the user out rather than renew them. The flag and the promise are read
+ * together with no await in between, so there is no window for a second refresh to start.
+ */
+const refreshSession = (): Promise<unknown> => {
+    if (!refreshPromise) {
+        refreshPromise = api.post('/api/auth/refresh')
+            .finally(() => { refreshPromise = null; });
+    }
+    return refreshPromise;
+};
+
+/**
  * Endpoints for which a 401 must not trigger a refresh: the two that mint the session, and
  * logout — where refreshing only to then discard the session produces a misleading "your session
  * expired" toast instead of a clean sign-out.
@@ -102,24 +118,14 @@ api.interceptors.response.use(
         }
         originalRequest._retry = true;
 
-        // Concurrent 401s share one refresh: the flag and the promise are read together with no
-        // await in between, so there is no window for a second refresh to start.
-        if (refreshPromise) {
-            await refreshPromise;
-            return api(originalRequest);
-        }
-
-        refreshPromise = api.post('/api/auth/refresh');
         try {
-            await refreshPromise;
+            await refreshSession();
             // Retrying is safe even for a POST: the 401 came from the authentication filter,
             // before any handler ran, so the request was never processed.
             return api(originalRequest);
         } catch (refreshError) {
             redirectToLogin();
             return Promise.reject(refreshError);
-        } finally {
-            refreshPromise = null;
         }
     }
 );
@@ -147,11 +153,25 @@ export const register = (payload: RegistrationPayload) =>
 export const getCurrentUser = () => api.get<CurrentUser>('/api/users/me').then(body);
 
 /**
- * The boot-time auth probe. Skips the 401 refresh so an anonymous visitor does not pay a wasted
- * round-trip, or get hard-redirected, before the router's own auth gate runs.
+ * The boot-time auth probe.
+ *
+ * Skips the interceptor's automatic refresh so an anonymous visitor is not hard-redirected before
+ * the router's own auth gate runs — but a returning user whose 15-minute access token has expired
+ * still has a valid refresh token, so one explicit rotation is attempted before giving up. Without
+ * that second step every reload past the access token's lifetime forced a fresh login and the
+ * seven-day refresh token was never used.
  */
-export const checkUserAuth = () =>
-    api.get<CurrentUser>('/api/users/me', { _skipRefresh: true } as AxiosRequestConfig).then(body);
+export const checkUserAuth = async (): Promise<CurrentUser> => {
+    const probe = () =>
+        api.get<CurrentUser>('/api/users/me', { _skipRefresh: true } as AxiosRequestConfig).then(body);
+    try {
+        return await probe();
+    } catch (error) {
+        if ((error as AxiosError).response?.status !== 401) throw error;
+        await refreshSession();
+        return probe();
+    }
+};
 
 export const updateProfile = (payload: ProfilePayload, profilePicture?: File | null) => {
     const formData = new FormData();
@@ -165,9 +185,6 @@ export const updateEmailPreferences = (preferences: EmailPreferencesPayload) =>
 
 export const getProjects = (page = 0, size = 100) =>
     api.get<Paged<Project>>('/api/projects', { params: { page, size } }).then(body);
-
-export const getProject = (projectKey: string) =>
-    api.get<Project>(`/api/projects/${encodeURIComponent(projectKey)}`).then(body);
 
 export const createProject = (payload: ProjectPayload, attachments: File[] = []) =>
     api.post<Project>('/api/projects', multipart(payload, attachments, 'projectDTO'), MULTIPART)
@@ -247,6 +264,13 @@ export const getUnreadNotificationCount = () =>
 
 export const markNotificationsAsRead = (notificationIds: number[]) =>
     api.post<void>('/api/notifications/mark-as-read', notificationIds).then(body);
+
+/**
+ * Clears every unread notification, not just the page the client happens to hold, and answers with
+ * the remaining count so the badge is set from the server rather than decremented locally.
+ */
+export const markAllNotificationsRead = () =>
+    api.post<{ unreadCount: number }>('/api/notifications/mark-all-read').then(body);
 
 export const globalSearch = (query: string) =>
     api.get<SearchResults>('/api/search', { params: { q: query } }).then(body);

@@ -1,10 +1,11 @@
 import React from 'react';
 
-export const Skeleton = ({ className = '' }) => (
+// Internal building blocks: only `DashboardSkeleton` below is imported outside this file.
+const Skeleton = ({ className = '' }) => (
     <div className={`animate-pulse bg-slate-200 dark:bg-slate-700 rounded ${className}`} />
 );
 
-export const StatCardSkeleton = () => (
+const StatCardSkeleton = () => (
     <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-3">
             <Skeleton className="h-4 w-24" />
@@ -15,7 +16,7 @@ export const StatCardSkeleton = () => (
     </div>
 );
 
-export const TaskRowSkeleton = () => (
+const TaskRowSkeleton = () => (
     <div className="flex items-center gap-4 py-3 px-4 border-b border-slate-100 dark:border-slate-700/50">
         <Skeleton className="h-4 w-16" />
         <Skeleton className="h-4 w-48 flex-1" />
@@ -57,5 +58,3 @@ export const DashboardSkeleton = () => (
         </div>
     </div>
 );
-
-export default Skeleton;
