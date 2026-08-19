@@ -97,23 +97,19 @@ exemption, never more. The one exception is the API docs subtree (`/swagger-ui/*
 
 Reachable without an access token:
 
-- `POST /api/users` (registration — the path is exempt for POST only; reading or updating the
-  current user still requires a token)
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
-- `POST /api/auth/logout` — it revokes whatever refresh-token cookie it is handed and never reads
-  the caller's id, so requiring an unexpired access token only meant a session left idle past the
-  fifteen-minute mark could not be ended: the request failed, the refresh token survived, and the
-  next page load signed the user straight back in. Still CSRF-checked, so it cannot be forced.
-- `/error`
-- `/actuator/health`
+- `POST /api/users` (registration only — reading or updating the current user still requires a
+  token)
+- `POST /api/auth/login`, `POST /api/auth/refresh`
+- `POST /api/auth/logout` — it revokes whatever refresh-token cookie it is handed rather than
+  reading the caller's id, so an already-idle session can still log out cleanly. Still
+  CSRF-checked.
+- `/error`, `/actuator/health`
 - `/swagger-ui/*`, `/v3/api-docs*`
 
 Everything else requires a valid access token. Exempt from the CSRF check: `POST /api/auth/login`,
-`POST /api/users`, `/error`, `/actuator/health`. `/api/auth/refresh` and `/api/auth/logout` are
-deliberately *not* exempt — the client already sends the CSRF header on both, so leaving them out
-of the exemption list means a future relaxation of `COOKIE_SAME_SITE` to `None` would not silently
-open a hole.
+`POST /api/users`, `/error`, `/actuator/health` — refresh and logout are deliberately left off that
+list even though the client already sends the header, so a future relaxation of
+`COOKIE_SAME_SITE` to `None` can't silently reopen a hole.
 
 ---
 
@@ -122,8 +118,7 @@ open a hole.
 `NotificationService` creates notifications asynchronously for project invitations, project
 updates and member removal (`ProjectService`); task assignment, task updates including date
 changes, and task deletion (`TaskService`); and new comments, replies and reactions on a task
-(`CommentService`). There is **no mention parsing** anywhere in the codebase — comments are not
-scanned for `@name`.
+(`CommentService`).
 
 Delivery is a Server-Sent Events stream at `GET /api/notifications/stream`, managed by
 `SseEmitterManager` and capped at `app.sse.max-emitters-per-user` (default `4`) concurrent streams
@@ -163,20 +158,16 @@ browser — it recomputes the schedule server-side from the current
 data and persists that, so what ends up in the database is feasible by construction rather than
 whatever the client last saw.
 
-Every reported metric — on-time count, weighted delay and schedule span — is measured over the
-work the optimizer actually controls. Completed and withdrawn tasks, and cross-project anchors,
-bound the timeline and constrain their successors, but are not scored: including them made the
-makespan term saturate so the `beta` weight stopped telling candidate schedules apart.
+Every reported metric — on-time count, weighted delay and schedule span — is measured only over
+the work the optimizer actually controls; completed tasks, withdrawn tasks and cross-project
+anchors still constrain their successors but are excluded from scoring, since including them
+saturated the makespan term and left the `beta` weight unable to tell candidate schedules apart.
 
 `CriticalPathAnalyzer` runs a forward and backward pass over the same precedence graph to compute
 each task's total float — the slack the timeline and dashboard use to flag what is critical. Float
-is slack against the work's **own** deadlines: a task's latest acceptable finish is the earlier of
-its due date and the latest start its successors can tolerate, so a task is critical when nothing
-is left between where it can start and where it must (`slack <= 0`). Deriving the finish from the
-schedule's own longest path instead — the textbook formulation for a network with a single
-unknown deadline — gave every task without a parallel alternative zero float, which on a board of
-chains and independent tasks meant all of them. Completed and withdrawn work, and cross-project
-anchors, still constrain their successors but are neither scored nor reported.
+is slack against a task's **own** deadline, not a shared project deadline: deriving it from the
+schedule's longest path instead (the textbook formulation) gave every task without a parallel
+alternative zero float, which on a board of chains and independent tasks meant nearly all of them.
 
 ---
 
@@ -271,10 +262,10 @@ files.
 
 - **config/** — `@ConfigurationProperties` classes (`AppProperties` for everything under `app.*`,
   `JwtProperties`, `CookieProperties`), plus `WebConfig` (CORS + argument resolvers), `AsyncConfig`,
-  `SchedulingConfig`, `JwtConfig`, `PasswordEncoderConfig`, `OpenApiConfig` (hides the
-  `@CurrentUserId` parameter from the generated OpenAPI docs, in both the parameter list and
-  multipart request bodies), and `PublicEndpoints` — the deny-by-default authentication/CSRF
-  policy in one place (see [Public vs protected endpoints](#public-vs-protected-endpoints)).
+  `SchedulingConfig`, `JwtConfig`, `PasswordEncoderConfig`, `OpenApiConfig` (hides the internal
+  `@CurrentUserId` parameter from the generated OpenAPI docs), and `PublicEndpoints` — the
+  deny-by-default authentication/CSRF policy in one place (see
+  [Public vs protected endpoints](#public-vs-protected-endpoints)).
 - **controllers/** — REST endpoints, one per resource: Auth, User, Project, Task, TaskActivity,
   Comment, Notification, Search, Optimization, File.
 - **services/** — business logic. Includes `SseEmitterManager` (notification streams),
@@ -307,13 +298,12 @@ files.
 - **exception/** — custom exceptions (`AuthorizationException`, `FileStorageException`,
   `ResourceNotFoundException`, `TooManyAttemptsException`, `UnauthenticatedException`,
   `ValidationException`) and `GlobalExceptionHandler`.
-- **util/** — `ValidationUtil`, `AfterCommit`, `FileValidationConstants`, `SecureTokens` (the one
-  generator for opaque URL-safe secrets), `GraphCycles` (the shared cycle-detection walk used for
-  project/task dependency validation), `HtmlSanitizer` (jsoup-based sanitisation for comment
-  bodies and rich-text task/project descriptions).
-
-There is no `events/` package; deferred side effects (mail, file unlinking, SSE pushes) go through
-`util/AfterCommit`, which registers a transaction synchronization so nothing escapes before commit.
+- **util/** — `ValidationUtil`, `AfterCommit` (deferred side effects like mail, file unlinking and
+  SSE pushes register a transaction synchronization here, so nothing escapes before commit),
+  `FileValidationConstants`, `SecureTokens` (the one generator for opaque URL-safe secrets),
+  `GraphCycles` (the shared cycle-detection walk used for project/task dependency validation),
+  `HtmlSanitizer` (jsoup-based sanitisation for comment bodies and rich-text task/project
+  descriptions).
 
 ### Frontend structure
 
@@ -413,13 +403,12 @@ openssl rand -base64 48    # -> JWT_SECRET
 openssl rand -base64 24    # -> POSTGRES_PASSWORD
 ```
 
-`JWT_SECRET` is **mandatory**. The backend binds it as a validated configuration property and
-refuses to start without a value of at least 32 characters — there is no fallback default, by
-design. `docker compose up` fails with a named error if either variable is missing.
+`JWT_SECRET` is mandatory — the backend refuses to start without it (see
+[Configuration](#configuration)). `docker compose up` fails with a named error if either variable
+is missing.
 
-For a plain-HTTP localhost stack, also set `COOKIE_SECURE=false` in `.env`. Auth cookies are marked
-`Secure` by default, and a browser will not send a `Secure` cookie over `http://`, so logging in
-appears to succeed and every subsequent request is unauthenticated.
+For a plain-HTTP localhost stack, also set `COOKIE_SECURE=false` in `.env`, or login will silently
+appear to succeed while every request after it is unauthenticated.
 
 ```bash
 docker compose up --build
@@ -619,8 +608,7 @@ trusted, which is what makes it safe for an hourly `ScheduledMaintenance` sweep 
 unreferenced uploads older than six hours — a row-less file on disk is an orphan, never a
 legitimate attachment still in use. Responses are always sent with
 `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`, so an uploaded document
-can never be rendered inline in the app's own origin. Uploads themselves use
-`multipart/form-data`, a JSON metadata part plus the file parts.
+can never be rendered inline in the app's own origin.
 
 ### Rate limiting
 
