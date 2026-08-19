@@ -333,6 +333,16 @@ There is no `events/` package; deferred side effects (mail, file unlinking, SSE 
   truthiness, because the container build passes an empty string on purpose), request timeout,
   debounce delay.
 - **types.ts** — the domain types every API function is declared against.
+- **types/api.generated.ts** — not hand-written. `npm run generate:api-types` runs
+  `openapi-typescript` against the backend's `docs/openapi.json` and overwrites this file; CI
+  regenerates it and fails the build on any diff, so it can never quietly drift from what the
+  backend actually serves.
+- **types/apiContract.ts** — a compile-time check, not a runtime one: for each domain type in
+  `types.ts` it asserts, at the type level, that its keys are exactly the generated schema's keys
+  (via a conditional type that resolves to `true` on a match and to a readable tuple like
+  `['missing on the client:', ...]` otherwise). A field renamed or removed on the backend fails
+  `tsc`, at the exact commit that caused it, with the offending field name in the compiler
+  output — not a runtime `undefined` discovered later.
 
 ### State management
 
@@ -349,6 +359,37 @@ thin façades over it, not hand-rolled stores:
   is resolved once at startup in `App.tsx` via `checkUserAuth()`.
 - `ThemeContext` holds dark mode.
 - Comment API access lives in the `useComments` hook, not a context.
+
+---
+
+## CI and code quality
+
+Every push and pull request against `main` runs four jobs (`.github/workflows/ci.yml`):
+
+- **Backend tests** — the full Maven suite on Java 21, including the Testcontainers-backed
+  integration tests against a real `postgres:16-alpine`, not an in-memory substitute.
+- **Frontend** — `tsc --noEmit` over the *entire* project, not just what `react-scripts` bundles
+  (which silently skips unreferenced modules and test files), plus ESLint, the Jest suite and a
+  production build.
+- **API contract check** — regenerates `frontend/src/types/api.generated.ts` from the backend's
+  `docs/openapi.json` and fails the build on any diff (see
+  [Frontend structure](#frontend-structure) for the compile-time half of this check). Paired with
+  a backend `OpenApiContractTest` that keeps the spec itself honest against the real controllers,
+  a DTO field renamed on one side cannot reach the other silently — the build breaks at the commit
+  that caused it, not at runtime months later.
+- **Secret scan** — `gitleaks` over the working tree. It runs because a JWT signing key was
+  committed in plaintext once in this repository's history; the two historical findings are
+  permanent (rewriting published history to erase them wasn't worth it), so the scan checks the
+  tree, not the log, and a passing run stays meaningful instead of being permanently red.
+
+A **Docker build** job then builds both images and depends on all three, so a change that passes
+every test but breaks the container build still fails CI. Dependabot watches four ecosystems
+(Maven, npm, GitHub Actions, Docker) weekly, with dependency groups tuned to avoid PR
+storms — Spring Boot's starters, React's matched trio, the `@tiptap/*` family and
+`@testing-library/*` are each bumped as one PR instead of several conflicting ones.
+
+At the time of writing: 619 backend tests and 176 frontend tests, all green; the frontend is
+TypeScript in `strict` mode with zero uses of `any` anywhere in `src/`.
 
 ---
 
