@@ -333,21 +333,21 @@ There is no `events/` package; deferred side effects (mail, file unlinking, SSE 
   truthiness, because the container build passes an empty string on purpose), request timeout,
   debounce delay.
 - **types.ts** — the domain types every API function is declared against.
-- **types/api.generated.ts** — not hand-written. `npm run generate:api-types` runs
+- **types/api.generated.ts** — generated, never hand-edited. `npm run generate:api-types` runs
   `openapi-typescript` against the backend's `docs/openapi.json` and overwrites this file; CI
   regenerates it and fails the build on any diff, so it can never quietly drift from what the
   backend actually serves.
-- **types/apiContract.ts** — a compile-time check, not a runtime one: for each domain type in
+- **types/apiContract.ts** — the compile-time half of that guarantee: for each domain type in
   `types.ts` it asserts, at the type level, that its keys are exactly the generated schema's keys
   (via a conditional type that resolves to `true` on a match and to a readable tuple like
   `['missing on the client:', ...]` otherwise). A field renamed or removed on the backend fails
-  `tsc`, at the exact commit that caused it, with the offending field name in the compiler
-  output — not a runtime `undefined` discovered later.
+  `tsc` at the exact commit that caused it, field name and all, instead of surfacing as a runtime
+  `undefined` weeks later.
 
 ### State management
 
-Server state is owned by **TanStack Query** (`QueryClient` created in `App.tsx`). The contexts are
-thin façades over it, not hand-rolled stores:
+Server state is owned by **TanStack Query** (`QueryClient` created in `App.tsx`). The contexts sit
+on top of it as thin façades:
 
 - `ProjectsContext` runs a `useQuery` on `['projects']` and exposes project/task CRUD. Mutations
   invalidate the query rather than patching local state; `retryProjects()` forces a fetch for a
@@ -358,7 +358,7 @@ thin façades over it, not hand-rolled stores:
 - `AuthContext` holds the current user in `useState`; there is no server query behind it. The user
   is resolved once at startup in `App.tsx` via `checkUserAuth()`.
 - `ThemeContext` holds dark mode.
-- Comment API access lives in the `useComments` hook, not a context.
+- Comment API access lives in the `useComments` hook rather than a context.
 
 ---
 
@@ -367,20 +367,20 @@ thin façades over it, not hand-rolled stores:
 Every push and pull request against `main` runs four jobs (`.github/workflows/ci.yml`):
 
 - **Backend tests** — the full Maven suite on Java 21, including the Testcontainers-backed
-  integration tests against a real `postgres:16-alpine`, not an in-memory substitute.
-- **Frontend** — `tsc --noEmit` over the *entire* project, not just what `react-scripts` bundles
-  (which silently skips unreferenced modules and test files), plus ESLint, the Jest suite and a
-  production build.
+  integration tests against a real `postgres:16-alpine` rather than an in-memory substitute.
+- **Frontend** — `tsc --noEmit` over the *entire* project. `react-scripts` only type-checks what
+  it bundles, so an unreferenced module or a test file can hide a type error from the build; a
+  plain `tsc` run can't miss it. Also ESLint, the Jest suite and a production build.
 - **API contract check** — regenerates `frontend/src/types/api.generated.ts` from the backend's
   `docs/openapi.json` and fails the build on any diff (see
   [Frontend structure](#frontend-structure) for the compile-time half of this check). Paired with
   a backend `OpenApiContractTest` that keeps the spec itself honest against the real controllers,
-  a DTO field renamed on one side cannot reach the other silently — the build breaks at the commit
-  that caused it, not at runtime months later.
+  this closes the loop end to end: a DTO field renamed on one side cannot reach the other without
+  a red build to show for it.
 - **Secret scan** — `gitleaks` over the working tree. It runs because a JWT signing key was
   committed in plaintext once in this repository's history; the two historical findings are
-  permanent (rewriting published history to erase them wasn't worth it), so the scan checks the
-  tree, not the log, and a passing run stays meaningful instead of being permanently red.
+  permanent (rewriting published history to erase them wasn't worth it), so the scan is scoped to
+  the tree, not the git log, and a passing run stays meaningful rather than permanently red.
 
 A **Docker build** job then builds both images and depends on all three, so a change that passes
 every test but breaks the container build still fails CI. Dependabot watches four ecosystems
