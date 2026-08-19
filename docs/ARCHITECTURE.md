@@ -44,6 +44,11 @@ mvn clean package          # build the jar
 `src/test/java/com/backend/integration/`. Everything else is a plain unit test; nothing is
 excluded from the build.
 
+On a Colima/rootless Docker setup, `mvn test` needs `TESTCONTAINERS_RYUK_DISABLED=true` (and
+usually `DOCKER_HOST=unix://$HOME/.colima/default/docker.sock`): Ryuk, the Testcontainers
+resource-reaper sidecar, cannot bind-mount the docker socket there and otherwise fails the whole
+run before a single test executes.
+
 ### Frontend
 
 ```bash
@@ -72,7 +77,8 @@ docker compose up --build
 
 - **config/** — `@ConfigurationProperties` classes (`AppProperties` for everything under `app.*`,
   `JwtProperties`, `CookieProperties`), plus `WebConfig` (CORS + argument resolvers), `AsyncConfig`,
-  `SchedulingConfig`, `JwtConfig`, `PasswordEncoderConfig`, and `PublicEndpoints` — the
+  `SchedulingConfig`, `JwtConfig`, `PasswordEncoderConfig`, `OpenApiConfig` (hides the
+  `@CurrentUserId` parameter from the generated OpenAPI docs), and `PublicEndpoints` — the
   deny-by-default authentication/CSRF policy in one place.
 - **controllers/** — REST endpoints. One per resource: Auth, User, Project, Task, TaskActivity,
   Comment, Notification, Search, Optimization, File.
@@ -91,8 +97,11 @@ docker compose up --build
   task / comment".
 - **scheduling/** — the extracted scheduling domain: `SchedulingService`, `ScheduleModel`,
   `PrecedenceGraph`, `SsgsDecoder`, `PriorityRule`, `ScheduleObjective`, `ScheduleEvaluator`,
-  `CriticalPathAnalyzer`. Free of entities and non-transactional: it consumes DTOs and returns a
-  value, so CPU-bound work does not hold a pooled database connection.
+  `CriticalPathAnalyzer`, plus the value types the decoder works in — `ScheduleTask` (a task on a
+  pure integer day axis, no entities or dates), `Placement` and `Schedule` (where the decoder put
+  each task), `ScheduleMetrics` (the scored result) — and `SchedulingSupport` (shared day
+  arithmetic). Free of entities and non-transactional: it consumes DTOs and returns a value, so
+  CPU-bound work does not hold a pooled database connection.
 - **web/** — HTTP plumbing: `CookieFactory`, `@CurrentUserId` + its argument resolver,
   `PageRequests`, `RequestValidator`, `FilterResponseUtil`.
 - **filter/** — servlet filters, ordered:
@@ -100,8 +109,12 @@ docker compose up --build
   2. `RateLimitFilter` (+1)
   3. `JwtAuthenticationFilter` (+2)
   4. `CsrfProtectionFilter` (+3)
-- **exception/** — custom exceptions and `GlobalExceptionHandler`.
-- **util/** — `ValidationUtil`, `AfterCommit`, `FileValidationConstants`.
+- **exception/** — custom exceptions (`AuthorizationException`, `FileStorageException`,
+  `ResourceNotFoundException`, `TooManyAttemptsException`, `UnauthenticatedException`,
+  `ValidationException`) and `GlobalExceptionHandler`.
+- **util/** — `ValidationUtil`, `AfterCommit`, `FileValidationConstants`, `GraphCycles` (shared
+  cycle-detection walk, used for project/task dependency validation), `HtmlSanitizer` (jsoup-based
+  sanitisation for comment bodies and rich-text task/project descriptions).
 
 There is no `events/` package; deferred side effects (mail, file unlinking, SSE pushes) go through
 `util/AfterCommit`, which registers a transaction synchronization so nothing escapes before commit.
@@ -116,8 +129,8 @@ environment shims) and `react-app-env.d.ts`.
 - **components/** — grouped by area: `auth`, `comments`, `common` (incl. the `RichTextEditor`
   subsystem), `dashboard`, `layout`, `modals`, `projects`.
 - **context/** — four providers, each with a `useX()` hook: `AuthContext` (current user + logout),
-  `ProjectsContext`, `NotificationsContext`, `ThemeContext` (dark mode). The first three keep the
-  raw context unexported so consumers cannot bypass the hook's provider guard.
+  `ProjectsContext`, `NotificationsContext`, `ThemeContext` (dark mode). All four keep the raw
+  context unexported so consumers cannot bypass the hook's provider guard.
 - **hooks/** — data enrichment, filtering, stats, modal/form state, timeline viewport and resize,
   `useComments`, `useScheduleOptimization`.
 - **util/api.ts** — the single HTTP boundary. Typed Axios client with CSRF header injection and
@@ -232,7 +245,7 @@ ones (Flyway on, `ddl-auto=validate`, `app.cookie.secure=true`).
 `@ConfigurationProperties` record with `@Size(min = 32)`, so the application fails at startup
 without it.
 
-28 environment variables are read by `application.properties`; the compose file adds
+29 environment variables are read by `application.properties`; the compose file adds
 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `HTTP_PORT` and `REACT_APP_API_URL`. The full
 table with defaults is in [README.md](../README.md#configuration); the annotated template is
 `.env.example`. Do not duplicate that table here — verify against `application.properties`.
@@ -248,7 +261,7 @@ Two that are easy to get wrong:
 
 ## Database schema
 
-Flyway owns the schema: `backend/src/main/resources/db/migration/`, currently `V1` through `V6`.
+Flyway owns the schema: `backend/src/main/resources/db/migration/`, currently `V1` through `V7`.
 It is enabled by default and runs on every startup — development, CI and production alike.
 `spring.jpa.hibernate.ddl-auto=validate` means Hibernate only verifies that the entity model
 matches; it never mutates the schema.
@@ -264,7 +277,9 @@ key; V3 gave every foreign key an explicit `ON DELETE` action, added the missing
 keys, made email identity case-insensitive, and added `projects.created/updated` (NOT NULL) and
 `users.version`; V4 renamed `refresh_tokens.token` to `token_hash` and added
 `family_id`/`family_started_at`/`consumed_at`; V5 added `stored_files`; V6 backfilled
-`users.version` for rows that predate V3 and made the column `NOT NULL`.
+`users.version` for rows that predate V3 and made the column `NOT NULL`; V7 dropped the redundant
+case-sensitive unique constraint on `users.email` from V1, since V3's case-insensitive
+`uk_users_email_lower` already subsumes it.
 
 ## Key entities
 

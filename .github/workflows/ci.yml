@@ -60,6 +60,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # The API types are generated from docs/openapi.json, which the backend's
+      # OpenApiContractTest keeps in step with the controllers. Regenerating here proves the
+      # committed types match that spec, so a renamed DTO field cannot reach the client silently.
+      - name: Check generated API types are current
+        run: |
+          npm run generate:api-types
+          git diff --exit-code -- src/types/api.generated.ts
+
       - name: Test
         run: npm test -- --watchAll=false
 

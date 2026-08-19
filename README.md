@@ -271,6 +271,12 @@ Per client address per window, except login, which is additionally scoped per ac
 | `RATE_LIMIT_SEARCH` | `120` |
 | `RATE_LIMIT_INVITATION` | `50` |
 
+### API docs
+
+| Variable | Default | Notes |
+|---|---|---|
+| `API_DOCS_ENABLED` | `true` | Gates Swagger UI and the raw OpenAPI JSON (`/swagger-ui/*`, `/v3/api-docs*`), both reachable without an access token. Recommended `false` in production. |
+
 ### Schedule optimizer
 
 | Variable | Default | Notes |
@@ -406,7 +412,7 @@ saw.
 ## Database schema
 
 Flyway owns the schema. The migrations are in
-`backend/src/main/resources/db/migration/` (`V1` … `V6`) and run automatically on startup, in
+`backend/src/main/resources/db/migration/` (`V1` … `V7`) and run automatically on startup, in
 development, in CI and in production alike.
 
 Hibernate is set to `spring.jpa.hibernate.ddl-auto=validate`: it verifies that the entity model

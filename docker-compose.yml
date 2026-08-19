@@ -46,6 +46,25 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       # No SPRING_PROFILES_ACTIVE: application.properties already carries the safe defaults
       # (Flyway on, ddl-auto=validate, secure cookies), so there is no profile to activate.
+      # The bare `KEY:` form below passes the variable through only when it is actually set in
+      # .env; left unset, it is omitted from the container's environment entirely (never an
+      # empty string), so application.properties' own default applies. Same pattern as
+      # INTERNAL_PROXIES above.
+      UPLOAD_DIR:
+      HIKARI_MIN_IDLE:
+      HIKARI_MAX_POOL:
+      OPT_ALPHA:
+      OPT_BETA:
+      RATE_LIMIT_WINDOW_MS:
+      RATE_LIMIT_LOGIN:
+      RATE_LIMIT_REGISTER:
+      RATE_LIMIT_WRITE:
+      RATE_LIMIT_OPTIMIZE:
+      RATE_LIMIT_SEARCH:
+      RATE_LIMIT_INVITATION:
+      # Gates Swagger/OpenAPI docs (springdoc.api-docs.enabled / springdoc.swagger-ui.enabled).
+      # Recommended false in production: the docs subtree is reachable without authentication.
+      API_DOCS_ENABLED:
     depends_on:
       db:
         condition: service_healthy

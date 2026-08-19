@@ -10,10 +10,13 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+# Source maps are not needed in the served bundle and would let anyone reconstruct the original
+# TypeScript from the production build.
+ENV GENERATE_SOURCEMAP=false
 RUN npm run build
 
 # Stage 2: Serve
-FROM nginx:alpine
+FROM nginx:1.27-alpine
 
 COPY --from=build /app/build /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
