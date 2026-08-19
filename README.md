@@ -185,8 +185,8 @@ anchors, still constrain their successors but are neither scored nor reported.
 
 ## Database schema
 
-Flyway owns the schema. The migrations are in
-`backend/src/main/resources/db/migration/` (`V1` … `V9`) and run automatically on startup, in
+Flyway owns the schema. The migration is
+`backend/src/main/resources/db/migration/V1__baseline.sql` and runs automatically on startup, in
 development, in CI and in production alike.
 
 Hibernate is set to `spring.jpa.hibernate.ddl-auto=validate`: it verifies that the entity model
@@ -209,19 +209,13 @@ Consequences worth knowing:
 - `spring.flyway.baseline-on-migrate=true` with `baseline-version=1` lets Flyway adopt a database
   that predates it (one built by the old auto-DDL) by treating its state as `V1`.
 
-Migration highlights, useful when reading the entities: `V2` made `refresh_tokens.user_id` a real
-foreign key; `V3` gave every foreign key an explicit `ON DELETE` action, added the missing
-join-table primary keys, made email identity case-insensitive, and added
-`projects.created`/`updated` (`NOT NULL`) and `users.version`; `V4` renamed `refresh_tokens.token`
-to `token_hash` and added `family_id`/`family_started_at`/`consumed_at`; `V5` added
-`stored_files`; `V6` backfilled `users.version` for rows that predate `V3` and made the column
-`NOT NULL`; `V7` dropped the redundant case-sensitive unique constraint on `users.email` from
-`V1`, since `V3`'s case-insensitive `uk_users_email_lower` already subsumes it; `V8` indexed the
-three foreign-key referencing columns `V3` and `V5` missed (`task_activities.author_id`,
-`comment_reactions.user_id`, `stored_files.uploaded_by`), since PostgreSQL creates no index for
-them and a delete on the parent scans the child without one; `V9` backfilled `stored_files` for
-every attachment and profile picture predating `V5`, since a file with no ownership row is now
-refused rather than served and the unreferenced-upload sweep would otherwise delete it.
+Every foreign key carries an explicit `ON DELETE` action rather than the database default, so
+deleting a task or project needs no application-level cleanup choreography: owned records (a
+task's comments, activities, attachments) cascade, an assignee who leaves a project unassigns
+(`SET NULL`) rather than dropping the task, and a project owner cannot be deleted while they still
+own projects (`RESTRICT`). Email identity is case-insensitive — registration lower-cases on write,
+and a functional unique index (`uk_users_email_lower`) enforces it at the database level so a
+`John@Example.com` and a `john@example.com` can never coexist.
 
 ### Key entities
 
