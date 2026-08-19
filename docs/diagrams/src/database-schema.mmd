@@ -1,0 +1,104 @@
+erDiagram
+    USERS ||--o{ PROJECTS : owns
+    USERS |o--o{ PROJECTS : "member of"
+    USERS |o--o{ TASKS : "assigned to"
+    USERS ||--o{ COMMENTS : authors
+    USERS ||--o{ COMMENT_REACTIONS : reacts
+    USERS ||--o{ NOTIFICATIONS : receives
+    USERS ||--o{ TASK_ACTIVITIES : authors
+    USERS ||--o{ REFRESH_TOKENS : sessions
+    USERS |o--o{ STORED_FILES : uploads
+
+    PROJECTS ||--o{ TASKS : contains
+    PROJECTS |o--o{ STORED_FILES : scopes
+    PROJECTS }o--o{ PROJECTS : "depends on"
+    PROJECTS ||--o{ PROJECT_ATTACHMENTS : has
+
+    TASKS ||--o{ COMMENTS : has
+    TASKS ||--o{ TASK_ACTIVITIES : logs
+    TASKS ||--o{ TASK_ATTACHMENTS : has
+    TASKS }o--o{ TASKS : "depends on"
+
+    COMMENTS ||--o{ COMMENT_REACTIONS : has
+    COMMENTS |o--o{ COMMENTS : "replies to"
+    COMMENTS ||--o{ COMMENT_ATTACHMENTS : has
+
+    USERS {
+        int id PK
+        string email UK "case-insensitive"
+        string password "BCrypt"
+        bigint version "optimistic lock"
+    }
+    PROJECTS {
+        int id PK
+        string project_key UK "e.g. ECOM"
+        string summary
+        int next_task_number
+        int owner_id FK
+        bigint version
+    }
+    TASKS {
+        int id PK
+        int project_id FK
+        int task_number "unique per project"
+        string status "12 values"
+        string priority "5 values, nullable"
+        int assignee_id FK "nullable"
+        date start_date
+        date due_date
+        int progress "0-100"
+        bigint version
+    }
+    COMMENTS {
+        int id PK
+        int task_id FK
+        int author_id FK
+        int parent_comment_id FK "nullable, threading"
+        text content
+        bigint version
+    }
+    COMMENT_REACTIONS {
+        int id PK
+        int comment_id FK
+        int user_id FK
+        string type "LIKE or DISLIKE"
+    }
+    NOTIFICATIONS {
+        int id PK
+        int user_id FK
+        string type "9 values"
+        string message
+        boolean is_read
+    }
+    TASK_ACTIVITIES {
+        int id PK
+        int task_id FK
+        int author_id FK
+        string type "14 values"
+        string field_name "nullable"
+    }
+    REFRESH_TOKENS {
+        bigint id PK
+        int user_id FK
+        string token_hash UK "SHA-256"
+        string family_id "rotation family"
+        timestamp consumed_at "nullable, replay check"
+    }
+    STORED_FILES {
+        bigint id PK
+        string stored_name UK
+        int project_id FK "nullable = profile picture"
+        int uploaded_by FK "nullable"
+    }
+    PROJECT_ATTACHMENTS {
+        int project_id FK
+        string attachment_url
+    }
+    TASK_ATTACHMENTS {
+        int task_id FK
+        string attachment_url
+    }
+    COMMENT_ATTACHMENTS {
+        int comment_id FK
+        string attachment_url
+    }

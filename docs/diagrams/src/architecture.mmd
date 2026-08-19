@@ -1,0 +1,16 @@
+flowchart LR
+    Browser(["Browser"])
+
+    subgraph Compose ["docker compose"]
+        Nginx["nginx<br/>reverse proxy + static SPA"]
+        Backend["Spring Boot API"]
+        DB[("PostgreSQL 16")]
+        Uploads[("uploads volume")]
+    end
+
+    Browser -->|"HTTP :80"| Nginx
+    Nginx -->|"/api/*, /files/*"| Backend
+    Nginx -.->|"static bundle"| Browser
+    Backend --> DB
+    Backend --> Uploads
+    Backend -.->|"SSE notifications"| Browser

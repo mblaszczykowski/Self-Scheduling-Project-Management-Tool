@@ -1,0 +1,34 @@
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant F as JwtAuthenticationFilter
+    participant S as AuthService / TokenService
+    participant DB as PostgreSQL
+
+    B->>F: POST /api/auth/login
+    F->>S: authenticateUser(email, password)
+    S->>DB: verify BCrypt hash
+    S->>DB: INSERT refresh_tokens (hash, family_id)
+    S-->>B: Set-Cookie: accessToken, refreshToken, XSRF-TOKEN
+
+    rect rgb(240, 240, 240)
+    Note over B,F: every subsequent request
+    B->>F: GET /api/... (Cookie: accessToken)
+    F->>F: verify JWT, set request attribute
+    F-->>B: 200 OK
+    end
+
+    rect rgb(240, 240, 240)
+    Note over B,S: access token expired
+    B->>F: GET /api/...
+    F-->>B: 401 Unauthorized
+    B->>S: POST /api/auth/refresh (Cookie: refreshToken)
+    alt refresh token already consumed
+        S->>DB: revoke the whole family_id
+        S-->>B: 401, session terminated
+    else refresh token valid
+        S->>DB: mark consumed, insert rotated token (same family_id)
+        S-->>B: new accessToken + refreshToken cookies
+        B->>F: retry the original request
+    end
+    end
