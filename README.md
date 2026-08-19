@@ -5,8 +5,8 @@
 ![FlowLink dashboard: three projects, critical/delayed/at-risk counts, and analytics charts](docs/screenshots/dashboard.png)
 *Dashboard — portfolio-wide risk counts and per-project progress at a glance.*
 
-![Gantt timeline before optimization: a dependency chain with two overdue tasks flagged, alongside a task that is still comfortably on schedule](docs/screenshots/timeline.png)
-*Gantt timeline — dependency chains and overdue tasks in red, work that still has slack in blue.*
+![Gantt timeline filtered to one project: a dependency chain with overdue tasks flagged in red, alongside tasks that are still comfortably on schedule in blue](docs/screenshots/timeline.png)
+*Gantt timeline, filtered to one project — dependency chains and overdue tasks in red, work that still has slack in blue.*
 
 ![Schedule optimization result: 17 resource conflicts resolved to 0, delayed tasks and their dependencies shifted to ghost-bar suggestions](docs/screenshots/schedule-optimizer.png)
 *Schedule optimizer — one run resolves all 17 resource conflicts; ghost bars show the proposed shift.*
