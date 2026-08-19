@@ -402,14 +402,19 @@ Reachable without an access token:
   current user still requires a token)
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
+- `POST /api/auth/logout` — it revokes whatever refresh-token cookie it is handed and never reads
+  the caller's id, so requiring an unexpired access token only meant a session left idle past the
+  fifteen-minute mark could not be ended: the request failed, the refresh token survived, and the
+  next page load signed the user straight back in. Still CSRF-checked, so it cannot be forced.
 - `/error`
 - `/actuator/health`
 - `/swagger-ui/*`, `/v3/api-docs*`
 
 Everything else requires a valid access token. Exempt from the CSRF check: `POST /api/auth/login`,
-`POST /api/users`, `/error`, `/actuator/health`. `/api/auth/refresh` is deliberately *not*
-exempt — the client already sends the CSRF header on it, so leaving it out of the exemption list
-means a future relaxation of `COOKIE_SAME_SITE` to `None` would not silently open a hole.
+`POST /api/users`, `/error`, `/actuator/health`. `/api/auth/refresh` and `/api/auth/logout` are
+deliberately *not* exempt — the client already sends the CSRF header on both, so leaving them out
+of the exemption list means a future relaxation of `COOKIE_SAME_SITE` to `None` would not silently
+open a hole.
 
 ---
 

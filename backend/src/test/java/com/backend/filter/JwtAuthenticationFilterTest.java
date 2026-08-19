@@ -58,6 +58,7 @@ class JwtAuthenticationFilterTest {
         @CsvSource({
                 "POST, /api/auth/login",
                 "POST, /api/auth/refresh",
+                "POST, /api/auth/logout",
                 "POST, /api/users",
                 "GET,  /error",
                 "GET,  /actuator/health",
