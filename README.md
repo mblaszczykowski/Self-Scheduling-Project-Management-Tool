@@ -11,9 +11,11 @@ dependencies are precedence constraints — and searches for a schedule that min
 combination of priority-weighted tardiness and makespan. It runs as a simulation first, so the
 proposed dates can be reviewed before anything is written.
 
-- **Backend**: Spring Boot 3.5, Java 21, PostgreSQL 16, Flyway, Maven.
-- **Frontend**: React 18 in TypeScript, TanStack Query, TailwindCSS, Chart.js, Tiptap.
-- **Auth**: JWT in HTTP-only cookies, rotating refresh tokens, double-submit CSRF.
+- **Backend**: Spring Boot 3.5.12, Java 21, PostgreSQL 16, Flyway, Maven.
+- **Frontend**: React 18.3 in TypeScript, TanStack Query v5, TailwindCSS, React Router 6, Axios,
+  Chart.js, Tiptap, Formik + Yup. Built with Create React App (`react-scripts` 5).
+- **Auth**: JWT in HTTP-only cookies — access token 15 min, refresh token 7 days rotated per use,
+  double-submit CSRF, 30-day absolute session cap.
 
 ---
 
@@ -44,6 +46,12 @@ view and nothing to configure for CORS in production. The backend is a single Sp
 process — there is no separate auth server, message queue or cache; sessions, rate limiting and
 the SSE notification stream all live inside that one JVM. PostgreSQL is the only other moving
 part.
+
+There is also no Spring Security filter chain. The only Spring Security artifact on the classpath
+is `spring-security-crypto`, used for `BCryptPasswordEncoder`; authentication, CSRF and rate
+limiting are plain servlet filters in `filter/` (see [Repository layout](#repository-layout)), not
+a security filter chain — do not expect method security such as `@PreAuthorize` to do anything
+here.
 
 ## Quick start with Docker
 
@@ -254,8 +262,17 @@ limiter entirely.
 |---|---|---|
 | `UPLOAD_DIR` | `uploads` | Filesystem directory for attachments and profile pictures. In compose this is a named volume mounted at `/app/uploads`. |
 
-Uploaded files are **not** static assets. They are served by the backend at `/files/{name}`, which
-requires a valid JWT *and* access to the project the file belongs to.
+Uploaded files are **not** static assets. Nothing serves `UPLOAD_DIR` over HTTP — neither nginx nor
+the backend maps `/uploads/...`; it is only the on-disk directory name. The public route is
+`GET /files/{name}` (`FileController`), which requires a valid JWT *and* access to the project the
+file belongs to: `stored_files` records which project each upload is scoped to, and `AccessGuard`
+is consulted before any bytes are streamed. A file with no ownership row is refused rather than
+trusted, which is what makes it safe for an hourly `ScheduledMaintenance` sweep to delete
+unreferenced uploads older than six hours — a row-less file on disk is an orphan, never a
+legitimate attachment still in use. Responses are always sent with
+`Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`, so an uploaded document
+can never be rendered inline in the app's own origin. Uploads themselves use
+`multipart/form-data`, a JSON metadata part plus the file parts.
 
 ### Rate limiting
 
@@ -313,6 +330,8 @@ With mail disabled, project invitations still arrive as in-app notifications.
 JWTs live in HTTP-only cookies rather than local storage, so they are invisible to JavaScript and
 immune to token-stealing XSS. A short-lived access token authenticates requests; a long-lived
 refresh token, rotated on every use, keeps the session alive without asking for a password again.
+Login sets three cookies: `accessToken` (HttpOnly, 15 min), `refreshToken` (HttpOnly, 7 days) and
+`XSRF-TOKEN` (script-readable, so the frontend can echo it into the CSRF header).
 
 ```mermaid
 sequenceDiagram
@@ -351,13 +370,61 @@ sequenceDiagram
     end
 ```
 
-Every token descended from one login shares a `family_id`. Presenting an already-consumed
-refresh token — the signature of a stolen token being replayed — revokes every token in that
-family rather than just the one presented, so a single compromised cookie cannot be reused even
-if the legitimate client refreshes first. `app.session.absolute-max-days` caps a session
-regardless of how many times it has been rotated. CSRF is handled separately, by double-submit:
-the `XSRF-TOKEN` cookie value must be echoed back in an `X-CSRF-Token` header on every unsafe
-method, which a cross-site request cannot do without reading the cookie itself.
+On the frontend, an Axios response interceptor is what drives the refresh step in the diagram
+above: it catches the 401, calls `/api/auth/refresh` exactly once even if several requests fail
+concurrently — the concurrent failures are queued behind that single in-flight refresh and
+replayed once it resolves, rather than each firing its own refresh — and retries the original
+request. It skips this dance for `/api/auth/login`, `/api/auth/refresh` and `/api/auth/logout`,
+where refreshing first would be pointless or actively wrong.
+
+Refresh tokens are never stored in plaintext: only a SHA-256 hash of 256 bits of `SecureRandom`
+output is persisted, so a stolen database backup does not also hand over every live session. Every
+token descended from one login shares a `family_id`. Presenting an already-consumed refresh
+token — the signature of a stolen token being replayed — revokes every token in that family
+rather than just the one presented, so a single compromised cookie cannot be reused even if the
+legitimate client refreshes first. `app.session.absolute-max-days` caps a session regardless of
+how many times it has been rotated. CSRF is handled separately, by double-submit: the
+`XSRF-TOKEN` cookie value must be echoed back in an `X-CSRF-Token` header on every unsafe method,
+which a cross-site request cannot do without reading the cookie itself.
+
+---
+
+## Public vs protected endpoints
+
+`config/PublicEndpoints` is the whole policy, deny-by-default. Matching is exact on the raw
+request URI, which is fail-closed: an encoding trick makes a path *less* likely to match an
+exemption, never more. The one exception is the API docs subtree (`/swagger-ui/*`,
+`/v3/api-docs*`), which is a deliberate prefix match.
+
+Reachable without an access token:
+
+- `POST /api/users` (registration — the path is exempt for POST only; reading or updating the
+  current user still requires a token)
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `/error`
+- `/actuator/health`
+- `/swagger-ui/*`, `/v3/api-docs*`
+
+Everything else requires a valid access token. Exempt from the CSRF check: `POST /api/auth/login`,
+`POST /api/users`, `/error`, `/actuator/health`. `/api/auth/refresh` is deliberately *not*
+exempt — the client already sends the CSRF header on it, so leaving it out of the exemption list
+means a future relaxation of `COOKIE_SAME_SITE` to `None` would not silently open a hole.
+
+---
+
+## Notification system
+
+`NotificationService` creates notifications asynchronously for project invitations, project
+updates and member removal (`ProjectService`); task assignment, task updates including date
+changes, and task deletion (`TaskService`); and new comments, replies and reactions on a task
+(`CommentService`). There is **no mention parsing** anywhere in the codebase — comments are not
+scanned for `@name`.
+
+Delivery is a Server-Sent Events stream at `GET /api/notifications/stream`, managed by
+`SseEmitterManager` and capped at `app.sse.max-emitters-per-user` (default `4`) concurrent streams
+per user, so a reconnect loop cannot accumulate them without bound. `GET
+/api/notifications/unread-count` and a manual refresh cover the case where the stream is down.
 
 ---
 
@@ -407,12 +474,27 @@ browser — it recomputes the schedule server-side from the current data and per
 what ends up in the database is feasible by construction rather than whatever the client last
 saw.
 
+Every reported metric — on-time count, weighted delay and schedule span — is measured over the
+work the optimizer actually controls. Completed and withdrawn tasks, and cross-project anchors,
+bound the timeline and constrain their successors, but are not scored: including them made the
+makespan term saturate so the `beta` weight stopped telling candidate schedules apart.
+
+`CriticalPathAnalyzer` runs a forward and backward pass over the same precedence graph to compute
+each task's total float — the slack the timeline and dashboard use to flag what is critical. Float
+is slack against the work's **own** deadlines: a task's latest acceptable finish is the earlier of
+its due date and the latest start its successors can tolerate, so a task is critical when nothing
+is left between where it can start and where it must (`slack <= 0`). Deriving the finish from the
+schedule's own longest path instead — the textbook formulation for a network with a single
+unknown deadline — gave every task without a parallel alternative zero float, which on a board of
+chains and independent tasks meant all of them. Completed and withdrawn work, and cross-project
+anchors, still constrain their successors but are neither scored nor reported.
+
 ---
 
 ## Database schema
 
 Flyway owns the schema. The migrations are in
-`backend/src/main/resources/db/migration/` (`V1` … `V7`) and run automatically on startup, in
+`backend/src/main/resources/db/migration/` (`V1` … `V9`) and run automatically on startup, in
 development, in CI and in production alike.
 
 Hibernate is set to `spring.jpa.hibernate.ddl-auto=validate`: it verifies that the entity model
@@ -496,7 +578,7 @@ erDiagram
         int id PK
         int task_id FK
         int author_id FK
-        string type "13 values"
+        string type "14 values"
         string field_name "nullable"
     }
     REFRESH_TOKENS {
@@ -538,11 +620,43 @@ Consequences worth knowing:
 - `spring.flyway.baseline-on-migrate=true` with `baseline-version=1` lets Flyway adopt a database
   that predates it (one built by the old auto-DDL) by treating its state as `V1`.
 
+Migration highlights, useful when reading the entities: `V2` made `refresh_tokens.user_id` a real
+foreign key; `V3` gave every foreign key an explicit `ON DELETE` action, added the missing
+join-table primary keys, made email identity case-insensitive, and added
+`projects.created`/`updated` (`NOT NULL`) and `users.version`; `V4` renamed `refresh_tokens.token`
+to `token_hash` and added `family_id`/`family_started_at`/`consumed_at`; `V5` added
+`stored_files`; `V6` backfilled `users.version` for rows that predate `V3` and made the column
+`NOT NULL`; `V7` dropped the redundant case-sensitive unique constraint on `users.email` from
+`V1`, since `V3`'s case-insensitive `uk_users_email_lower` already subsumes it; `V8` indexed the
+three foreign-key referencing columns `V3` and `V5` missed (`task_activities.author_id`,
+`comment_reactions.user_id`, `stored_files.uploaded_by`), since PostgreSQL creates no index for
+them and a delete on the parent scans the child without one; `V9` backfilled `stored_files` for
+every attachment and profile picture predating `V5`, since a file with no ownership row is now
+refused rather than served and the unreferenced-upload sweep would otherwise delete it.
+
+### Key entities
+
+- **User** — owns projects, is a member of projects, is assigned tasks, receives notifications.
+  Optimistically locked (`version`).
+- **Project** — has an owner, members, tasks, a unique `projectKey`, `nextTaskNumber` for
+  allocating task numbers, attachments, and other projects as dependencies. Optimistically locked.
+- **Task** — belongs to a project, has one assignee, comments, activities, attachments, other
+  tasks as dependencies, status, priority, progress, start/due dates. Identified in the API by
+  `{projectKey}-{taskNumber}`. Optimistically locked.
+- **Comment** — belongs to a task, has an author, an optional parent comment (threading),
+  reactions and attachments. Optimistically locked.
+- **Notification** — belongs to a user, carries a type and a link. Not optimistically locked.
+- **RefreshToken** — hash, family id, family start, consumption timestamp. Not optimistically
+  locked.
+- **StoredFile** — maps an uploaded filename to the project and uploader it belongs to. Not
+  optimistically locked.
+
 ## Demo data
 
 `backend/scripts/db/demo-seed.sql` loads a realistic portfolio — four accounts, three projects,
 45 tasks with dependencies and deliberate resource conflicts — for demos and manual testing. See
-`backend/scripts/db/DEMO-SEED-README.md`.
+`backend/scripts/db/DEMO-SEED-README.md`. It is idempotent — it clears its own data before
+inserting — and it must never contain DDL, since Flyway alone owns the schema.
 
 ## Repository layout
 
@@ -573,6 +687,94 @@ frontend/
   src/util/api.ts   the single HTTP boundary
 docker-compose.yml
 ```
+
+Nearly every frontend source file is `.ts`/`.tsx`. The two deliberate exceptions are
+`setupTests.js` (Jest environment shims) and `react-app-env.d.ts`; do not add new plain `.js`
+files.
+
+### Backend packages
+
+- **config/** — `@ConfigurationProperties` classes (`AppProperties` for everything under `app.*`,
+  `JwtProperties`, `CookieProperties`), plus `WebConfig` (CORS + argument resolvers), `AsyncConfig`,
+  `SchedulingConfig`, `JwtConfig`, `PasswordEncoderConfig`, `OpenApiConfig` (hides the
+  `@CurrentUserId` parameter from the generated OpenAPI docs, in both the parameter list and
+  multipart request bodies), and `PublicEndpoints` — the deny-by-default authentication/CSRF
+  policy in one place (see [Public vs protected endpoints](#public-vs-protected-endpoints)).
+- **controllers/** — REST endpoints, one per resource: Auth, User, Project, Task, TaskActivity,
+  Comment, Notification, Search, Optimization, File.
+- **services/** — business logic. Includes `SseEmitterManager` (notification streams),
+  `RateLimitService`, `EmailService`, `ScheduledMaintenance` (the hourly refresh-token cleanup and
+  unreferenced-upload sweep), `OptimizationService` + `OptimizationInputLoader`.
+- **repositories/** — Spring Data JPA.
+- **entities/** — JPA entities: `User`, `Project`, `Task`, `Comment`, `CommentReaction`,
+  `Notification`, `TaskActivity`, `RefreshToken`, `StoredFile`, plus the enums.
+- **dtos/** — API response shapes, including the `PagedResponse` envelope and `ApiError`.
+- **requests/** — request payload records: `LoginRequest`, `UserRegistrationRequest`,
+  `ProjectRequest`, `TaskRequest`, `TaskScheduleRequest`, `OptimizationRequest`,
+  `ApplyOptimizationRequest`, `UpdateProfileRequest`, `EmailPreferencesRequest`.
+- **mapper/** — `EntityMapper`, entity → DTO conversion.
+- **security/** — `AccessGuard`, the single place that answers "may this user touch this project /
+  task / comment".
+- **scheduling/** — the extracted scheduling domain: `SchedulingService`, `ScheduleModel`,
+  `PrecedenceGraph`, `SsgsDecoder`, `PriorityRule`, `ScheduleObjective`, `ScheduleEvaluator`,
+  `CriticalPathAnalyzer`, plus the value types the decoder works in — `ScheduleTask` (a task on a
+  pure integer day axis, no entities or dates), `Placement` and `Schedule` (where the decoder put
+  each task), `ScheduleMetrics` (the scored result) — and `SchedulingSupport` (shared day
+  arithmetic). Free of entities and non-transactional: it consumes DTOs and returns a value, so
+  CPU-bound work does not hold a pooled database connection.
+- **web/** — HTTP plumbing: `CookieFactory`, `@CurrentUserId` + its argument resolver,
+  `PageRequests`, `RequestValidator`, `FilterResponseUtil`.
+- **filter/** — servlet filters, ordered:
+  1. `SecurityHeadersFilter` (`HIGHEST_PRECEDENCE`)
+  2. `RateLimitFilter` (+1)
+  3. `JwtAuthenticationFilter` (+2)
+  4. `CsrfProtectionFilter` (+3)
+- **exception/** — custom exceptions (`AuthorizationException`, `FileStorageException`,
+  `ResourceNotFoundException`, `TooManyAttemptsException`, `UnauthenticatedException`,
+  `ValidationException`) and `GlobalExceptionHandler`.
+- **util/** — `ValidationUtil`, `AfterCommit`, `FileValidationConstants`, `SecureTokens` (the one
+  generator for opaque URL-safe secrets), `GraphCycles` (the shared cycle-detection walk used for
+  project/task dependency validation), `HtmlSanitizer` (jsoup-based sanitisation for comment
+  bodies and rich-text task/project descriptions).
+
+There is no `events/` package; deferred side effects (mail, file unlinking, SSE pushes) go through
+`util/AfterCommit`, which registers a transaction synchronization so nothing escapes before commit.
+
+### Frontend structure
+
+- **pages/** — route-level containers: `AuthPage`, `DashboardPage`, `ProjectsPage`. The last two
+  are `React.lazy`-loaded from `App.tsx`.
+- **components/** — grouped by area: `auth`, `comments`, `common` (incl. the `RichTextEditor`
+  subsystem), `dashboard`, `layout`, `modals`, `projects`.
+- **context/** — four providers, each with a `useX()` hook: `AuthContext` (current user + logout),
+  `ProjectsContext`, `NotificationsContext`, `ThemeContext` (dark mode). All four keep the raw
+  context unexported so consumers cannot bypass the hook's provider guard.
+- **hooks/** — data enrichment, filtering, stats, modal/form state, timeline viewport and resize,
+  `useComments`, `useScheduleOptimization`.
+- **util/api.ts** — the single HTTP boundary. Typed Axios client with CSRF header injection and
+  automatic refresh on 401 (see [Authentication](#authentication)).
+- **util/** — pure helpers: dates, status/priority config, error/toast helpers, project/task
+  utilities, `statsCompute`, `scheduleAnalysis`.
+- **config/index.ts** — `API_BASE_URL` from `REACT_APP_API_URL` (checked against `undefined`, not
+  truthiness, because the container build passes an empty string on purpose), request timeout,
+  debounce delay.
+- **types.ts** — the domain types every API function is declared against.
+
+### State management
+
+Server state is owned by **TanStack Query** (`QueryClient` created in `App.tsx`). The contexts are
+thin façades over it, not hand-rolled stores:
+
+- `ProjectsContext` runs a `useQuery` on `['projects']` and exposes project/task CRUD. Mutations
+  invalidate the query rather than patching local state; `retryProjects()` forces a fetch for a
+  user-initiated retry.
+- `NotificationsContext` holds the notification list and unread count in local state fed by the
+  Server-Sent Events stream, with exponential-backoff reconnect. Notification types that mean the
+  board changed additionally invalidate the projects query (debounced).
+- `AuthContext` holds the current user in `useState`; there is no server query behind it. The user
+  is resolved once at startup in `App.tsx` via `checkUserAuth()`.
+- `ThemeContext` holds dark mode.
+- Comment API access lives in the `useComments` hook, not a context.
 
 ## License
 

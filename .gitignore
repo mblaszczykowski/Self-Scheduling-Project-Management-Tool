@@ -14,8 +14,6 @@ dist/
 # IDE / tooling
 .idea/
 .vscode/
-.claude/
-CLAUDE.md
 *.iml
 *.swp
 *.swo

@@ -18,6 +18,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
 
   backend:
     build: ./backend
@@ -27,6 +29,8 @@ services:
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       # Mandatory. The application refuses to start without it; there is no default.
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (min 32 chars)}
+      # A share of mem_limit below, so the heap ceiling follows the container's bound.
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
       # Origin the browser loads the app from. Behind the bundled nginx this is the site root.
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost}
@@ -77,6 +81,8 @@ services:
     volumes:
       - uploads:/app/uploads
     restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.5
 
   frontend:
     build:
@@ -91,7 +97,15 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
 
 volumes:
   pgdata:
