@@ -4,7 +4,11 @@
 
 ![FlowLink dashboard: three projects, critical/delayed/at-risk counts, and analytics charts](docs/screenshots/dashboard.png)
 
+![Gantt timeline before optimization: overlapping assignments across a project's tasks, with dependency arrows and delayed-task flags](docs/screenshots/timeline.png)
+
 ![Schedule optimization result: 18 resource conflicts resolved to 0, delayed tasks and their dependencies shifted to ghost-bar suggestions](docs/screenshots/schedule-optimizer.png)
+
+![List view: the same tasks as a table, with per-row schedule slip, blocked-by dependencies and days-overdue called out inline](docs/screenshots/list.png)
 
 ![Task detail modal with a rich text editor, schedule, and a threaded comment discussion](docs/screenshots/task-detail.png)
 
