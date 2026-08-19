@@ -34,8 +34,6 @@ proposed dates can be reviewed before anything is written.
 - **Auth**: JWT in HTTP-only cookies — access token 15 min, refresh token 7 days rotated per use,
   double-submit CSRF, 30-day absolute session cap.
 
----
-
 ## Architecture
 
 ![Architecture: browser through nginx to the Spring Boot API, PostgreSQL and the uploads volume, with an SSE channel back to the browser](docs/diagrams/architecture.svg)
@@ -55,85 +53,7 @@ limiting are plain servlet filters in `filter/` (see [Repository layout](#reposi
 a security filter chain — do not expect method security such as `@PreAuthorize` to do anything
 here.
 
----
-
-## Authentication
-
-JWTs live in HTTP-only cookies rather than local storage, so they are invisible to JavaScript and
-immune to token-stealing XSS. A short-lived access token authenticates requests; a long-lived
-refresh token, rotated on every use, keeps the session alive without asking for a password again.
-Login sets three cookies: `accessToken` (HttpOnly, 15 min), `refreshToken` (HttpOnly, 7 days) and
-`XSRF-TOKEN` (script-readable, so the frontend can echo it into the CSRF header).
-
-![Authentication sequence: login sets three cookies, every request verifies the access token, and an expired token triggers a one-shot refresh with replay detection](docs/diagrams/authentication.svg)
-
-<sub>Source: [`docs/diagrams/src/authentication.mmd`](docs/diagrams/src/authentication.mmd)</sub>
-
-On the frontend, an Axios response interceptor is what drives the refresh step in the diagram
-above: it catches the 401, calls `/api/auth/refresh` exactly once even if several requests fail
-concurrently — the concurrent failures are queued behind that single in-flight refresh and
-replayed once it resolves, rather than each firing its own refresh — and retries the original
-request. It skips this dance for `/api/auth/login`, `/api/auth/refresh` and `/api/auth/logout`,
-where refreshing first would be pointless or actively wrong.
-
-Refresh tokens are never stored in plaintext: only a SHA-256 hash of 256 bits of `SecureRandom`
-output is persisted, so a stolen database backup does not also hand over every live session. Every
-token descended from one login shares a `family_id`. Presenting an already-consumed refresh
-token — the signature of a stolen token being replayed — revokes every token in that family
-rather than just the one presented, so a single compromised cookie cannot be reused even if the
-legitimate client refreshes first. `app.session.absolute-max-days` caps a session regardless of
-how many times it has been rotated. CSRF is handled separately, by double-submit: the
-`XSRF-TOKEN` cookie value must be echoed back in an `X-CSRF-Token` header on every unsafe method,
-which a cross-site request cannot do without reading the cookie itself.
-
----
-
-## Public vs protected endpoints
-
-`config/PublicEndpoints` is the whole policy, deny-by-default. Matching is exact on the raw
-request URI, which is fail-closed: an encoding trick makes a path *less* likely to match an
-exemption, never more. The one exception is the API docs subtree (`/swagger-ui/*`,
-`/v3/api-docs*`), which is a deliberate prefix match.
-
-Reachable without an access token:
-
-- `POST /api/users` (registration only — reading or updating the current user still requires a
-  token)
-- `POST /api/auth/login`, `POST /api/auth/refresh`
-- `POST /api/auth/logout` — it revokes whatever refresh-token cookie it is handed rather than
-  reading the caller's id, so an already-idle session can still log out cleanly. Still
-  CSRF-checked.
-- `/error`, `/actuator/health`
-- `/swagger-ui/*`, `/v3/api-docs*`
-
-Everything else requires a valid access token. Exempt from the CSRF check: `POST /api/auth/login`,
-`POST /api/users`, `/error`, `/actuator/health` — refresh and logout are deliberately left off that
-list even though the client already sends the header, so a future relaxation of
-`COOKIE_SAME_SITE` to `None` can't silently reopen a hole.
-
----
-
-## Notification system
-
-`NotificationService` creates notifications asynchronously for project invitations, project
-updates and member removal (`ProjectService`); task assignment, task updates including date
-changes, and task deletion (`TaskService`); and new comments, replies and reactions on a task
-(`CommentService`).
-
-Delivery is a Server-Sent Events stream at `GET /api/notifications/stream`, managed by
-`SseEmitterManager` and capped at `app.sse.max-emitters-per-user` (default `4`) concurrent streams
-per user, so a reconnect loop cannot accumulate them without bound. `GET
-/api/notifications/unread-count` and a manual refresh cover the case where the stream is down.
-
----
-
 ## Schedule optimizer
-
-Projects in a portfolio usually share the same people, so plans drawn up independently collide —
-the same engineer assigned to overlapping work in two projects at once. The optimizer treats the
-whole portfolio as one resource-constrained project scheduling problem: assignees are the
-renewable resources, task dependencies are precedence constraints, and it searches for a schedule
-that resolves the conflicts.
 
 ![Optimizer pipeline: task DTOs into ScheduleModel and PrecedenceGraph, decoded once per priority rule, scored by ScheduleEvaluator, lowest Z wins, then simulate or apply](docs/diagrams/schedule-optimizer.svg)
 
@@ -169,7 +89,69 @@ is slack against a task's **own** deadline, not a shared project deadline: deriv
 schedule's longest path instead (the textbook formulation) gave every task without a parallel
 alternative zero float, which on a board of chains and independent tasks meant nearly all of them.
 
----
+## Authentication
+
+JWTs live in HTTP-only cookies rather than local storage, so they are invisible to JavaScript and
+immune to token-stealing XSS. A short-lived access token authenticates requests; a long-lived
+refresh token, rotated on every use, keeps the session alive without asking for a password again.
+Login sets three cookies: `accessToken` (HttpOnly, 15 min), `refreshToken` (HttpOnly, 7 days) and
+`XSRF-TOKEN` (script-readable, so the frontend can echo it into the CSRF header).
+
+![Authentication sequence: login sets three cookies, every request verifies the access token, and an expired token triggers a one-shot refresh with replay detection](docs/diagrams/authentication.svg)
+
+<sub>Source: [`docs/diagrams/src/authentication.mmd`](docs/diagrams/src/authentication.mmd)</sub>
+
+On the frontend, an Axios response interceptor is what drives the refresh step in the diagram
+above: it catches the 401, calls `/api/auth/refresh` exactly once even if several requests fail
+concurrently — the concurrent failures are queued behind that single in-flight refresh and
+replayed once it resolves, rather than each firing its own refresh — and retries the original
+request. It skips this dance for `/api/auth/login`, `/api/auth/refresh` and `/api/auth/logout`,
+where refreshing first would be pointless or actively wrong.
+
+Refresh tokens are never stored in plaintext: only a SHA-256 hash of 256 bits of `SecureRandom`
+output is persisted, so a stolen database backup does not also hand over every live session. Every
+token descended from one login shares a `family_id`. Presenting an already-consumed refresh
+token — the signature of a stolen token being replayed — revokes every token in that family
+rather than just the one presented, so a single compromised cookie cannot be reused even if the
+legitimate client refreshes first. `app.session.absolute-max-days` caps a session regardless of
+how many times it has been rotated. CSRF is handled separately, by double-submit: the
+`XSRF-TOKEN` cookie value must be echoed back in an `X-CSRF-Token` header on every unsafe method,
+which a cross-site request cannot do without reading the cookie itself.
+
+### Public vs protected endpoints
+
+`config/PublicEndpoints` is the whole policy, deny-by-default. Matching is exact on the raw
+request URI, which is fail-closed: an encoding trick makes a path *less* likely to match an
+exemption, never more. The one exception is the API docs subtree (`/swagger-ui/*`,
+`/v3/api-docs*`), which is a deliberate prefix match.
+
+Reachable without an access token:
+
+- `POST /api/users` (registration only — reading or updating the current user still requires a
+  token)
+- `POST /api/auth/login`, `POST /api/auth/refresh`
+- `POST /api/auth/logout` — it revokes whatever refresh-token cookie it is handed rather than
+  reading the caller's id, so an already-idle session can still log out cleanly. Still
+  CSRF-checked.
+- `/error`, `/actuator/health`
+- `/swagger-ui/*`, `/v3/api-docs*`
+
+Everything else requires a valid access token. Exempt from the CSRF check: `POST /api/auth/login`,
+`POST /api/users`, `/error`, `/actuator/health` — refresh and logout are deliberately left off that
+list even though the client already sends the header, so a future relaxation of
+`COOKIE_SAME_SITE` to `None` can't silently reopen a hole.
+
+## Notification system
+
+`NotificationService` creates notifications asynchronously for project invitations, project
+updates and member removal (`ProjectService`); task assignment, task updates including date
+changes, and task deletion (`TaskService`); and new comments, replies and reactions on a task
+(`CommentService`).
+
+Delivery is a Server-Sent Events stream at `GET /api/notifications/stream`, managed by
+`SseEmitterManager` and capped at `app.sse.max-emitters-per-user` (default `4`) concurrent streams
+per user, so a reconnect loop cannot accumulate them without bound. `GET
+/api/notifications/unread-count` and a manual refresh cover the case where the stream is down.
 
 ## Database schema
 
@@ -221,8 +203,6 @@ and a functional unique index (`uk_users_email_lower`) enforces it at the databa
   locked.
 - **StoredFile** — maps an uploaded filename to the project and uploader it belongs to. Not
   optimistically locked.
-
----
 
 ## Repository layout
 
@@ -351,8 +331,6 @@ on top of it as thin façades:
 - `ThemeContext` holds dark mode.
 - Comment API access lives in the `useComments` hook rather than a context.
 
----
-
 ## CI and code quality
 
 Every push and pull request against `main` runs four jobs (`.github/workflows/ci.yml`):
@@ -381,8 +359,6 @@ storms — Spring Boot's starters, React's matched trio, the `@tiptap/*` family 
 
 At the time of writing: 619 backend tests and 176 frontend tests, all green; the frontend is
 TypeScript in `strict` mode with zero uses of `any` anywhere in `src/`.
-
----
 
 ## Quick start with Docker
 
@@ -438,8 +414,6 @@ docker compose down -v              # stop and delete all data
 45 tasks with dependencies and deliberate resource conflicts — for demos and manual testing. See
 `backend/scripts/db/DEMO-SEED-README.md`. It is idempotent — it clears its own data before
 inserting — and it must never contain DDL, since Flyway alone owns the schema.
-
----
 
 ## Local development
 
@@ -504,8 +478,6 @@ backend's default `CORS_ORIGIN` is `http://localhost:3000`, so the two agree out
 run the dev server on another port, set `CORS_ORIGIN` to match exactly — scheme, host and port. A
 credentialed CORS preflight does not accept wildcards, so a mismatch blocks every API call.
 
----
-
 ## Tests
 
 ### Backend
@@ -546,8 +518,6 @@ npm run lint                             # eslint over src/
 ```
 
 The test files live next to the code they cover, as `*.test.ts` under `src/util/`.
-
----
 
 ## Configuration
 
@@ -658,8 +628,6 @@ With mail disabled, project invitations still arrive as in-app notifications.
 | `POSTGRES_USER` | `postgres` | Compose only. |
 | `HTTP_PORT` | `80` | Host port the site is published on. |
 | `REACT_APP_API_URL` | `http://localhost:8080` | Baked into the bundle at build time. The compose build passes an **empty string** on purpose, so the app issues same-origin relative requests that nginx proxies. An absolute URL here hard-codes a hostname into the JavaScript and bypasses the proxy. |
-
----
 
 ## License
 
