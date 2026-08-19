@@ -10,7 +10,6 @@ import java.util.List;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
-
     private final AppProperties appProperties;
     private final CurrentUserIdArgumentResolver currentUserIdArgumentResolver;
 
@@ -38,8 +37,6 @@ public class WebConfig implements WebMvcConfigurer {
                         "X-CSRF-Token",
                         "Last-Event-ID"
                 )
-                // Set-Cookie is applied by the browser automatically and is not script-readable,
-                // so it does not belong in exposedHeaders.
                 .exposedHeaders("Cache-Control", "Content-Type")
                 .allowCredentials(true)
                 .maxAge(600);

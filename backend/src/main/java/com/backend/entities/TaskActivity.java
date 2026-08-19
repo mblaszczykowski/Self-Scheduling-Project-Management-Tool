@@ -7,6 +7,7 @@ import java.time.Instant;
 @Table(name = "task_activities",
         indexes = {
                 @Index(name = "idx_task_activity_task", columnList = "task_id"),
+        @Index(name = "idx_task_activity_author", columnList = "author_id"),
                 @Index(name = "idx_task_activity_timestamp", columnList = "task_id, timestamp")
         }
 )

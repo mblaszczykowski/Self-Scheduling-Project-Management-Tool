@@ -13,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -37,7 +38,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TokenService")
 class TokenServiceTest {
-
     private static final String SECRET = "unit-test-signing-secret-32-chars-min!!";
     private static final String ISSUER = "flowlink";
     private static final String AUDIENCE = "flowlink-app";
@@ -99,7 +99,6 @@ class TokenServiceTest {
     @Nested
     @DisplayName("generateAccessToken / validateTokenAndGetUserId")
     class AccessTokenTests {
-
         @Test
         @DisplayName("round-trips a freshly generated token back to its user id")
         void roundTripsAFreshToken() {
@@ -190,12 +189,54 @@ class TokenServiceTest {
 
             assertThat(tokenService.validateTokenAndGetUserId(tampered)).isNull();
         }
+
+        @Test
+        @DisplayName("mints an access token whose lifetime matches the configured expiration exactly")
+        void accessTokenLifetimeMatchesConfiguration() {
+            var token = tokenService.generateAccessToken(42);
+
+            var claims = Jwts.parser()
+                    .verifyWith(deriveKey(SECRET))
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+            var lifetime = Duration.between(claims.getIssuedAt().toInstant(),
+                    claims.getExpiration().toInstant());
+            assertThat(lifetime).isEqualTo(jwtProperties.accessTokenExpiration());
+        }
+    }
+
+    @Nested
+    @DisplayName("createAuthTokens")
+    class CreateAuthTokensTests {
+        @Test
+        @DisplayName("issues a refresh token whose stored expiry matches the configured refresh-token lifetime")
+        void issuedRefreshTokenExpiryMatchesConfiguration() {
+            var user = TestEntityFactory.createUser(7, "user@example.com");
+            when(userRepository.getReferenceById(7)).thenReturn(user);
+
+            tokenService.createAuthTokens(7);
+
+            var captor = ArgumentCaptor.forClass(RefreshToken.class);
+            verify(refreshTokenRepository).save(captor.capture());
+            var saved = captor.getValue();
+
+            var refreshLifetime = jwtProperties.refreshTokenExpiration();
+            var margin = Duration.ofSeconds(5);
+
+            assertThat(saved.isExpired(Instant.now().plus(refreshLifetime).minus(margin)))
+                    .as("not yet expired just inside the configured lifetime")
+                    .isFalse();
+            assertThat(saved.isExpired(Instant.now().plus(refreshLifetime).plus(margin)))
+                    .as("expired just past the configured lifetime")
+                    .isTrue();
+        }
     }
 
     @Nested
     @DisplayName("rotateRefreshToken")
     class RotateRefreshTokenTests {
-
         @Test
         @DisplayName("refuses a null or blank presented token without touching the repository")
         void refusesABlankPresentedToken() {
@@ -234,7 +275,7 @@ class TokenServiceTest {
             assertThat(result.succeeded()).isTrue();
             assertThat(result.userId()).isEqualTo(7);
             assertThat(result.refreshToken()).isNotBlank();
-            assertThat(stored.isConsumed()).isTrue();
+            verify(refreshTokenRepository).markConsumedIfUnconsumed(anyString(), any());
             verify(refreshTokenRepository).save(argThatFamilyMatches("family-1"));
             verify(refreshTokenRepository, never()).deleteFamily(anyString());
         }

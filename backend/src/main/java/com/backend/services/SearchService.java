@@ -18,11 +18,9 @@ import java.util.List;
 
 @Service
 public class SearchService {
-
     private static final int MIN_QUERY_LENGTH = 2;
     private static final int MAX_QUERY_LENGTH = 100;
     private static final int SNIPPET_LENGTH = 100;
-    /** The escape character declared in the repository LIKE clauses. */
     private static final char LIKE_ESCAPE = '!';
 
     private final ProjectRepository projectRepository;
@@ -47,7 +45,6 @@ public class SearchService {
         if (trimmed.length() < MIN_QUERY_LENGTH) {
             return new SearchResultDTO(List.of(), List.of(), List.of());
         }
-        // Bound the input before it reaches three unindexed LIKE scans.
         if (trimmed.length() > MAX_QUERY_LENGTH) {
             trimmed = trimmed.substring(0, MAX_QUERY_LENGTH);
         }
@@ -81,11 +78,6 @@ public class SearchService {
         return new SearchResultDTO(projects, tasks, comments);
     }
 
-    /**
-     * Escapes the LIKE metacharacters with {@code !}, which the queries declare via
-     * {@code ESCAPE '!'}. A backslash would work on PostgreSQL by accident (it is that engine's
-     * implicit default) but silently break on any other dialect.
-     */
     private static String escapeLikeWildcards(String input) {
         var escaped = new StringBuilder(input.length() + 8);
         for (var ch : input.toCharArray()) {

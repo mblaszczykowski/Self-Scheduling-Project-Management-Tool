@@ -16,16 +16,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Loads and authorizes the tasks a schedule optimization will work on, and returns DTOs.
- *
- * <p>A separate bean so the read transaction opens and closes here: the decode itself is CPU-bound
- * and must not run while holding a pooled database connection. Keeping it in the same class would
- * have made the {@code @Transactional} boundary a self-invocation, which the proxy never applies.
- */
 @Service
 public class OptimizationInputLoader {
-
     private final ProjectRepository projectRepository;
     private final TaskRepository taskRepository;
     private final EntityMapper entityMapper;
@@ -38,12 +30,6 @@ public class OptimizationInputLoader {
         this.entityMapper = entityMapper;
     }
 
-    /**
-     * @param tasks   the tasks of the requested projects
-     * @param anchors predecessors that live outside those projects. A dependency whose task was not
-     *                loaded contributed no constraint at all, so optimizing one project could
-     *                silently produce a schedule that violated a cross-project dependency.
-     */
     public record Input(List<TaskDTO> tasks, List<TaskDTO> anchors) {}
 
     @Transactional(readOnly = true)
@@ -55,8 +41,7 @@ public class OptimizationInputLoader {
         }
         for (var project : projects) {
             if (!project.hasAccess(userId)) {
-                // Same message as a genuinely missing project, so this is not an existence oracle.
-                throw new ResourceNotFoundException("Project not found");
+                throw new ResourceNotFoundException("One or more projects not found");
             }
         }
 
@@ -81,8 +66,6 @@ public class OptimizationInputLoader {
             return List.of();
         }
 
-        // The dependency entities are already loaded on the tasks, so their ids are available
-        // without another lookup per key.
         var idsByKey = new HashMap<String, Integer>();
         for (var task : tasks) {
             for (var dependency : task.getDependencies()) {

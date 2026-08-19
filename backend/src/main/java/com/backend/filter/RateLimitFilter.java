@@ -19,22 +19,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * Coarse per-client throttling, applied before authentication.
- *
- * <p>The client address comes from {@code request.getRemoteAddr()}, which Tomcat's RemoteIpValve
- * has already resolved from {@code X-Forwarded-For} for trusted proxies (see
- * {@code server.forward-headers-strategy} and {@code server.tomcat.remoteip.internal-proxies}).
- * A request arriving from an untrusted peer keeps that peer's address, so the header cannot be
- * spoofed to evade or to poison another client's bucket.
- *
- * <p>Login is throttled per (address, email) rather than per address: a shared office NAT must
- * not be able to lock everyone out, and a flood against one account must still be stopped.
- */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 1) // right after SecurityHeaders, before authentication
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 public class RateLimitFilter extends OncePerRequestFilter {
-
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
     private final ObjectMapper objectMapper;
@@ -49,7 +36,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-
         var path = request.getRequestURI();
         var method = request.getMethod();
         var clientIp = request.getRemoteAddr();
@@ -60,8 +46,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Login is keyed on (ip, email); the email is only available to AuthService, which owns
-        // that check. Here we only guard the endpoints keyed purely on the client address.
         if (!isPreflight(method) && path.startsWith("/api/optimization/")
                 && !rateLimitService.allow(Bucket.OPTIMIZE, clientIp)) {
             reject(response, clientIp, path, "Too many optimization requests. Please try again later.");

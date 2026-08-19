@@ -26,15 +26,9 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
-/**
- * The only place where {@code Project.hasAccess} / {@code Project.isOwner} are turned into an
- * outcome, so these tests use real {@link Project} / {@link Task} / {@link User} entities and mock
- * only the repositories: what is under test is the authorization decision, not the lookup.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AccessGuard")
 class AccessGuardTest {
-
     @Mock
     private ProjectRepository projectRepository;
 
@@ -60,7 +54,6 @@ class AccessGuardTest {
     @Nested
     @DisplayName("getAccessibleProject")
     class GetAccessibleProject {
-
         @Test
         @DisplayName("returns the project to its owner")
         void returnsTheProjectToItsOwner() {
@@ -117,7 +110,6 @@ class AccessGuardTest {
     @Nested
     @DisplayName("requireAccess")
     class RequireAccess {
-
         @Test
         @DisplayName("passes for the owner and for a member, and rejects everybody else")
         void passesForTheOwnerAndForAMember() {
@@ -134,7 +126,6 @@ class AccessGuardTest {
     @Nested
     @DisplayName("requireOwner")
     class RequireOwner {
-
         @Test
         @DisplayName("passes for the owner")
         void passesForTheOwner() {
@@ -156,7 +147,6 @@ class AccessGuardTest {
     @Nested
     @DisplayName("getOwnedProject")
     class GetOwnedProject {
-
         @Test
         @DisplayName("returns the project to its owner")
         void returnsTheProjectToItsOwner() {
@@ -209,7 +199,6 @@ class AccessGuardTest {
     @Nested
     @DisplayName("requireProjectAccessById")
     class RequireProjectAccessById {
-
         @Test
         @DisplayName("passes for a member of the project the id points at")
         void passesForAMemberOfTheProject() {
@@ -243,7 +232,6 @@ class AccessGuardTest {
     @Nested
     @DisplayName("verifyTaskInProject")
     class VerifyTaskInProject {
-
         @Test
         @DisplayName("passes for a task that belongs to the project")
         void passesForATaskThatBelongsToTheProject() {
@@ -268,7 +256,6 @@ class AccessGuardTest {
     @Nested
     @DisplayName("getAccessibleTaskById")
     class GetAccessibleTaskById {
-
         @Test
         @DisplayName("returns a task whose project the caller can see")
         void returnsATaskWhoseProjectTheCallerCanSee() {
@@ -321,7 +308,6 @@ class AccessGuardTest {
     @Nested
     @DisplayName("requireCommentOwnership")
     class RequireCommentOwnership {
-
         @Test
         @DisplayName("passes for the comment's own author")
         void passesForTheCommentsOwnAuthor() {
@@ -343,5 +329,4 @@ class AccessGuardTest {
                     .hasMessage("User not authorized to modify this comment");
         }
     }
-
 }

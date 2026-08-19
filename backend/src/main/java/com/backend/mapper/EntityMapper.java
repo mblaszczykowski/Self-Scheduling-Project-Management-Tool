@@ -14,13 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Entity to DTO mapping. Collections are always emitted as lists, never null, so no consumer
- * has to guard two different "empty" representations of the same field.
- */
 @Component
 public class EntityMapper {
-
     public UserDTO toUserDTO(User user) {
         if (user == null) return null;
         return new UserDTO(
@@ -58,12 +53,6 @@ public class EntityMapper {
         );
     }
 
-    /**
-     * @param isCritical whether the task lies on its project's critical path. An explicit
-     *                   parameter rather than a hardcoded null, so every call site has to decide
-     *                   — the field used to be silently absent from create/update responses while
-     *                   being populated on reads.
-     */
     public TaskDTO toTaskDTO(Task task, Boolean isCritical) {
         return new TaskDTO(
                 task.getId(),
@@ -148,23 +137,20 @@ public class EntityMapper {
                 comment.getTimestamp(),
                 comment.getEditedAt(),
                 toListOrEmpty(comment.getAttachments()),
-                reactions.liked().size(),
-                reactions.disliked().size(),
-                reactions.liked(),
-                reactions.disliked(),
+                reactions.likes(),
+                reactions.dislikes(),
                 reactions.likedByCurrentUser(),
                 reactions.dislikedByCurrentUser(),
                 replies
         );
     }
 
-    /** Who liked and disliked a comment, and whether the current user is among them. */
-    private record ReactionSummary(List<String> liked, List<String> disliked,
+    private record ReactionSummary(int likes, int dislikes,
                                    boolean likedByCurrentUser, boolean dislikedByCurrentUser) {}
 
     private static ReactionSummary summarizeReactions(Comment comment, Integer currentUserId) {
-        var likedByUsernames = new ArrayList<String>();
-        var dislikedByUsernames = new ArrayList<String>();
+        int likes = 0;
+        int dislikes = 0;
         boolean likedByCurrentUser = false;
         boolean dislikedByCurrentUser = false;
 
@@ -173,18 +159,17 @@ public class EntityMapper {
             if (reactor == null || reactor.getFullName() == null) continue;
             boolean isCurrentUser = reactor.getId().equals(currentUserId);
             if (reaction.getType() == ReactionType.LIKE) {
-                likedByUsernames.add(reactor.getFullName());
+                likes++;
                 likedByCurrentUser |= isCurrentUser;
             } else if (reaction.getType() == ReactionType.DISLIKE) {
-                dislikedByUsernames.add(reactor.getFullName());
+                dislikes++;
                 dislikedByCurrentUser |= isCurrentUser;
             }
         }
 
-        return new ReactionSummary(likedByUsernames, dislikedByUsernames, likedByCurrentUser, dislikedByCurrentUser);
+        return new ReactionSummary(likes, dislikes, likedByCurrentUser, dislikedByCurrentUser);
     }
 
-    /** Task keys of this task's predecessors; empty when it has none. */
     public static List<String> extractDependencyKeys(Task task) {
         return task.getDependencies().stream().map(Task::getTaskKey).sorted().toList();
     }
@@ -199,7 +184,6 @@ public class EntityMapper {
                 .toList();
     }
 
-    /** Inverse of {@link #parseLabels}: joins labels into the comma-separated stored form. */
     public static String joinLabels(List<String> labels) {
         var cleaned = (labels == null ? List.<String>of() : labels).stream()
                 .filter(Objects::nonNull)

@@ -8,12 +8,7 @@ import org.springframework.http.MediaType;
 
 import java.io.IOException;
 
-/**
- * Error responses for the servlet filters, which run before Spring MVC and so cannot go through
- * {@code GlobalExceptionHandler}. Emits the same {@link ApiError} body so the two paths agree.
- */
 public final class FilterResponseUtil {
-
     private FilterResponseUtil() {}
 
     public static void sendJsonError(HttpServletResponse response, HttpStatus status,

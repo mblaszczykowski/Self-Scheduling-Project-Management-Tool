@@ -18,14 +18,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * Deny-by-default authentication: every path not explicitly listed in {@link PublicEndpoints}
- * requires a valid access token.
- */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 2) // after SecurityHeaders and RateLimit, before Csrf
+@Order(Ordered.HIGHEST_PRECEDENCE + 2)
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final TokenService tokenService;
@@ -40,7 +35,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-
         var path = request.getRequestURI();
         var method = request.getMethod();
 
@@ -50,8 +44,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         Integer userId;
-        // Only token extraction/validation is guarded here — wrapping the downstream chain
-        // would mislabel any request-handling error as a 401 and can double-commit the response.
         try {
             var token = tokenService.extractTokenFromRequest(request);
             if (token == null) {
@@ -60,6 +52,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
             userId = tokenService.validateTokenAndGetUserId(token);
         } catch (Exception e) {
+            log.error("Unexpected failure while authenticating {} {}",
+                    request.getMethod(), request.getRequestURI(), e);
             reject(request, response, "Authentication failed", "token processing error");
             return;
         }
@@ -75,8 +69,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private void reject(HttpServletRequest request, HttpServletResponse response,
                         String clientMessage, String reason) throws IOException {
-        // DEBUG, not WARN: an expired access token is the normal precursor to a refresh, so
-        // logging it at warning level would bury the events that matter.
         log.debug("Authentication rejected ({}): client={} method={} path={}",
                 reason, request.getRemoteAddr(), request.getMethod(), request.getRequestURI());
         FilterResponseUtil.sendJsonError(response, HttpStatus.UNAUTHORIZED, clientMessage,

@@ -30,7 +30,6 @@ import java.util.Base64;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CsrfProtectionFilterTest {
-
     private static final String CSRF_COOKIE_NAME = "XSRF-TOKEN";
     private static final String CSRF_HEADER_NAME = "X-CSRF-Token";
     private static final String VALID_TOKEN = "validCsrfToken123456789012345678901234567890";
@@ -38,7 +37,6 @@ class CsrfProtectionFilterTest {
     private static final Duration ACCESS_TOKEN_TTL = Duration.ofMinutes(15);
     private static final Duration REFRESH_TOKEN_TTL = Duration.ofDays(7);
 
-    /** Configured like the application's own mapper, so the error body is the real one. */
     private final ObjectMapper objectMapper = JsonMapper.builder()
             .addModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -51,7 +49,6 @@ class CsrfProtectionFilterTest {
     private MockHttpServletResponse response;
     private RecordingFilterChain chain;
 
-    /** Records whether — and with what — the request was let through. */
     private static final class RecordingFilterChain implements FilterChain {
         private ServletRequest passedRequest;
         private ServletResponse passedResponse;
@@ -138,7 +135,6 @@ class CsrfProtectionFilterTest {
     @Nested
     @DisplayName("safe methods")
     class SafeMethodTests {
-
         @ParameterizedTest
         @ValueSource(strings = {"GET", "HEAD", "OPTIONS", "get"})
         @DisplayName("pass through without any CSRF header")
@@ -222,7 +218,6 @@ class CsrfProtectionFilterTest {
     @Nested
     @DisplayName("state-changing methods")
     class StateChangingMethodTests {
-
         @ParameterizedTest
         @ValueSource(strings = {"POST", "PUT", "DELETE", "PATCH"})
         @DisplayName("pass through when the header echoes the cookie exactly")
@@ -322,7 +317,6 @@ class CsrfProtectionFilterTest {
     @Nested
     @DisplayName("exempt endpoints")
     class ExemptEndpointTests {
-
         @ParameterizedTest
         @CsvSource({
                 "/api/auth/login, POST",

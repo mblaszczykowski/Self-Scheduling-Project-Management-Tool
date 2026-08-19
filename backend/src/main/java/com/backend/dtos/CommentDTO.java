@@ -15,8 +15,6 @@ public record CommentDTO(
         List<String> attachments,
         Integer likeCount,
         Integer dislikeCount,
-        List<String> likedByUsernames,
-        List<String> dislikedByUsernames,
         boolean likedByCurrentUser,
         boolean dislikedByCurrentUser,
         List<CommentDTO> replies

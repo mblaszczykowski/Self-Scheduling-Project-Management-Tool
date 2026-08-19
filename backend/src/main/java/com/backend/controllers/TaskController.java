@@ -18,7 +18,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/projects/{projectKey}/tasks")
 public class TaskController {
-
     private final TaskService taskService;
     private final RequestValidator requestValidator;
 
@@ -51,10 +50,6 @@ public class TaskController {
         return ResponseEntity.ok(taskService.updateTask(projectKey, taskKey, request, userId, attachments));
     }
 
-    /**
-     * Moves a task in time. Separate from the full update so a caller that only knows the new dates
-     * cannot accidentally clear everything it did not send.
-     */
     @PatchMapping("/{taskKey}/schedule")
     public ResponseEntity<TaskDTO> updateSchedule(
             @CurrentUserId Integer userId,

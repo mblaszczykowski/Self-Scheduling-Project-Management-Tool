@@ -8,13 +8,8 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.Optional;
 
-/**
- * Central builder for cookies so the security attributes (Secure / SameSite / Path) are applied
- * consistently everywhere. Auth cookies are HttpOnly; the CSRF cookie must be script-readable.
- */
 @Component
 public class CookieFactory {
-
     private final CookieProperties cookieProperties;
 
     public CookieFactory(CookieProperties cookieProperties) {
@@ -31,7 +26,6 @@ public class CookieFactory {
                 .build();
     }
 
-    /** A cookie that immediately deletes the named cookie (same attributes, zero max-age). */
     public ResponseCookie deletion(String name, boolean httpOnly) {
         return build(name, "", Duration.ZERO, httpOnly);
     }

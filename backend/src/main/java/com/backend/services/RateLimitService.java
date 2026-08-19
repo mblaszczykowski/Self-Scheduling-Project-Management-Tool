@@ -1,6 +1,8 @@
 package com.backend.services;
 
 import com.backend.config.AppProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -8,17 +10,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * In-memory fixed-window rate limiting, keyed per bucket.
- *
- * <p>State is per-JVM, which is correct for a single instance and must move to a shared store
- * (Redis) before running more than one replica — noted rather than pre-built, since the limits
- * that matter most (login, register) are already backed by per-account lockout semantics.
- */
 @Service
 public class RateLimitService {
+    private static final Logger log = LoggerFactory.getLogger(RateLimitService.class);
 
-    /** Named buckets, so a new limit is one enum constant plus one config property. */
     public enum Bucket {
         LOGIN,
         REGISTER,
@@ -43,10 +38,6 @@ public class RateLimitService {
         return config.getWindowMs();
     }
 
-    /**
-     * Records an attempt and reports whether it is within the bucket's limit. Check and
-     * increment happen inside a single {@code compute} so concurrent requests cannot all pass.
-     */
     public boolean allow(Bucket bucket, String key) {
         if (key == null || key.isBlank()) {
             key = "unknown";
@@ -64,18 +55,12 @@ public class RateLimitService {
         return entry.count.get() <= max;
     }
 
-    /**
-     * Clears one key in one bucket. Used on a successful login for the (ip, email) key only:
-     * clearing a coarse per-IP bucket on success would let anyone holding a single valid account
-     * reset the counter every few guesses and brute-force indefinitely.
-     */
     public void reset(Bucket bucket, String key) {
         if (key != null) {
             buckets.get(bucket).remove(key);
         }
     }
 
-    /** Composite key so a login flood against one account cannot lock out an entire office NAT. */
     public static String loginKey(String clientIp, String email) {
         var normalized = email == null ? "" : email.toLowerCase().trim();
         return clientIp + "|" + normalized;
@@ -92,21 +77,16 @@ public class RateLimitService {
         };
     }
 
-    /**
-     * Reclaims entries whose window has long closed. This sweep is the only thing that bounds a
-     * bucket's size, deliberately: a capacity cap that evicted the oldest entry would hand that
-     * key a fresh budget the moment the map filled, and the LOGIN bucket is keyed partly on a
-     * caller-supplied email, so flooding it with distinct keys would reset the limiter for whoever
-     * happened to be oldest — trading a memory bound for a rate-limit bypass. Bounding key
-     * cardinality safely needs a coarser key or a store with its own eviction, not an eviction
-     * policy layered over this map.
-     */
     @Scheduled(fixedRate = 60_000)
     public void cleanupExpiredEntries() {
-        long now = System.currentTimeMillis();
-        long expiryThreshold = config.getWindowMs() * 2;
-        buckets.values().forEach(bucket ->
-                bucket.entrySet().removeIf(e -> now - e.getValue().windowStart > expiryThreshold));
+        try {
+            long now = System.currentTimeMillis();
+            long expiryThreshold = config.getWindowMs() * 2;
+            buckets.values().forEach(bucket ->
+                    bucket.entrySet().removeIf(e -> now - e.getValue().windowStart > expiryThreshold));
+        } catch (Exception e) {
+            log.error("Rate limit bucket sweep failed", e);
+        }
     }
 
     private static final class Entry {

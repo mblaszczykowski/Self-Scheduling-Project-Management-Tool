@@ -16,10 +16,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
-/** Records what changed on a task, who changed it, and when. */
 @Service
 public class TaskActivityService {
-
     private final TaskActivityRepository taskActivityRepository;
     private final EntityMapper entityMapper;
 
@@ -39,7 +37,6 @@ public class TaskActivityService {
         save(task, author, TaskActivityType.CREATED, null, null, null);
     }
 
-    /** Diffs two snapshots and writes one row per field that actually changed. */
     @Transactional(rollbackFor = Exception.class)
     public void logFieldChanges(Task task, User author, TaskSnapshot before, TaskSnapshot after) {
         if (author == null || before == null || after == null) {
@@ -51,6 +48,7 @@ public class TaskActivityService {
         logChange(task, author, TaskActivityType.PRIORITY_CHANGED, "priority",
                 name(before.priority()), name(after.priority()));
         logChange(task, author, TaskActivityType.ASSIGNEE_CHANGED, "assignee",
+                text(before.assigneeId()), text(after.assigneeId()),
                 before.assignee(), after.assignee());
         logChange(task, author, TaskActivityType.PROGRESS_CHANGED, "progress",
                 text(before.progress()), text(after.progress()));
@@ -86,7 +84,12 @@ public class TaskActivityService {
 
     private void logChange(Task task, User author, TaskActivityType type, String field,
                            String oldValue, String newValue) {
-        if (Objects.equals(blankToNull(oldValue), blankToNull(newValue))) {
+        logChange(task, author, type, field, oldValue, newValue, oldValue, newValue);
+    }
+
+    private void logChange(Task task, User author, TaskActivityType type, String field,
+                           String oldKey, String newKey, String oldValue, String newValue) {
+        if (Objects.equals(blankToNull(oldKey), blankToNull(newKey))) {
             return;
         }
         save(task, author, type, field, oldValue, newValue);
@@ -113,10 +116,6 @@ public class TaskActivityService {
         return values == null || values.isEmpty() ? null : String.join(", ", values);
     }
 
-    /**
-     * Descriptions are rich text and can be thousands of characters; the activity feed only needs
-     * to say that it changed, so a length marker is recorded rather than two full documents.
-     */
     private static String summarize(String description) {
         if (description == null || description.isBlank()) {
             return null;
@@ -124,7 +123,6 @@ public class TaskActivityService {
         return description.length() + " characters";
     }
 
-    /** Attachment order is an append artefact, so the set is compared rather than the sequence. */
     private static String joinSorted(List<String> values) {
         return values == null || values.isEmpty() ? null : values.stream().sorted()
                 .collect(java.util.stream.Collectors.joining(", "));

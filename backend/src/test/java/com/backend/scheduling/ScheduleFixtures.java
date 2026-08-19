@@ -7,9 +7,7 @@ import com.backend.entities.TaskStatus;
 import java.time.LocalDate;
 import java.util.List;
 
-/** Builders for the scheduling tests, so each test reads as the scenario it describes. */
 final class ScheduleFixtures {
-
     static final LocalDate TODAY = LocalDate.of(2026, 1, 5);
 
     private ScheduleFixtures() {}

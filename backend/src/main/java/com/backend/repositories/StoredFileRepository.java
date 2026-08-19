@@ -10,19 +10,16 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface StoredFileRepository extends JpaRepository<StoredFile, Long> {
-
     Optional<StoredFile> findByStoredName(String storedName);
+
+    @Query("SELECT f.storedName FROM StoredFile f")
+    Set<String> findAllStoredNames();
 
     List<StoredFile> findByStoredNameIn(Collection<String> storedNames);
 
-    /**
-     * Every caller reaches this from an {@code AfterCommit} callback, where the surrounding
-     * transaction has already committed — so without its own transaction the modifying query threw
-     * {@code InvalidDataAccessApiUsageException}, which the best-effort delete then swallowed. The
-     * ownership row survived every file deletion and the ledger drifted from disk immediately.
-     */
     @Modifying
     @Transactional
     @Query("DELETE FROM StoredFile f WHERE f.storedName IN :storedNames")

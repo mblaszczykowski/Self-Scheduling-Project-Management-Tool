@@ -6,9 +6,11 @@ import org.hibernate.Hibernate;
 import java.util.Objects;
 
 @Entity
-@Table(name = "comment_reactions", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"comment_id", "user_id"})
-})
+@Table(name = "comment_reactions",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"comment_id", "user_id"})
+        },
+        indexes = @Index(name = "idx_comment_reaction_user", columnList = "user_id"))
 public class CommentReaction {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -66,8 +68,6 @@ public class CommentReaction {
         this.user = user;
     }
 
-    // See User.equals for why hashCode is constant per type rather than id-derived: this
-    // entity is added to Comment.reactions (a HashSet) while still transient.
     @Override
     public boolean equals(Object other) {
         if (this == other) return true;

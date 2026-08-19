@@ -5,28 +5,14 @@ import com.backend.dtos.TaskDTO;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Runs the scheduling problem: build the model, decode it under several priority rules, and keep
- * the one with the lowest objective value.
- *
- * <p>Trying several rules is what makes the {@code alpha} / {@code beta} weights mean something.
- * A single-pass constructive heuristic produces the same schedule regardless of them, so they only
- * ever changed the number that was reported — the endpoint advertised a trade-off the
- * implementation could not deliver. Decoding is a few milliseconds even at two thousand tasks, so
- * evaluating the whole candidate set and taking {@code argmin Z} is close to free, and it turns the
- * weights into genuine selectors.
- *
- * <p>Deliberately not transactional and free of entities: it consumes DTOs and returns a value, so
- * the CPU-bound work does not sit inside a transaction holding a pooled database connection.
- */
 @Service
 public class SchedulingService {
-
     private final SsgsDecoder decoder;
     private final int minHorizonDays;
 
@@ -37,12 +23,6 @@ public class SchedulingService {
         this.minHorizonDays = optimization.getMinHorizonDays();
     }
 
-    /**
-     * @param tasks        the tasks being optimized
-     * @param anchors      tasks outside that set which constrain it (cross-project predecessors,
-     *                     or predecessors that have no dates of their own); treated as fixed
-     * @param horizonStart day 0 of the model, normally today
-     */
     public Outcome optimize(List<TaskDTO> tasks, List<TaskDTO> anchors,
                             LocalDate horizonStart, double alpha, double beta) {
         var model = ScheduleModel.build(tasks, anchors, horizonStart);
@@ -64,8 +44,6 @@ public class SchedulingService {
             var candidate = decoder.decode(graph, rule, horizon);
             var metrics = ScheduleEvaluator.evaluate(candidate, graph, horizon, alpha, beta);
             metricsByRule.put(rule, metrics);
-            // Strictly-better wins, so ties keep the earlier (more explainable) rule: MORCPSP is
-            // evaluated first, and AS_PLANNED before the single-criterion rules.
             if (bestMetrics == null || metrics.objectiveValue() < bestMetrics.objectiveValue()) {
                 best = candidate;
                 bestMetrics = metrics;
@@ -74,14 +52,9 @@ public class SchedulingService {
 
         return new Outcome(horizonStart, graph, current, currentMetrics, best, bestMetrics,
                 CriticalPathAnalyzer.criticalTaskKeys(graph), model.skippedKeys(),
-                Map.copyOf(metricsByRule));
+                Collections.unmodifiableMap(metricsByRule));
     }
 
-    /**
-     * Critical-path flags and per-task total float for one project's tasks, independent of any
-     * optimization run. Float is reported alongside the flag rather than discarded, so the clients
-     * that need slack do not have to re-derive it from a model they cannot see.
-     */
     public CriticalPathAnalyzer.Analysis analyzeCriticalPath(List<TaskDTO> tasks, LocalDate horizonStart) {
         var model = ScheduleModel.build(tasks, List.of(), horizonStart);
         if (model.scheduleTasks().isEmpty()) {
@@ -90,18 +63,11 @@ public class SchedulingService {
         return CriticalPathAnalyzer.analyze(PrecedenceGraph.of(model.scheduleTasks()));
     }
 
-    /** Stamps a task DTO with the critical-path flag and total float an analysis computed for it. */
     public TaskDTO applyCriticality(TaskDTO task, CriticalPathAnalyzer.Analysis analysis) {
         return task.withCriticality(analysis.criticalKeys().contains(task.taskKey()),
                 analysis.totalFloat().get(task.taskKey()));
     }
 
-    /**
-     * @param current        the plan as it stands today, placed on the shared axis; may be
-     *                       resource-infeasible, which is the point of reporting its conflict count
-     * @param chosen         the lowest-Z feasible schedule
-     * @param metricsByRule  every rule's metrics, so a caller can explain why one was chosen
-     */
     public record Outcome(
             LocalDate horizonStart,
             PrecedenceGraph graph,

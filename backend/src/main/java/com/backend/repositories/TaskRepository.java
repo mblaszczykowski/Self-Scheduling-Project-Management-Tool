@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TaskRepository extends JpaRepository<Task, Integer> {
-
     @EntityGraph(value = "Task.withDetails", type = EntityGraph.EntityGraphType.FETCH)
     @Query("SELECT t FROM Task t WHERE t.project.id = :projectId ORDER BY t.taskNumber")
     List<Task> findByProjectIdWithDetails(@Param("projectId") Integer projectId);
@@ -36,10 +35,6 @@ public interface TaskRepository extends JpaRepository<Task, Integer> {
     @Query("SELECT t FROM Task t WHERE t.project.id IN :projectIds ORDER BY t.project.id, t.taskNumber")
     List<Task> findByProjectIdsWithDetails(@Param("projectIds") List<Integer> projectIds);
 
-    /**
-     * Loads tasks by key across any project — used to pull in precedence constraints that live
-     * outside the set being optimized, so they are respected instead of silently dropped.
-     */
     @EntityGraph(value = "Task.withDetails", type = EntityGraph.EntityGraphType.FETCH)
     @Query("SELECT t FROM Task t WHERE t.id IN :ids ORDER BY t.id")
     List<Task> findAllByIdInWithDetails(@Param("ids") List<Integer> ids);

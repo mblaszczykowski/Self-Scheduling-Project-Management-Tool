@@ -20,7 +20,6 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
-
     private final UserService userService;
     private final RequestValidator requestValidator;
 
@@ -38,8 +37,6 @@ public class UserController {
                 .body(new LoginResponse("Registration successful", result.userId(), result.email(), null));
     }
 
-    // "me" rather than a bare collection path: GET /api/users returned the caller, not a list of
-    // users, and PUT /api/users updated the caller — both lied about what they addressed.
     @GetMapping("/me")
     public ResponseEntity<CurrentUserDTO> getCurrentUser(@CurrentUserId Integer userId) {
         return ResponseEntity.ok(userService.getCurrentUser(userId));
@@ -63,9 +60,6 @@ public class UserController {
         return ResponseEntity.ok(userService.updateEmailPreferences(userId, request));
     }
 
-    // A query parameter, not a path variable: an email in a path segment collides with every
-    // literal sub-resource at the same level, so /api/users/me would have shadowed a user whose
-    // address was literally "me".
     @GetMapping("/lookup")
     public ResponseEntity<UserDTO> lookupByEmail(@CurrentUserId Integer userId,
                                                  @RequestParam String email) {

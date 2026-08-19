@@ -29,7 +29,6 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TaskActivityService")
 class TaskActivityServiceTest {
-
     @Mock
     private TaskActivityRepository taskActivityRepository;
 
@@ -49,6 +48,7 @@ class TaskActivityServiceTest {
     private static final class Snap {
         TaskStatus status = TaskStatus.TODO;
         TaskPriority priority = TaskPriority.MEDIUM;
+        Integer assigneeId = null;
         String assignee = null;
         Integer progress = 0;
         LocalDate startDate = LocalDate.of(2026, 1, 5);
@@ -60,7 +60,7 @@ class TaskActivityServiceTest {
         List<String> attachments = List.of();
 
         TaskSnapshot build() {
-            return new TaskSnapshot(status, priority, assignee, progress, startDate, dueDate,
+            return new TaskSnapshot(status, priority, assigneeId, assignee, progress, startDate, dueDate,
                     summary, description, labels, dependencyKeys, attachments);
         }
     }
@@ -74,7 +74,6 @@ class TaskActivityServiceTest {
     @Nested
     @DisplayName("logFieldChanges")
     class LogFieldChanges {
-
         @Test
         @DisplayName("logs nothing when nothing changed")
         void logsNothingWhenNothingChanged() {
@@ -124,6 +123,7 @@ class TaskActivityServiceTest {
         void logsAnAssigneeChange() {
             var before = new Snap().build();
             var afterSnap = new Snap();
+            afterSnap.assigneeId = 42;
             afterSnap.assignee = "Jane Doe";
 
             taskActivityService.logFieldChanges(task, author, before, afterSnap.build());
@@ -133,6 +133,40 @@ class TaskActivityServiceTest {
             assertThat(activities.getFirst().getType()).isEqualTo(TaskActivityType.ASSIGNEE_CHANGED);
             assertThat(activities.getFirst().getOldValue()).isNull();
             assertThat(activities.getFirst().getNewValue()).isEqualTo("Jane Doe");
+        }
+
+        @Test
+        @DisplayName("logs a reassignment between two members who share a display name, diffing on id")
+        void logsAReassignmentBetweenTwoMembersWithTheSameName() {
+            var before = new Snap();
+            before.assigneeId = 1;
+            before.assignee = "Jane Doe";
+            var after = new Snap();
+            after.assigneeId = 2;
+            after.assignee = "Jane Doe";
+
+            taskActivityService.logFieldChanges(task, author, before.build(), after.build());
+
+            var activities = loggedActivities();
+            assertThat(activities).hasSize(1);
+            assertThat(activities.getFirst().getType()).isEqualTo(TaskActivityType.ASSIGNEE_CHANGED);
+            assertThat(activities.getFirst().getOldValue()).isEqualTo("Jane Doe");
+            assertThat(activities.getFirst().getNewValue()).isEqualTo("Jane Doe");
+        }
+
+        @Test
+        @DisplayName("logs nothing when the assignee id and name are both unchanged")
+        void logsNothingWhenAssigneeIdIsUnchanged() {
+            var before = new Snap();
+            before.assigneeId = 7;
+            before.assignee = "Jane Doe";
+            var after = new Snap();
+            after.assigneeId = 7;
+            after.assignee = "Jane Doe";
+
+            taskActivityService.logFieldChanges(task, author, before.build(), after.build());
+
+            verify(taskActivityRepository, never()).save(any());
         }
 
         @Test
@@ -319,7 +353,6 @@ class TaskActivityServiceTest {
     @Nested
     @DisplayName("logCreated / logCommentAdded / logCommentEdited / logCommentDeleted")
     class SimpleEvents {
-
         @Test
         @DisplayName("logCreated writes a single CREATED row with no field or values")
         void logCreatedWritesACreatedRow() {

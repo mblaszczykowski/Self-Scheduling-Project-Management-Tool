@@ -20,13 +20,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-/**
- * Application service for schedule optimization: authorize, load, delegate to the scheduler,
- * translate day offsets back into dates, and persist an accepted result.
- */
 @Service
 public class OptimizationService {
-
     private static final Logger log = LoggerFactory.getLogger(OptimizationService.class);
 
     private final OptimizationInputLoader inputLoader;
@@ -45,14 +40,10 @@ public class OptimizationService {
     }
 
     public OptimizationResultDTO simulate(OptimizationRequest request, Integer userId) {
-        var alpha = request.alpha() != null ? request.alpha() : config.getDefaultAlpha();
-        var beta = request.beta() != null ? request.beta() : config.getDefaultBeta();
-        var horizonStart = resolveHorizonStart(request.horizonStart());
-
-        var input = inputLoader.load(request.projectKeys(), userId);
-        // The CPU-bound decode runs outside any transaction: the loader owns a read-only
-        // transaction that has already closed, and the scheduler consumes DTOs only.
-        var outcome = schedulingService.optimize(input.tasks(), input.anchors(), horizonStart, alpha, beta);
+        var run = derive(request.projectKeys(), request.alpha(), request.beta(),
+                request.horizonStart(), userId);
+        var input = run.input();
+        var outcome = run.outcome();
 
         if (outcome.isEmpty()) {
             var empty = new OptimizationMetricsDTO(0, 0, 0, 0, 0, 0, 0, true);
@@ -72,30 +63,12 @@ public class OptimizationService {
                 outcome.skippedKeys());
     }
 
-    /**
-     * Re-derives the schedule server-side and persists it.
-     *
-     * <p>The endpoint takes the same inputs as the simulation rather than a list of dates echoed
-     * back by the browser. That makes what lands in the database feasible by construction, removes
-     * the need to trust client-supplied dates, and closes the window where a dependency edited
-     * between simulate and apply would have been written as a silently infeasible plan.
-     *
-     * <p>{@code acceptedTaskKeys} is therefore a confirmation of <em>which plan</em> the caller
-     * saw, not a subset to cherry-pick: a schedule is a coherent whole, and applying part of one
-     * produces a third plan nobody computed. If the freshly derived plan moves a task the caller
-     * did not approve, their preview is stale and the request is refused.
-     *
-     * <p>Writes go through {@link TaskService#applySchedule} so the change appears in each task's
-     * activity history and reaches its assignee — the previous direct {@code saveAll} left no trace
-     * of how a task's dates got there.
-     */
     public int apply(ApplyOptimizationRequest request, Integer userId) {
-        var alpha = request.alpha() != null ? request.alpha() : config.getDefaultAlpha();
-        var beta = request.beta() != null ? request.beta() : config.getDefaultBeta();
-        var horizonStart = resolveHorizonStart(request.horizonStart());
-
-        var input = inputLoader.load(request.projectKeys(), userId);
-        var outcome = schedulingService.optimize(input.tasks(), input.anchors(), horizonStart, alpha, beta);
+        var run = derive(request.projectKeys(), request.alpha(), request.beta(),
+                request.horizonStart(), userId);
+        var input = run.input();
+        var outcome = run.outcome();
+        var horizonStart = run.horizonStart();
         if (outcome.isEmpty()) {
             return 0;
         }
@@ -115,12 +88,6 @@ public class OptimizationService {
                 continue;
             }
             if (accepted != null && !accepted.contains(dto.taskKey())) {
-                // The fresh plan moves a task the caller never saw. Re-deriving keeps the dates
-                // honest, but the accepted set still comes from a preview, and a preview goes
-                // stale the moment someone edits a dependency — or simply when the horizon rolls
-                // over to the next day. Writing only the approved part of a plan persists half a
-                // schedule, and the half left behind is what made the other half feasible, so
-                // this is the very silently-infeasible write the re-derivation exists to prevent.
                 throw new ValidationException(
                         "The schedule has changed since it was previewed. Re-run the optimization "
                                 + "to review the current plan before applying it.");
@@ -136,10 +103,20 @@ public class OptimizationService {
         return taskService.applySchedule(changes, userId);
     }
 
-    /**
-     * Bounds a caller-supplied horizon. Without this, a simulation could be asked to start in the
-     * year 1000 and would happily return (and let the client persist) dates from that year.
-     */
+    private record Run(OptimizationInputLoader.Input input, SchedulingService.Outcome outcome,
+                       LocalDate horizonStart) {}
+
+    private Run derive(List<String> projectKeys, Double requestedAlpha, Double requestedBeta,
+                       LocalDate requestedHorizonStart, Integer userId) {
+        var alpha = requestedAlpha != null ? requestedAlpha : config.getDefaultAlpha();
+        var beta = requestedBeta != null ? requestedBeta : config.getDefaultBeta();
+        var horizonStart = resolveHorizonStart(requestedHorizonStart);
+        var input = inputLoader.load(projectKeys, userId);
+        return new Run(input,
+                schedulingService.optimize(input.tasks(), input.anchors(), horizonStart, alpha, beta),
+                horizonStart);
+    }
+
     private LocalDate resolveHorizonStart(LocalDate requested) {
         var today = LocalDate.now();
         if (requested == null) {
@@ -188,7 +165,6 @@ public class OptimizationService {
         return suggestions;
     }
 
-    /** A placement's suggested dates, and whether they differ from the task's current ones. */
     private record SuggestedDates(LocalDate start, LocalDate due, boolean changed) {}
 
     private static SuggestedDates suggestedDatesFor(TaskDTO dto, LocalDate horizonStart, Placement placement) {
@@ -198,7 +174,6 @@ public class OptimizationService {
         return new SuggestedDates(start, due, changed);
     }
 
-    /** {@code end} is exclusive, and a due date is inclusive, so the last worked day is end - 1. */
     private static LocalDate suggestedDueDate(LocalDate horizonStart, Placement placement) {
         return horizonStart.plusDays(Math.max(placement.end() - 1, placement.start()));
     }

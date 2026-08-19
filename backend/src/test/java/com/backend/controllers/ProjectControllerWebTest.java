@@ -55,22 +55,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The HTTP contract of {@link ProjectController}: status codes, the {@code ApiError} shape and the
- * {@code PagedResponse} envelope. The service is mocked, but everything between the socket and it
- * is real — the production {@code WebConfig}/{@code CurrentUserIdArgumentResolver} pair that
- * resolves {@code @CurrentUserId}, the real {@code RequestValidator}, the real {@code PageRequests}
- * clamping and the real {@code GlobalExceptionHandler}.
- */
-// The servlet filters are deliberately out of the slice. JwtAuthenticationFilter would reject
-// every request here (these tests carry no token, they carry the attribute the filter would have
-// written), and the rest pull in configuration that has nothing to do with the HTTP contract.
 @WebMvcTest(controllers = ProjectController.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = Filter.class))
 @Import({ProjectControllerWebTest.SliceConfig.class, WebConfig.class, CurrentUserIdArgumentResolver.class})
 @DisplayName("ProjectController over HTTP")
 class ProjectControllerWebTest {
-
     private static final int USER_ID = 7;
 
     @Autowired
@@ -79,11 +68,6 @@ class ProjectControllerWebTest {
     @MockitoBean
     private ProjectService projectService;
 
-    /**
-     * Spring's automatic reset of a {@code @MockitoBean} keys off annotations found on the class
-     * being run, and does not look at the enclosing class of a {@code @Nested} one — so without
-     * this the recorded invocations would leak from one nested case into the next.
-     */
     @BeforeEach
     void resetServiceMock() {
         reset(projectService);
@@ -104,7 +88,6 @@ class ProjectControllerWebTest {
     @Nested
     @DisplayName("POST /api/projects")
     class CreateProject {
-
         @Test
         @DisplayName("answers 201 Created and hands the service the parsed request and the caller's id")
         void answers201CreatedWithTheParsedRequest() throws Exception {
@@ -183,7 +166,6 @@ class ProjectControllerWebTest {
     @Nested
     @DisplayName("DELETE /api/projects/{projectKey}")
     class DeleteProject {
-
         @Test
         @DisplayName("answers 204 No Content with an empty body")
         void answers204NoContent() throws Exception {
@@ -223,7 +205,6 @@ class ProjectControllerWebTest {
     @Nested
     @DisplayName("GET /api/projects")
     class ListProjects {
-
         @Test
         @DisplayName("wraps the page in the PagedResponse envelope with a content array")
         void wrapsThePageInThePagedResponseEnvelope() throws Exception {
@@ -305,14 +286,8 @@ class ProjectControllerWebTest {
         }
     }
 
-    /**
-     * The collaborators the controller needs that a {@code @WebMvcTest} slice does not
-     * component-scan. They are the real implementations, not mocks: the validation, the pagination
-     * clamping and the argument resolution are part of what is being asserted.
-     */
     @TestConfiguration
     static class SliceConfig {
-
         @Bean
         AppProperties appProperties() {
             return new AppProperties();

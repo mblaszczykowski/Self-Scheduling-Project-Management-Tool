@@ -19,20 +19,8 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-/**
- * Maps exceptions to the single {@link ApiError} response shape.
- *
- * <p>Extends {@link ResponseEntityExceptionHandler} deliberately. A bare
- * {@code @ExceptionHandler(Exception.class)} on a plain advice class pre-empts Spring's own
- * status mapping, because {@code ExceptionHandlerExceptionResolver} runs before
- * {@code DefaultHandlerExceptionResolver} — which turned an unmapped URL into a 500 with a full
- * stack trace, a missing multipart part into a 500 instead of a 400, and a bad {@code Content-Type}
- * into a 500 instead of a 415. The base class handles that whole family with correct statuses;
- * the handlers below cover the domain exceptions, and the catch-all is now genuinely last.
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
-
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ValidationException.class)
@@ -62,7 +50,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(FileStorageException.class)
     public ResponseEntity<ApiError> handleFileStorage(FileStorageException ex) {
-        // Signals a server-side storage/IO failure; bad client input is a ValidationException.
         log.error("File storage failure", ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "File Error",
                 "Could not process the file. Please try again.");
@@ -80,7 +67,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "Invalid value for parameter: " + ex.getName());
     }
 
-    /** Raised by {@code @Min}/{@code @Max} on request parameters of a {@code @Validated} controller. */
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiError> handleConstraintViolation(ConstraintViolationException ex) {
         var fieldErrors = ex.getConstraintViolations().stream()
@@ -97,11 +83,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "This item was modified by someone else. Please reload and try again.");
     }
 
-    /**
-     * A unique constraint reached at flush time. The services check for duplicates first, so this
-     * only fires when two concurrent requests pass that check and the database settles the race —
-     * a conflict, not a server fault, and the message stays generic so it names no other account.
-     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         log.warn("Constraint violation on write: {}", ex.getMostSpecificCause().getMessage());
@@ -109,7 +90,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "That change conflicts with existing data. Please reload and try again.");
     }
 
-    /** Genuinely last: anything not mapped above is an unexpected server-side failure. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(Exception ex) {
         log.error("Unexpected error", ex);
@@ -129,11 +109,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.BAD_REQUEST.value(), "Validation Failed", "Invalid request data", fieldErrors));
     }
 
-    /**
-     * Rewrites every response the base class produces into {@link ApiError}. Spring's own
-     * {@code ProblemDetail} carries a client-safe {@code detail} for 4xx, which is kept; 5xx
-     * details are replaced with a generic message so nothing internal leaks.
-     */
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex,
                                                             Object body,

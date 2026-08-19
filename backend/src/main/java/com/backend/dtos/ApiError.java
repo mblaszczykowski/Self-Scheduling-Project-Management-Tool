@@ -5,11 +5,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * The single error shape for the whole API. Servlet filters (which run before Spring MVC) and
- * {@code GlobalExceptionHandler} both emit this, so a client has exactly one error contract to
- * model — previously the two paths disagreed on the type of {@code timestamp}.
- */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiError(
         int status,

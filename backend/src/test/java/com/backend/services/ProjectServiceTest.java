@@ -24,8 +24,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 
 import java.util.List;
 import java.util.Map;
@@ -40,22 +38,14 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Behavioural tests for {@link ProjectService}.
- *
- * <p>{@link EntityMapper} and {@link RateLimitService} are real instances, not mocks. A mapping
- * assertion against a stubbed mapper only restates the stub; and the invitation cap is only
- * meaningful if the real fixed-window counter is doing the counting.
- */
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 class ProjectServiceTest {
-
     private static final Integer OWNER_ID = 1;
     private static final Integer MEMBER_ID = 2;
     private static final Integer OUTSIDER_ID = 99;
@@ -87,12 +77,9 @@ class ProjectServiceTest {
                 fileStorageService, schedulingService, new EntityMapper(), accessGuard,
                 notificationService, emailService, rateLimitService);
 
-        when(userService.getRequiredUserById(OWNER_ID)).thenReturn(owner);
-        when(fileStorageService.storeFiles(any(), any(), any())).thenReturn(List.of());
-        // Mirrors the real FileStorageService.resolveAttachments: validate then merge in the
-        // newly stored files, delegating to this same mock so per-test stubs/verifies on
-        // requireAttachmentsBelongTo and storeFiles keep working unchanged.
-        when(fileStorageService.resolveAttachments(any(), any(), any(), any())).thenAnswer(invocation -> {
+        lenient().when(userService.getRequiredUserById(OWNER_ID)).thenReturn(owner);
+        lenient().when(fileStorageService.storeFiles(any(), any(), any())).thenReturn(List.of());
+        lenient().when(fileStorageService.resolveAttachments(any(), any(), any(), any())).thenAnswer(invocation -> {
             Integer projectId = invocation.getArgument(0);
             List<String> declared = invocation.getArgument(1);
             var newFiles = invocation.getArgument(2, List.class);
@@ -102,16 +89,16 @@ class ProjectServiceTest {
             merged.addAll(fileStorageService.storeFiles(newFiles, projectId, uploaderId));
             return merged;
         });
-        when(taskRepository.findByProjectIdWithDetails(anyInt())).thenReturn(List.of());
-        when(schedulingService.analyzeCriticalPath(anyList(), any()))
+        lenient().when(taskRepository.findByProjectIdWithDetails(anyInt())).thenReturn(List.of());
+        lenient().when(schedulingService.analyzeCriticalPath(anyList(), any()))
                 .thenReturn(CriticalPathAnalyzer.Analysis.empty());
-        when(schedulingService.applyCriticality(any(), any())).thenAnswer(invocation -> {
+        lenient().when(schedulingService.applyCriticality(any(), any())).thenAnswer(invocation -> {
             TaskDTO dto = invocation.getArgument(0);
             CriticalPathAnalyzer.Analysis analysis = invocation.getArgument(1);
             return dto.withCriticality(analysis.criticalKeys().contains(dto.taskKey()),
                     analysis.totalFloat().get(dto.taskKey()));
         });
-        when(projectRepository.save(any(Project.class))).thenAnswer(call -> call.getArgument(0));
+        lenient().when(projectRepository.save(any(Project.class))).thenAnswer(call -> call.getArgument(0));
     }
 
     private static ProjectRequest request(String key, String summary, String description,
@@ -123,7 +110,6 @@ class ProjectServiceTest {
     @Nested
     @DisplayName("Creating a project")
     class CreateProject {
-
         @Test
         @DisplayName("stores the submitted details and makes the caller its owner")
         void createsProject() {
@@ -138,7 +124,6 @@ class ProjectServiceTest {
             assertThat(saved.getValue().getOwner()).isSameAs(owner);
             assertThat(saved.getValue().getNextTaskNumber()).isEqualTo(1);
 
-            // The returned DTO is built by a real mapper from the entity that was written.
             assertThat(result.projectKey()).isEqualTo("NEW");
             assertThat(result.owner().email()).isEqualTo("owner@example.com");
             assertThat(result.members()).extracting("email").contains("owner@example.com");
@@ -176,8 +161,6 @@ class ProjectServiceTest {
         @Test
         @DisplayName("never notifies the owner about their own project")
         void doesNotNotifyOwner() {
-            when(userService.findByEmailsAsMap(anyCollection())).thenReturn(Map.of());
-
             projectService.createProject(
                     request("NEW", "New project", null, List.of("owner@example.com"), null, null),
                     OWNER_ID, List.of());
@@ -194,7 +177,6 @@ class ProjectServiceTest {
                     request("NEW", "New project", null, List.of("stranger@example.com"), null, null),
                     OWNER_ID, List.of());
 
-            // No transaction is active in a unit test, so AfterCommit runs the action inline.
             verify(emailService).sendInvitationEmail("stranger@example.com", "New project",
                     owner.getFullName());
         }
@@ -212,8 +194,6 @@ class ProjectServiceTest {
                         OWNER_ID, List.of());
             }
 
-            // Every unregistered address triggers mail from a verified sender carrying
-            // caller-supplied text, so the volume one account can generate has to be bounded.
             assertThatThrownBy(() -> projectService.createProject(
                     request("OVER", "One too many", null, List.of("stranger@example.com"), null, null),
                     OWNER_ID, List.of()))
@@ -231,8 +211,6 @@ class ProjectServiceTest {
                     request("NEW", "New project", null, null, List.of("API"), null),
                     OWNER_ID, List.of());
 
-            // Going through the guard is what stops a caller writing a dependency row that points
-            // at another tenant's project.
             verify(accessGuard).requireAccess(dependency, OWNER_ID);
         }
 
@@ -279,6 +257,11 @@ class ProjectServiceTest {
         @Test
         @DisplayName("records uploaded attachments against the project that owns them")
         void storesAttachmentsAgainstTheProject() {
+            when(projectRepository.save(any(Project.class))).thenAnswer(call -> {
+                Project saved = call.getArgument(0);
+                saved.setId(10);
+                return saved;
+            });
             when(fileStorageService.storeFiles(any(), eq(10), eq(OWNER_ID)))
                     .thenReturn(List.of("/files/spec.pdf"));
             var uploads = List.<org.springframework.web.multipart.MultipartFile>of();
@@ -286,18 +269,17 @@ class ProjectServiceTest {
             var result = projectService.createProject(
                     request("NEW", "New project", null, null, null, null), OWNER_ID, uploads);
 
-            verify(fileStorageService).storeFiles(eq(uploads), any(), eq(OWNER_ID));
-            assertThat(result).isNotNull();
+            verify(fileStorageService).storeFiles(eq(uploads), eq(10), eq(OWNER_ID));
+            assertThat(result.attachments()).containsExactly("/files/spec.pdf");
         }
     }
 
     @Nested
     @DisplayName("Updating a project")
     class UpdateProject {
-
         @BeforeEach
         void projectIsOwnedByCaller() {
-            when(accessGuard.getOwnedProject("WEB", OWNER_ID)).thenReturn(project);
+            lenient().when(accessGuard.getOwnedProject("WEB", OWNER_ID)).thenReturn(project);
         }
 
         @Test
@@ -320,8 +302,6 @@ class ProjectServiceTest {
                     request("WEB", "Project WEB", null, null, null, List.of("/files/keep.pdf")),
                     OWNER_ID, List.of());
 
-            // The endpoint used to be add-only, so removing a project attachment reported success
-            // and did nothing.
             assertThat(result.attachments()).containsExactly("/files/keep.pdf");
             assertThat(project.getAttachments()).containsExactly("/files/keep.pdf");
         }
@@ -350,9 +330,6 @@ class ProjectServiceTest {
                     request("WEB", "Renamed", null, null, null, null),
                     OWNER_ID, List.of());
 
-            // ProjectRequest documents an absent collection as "leave that aspect untouched", the
-            // same as memberEmails and dependencies. Coercing null to an empty list here detached
-            // every attachment and then deleted the files from disk after commit.
             assertThat(result.attachments()).containsExactly("/files/a.pdf", "/files/b.pdf");
             assertThat(project.getAttachments()).containsExactly("/files/a.pdf", "/files/b.pdf");
         }
@@ -381,8 +358,6 @@ class ProjectServiceTest {
                     request("WEB", "Project WEB", null, null, null, List.of()),
                     OWNER_ID, List.of());
 
-            // Present-but-empty still means "the new complete contents", which is how a caller
-            // removes the last attachment — the distinction omitting the field must not blur.
             assertThat(result.attachments()).isEmpty();
         }
 
@@ -435,7 +410,6 @@ class ProjectServiceTest {
             var forNewcomer = pending.stream()
                     .filter(candidate -> candidate.recipient() == newcomer)
                     .toList();
-            // Both candidates are handed over; NotificationService keeps the first per recipient.
             assertThat(forNewcomer).hasSize(1);
             assertThat(forNewcomer.get(0).type()).isEqualTo(NotificationType.PROJECT_INVITATION);
         }
@@ -443,8 +417,6 @@ class ProjectServiceTest {
         @Test
         @DisplayName("tells a member who was dropped that they were removed")
         void notifiesRemovedMember() {
-            when(userService.findByEmailsAsMap(anyCollection())).thenReturn(Map.of());
-
             projectService.updateProject("WEB",
                     request("WEB", "Project WEB", null, List.of(), null, null),
                     OWNER_ID, List.of());
@@ -495,7 +467,6 @@ class ProjectServiceTest {
     @Nested
     @DisplayName("Reading and deleting")
     class ReadAndDelete {
-
         @Test
         @DisplayName("returns a project the caller can see, with its critical path marked")
         void returnsAccessibleProject() {
@@ -506,8 +477,7 @@ class ProjectServiceTest {
             when(taskRepository.findByProjectIdWithDetails(10)).thenReturn(List.of(task));
             when(schedulingService.analyzeCriticalPath(anyList(), any()))
                     .thenReturn(new CriticalPathAnalyzer.Analysis(
-                            java.util.Map.of("WEB-1", 0), java.util.Map.of("WEB-1", 0),
-                            java.util.Set.of("WEB-1")));
+                            java.util.Map.of("WEB-1", 0), java.util.Set.of("WEB-1")));
 
             var result = projectService.getProjectByKey("WEB", MEMBER_ID);
 
@@ -535,8 +505,6 @@ class ProjectServiceTest {
 
             projectService.deleteProject("WEB", OWNER_ID);
 
-            // Unlinking first meant a failed commit left the project intact with every attachment
-            // URL pointing at a file that no longer existed.
             var order = org.mockito.Mockito.inOrder(projectRepository, fileStorageService);
             order.verify(projectRepository).delete(project);
             order.verify(fileStorageService).deleteFilesSilently(anyCollection());

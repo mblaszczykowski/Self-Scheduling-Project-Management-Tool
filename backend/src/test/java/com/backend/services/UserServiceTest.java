@@ -18,8 +18,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -37,15 +39,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * The password encoder and the entity mapper are real: the point of most of these tests is that a
- * credential change is actually verified against the stored hash, and that the DTO handed back
- * actually reflects the mutated entity. Only the repositories and the token service are mocked.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserService")
 class UserServiceTest {
-
     private static final String CURRENT_PASSWORD = "OldPass1!";
 
     @Mock
@@ -80,7 +76,6 @@ class UserServiceTest {
     @Nested
     @DisplayName("registerUser")
     class RegisterUser {
-
         @Test
         @DisplayName("stores the email address lower-cased and trimmed, and trims the names")
         void storesTheEmailLowerCasedAndTrimmed() {
@@ -148,7 +143,6 @@ class UserServiceTest {
     @Nested
     @DisplayName("findUserByEmailOrNull")
     class FindUserByEmailOrNull {
-
         @Test
         @DisplayName("normalizes the address before looking it up")
         void normalizesTheAddressBeforeLookingItUp() {
@@ -176,7 +170,6 @@ class UserServiceTest {
     @Nested
     @DisplayName("findByEmailsAsMap")
     class FindByEmailsAsMap {
-
         @Test
         @DisplayName("keys the result by normalized email and skips blank entries")
         @SuppressWarnings("unchecked")
@@ -211,7 +204,6 @@ class UserServiceTest {
     @Nested
     @DisplayName("updateProfile")
     class UpdateProfile {
-
         @BeforeEach
         void stubLookup() {
             when(userRepository.findById(7)).thenReturn(Optional.of(existingUser));
@@ -336,12 +328,51 @@ class UserServiceTest {
             assertThat(existingUser.getFirstname()).isEqualTo("Old");
             assertThat(existingUser.getLastname()).isEqualTo("Name");
         }
+
+        @Test
+        @DisplayName("refuses a profile picture whose content type is not an image")
+        void refusesAProfilePictureWhoseContentTypeIsNotAnImage() {
+            var upload = new MockMultipartFile("profilePicture", "resume.pdf", "application/pdf",
+                    "%PDF-1.4".getBytes(StandardCharsets.UTF_8));
+            var request = new UpdateProfileRequest(null, null, null, null, null);
+
+            assertThatThrownBy(() -> userService.updateProfile(7, request, upload))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Invalid file type. Only images are allowed");
+            verifyNoInteractions(fileStorageService);
+        }
+
+        @Test
+        @DisplayName("refuses a profile picture whose bytes do not match an image's magic prefix")
+        void refusesAProfilePictureWhoseBytesDoNotMatchAnImageMagicPrefix() {
+            var upload = new MockMultipartFile("profilePicture", "fake.png", "image/png",
+                    "not actually a png".getBytes(StandardCharsets.UTF_8));
+            var request = new UpdateProfileRequest(null, null, null, null, null);
+
+            assertThatThrownBy(() -> userService.updateProfile(7, request, upload))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining("doesn't match image type");
+            verifyNoInteractions(fileStorageService);
+        }
+
+        @Test
+        @DisplayName("accepts a valid PNG and stores it as the user's profile picture")
+        void acceptsAValidPngAndStoresItAsTheProfilePicture() {
+            var upload = new MockMultipartFile("profilePicture", "avatar.png", "image/png",
+                    new byte[]{(byte) 0x89, 'P', 'N', 'G'});
+            var request = new UpdateProfileRequest(null, null, null, null, null);
+            when(fileStorageService.storeFile(upload, null, 7)).thenReturn("/files/generated.png");
+
+            var dto = userService.updateProfile(7, request, upload);
+
+            assertThat(dto.profilePicture()).isEqualTo("/files/generated.png");
+            verify(fileStorageService).storeFile(upload, null, 7);
+        }
     }
 
     @Nested
     @DisplayName("getUserByEmailForRequester")
     class GetUserByEmailForRequester {
-
         @Test
         @DisplayName("returns the member-safe view of somebody the requester shares a project with")
         void returnsTheMemberSafeViewOfAProjectPartner() {
@@ -394,7 +425,6 @@ class UserServiceTest {
     @Nested
     @DisplayName("updateEmailPreferences")
     class UpdateEmailPreferences {
-
         @Test
         @DisplayName("changes only the flags the request actually carries")
         void changesOnlyTheFlagsTheRequestCarries() {

@@ -25,12 +25,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Real entities throughout: the mapper is the thing under test, so nothing about it is stubbed.
- */
 @DisplayName("EntityMapper")
 class EntityMapperTest {
-
     private final EntityMapper mapper = new EntityMapper();
 
     private User owner;
@@ -53,7 +49,6 @@ class EntityMapperTest {
     @Nested
     @DisplayName("user mapping")
     class UserMapping {
-
         @Test
         @DisplayName("keeps the email-notification preferences out of the view other people see")
         void keepsThePreferencesOutOfTheViewOtherPeopleSee() {
@@ -110,7 +105,6 @@ class EntityMapperTest {
     @Nested
     @DisplayName("toTaskDTO")
     class ToTaskDTO {
-
         @Test
         @DisplayName("emits empty lists, never nulls, for a task with no labels, dependencies or attachments")
         void emitsEmptyListsNeverNulls() {
@@ -208,7 +202,6 @@ class EntityMapperTest {
     @Nested
     @DisplayName("toProjectDTO")
     class ToProjectDTO {
-
         @Test
         @DisplayName("emits empty lists, never nulls, for a project with no attachments or dependencies")
         void emitsEmptyListsNeverNulls() {
@@ -246,7 +239,6 @@ class EntityMapperTest {
     @Nested
     @DisplayName("toCommentDTO")
     class ToCommentDTO {
-
         private Comment comment;
 
         @BeforeEach
@@ -268,8 +260,6 @@ class EntityMapperTest {
 
             assertThat(dto.likeCount()).isEqualTo(2);
             assertThat(dto.dislikeCount()).isEqualTo(1);
-            assertThat(dto.likedByUsernames()).containsExactlyInAnyOrder("Grace Hopper", "Alan Turing");
-            assertThat(dto.dislikedByUsernames()).containsExactly("Ada Lovelace");
             assertThat(dto.likedByCurrentUser()).isTrue();
             assertThat(dto.dislikedByCurrentUser()).isFalse();
         }
@@ -307,8 +297,6 @@ class EntityMapperTest {
 
             assertThat(dto.attachments()).isNotNull().isEmpty();
             assertThat(dto.replies()).isNotNull().isEmpty();
-            assertThat(dto.likedByUsernames()).isNotNull().isEmpty();
-            assertThat(dto.dislikedByUsernames()).isNotNull().isEmpty();
             assertThat(dto.likeCount()).isZero();
             assertThat(dto.dislikeCount()).isZero();
         }
@@ -332,7 +320,6 @@ class EntityMapperTest {
     @Nested
     @DisplayName("toCommentDTOWithReplies")
     class ToCommentDTOWithReplies {
-
         @Test
         @DisplayName("nests replies recursively and orders each level by timestamp, not by map order")
         void nestsRepliesRecursivelyInTimestampOrder() {
@@ -343,7 +330,6 @@ class EntityMapperTest {
             var grandchild = commentAt(4, base.plus(9, ChronoUnit.MINUTES));
 
             Map<Integer, List<Comment>> repliesMap = new HashMap<>();
-            // Deliberately out of order: the mapper, not the caller, owns the ordering.
             repliesMap.put(1, List.of(newer, older));
             repliesMap.put(2, List.of(grandchild));
 
@@ -385,11 +371,6 @@ class EntityMapperTest {
         }
     }
 
-    /**
-     * {@code Comment.timestamp} is write-once and set in the constructor, which is right for
-     * production and leaves a test no way to build a deterministic ordering fixture. Reflection
-     * here rather than a setter that only tests would ever call.
-     */
     private static void setTimestamp(Comment comment, Instant timestamp) {
         try {
             Field field = Comment.class.getDeclaredField("timestamp");

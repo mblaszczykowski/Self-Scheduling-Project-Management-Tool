@@ -21,7 +21,7 @@ public class Notification {
     private String message;
 
     @Column(nullable = false)
-    private Instant timestamp;
+    private Instant timestamp = Instant.now();
 
     @Column(name = "is_read", nullable = false)
     private Boolean isRead = false;

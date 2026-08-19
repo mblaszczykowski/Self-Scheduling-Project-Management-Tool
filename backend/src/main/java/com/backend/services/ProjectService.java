@@ -35,7 +35,6 @@ import java.util.stream.Collectors;
 
 @Service
 public class ProjectService {
-
     private final ProjectRepository projectRepository;
     private final UserService userService;
     private final TaskRepository taskRepository;
@@ -164,8 +163,6 @@ public class ProjectService {
             updatedAttachments = fileStorageService.resolveAttachments(
                     project.getId(), declared, attachments, userId);
         } else {
-            // No declared list to validate ownership against here: every file in
-            // previousAttachments already belongs to this project.
             updatedAttachments = new ArrayList<>(previousAttachments);
             updatedAttachments.addAll(fileStorageService.storeFiles(attachments, project.getId(), userId));
         }
@@ -190,17 +187,10 @@ public class ProjectService {
 
         var attachments = collectAllAttachments(project);
         projectRepository.delete(project);
-        // Files come off disk only once the rows are really gone: unlinking first meant a failed
-        // commit left the project intact with every attachment URL pointing at nothing.
         AfterCommit.run("delete attachments of project " + projectKey,
                 () -> fileStorageService.deleteFilesSilently(attachments));
     }
 
-    /**
-     * One notification per person, and only for something they can actually see: a member who
-     * was just invited does not also need "the project was updated", and nobody needs it when
-     * only the member list changed.
-     */
     private List<NotificationService.Pending> buildMembershipNotifications(
             Project updated, Set<User> added, Set<User> removed, boolean detailsChanged, Integer actorId) {
         var pending = new ArrayList<NotificationService.Pending>();
@@ -218,8 +208,6 @@ public class ProjectService {
         if (detailsChanged) {
             var justInvited = added.stream().map(User::getId).collect(Collectors.toSet());
             for (var member : updated.getMembers()) {
-                // Skip the actor, and skip anyone who is being invited in this same request: their
-                // invitation already tells them everything "the project was updated" would.
                 if (member.getId().equals(actorId) || justInvited.contains(member.getId())) {
                     continue;
                 }
@@ -233,10 +221,6 @@ public class ProjectService {
 
     private record MemberResolution(Set<User> members, Set<String> unregisteredEmails) {}
 
-    /**
-     * Turns member email addresses into users, collecting the ones that do not exist yet so they
-     * can be invited after the transaction commits.
-     */
     private MemberResolution resolveMembers(List<String> emails, User owner, Integer actorId) {
         var members = new LinkedHashSet<User>();
         members.add(owner);
@@ -267,21 +251,12 @@ public class ProjectService {
 
         if (!unregistered.isEmpty()
                 && !rateLimitService.allow(Bucket.INVITATION, String.valueOf(actorId))) {
-            // Each unregistered address triggers mail from a verified sender with caller-supplied
-            // text in it, so the volume one user can generate has to be bounded.
             throw new ValidationException("Too many invitations sent. Please try again later.");
         }
 
         return new MemberResolution(members, unregistered);
     }
 
-    /**
-     * Resolves dependency project keys through the access guard.
-     *
-     * <p>Going through the guard is what stops a caller from writing a dependency row pointing at
-     * another tenant's project, and makes "not found" indistinguishable from "no access" so the
-     * endpoint is not an existence oracle over a small key namespace.
-     */
     private void applyDependencies(Project project, List<String> dependencyKeys, Integer userId) {
         if (dependencyKeys == null) {
             return;
@@ -322,11 +297,6 @@ public class ProjectService {
         notificationService.notifyAll(pending);
     }
 
-    /**
-     * Invitations go out only once the project really exists. Sending them inline meant a
-     * validation failure later in the same method rolled the project back after the mail had
-     * already left.
-     */
     private void sendInvitationsAfterCommit(Set<String> emails, String projectName, User inviter) {
         if (emails == null || emails.isEmpty()) {
             return;
@@ -348,7 +318,6 @@ public class ProjectService {
                         Collectors.mapping(task -> entityMapper.toTaskDTO(task, null), Collectors.toList())));
     }
 
-    /** Single canonical project mapping: enrich the tasks with critical-path flags, then map. */
     private ProjectDTO toDto(Project project, List<TaskDTO> tasks) {
         var analysis = schedulingService.analyzeCriticalPath(tasks, LocalDate.now());
         var enriched = tasks.stream()
@@ -367,5 +336,4 @@ public class ProjectService {
         }
         return all;
     }
-
 }

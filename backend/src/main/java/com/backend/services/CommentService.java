@@ -31,7 +31,6 @@ import java.util.Map;
 
 @Service
 public class CommentService {
-
     private final CommentRepository commentRepository;
     private final CommentReactionRepository commentReactionRepository;
     private final UserService userService;
@@ -59,17 +58,9 @@ public class CommentService {
         this.accessGuard = accessGuard;
     }
 
-    /**
-     * Top-level comments for a task, paged, each with its full reply tree.
-     *
-     * <p>Paged because the previous unbounded version returned every comment on a task plus the
-     * whole recursive reply tree and every reactor's name in one response.
-     */
     @Transactional(readOnly = true)
     public Page<CommentDTO> getCommentsByTask(Integer taskId, Integer userId, Pageable pageable) {
         var task = accessGuard.getAccessibleTaskById(taskId, userId);
-        // Two steps so the database does the paging: a collection fetch and a Pageable in one
-        // query makes Hibernate load every top-level comment on the task and slice in memory.
         var ids = commentRepository.findTopLevelCommentIds(task.getId(), pageable);
         if (ids.isEmpty()) {
             return Page.empty(pageable);
@@ -85,8 +76,6 @@ public class CommentService {
     @Transactional(rollbackFor = Exception.class)
     public CommentDTO addComment(Integer taskId, Integer userId, String content,
                                  List<MultipartFile> files, Integer parentCommentId) {
-        validateCommentContent(content);
-
         var task = accessGuard.getAccessibleTaskById(taskId, userId);
         var author = userService.getRequiredUserById(userId);
 
@@ -113,8 +102,6 @@ public class CommentService {
     @Transactional(rollbackFor = Exception.class)
     public CommentDTO updateComment(Integer taskId, Integer commentId, Integer userId, String content,
                                     List<MultipartFile> files) {
-        validateCommentContent(content);
-
         var comment = requireOwnEditableComment(taskId, commentId, userId);
         comment.setContent(sanitize(content));
         comment.setEditedAt(Instant.now());
@@ -143,13 +130,6 @@ public class CommentService {
                 () -> fileStorageService.deleteFilesSilently(attachments));
     }
 
-    /**
-     * Adds, switches or removes the caller's reaction.
-     *
-     * <p>Mutations go through the {@code Comment} aggregate rather than the reaction repository, so
-     * the collection the response is built from already reflects the change instead of depending on
-     * Hibernate's flush and collection-load ordering.
-     */
     @Transactional(rollbackFor = Exception.class)
     public CommentDTO reactToComment(Integer taskId, Integer commentId, Integer userId,
                                      ReactionType reactionType) {
@@ -186,7 +166,6 @@ public class CommentService {
     private Comment requireOwnEditableComment(Integer taskId, Integer commentId, Integer userId) {
         var comment = commentRepository.findByIdWithTaskAndProject(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
-        // Checked on the already-loaded comment: no second query, no time-of-check gap.
         requireCommentAccessibleFromTask(comment, taskId, userId);
         accessGuard.requireCommentOwnership(comment, userId);
         return comment;
@@ -199,24 +178,10 @@ public class CommentService {
         }
     }
 
-    private void validateCommentContent(String content) {
-        if (content == null || content.trim().isEmpty()) {
-            throw new ValidationException("Comment content cannot be empty");
-        }
-        if (content.length() > ValidationUtil.MAX_COMMENT_LENGTH) {
-            throw new ValidationException("Comment exceeds maximum length of "
-                    + ValidationUtil.MAX_COMMENT_LENGTH + " characters");
-        }
-    }
-
     private static String sanitize(String content) {
         return HtmlSanitizer.sanitizeComment(content);
     }
 
-    /**
-     * One notification per person for one comment: replying to the assignee's own comment on their
-     * own task used to send them both a reply notification and a new-comment notification.
-     */
     private void notifyAboutNewComment(Task task, Comment parentComment, User author, Integer commentId) {
         var pending = new ArrayList<NotificationService.Pending>(2);
         var link = NotificationService.taskCommentLink(task.getTaskKey(), commentId);
@@ -234,9 +199,6 @@ public class CommentService {
         notificationService.notifyAll(pending);
     }
 
-    /**
-     * Loads the whole reply tree in one query per depth level rather than one per comment.
-     */
     private Map<Integer, List<Comment>> batchLoadReplies(List<Comment> topLevelComments) {
         var repliesByParent = new HashMap<Integer, List<Comment>>();
         var parentIds = topLevelComments.stream().map(Comment::getId).toList();

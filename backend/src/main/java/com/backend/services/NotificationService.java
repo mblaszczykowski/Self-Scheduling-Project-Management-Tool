@@ -18,10 +18,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class NotificationService {
-
     private final NotificationRepository notificationRepository;
     private final SseEmitterManager sseEmitterManager;
     private final EmailService emailService;
@@ -37,20 +37,16 @@ public class NotificationService {
         this.entityMapper = entityMapper;
     }
 
-    /** One notification to send: the recipient plus everything needed to render it. */
     public record Pending(User recipient, String message, NotificationType type, String link) {}
 
-    /** Deep link to a project's page. */
     public static String projectLink(String projectKey) {
         return "/projects?projectKey=" + projectKey;
     }
 
-    /** Deep link to a task, opened as the selected issue. */
     public static String taskLink(String taskKey) {
         return "/projects?selectedIssue=" + taskKey;
     }
 
-    /** Deep link to a task with one of its comments highlighted. */
     public static String taskCommentLink(String taskKey, Integer commentId) {
         return "/projects?selectedIssue=" + taskKey + "&commentId=" + commentId;
     }
@@ -60,14 +56,6 @@ public class NotificationService {
         notifyAll(List.of(new Pending(recipient, message, type, link)));
     }
 
-    /**
-     * Sends a batch, at most one notification per recipient.
-     *
-     * <p>The de-duplication is the point: adding a project member used to fire both
-     * PROJECT_INVITATION and PROJECT_UPDATED at the same person, and replying to the assignee's
-     * comment on their own task fired both COMMENT_REPLY and TASK_COMMENT. Callers now hand over
-     * every candidate and the first entry per recipient wins.
-     */
     @Transactional(rollbackFor = Exception.class)
     public void notifyAll(Collection<Pending> pending) {
         if (pending == null || pending.isEmpty()) {
@@ -94,8 +82,6 @@ public class NotificationService {
             notification.setLink(entry.link());
             notificationRepository.save(notification);
 
-            // Snapshot everything the side effects need while the entities are still managed, so
-            // the async email thread never touches a detached User.
             var dto = entityMapper.toNotificationDTO(notification);
             var recipientId = recipient.getId();
             var recipientEmail = recipient.getEmail();
@@ -116,7 +102,6 @@ public class NotificationService {
         sideEffects.forEach(action -> AfterCommit.run("notification side effect", action));
     }
 
-    /** Mapping happens inside the transaction; entities never leave the service. */
     @Transactional(readOnly = true)
     public Page<NotificationDTO> getNotifications(Integer userId, Pageable pageable) {
         return notificationRepository.findByUserIdOrderByTimestampDescIdDesc(userId, pageable)
@@ -128,16 +113,12 @@ public class NotificationService {
         return notificationRepository.countByUserIdAndIsReadFalse(userId);
     }
 
-    /**
-     * Flips the read flag in one statement. Ownership is checked by counting how many of the ids
-     * actually belong to the caller, rather than loading every row to inspect it in Java.
-     */
     @Transactional(rollbackFor = Exception.class)
     public void markNotificationsAsRead(List<Integer> notificationIds, Integer userId) {
         if (notificationIds == null || notificationIds.isEmpty()) {
             return;
         }
-        var distinctIds = notificationIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        var distinctIds = notificationIds.stream().filter(Objects::nonNull).distinct().toList();
         if (distinctIds.isEmpty()) {
             return;
         }
@@ -147,14 +128,6 @@ public class NotificationService {
         notificationRepository.markReadForUser(distinctIds, userId);
     }
 
-    /**
-     * Marks every unread notification for the user read in one statement. The client falls back
-     * to this when it has more unread notifications than fit on the one page it has loaded, since
-     * {@link #markNotificationsAsRead} can only ever mark ids the client already knows about.
-     *
-     * @return how many notifications are still unread for the user afterward, so the caller can
-     *         set its badge from the database rather than assuming zero
-     */
     @Transactional(rollbackFor = Exception.class)
     public long markAllNotificationsAsRead(Integer userId) {
         notificationRepository.markAllReadForUser(userId);

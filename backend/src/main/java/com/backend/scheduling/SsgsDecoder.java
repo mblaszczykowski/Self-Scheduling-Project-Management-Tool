@@ -10,35 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 
-/**
- * Serial Schedule Generation Scheme: the eligible-set decoder at the heart of the optimizer.
- *
- * <p>At every step it takes the highest-priority task whose predecessors are <em>all</em> already
- * placed, and puts it at the earliest day that satisfies its release date, its predecessors'
- * finish times, and its assignee's availability. Because a task is only ever considered once all
- * of its predecessors are final, the result is precedence-feasible by construction among the
- * <em>movable</em> tasks — no repair pass, no possibility of a high-priority successor slipping in
- * front of a low-priority predecessor.
- *
- * <p><strong>Fixed successors are outside that guarantee.</strong> A completed task, or an anchor
- * pulled in from another project, is pinned to the dates it already has; the scheme places it
- * first and never moves it. So it constrains its own successors, and it consumes its assignee's
- * capacity, but it imposes no deadline on a movable <em>predecessor</em> — this is a forward-only
- * scheme with no notion of a latest finish, so it cannot pull a predecessor back to land in front
- * of something already pinned. When a board says a finished task depends on unfinished work, or
- * an anchor depends on a task being rescheduled, the emitted plan can therefore show the
- * predecessor finishing after the successor starts. That state is already inconsistent before the
- * optimizer sees it, and honouring it would mean a deadline-aware scheme with backtracking rather
- * than a repair pass bolted onto this one. {@code SchedulingInvariantsTest} pins the behaviour so
- * the limitation stays visible.
- *
- * <p>Stateless and therefore safe to share.
- *
- * <p>Complexity: O(n log n + n·H) where n is the task count and H the horizon in days.
- */
 public final class SsgsDecoder {
-
-    /** Safety bound on the resource search, far above any real horizon. */
     private final int maxHorizonDays;
     private final double dependencyWeight;
 
@@ -47,19 +19,10 @@ public final class SsgsDecoder {
         this.dependencyWeight = dependencyWeight;
     }
 
-    /**
-     * @param graph  the problem; fixed tasks pin their own dates, constrain their successors and
-     *               consume their assignee's capacity, but never constrain a movable predecessor
-     * @param rule   the order in which eligible tasks are chosen
-     * @throws ValidationException if some task can never become eligible (a cycle the graph
-     *                             construction did not already reject)
-     */
     public Schedule decode(PrecedenceGraph graph, PriorityRule rule, ScheduleObjective.Horizon horizon) {
         var placements = new LinkedHashMap<String, Placement>();
         var resourceUsage = new HashMap<String, BitSet>();
 
-        // Fixed tasks are placed first and occupy their resources, so movable work schedules
-        // around them instead of on top of them.
         var movable = new ArrayList<ScheduleTask>();
         for (var key : graph.topologicalOrder()) {
             var task = graph.task(key);
@@ -120,7 +83,6 @@ public final class SsgsDecoder {
         return new Schedule(placements, rule);
     }
 
-    /** Places every task exactly where the current plan puts it, ignoring feasibility. */
     public Schedule asPlanned(PrecedenceGraph graph) {
         var placements = new LinkedHashMap<String, Placement>();
         for (var task : graph.tasks().values()) {
@@ -147,11 +109,6 @@ public final class SsgsDecoder {
         return firstFreeSlot(resourceUsage.get(task.assignee()), earliest, task.duration());
     }
 
-    /**
-     * Earliest day at or after {@code from} where the resource has {@code duration} consecutive
-     * free days. Guaranteed to terminate: {@code nextClearBit} of a set bit is strictly greater,
-     * so the candidate always advances.
-     */
     private int firstFreeSlot(BitSet busyDays, int from, int duration) {
         if (busyDays == null) {
             return from;
@@ -175,12 +132,6 @@ public final class SsgsDecoder {
         if (!task.hasAssignee()) {
             return;
         }
-        // Clip the busy interval to the planning window instead of sliding it forward. A fixed
-        // task can start before day 0 — that is what a completed task is — and clamping both ends
-        // moved it into the present: work that finished five weeks ago was recorded as occupying
-        // its assignee from today for its whole duration, so the decoder scheduled around a person
-        // who was in fact free. Anything that ended before today now occupies nothing, and work
-        // straddling today occupies only the part that is still ahead.
         int from = Math.max(0, start);
         int to = start + task.duration();
         if (to > from) {
@@ -193,18 +144,6 @@ public final class SsgsDecoder {
         return new Placement(task.key(), start, end, Math.max(0, end - task.dueOffset()));
     }
 
-    /**
-     * The MORCPSP composite score: {@code w_j * urgency + dependencyWeight * normalisedFanOut}.
-     *
-     * <p>Both factors are in [0, 1] and {@code w_j} is in [1, 10], so at a glance fan-out looks
-     * like it can only ever break ties between similarly-urgent tasks. At the shipped
-     * {@code app.optimization.dependency-weight} of 5.0 that is not true for the two lowest
-     * priority bands: a LOWEST task (w=1) with no urgency but maximum fan-out
-     * ({@code 1*0 + 5*1 = 5}) outranks a LOW task (w=3) due today with no fan-out of its own
-     * ({@code 3*1 + 5*0 = 3}) — fan-out has outweighed a full swing in urgency. The fan-out term
-     * is normalised by the largest fan-out in the problem, so it cannot grow without bound and
-     * swamp the priority signal on a densely linked portfolio.
-     */
     private Map<String, Double> compositeScores(PrecedenceGraph graph, ScheduleObjective.Horizon horizon) {
         var successorCounts = graph.transitiveSuccessorCounts();
         int maxFanOut = successorCounts.values().stream().mapToInt(Integer::intValue).max().orElse(0);
@@ -220,7 +159,6 @@ public final class SsgsDecoder {
         return scores;
     }
 
-    /** Rules worth trying, in the order they are reported. */
     public static List<PriorityRule> candidateRules() {
         return List.of(PriorityRule.MORCPSP, PriorityRule.AS_PLANNED, PriorityRule.LFT,
                 PriorityRule.SPT, PriorityRule.MTS);

@@ -13,11 +13,6 @@ import java.security.NoSuchAlgorithmException;
 @Configuration
 @EnableConfigurationProperties(JwtProperties.class)
 public class JwtConfig {
-
-    /**
-     * Derives a fixed-length HMAC-SHA256 key from the configured secret, so any secret of at
-     * least the validated minimum length yields a key of the algorithm's full strength.
-     */
     @Bean
     public SecretKey jwtSecretKey(JwtProperties properties) {
         try {

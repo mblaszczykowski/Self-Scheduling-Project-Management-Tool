@@ -31,11 +31,6 @@ public record TaskDTO(
         Integer progress,
         TaskPriority priority
 ) {
-    /**
-     * Returns a copy with the derived critical-path values set (avoids fragile full-field rebuilds).
-     *
-     * @param totalFloat slack in days; zero means the task is on a critical path
-     */
     public TaskDTO withCriticality(Boolean isCritical, Integer totalFloat) {
         return new TaskDTO(id, taskNumber, taskKey, projectKey, summary, description, status,
                 startDate, dueDate, assignee, labels, dependencyKeys, isCritical, totalFloat,

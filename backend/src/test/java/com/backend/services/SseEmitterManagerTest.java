@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.lang.reflect.Field;
@@ -17,7 +18,6 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 @DisplayName("SseEmitterManager")
 class SseEmitterManagerTest {
-
     private SseEmitterManager manager;
 
     @BeforeEach
@@ -25,7 +25,7 @@ class SseEmitterManagerTest {
         var appProperties = new AppProperties();
         appProperties.getSse().setMaxEmittersPerUser(2);
         appProperties.getSse().setTimeoutMs(300_000);
-        manager = new SseEmitterManager(new ObjectMapper(), appProperties);
+        manager = new SseEmitterManager(new ObjectMapper().findAndRegisterModules(), appProperties);
     }
 
     @SuppressWarnings("unchecked")
@@ -33,6 +33,12 @@ class SseEmitterManagerTest {
         Field field = SseEmitterManager.class.getDeclaredField("emitters");
         field.setAccessible(true);
         return (Map<Integer, List<SseEmitter>>) field.get(manager);
+    }
+
+    private static boolean isCompleted(SseEmitter emitter) throws Exception {
+        Field field = ResponseBodyEmitter.class.getDeclaredField("complete");
+        field.setAccessible(true);
+        return field.getBoolean(emitter);
     }
 
     @Test
@@ -47,6 +53,11 @@ class SseEmitterManagerTest {
         assertThat(tracked).hasSize(2);
         assertThat(tracked).doesNotContain(first);
         assertThat(tracked).containsExactly(second, third);
+
+        assertThat(isCompleted(first))
+                .as("the evicted emitter must actually be completed, or its async context leaks")
+                .isTrue();
+        assertThat(isCompleted(second)).isFalse();
     }
 
     @Test
@@ -65,6 +76,21 @@ class SseEmitterManagerTest {
     void doesNothingForAUserWithNoStreams() {
         assertThatCode(() -> manager.sendNotification(999, sampleNotification()))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("a dead stream is pruned without aborting delivery to the rest")
+    void deadStreamDoesNotAbortDeliveryToTheRest() throws Exception {
+        var first = manager.createEmitter(1);
+        var second = manager.createEmitter(1);
+        first.complete();
+
+        assertThatCode(() -> manager.sendNotification(1, sampleNotification()))
+                .doesNotThrowAnyException();
+
+        var tracked = emitters().get(1);
+        assertThat(tracked).doesNotContain(first);
+        assertThat(tracked).contains(second);
     }
 
     private static NotificationDTO sampleNotification() {

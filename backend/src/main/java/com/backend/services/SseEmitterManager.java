@@ -12,16 +12,8 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * Holds the open Server-Sent Events streams, keyed by user.
- *
- * <p>Capped per user: the server only notices a vanished client on the next write or at the
- * configured timeout, so a client stuck in a reconnect loop would otherwise accumulate live
- * emitters — each holding a servlet async context — and multiply every notification fan-out.
- */
 @Service
 public class SseEmitterManager {
-
     private static final Logger log = LoggerFactory.getLogger(SseEmitterManager.class);
 
     private final ConcurrentHashMap<Integer, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
@@ -41,8 +33,6 @@ public class SseEmitterManager {
         var userEmitters = emitters.computeIfAbsent(userId, key -> new CopyOnWriteArrayList<>());
         userEmitters.add(emitter);
 
-        // Over the cap, retire the oldest rather than refusing the newest: the newest is the one
-        // the user is actually looking at.
         while (userEmitters.size() > maxPerUser) {
             var oldest = userEmitters.get(0);
             userEmitters.remove(oldest);
@@ -55,7 +45,6 @@ public class SseEmitterManager {
         emitter.onTimeout(removeEmitter);
         emitter.onError(e -> removeEmitter.run());
 
-        // An initial event makes proxies flush headers and lets the client confirm the stream.
         try {
             emitter.send(SseEmitter.event().name("connected").data("ok"));
         } catch (Exception e) {
@@ -74,7 +63,6 @@ public class SseEmitterManager {
 
         String json;
         try {
-            // Serialize once, not once per stream.
             json = objectMapper.writeValueAsString(notification);
         } catch (Exception e) {
             log.error("Could not serialize notification {} for user {}", notification.id(), userId, e);
@@ -85,9 +73,6 @@ public class SseEmitterManager {
             try {
                 emitter.send(SseEmitter.event().name("notification").data(json));
             } catch (Exception e) {
-                // Catch Exception, not IOException: sending to an emitter that has already
-                // completed throws IllegalStateException, and letting that escape would abort the
-                // loop so the remaining streams never received the event.
                 log.debug("Dropping dead SSE stream for user {}: {}", userId, e.getMessage());
                 completeWithErrorQuietly(emitter, e);
                 removeEmitter(userId, emitter);
@@ -96,10 +81,6 @@ public class SseEmitterManager {
     }
 
     private void removeEmitter(Integer userId, SseEmitter emitter) {
-        // Atomic: remove the emitter and drop the user's entry only if it is now empty, all under
-        // the map bucket lock. This closes the check-then-remove race with a concurrent
-        // createEmitter (which locks the same bucket via computeIfAbsent) that could otherwise
-        // orphan a freshly-added emitter.
         emitters.computeIfPresent(userId, (key, list) -> {
             list.remove(emitter);
             return list.isEmpty() ? null : list;
@@ -110,7 +91,6 @@ public class SseEmitterManager {
         try {
             emitter.complete();
         } catch (Exception e) {
-            // Already closed by the container; nothing to do.
         }
     }
 
@@ -118,7 +98,6 @@ public class SseEmitterManager {
         try {
             emitter.completeWithError(cause);
         } catch (Exception e) {
-            // ignored
         }
     }
 }

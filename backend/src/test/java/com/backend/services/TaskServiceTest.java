@@ -52,16 +52,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * Behavioural tests for {@link TaskService}.
- *
- * <p>{@link EntityMapper} is deliberately a real instance rather than a mock: a mapping assertion
- * against a stubbed mapper only restates the stub, whereas here the DTO the caller receives is
- * really built from the entity the service wrote.
- */
 @ExtendWith(MockitoExtension.class)
 class TaskServiceTest {
-
     private static final LocalDate MONDAY = LocalDate.of(2025, 3, 3);
     private static final LocalDate FRIDAY = LocalDate.of(2025, 3, 7);
     private static final String NOT_A_MEMBER = "Assignee must be a member of this project";
@@ -119,9 +111,6 @@ class TaskServiceTest {
                     return dto.withCriticality(analysis.criticalKeys().contains(dto.taskKey()),
                             analysis.totalFloat().get(dto.taskKey()));
                 });
-        // Mirrors the real FileStorageService.resolveAttachments: validate then merge in the
-        // newly stored files, delegating to this same mock so per-test stubs/verifies on
-        // requireAttachmentsBelongTo and storeFiles keep working unchanged.
         lenient().when(fileStorageService.resolveAttachments(any(), anyList(), any(), any()))
                 .thenAnswer(invocation -> {
                     Integer projectId = invocation.getArgument(0);
@@ -135,7 +124,6 @@ class TaskServiceTest {
                 });
     }
 
-    /** A task request in which a test names only the fields it is about. */
     private static final class Req {
         private String summary = "Task summary";
         private String description = "Task description";
@@ -212,7 +200,6 @@ class TaskServiceTest {
     @Nested
     @DisplayName("createTask")
     class CreateTaskTests {
-
         @Test
         @DisplayName("stores the submitted representation and allocates the project's next task number")
         void shouldStoreSubmittedRepresentation() {
@@ -263,6 +250,19 @@ class TaskServiceTest {
             order.verify(accessGuard).requireAccess(project, 1);
             order.verify(fileStorageService).storeFiles(List.of(upload), 10, 1);
             order.verify(taskRepository).save(any(Task.class));
+        }
+
+        @Test
+        @DisplayName("refuses to create a task when the access guard rejects the caller, and writes nothing")
+        void shouldRefuseCreationWhenAccessGuardRejectsCaller() {
+            givenLockedProject();
+            doThrow(new ResourceNotFoundException("Project not found"))
+                    .when(accessGuard).requireAccess(project, 3);
+
+            assertThatThrownBy(() -> taskService.createTask("PROJ", request().build(), 3, null))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessage("Project not found");
+            verify(taskRepository, never()).save(any());
         }
 
         @Test
@@ -380,14 +380,13 @@ class TaskServiceTest {
             when(taskRepository.findByProjectIdWithDetails(10)).thenReturn(List.of(sibling));
             when(schedulingService.analyzeCriticalPath(anyList(), any(LocalDate.class)))
                     .thenReturn(new CriticalPathAnalyzer.Analysis(
-                            Map.of("PROJ-1", 0), Map.of("PROJ-1", 0), Set.of("PROJ-1")));
+                            Map.of("PROJ-1", 0), Set.of("PROJ-1")));
 
             var result = taskService.createTask("PROJ", request().build(), 1, null);
 
             assertThat(result.taskKey()).isEqualTo("PROJ-1");
             assertThat(result.isCritical()).isTrue();
 
-            // The flags are computed over the whole project, not over the single written task.
             @SuppressWarnings("unchecked")
             ArgumentCaptor<List<TaskDTO>> analysed = ArgumentCaptor.forClass(List.class);
             verify(schedulingService).analyzeCriticalPath(analysed.capture(), any(LocalDate.class));
@@ -410,7 +409,6 @@ class TaskServiceTest {
     @Nested
     @DisplayName("assignee resolution")
     class AssigneeResolutionTests {
-
         @Test
         @DisplayName("refuses an address that belongs to nobody")
         void shouldRefuseUnknownAddress() {
@@ -496,7 +494,6 @@ class TaskServiceTest {
     @Nested
     @DisplayName("dependency resolution")
     class DependencyResolutionTests {
-
         @Test
         @DisplayName("rejects a key that is not a task key at all")
         void shouldRejectMalformedKey() {
@@ -588,7 +585,6 @@ class TaskServiceTest {
     @Nested
     @DisplayName("updateTask")
     class UpdateTaskTests {
-
         @Test
         @DisplayName("replaces every field the request carries")
         void shouldReplaceSubmittedFields() {
@@ -715,8 +711,6 @@ class TaskServiceTest {
             taskService.updateTask("PROJ", "PROJ-1",
                     request().attachments(List.of("/files/keep.pdf")).build(), 1, null);
 
-            // The service always delegates; FileStorageService.deleteRemovedAfterCommit handles
-            // the no-changes case internally by computing an empty removed set.
             verify(fileStorageService).deleteRemovedAfterCommit(
                     eq(List.of("/files/keep.pdf")),
                     eq(List.of("/files/keep.pdf")),
@@ -736,7 +730,6 @@ class TaskServiceTest {
                     request().attachments(List.of("/files/stolen.pdf")).build(), 1, null))
                     .isInstanceOf(ValidationException.class);
 
-            // The point is the ordering: nothing is written and no file is unlinked.
             verify(taskRepository, never()).save(any());
             verify(fileStorageService, never()).deleteRemovedAfterCommit(any(), any(), anyString());
             assertThat(task.getAttachments()).containsExactly("/files/mine.pdf");
@@ -795,7 +788,6 @@ class TaskServiceTest {
     @Nested
     @DisplayName("updateSchedule")
     class UpdateScheduleTests {
-
         private Task task;
 
         @BeforeEach
@@ -822,8 +814,6 @@ class TaskServiceTest {
             assertThat(task.getStartDate()).isEqualTo(MONDAY);
             assertThat(task.getDueDate()).isEqualTo(FRIDAY);
 
-            // The regression this endpoint exists to prevent: a drag that reused the full PUT reset
-            // progress to 0, priority to MEDIUM and dropped every attachment.
             assertThat(task.getProgress()).isEqualTo(65);
             assertThat(task.getPriority()).isEqualTo(TaskPriority.HIGHEST);
             assertThat(task.getAttachments()).containsExactly("/files/spec.pdf");
@@ -863,9 +853,8 @@ class TaskServiceTest {
 
             assertThat(before.startDate()).isEqualTo(MONDAY.minusWeeks(1));
             assertThat(before.dueDate()).isEqualTo(FRIDAY.minusWeeks(1));
-            // Record equality makes this total: any other field that moved fails the comparison.
             assertThat(after).isEqualTo(new TaskSnapshot(before.status(), before.priority(),
-                    before.assignee(), before.progress(), MONDAY, FRIDAY, before.summary(),
+                    before.assigneeId(), before.assignee(), before.progress(), MONDAY, FRIDAY, before.summary(),
                     before.description(), before.labels(), before.dependencyKeys(),
                     before.attachments()));
         }
@@ -894,7 +883,6 @@ class TaskServiceTest {
     @Nested
     @DisplayName("applySchedule")
     class ApplyScheduleTests {
-
         private Task first;
         private Task second;
 
@@ -976,9 +964,6 @@ class TaskServiceTest {
                     new TaskService.ScheduleChange("PROJ-1", MONDAY, FRIDAY),
                     new TaskService.ScheduleChange("PROJ-2", MONDAY, FRIDAY)), 1);
 
-            // A single batched call is what lets NotificationService collapse the batch to one
-            // notification per recipient; one createNotification per task would flood the assignee
-            // of a portfolio-wide reschedule.
             verify(notificationService, never()).createNotification(any(), anyString(), any(), any());
             var batch = notifiedBatch();
             assertThat(batch).allSatisfy(pending -> {
@@ -1094,7 +1079,6 @@ class TaskServiceTest {
     @Nested
     @DisplayName("deleteTask")
     class DeleteTaskTests {
-
         private Task task;
 
         private void givenOwnedTask() {

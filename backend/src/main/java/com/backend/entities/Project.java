@@ -34,7 +34,7 @@ public class Project {
     private Integer id;
 
     @Version
-    private Long version; // optimistic lock — concurrent edits surface as OptimisticLockException (409)
+    private Long version;
 
     @Column(name = "project_key", nullable = false, unique = true, updatable = false)
     private String projectKey;
@@ -98,7 +98,7 @@ public class Project {
         return owner != null && owner.getId().equals(userId);
     }
 
-    public boolean isMember(Integer userId) {
+    private boolean isMember(Integer userId) {
         return members.stream().anyMatch(m -> m.getId().equals(userId));
     }
 
@@ -114,14 +114,6 @@ public class Project {
 
     public Integer getId() { return id; }
 
-    /**
-     * Exposed deliberately, and not only for completeness.
-     *
-     * <p>Spring Data decides whether an entity is new by reading its version property, and with no
-     * getter it falls back to reading the field directly. On an uninitialized Hibernate proxy that
-     * field is null, so {@code repository.delete(proxy)} concluded the entity was unsaved and
-     * silently did nothing. Going through a getter initializes the proxy and returns the real value.
-     */
     public Long getVersion() {
         return version;
     }
@@ -186,7 +178,6 @@ public class Project {
 
     public Instant getUpdated() { return updated; }
 
-    // See User.equals for why hashCode is constant per type rather than id-derived.
     @Override
     public boolean equals(Object other) {
         if (this == other) return true;

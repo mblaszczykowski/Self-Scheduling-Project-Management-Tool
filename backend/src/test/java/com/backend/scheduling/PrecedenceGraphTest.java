@@ -10,7 +10,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PrecedenceGraphTest {
-
     private static ScheduleTask node(String key, String... predecessors) {
         return new ScheduleTask(key, 1, 0, 0, 1, 5, null, List.of(predecessors), false);
     }
@@ -30,8 +29,6 @@ class PrecedenceGraphTest {
     @Test
     @DisplayName("transitive successor counts do not double-count a diamond")
     void diamondIsCountedOnce() {
-        // A -> B -> D and A -> C -> D. A reaches exactly three distinct tasks. The naive
-        // "1 + count(successor)" recurrence would report four.
         var graph = PrecedenceGraph.of(List.of(
                 node("A"), node("B", "A"), node("C", "A"), node("D", "B", "C")));
 
@@ -40,17 +37,6 @@ class PrecedenceGraphTest {
                 .containsEntry("B", 1)
                 .containsEntry("C", 1)
                 .containsEntry("D", 0);
-    }
-
-    @Test
-    @DisplayName("unrelated task groups are separate components")
-    void unrelatedGroupsAreSeparateComponents() {
-        var graph = PrecedenceGraph.of(List.of(
-                node("X-1"), node("X-2", "X-1"), node("Y-1")));
-
-        assertThat(graph.componentCount()).isEqualTo(2);
-        assertThat(graph.componentByKey().get("X-1")).isEqualTo(graph.componentByKey().get("X-2"));
-        assertThat(graph.componentByKey().get("Y-1")).isNotEqualTo(graph.componentByKey().get("X-1"));
     }
 
     @Test

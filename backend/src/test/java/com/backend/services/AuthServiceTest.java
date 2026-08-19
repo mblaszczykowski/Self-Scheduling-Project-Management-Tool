@@ -45,14 +45,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit tests for {@link AuthService}. The password encoder and the rate limiter are real, so the
- * throttling and the constant-time credential check are exercised rather than simulated; only the
- * collaborators that reach the database or mint credentials are mocked.
- */
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
-
     private static final String EMAIL = "user@example.com";
     private static final String OTHER_EMAIL = "someone.else@example.com";
     private static final String PASSWORD = "TestPassword123!";
@@ -82,7 +76,6 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Cost factor 4 keeps the suite fast; the timing test below uses a realistic cost.
         passwordEncoder = new BCryptPasswordEncoder(4);
         authService = authServiceWith(5, passwordEncoder);
 
@@ -95,7 +88,6 @@ class AuthServiceTest {
     @Nested
     @DisplayName("authenticateUser: credentials")
     class Credentials {
-
         @Test
         @DisplayName("returns the signed-in user's details together with the cookies issued for that user")
         void returnsUserDetailsAndIssuedCookies() {
@@ -177,8 +169,6 @@ class AuthServiceTest {
     @Nested
     @DisplayName("authenticateUser: timing-attack resistance")
     class TimingAttackResistance {
-
-        /** The encoder the application actually wires in, so its real cost factor is used here. */
         private static final BCryptPasswordEncoder PRODUCTION_ENCODER =
                 new PasswordEncoderConfig().passwordEncoder();
 
@@ -199,8 +189,6 @@ class AuthServiceTest {
             var hash = ArgumentCaptor.forClass(String.class);
             verify(encoder).matches(raw.capture(), hash.capture());
             assertThat(raw.getValue()).isEqualTo(PASSWORD);
-            // A full-length bcrypt hash whose cost factor matches the configured encoder's, so the
-            // wasted comparison takes as long as a comparison against a real account would.
             assertThat(hash.getValue())
                     .hasSize(60)
                     .startsWith(costPrefix(PRODUCTION_ENCODER.encode(PASSWORD)));
@@ -218,7 +206,6 @@ class AuthServiceTest {
 
             var wrongPassword = new LoginRequest(EMAIL, WRONG_PASSWORD);
             var unknownEmail = new LoginRequest(OTHER_EMAIL, WRONG_PASSWORD);
-            // One warm-up round each, so JIT compilation is not charged to the first sample.
             timeFailure(service, wrongPassword);
             timeFailure(service, unknownEmail);
 
@@ -249,7 +236,6 @@ class AuthServiceTest {
             return sorted[sorted.length / 2];
         }
 
-        /** The {@code $2a$NN$} prefix of a bcrypt hash, i.e. its algorithm and cost factor. */
         private static String costPrefix(String bcryptHash) {
             return bcryptHash.substring(0, bcryptHash.indexOf('$', 4) + 1);
         }
@@ -258,7 +244,6 @@ class AuthServiceTest {
     @Nested
     @DisplayName("authenticateUser: rate limiting")
     class RateLimiting {
-
         private static final int LIMIT = 3;
 
         private AuthService throttled;
@@ -279,7 +264,6 @@ class AuthServiceTest {
             assertThatThrownBy(() -> throttled.authenticateUser(wrongPassword, request))
                     .isInstanceOf(TooManyAttemptsException.class)
                     .hasMessage(THROTTLE_ERROR);
-            // A throttled attempt is rejected before the account is even looked up.
             verify(userService, times(LIMIT)).findUserByEmailOrNull(EMAIL);
         }
 
@@ -324,14 +308,11 @@ class AuthServiceTest {
             assertThat(catchLoginFailure(throttled, wrongPassword, attacker))
                     .isInstanceOf(TooManyAttemptsException.class);
 
-            // Two failures, then a success, from the legitimate client.
             assertThat(catchLoginFailure(throttled, wrongPassword, request)).isInstanceOf(ValidationException.class);
             assertThat(catchLoginFailure(throttled, wrongPassword, request)).isInstanceOf(ValidationException.class);
             assertThat(throttled.authenticateUser(new LoginRequest(EMAIL, PASSWORD), request)).isNotNull();
 
-            // Its counter started over, so a full run of attempts is allowed again...
             exhaust(wrongPassword, request);
-            // ...while the flooding address stays locked out.
             assertThat(catchLoginFailure(throttled, wrongPassword, attacker))
                     .as("the reset must not clear another client's counter")
                     .isInstanceOf(TooManyAttemptsException.class);
@@ -349,7 +330,6 @@ class AuthServiceTest {
     @Nested
     @DisplayName("refreshAccessToken")
     class RefreshAccessToken {
-
         @Test
         @DisplayName("rotates the presented refresh token and re-issues both cookies for the rotated one")
         void rotatesAndReissuesCookies() {
@@ -435,7 +415,6 @@ class AuthServiceTest {
     @Nested
     @DisplayName("logoutUser")
     class LogoutUser {
-
         @Test
         @DisplayName("revokes the presented refresh token and sends both deletion cookies")
         void revokesThisDeviceAndClearsCookies() {
@@ -447,7 +426,6 @@ class AuthServiceTest {
             var revoked = ArgumentCaptor.forClass(String.class);
             verify(tokenService).revokeRefreshToken(revoked.capture());
             assertThat(revoked.getValue()).isEqualTo("device-token");
-            // Signing out one device must not end the user's sessions elsewhere.
             verify(tokenService, never()).revokeAllSessionsForUser(any());
 
             assertThat(setCookieHeaders())
@@ -516,7 +494,6 @@ class AuthServiceTest {
                 cookieFactory.build("refreshToken", refreshValue, Duration.ofDays(7), true));
     }
 
-    /** Runs a login that is expected to be refused and returns the exception it was refused with. */
     private static Throwable catchLoginFailure(AuthService service, LoginRequest login,
                                                HttpServletRequest from) {
         try {

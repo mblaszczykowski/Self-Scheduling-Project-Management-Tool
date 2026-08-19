@@ -10,16 +10,10 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 
-/**
- * Single home for the application's own configuration. Everything under {@code app.*} binds
- * here so there is one place to look, one place to document defaults, and one place where a
- * bad value fails at startup rather than at first use.
- */
 @Component
 @ConfigurationProperties(prefix = "app")
 @Validated
 public class AppProperties {
-
     private Pagination pagination = new Pagination();
     private Sse sse = new Sse();
     private Optimization optimization = new Optimization();
@@ -68,7 +62,6 @@ public class AppProperties {
 
     public static class Sse {
         @Min(1000) private long timeoutMs = 300_000;
-        /** Cap on concurrent streams per user; a reconnect loop would otherwise accumulate them. */
         @Min(1) private int maxEmittersPerUser = 4;
 
         public long getTimeoutMs() { return timeoutMs; }
@@ -80,13 +73,9 @@ public class AppProperties {
     public static class Optimization {
         @DecimalMin("0.0") @DecimalMax("1.0") private double defaultAlpha = 0.8;
         @DecimalMin("0.0") @DecimalMax("1.0") private double defaultBeta = 0.2;
-        /** Upper bound on the scheduling horizon H, in days. */
         @Min(1) private int maxHorizonDays = 3650;
-        /** Floor on H so urgency stays well-defined for tiny portfolios. */
         @Min(1) private int minHorizonDays = 30;
-        /** Weight of the normalized downstream fan-out term in the MORCPSP priority score. */
         private double dependencyWeight = 5.0;
-        /** How far into the past/future a caller-supplied horizon start may sit. */
         @Min(0) private int horizonStartMaxPastDays = 30;
         @Min(0) private int horizonStartMaxFutureDays = 365;
 
@@ -110,12 +99,9 @@ public class AppProperties {
         @Min(1) private long windowMs = 900_000;
         @Min(1) private int login = 5;
         @Min(1) private int register = 3;
-        /** Writes (create/update/delete of any resource) per client per window. */
         @Min(1) private int write = 300;
-        /** Optimizer simulations per client per window — the heaviest read in the app. */
         @Min(1) private int optimize = 30;
         @Min(1) private int search = 120;
-        /** Project invitations a single user may trigger per window. */
         @Min(1) private int invitation = 50;
 
         public long getWindowMs() { return windowMs; }
@@ -152,7 +138,6 @@ public class AppProperties {
     }
 
     public static class Frontend {
-        /** Used to build absolute links in outbound email. */
         @NotBlank private String baseUrl = "http://localhost:3000";
 
         public String getBaseUrl() { return baseUrl; }
@@ -160,10 +145,6 @@ public class AppProperties {
     }
 
     public static class Session {
-        /**
-         * Absolute lifetime of a login, regardless of refresh-token rotation. Without it a
-         * session could be extended indefinitely by rotating forever.
-         */
         @Min(1) private int absoluteMaxDays = 30;
 
         public int getAbsoluteMaxDays() { return absoluteMaxDays; }

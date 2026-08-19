@@ -26,21 +26,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * The deny-by-default authentication policy.
- *
- * <p>Uses real {@link MockHttpServletRequest}/{@link MockHttpServletResponse} rather than mocks so
- * the assertions are about the response that was actually produced — status, content type and JSON
- * body — instead of about which setter happened to be called.
- *
- * <p>The {@code ObjectMapper} is built the way Spring Boot builds the application's own, with the
- * JSR-310 module registered. A bare mapper cannot serialize the {@code Instant} in an
- * {@code ApiError}, and a filter that throws while writing a 401 is a bad failure mode to discover
- * in production.
- */
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
-
     private static final Integer TEST_USER_ID = 123;
     private static final String VALID_TOKEN = "valid.jwt.token";
 
@@ -67,7 +54,6 @@ class JwtAuthenticationFilterTest {
     @Nested
     @DisplayName("Endpoints reachable without a token")
     class PublicEndpoints {
-
         @ParameterizedTest
         @CsvSource({
                 "POST, /api/auth/login",
@@ -112,9 +98,6 @@ class JwtAuthenticationFilterTest {
         })
         @DisplayName("everything not explicitly listed requires a token")
         void unlistedPathsRequireAuthentication(String path) throws Exception {
-            // /uploads/** and /static/** used to be exempt for paths nothing serves, which made an
-            // unauthenticated 500-with-stack-trace reachable; /api/users/exists was removed
-            // outright because it was an anonymous account-existence oracle.
             given("GET", path);
 
             filter.doFilterInternal(request, response, filterChain);
@@ -136,8 +119,6 @@ class JwtAuthenticationFilterTest {
         @Test
         @DisplayName("exemption matching is exact, so a path that merely starts with one is refused")
         void exemptionMatchingIsExact() throws Exception {
-            // Fail-closed: an encoding or matrix-parameter trick makes a request less likely to
-            // match an exemption, never more.
             given("POST", "/api/auth/login/../projects");
 
             filter.doFilterInternal(request, response, filterChain);
@@ -150,7 +131,6 @@ class JwtAuthenticationFilterTest {
     @Nested
     @DisplayName("Protected endpoints")
     class ProtectedEndpoints {
-
         @Test
         @DisplayName("a valid token authenticates the request and publishes the user id")
         void validTokenAuthenticates() throws Exception {
@@ -208,7 +188,6 @@ class JwtAuthenticationFilterTest {
     @Nested
     @DisplayName("The refusal body")
     class RefusalBody {
-
         @Test
         @DisplayName("is the application's single error shape, as JSON")
         void refusalBodyIsApiError() throws Exception {
@@ -225,8 +204,6 @@ class JwtAuthenticationFilterTest {
             assertThat(body.get("error").asText()).isEqualTo("Unauthorized");
             assertThat(body.get("message").asText()).isNotBlank();
             assertThat(body.get("code").asText()).isEqualTo("AUTH_ERROR");
-            // Serializing an Instant is exactly what a bare ObjectMapper cannot do, so this also
-            // pins that the filter's mapper is configured for it.
             assertThat(body.get("timestamp").asText()).isNotBlank();
         }
 

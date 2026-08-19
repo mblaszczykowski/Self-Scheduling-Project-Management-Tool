@@ -1,50 +1,5 @@
--- ============================================================================
--- FlowLink demo data
--- ============================================================================
---
--- A realistic portfolio for product demos, manual testing and screenshots:
---
---   * 1 portfolio manager account + 3 contributor accounts
---   * 3 projects (ECOM / MAPP / B2B)
---   * 45 tasks (15 per project) across eight of the workflow statuses
---   * 15 precedence dependencies
---   * threaded comments, reactions and notifications
---
--- The three contributors are members of all three projects, so the projects compete for the
--- same people. The overlapping assignments are deliberate: they are the resource conflicts the
--- schedule optimizer is meant to resolve, which is what makes "Optimize Schedule" show
--- something on a fresh install.
---
--- Sign in as demo@flowlink.dev / Demo1234!  (same password for every seeded account).
---
--- Run it against a database whose schema Flyway has already created:
---
---   psql -U postgres -d flowlink -f backend/scripts/db/demo-seed.sql
---
--- Idempotent: section 0 deletes everything this script owns before re-inserting it, so running
--- it again after an optimization run restores the starting state. It contains no DDL - Flyway
--- owns the schema, and a seed script that alters constraints will silently undo a migration.
---
--- See DEMO-SEED-README.md for the account table, what to click, and how to change the password.
--- ============================================================================
-
 BEGIN;
 
--- ============================================================================
--- 0.  RESET - back to the starting state
--- ============================================================================
--- Always active: every run first deletes the demo accounts (@flowlink.dev) and the ECOM / MAPP /
--- B2B projects with everything under them, then re-inserts them. So the usual loop is:
---
---   1. Run this script to load the demo data.
---   2. Optimize a schedule in the app, which writes new dates to the database.
---   3. Run it again to get the starting state back and repeat.
---
--- The DELETEs are ordered child -> parent. Most of these foreign keys cascade now, so several
--- statements are belt-and-braces; they are kept because the script must also work against a
--- database that predates those migrations.
-
--- Attachments (anything added through the UI)
 DELETE FROM comment_attachments
 WHERE comment_id IN (
   SELECT c.id FROM comments c
@@ -61,7 +16,6 @@ DELETE FROM project_attachments
 WHERE project_id IN (
   SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'));
 
--- Comment reactions
 DELETE FROM comment_reactions
 WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev')
    OR comment_id IN (
@@ -70,25 +24,21 @@ WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev')
        JOIN projects p ON t.project_id = p.id
      WHERE p.project_key IN ('ECOM','MAPP','B2B'));
 
--- Comments (the self-referencing parent_comment_id goes with the whole set)
 DELETE FROM comments
 WHERE author_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev')
    OR task_id IN (
      SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
      WHERE p.project_key IN ('ECOM','MAPP','B2B'));
 
--- Notifications
 DELETE FROM notifications
 WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev');
 
--- Task activity (change history)
 DELETE FROM task_activities
 WHERE author_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev')
    OR task_id IN (
      SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
      WHERE p.project_key IN ('ECOM','MAPP','B2B'));
 
--- Task dependencies
 DELETE FROM task_dependencies
 WHERE task_id IN (
      SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
@@ -97,36 +47,23 @@ WHERE task_id IN (
      SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
      WHERE p.project_key IN ('ECOM','MAPP','B2B'));
 
--- Tasks
 DELETE FROM tasks
 WHERE project_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'));
 
--- Project members
 DELETE FROM project_members
 WHERE project_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'))
    OR user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev');
 
--- Project-to-project dependencies (if any were created in the UI)
 DELETE FROM project_dependencies
 WHERE project_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'))
    OR dependency_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'));
 
--- Refresh tokens, so old sessions do not survive the reset
 DELETE FROM refresh_tokens
 WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev');
 
--- Projects
 DELETE FROM projects WHERE project_key IN ('ECOM','MAPP','B2B');
 
--- Demo accounts
 DELETE FROM users WHERE email LIKE '%@flowlink.dev';
-
-
--- ============================================================================
--- 1.  ACCOUNTS
--- ============================================================================
--- BCrypt hash (cost 10) of the password "Demo1234!":
---   $2b$10$mpV2p05Dv44wn2ELzedN6.q4zy9xoNyyHXoGm46kmX5TIQTpqpNzO
 
 INSERT INTO users (first_name, last_name, email, password,
                    email_notifications_enabled, email_on_task_assigned,
@@ -145,16 +82,6 @@ VALUES
    '$2b$10$mpV2p05Dv44wn2ELzedN6.q4zy9xoNyyHXoGm46kmX5TIQTpqpNzO',
    true, true, true, true, 0)
 ON CONFLICT (email) DO NOTHING;
-
-
--- ============================================================================
--- 2.  PROJECTS
--- ============================================================================
--- next_task_number = 16: after the 15 seeded tasks, the next one created through the API gets
--- number 16.
---
--- created/updated are NOT NULL (migration V3), so they must be supplied here - the entity fills
--- them in via @PrePersist, which a plain INSERT never runs.
 
 INSERT INTO projects (project_key, summary, description, next_task_number, owner_id,
                       created, updated)
@@ -183,13 +110,6 @@ SELECT 'B2B',
 FROM users u WHERE u.email = 'demo@flowlink.dev'
 ON CONFLICT (project_key) DO NOTHING;
 
-
--- ============================================================================
--- 3.  PROJECT MEMBERSHIP
--- ============================================================================
--- All three contributors belong to all three projects, so the optimizer sees one shared pool of
--- three people rather than three independent plans.
-
 INSERT INTO project_members (project_id, user_id)
 SELECT p.id, u.id
 FROM projects p
@@ -199,12 +119,6 @@ WHERE p.project_key IN ('ECOM', 'MAPP', 'B2B')
                   'priya.sharma@flowlink.dev',
                   'marcus.webb@flowlink.dev')
 ON CONFLICT DO NOTHING;
-
-
--- ============================================================================
--- 4.  TASKS - ECOM (e-commerce replatform)
--- ============================================================================
--- Priority mix: 2 HIGHEST, 3 HIGH, 6 MEDIUM, 3 LOW, 1 LOWEST.
 
 INSERT INTO tasks (project_id, task_number, summary, description,
                    status, priority, start_date, due_date, progress,
@@ -279,12 +193,6 @@ FROM projects p,
 WHERE p.project_key = 'ECOM'
 ON CONFLICT (project_id, task_number) DO NOTHING;
 
-
--- ============================================================================
--- 5.  TASKS - MAPP (mobile app)
--- ============================================================================
--- Priority mix: 2 HIGHEST, 3 HIGH, 6 MEDIUM, 3 LOW, 1 LOWEST.
-
 INSERT INTO tasks (project_id, task_number, summary, description,
                    status, priority, start_date, due_date, progress,
                    assignee_id, labels, created, updated)
@@ -357,12 +265,6 @@ FROM projects p,
 ) AS v(tn, summary, description, status, priority, sd, dd, progress, assignee_email, labels)
 WHERE p.project_key = 'MAPP'
 ON CONFLICT (project_id, task_number) DO NOTHING;
-
-
--- ============================================================================
--- 6.  TASKS - B2B (partner API)
--- ============================================================================
--- Priority mix: 1 HIGHEST, 3 HIGH, 6 MEDIUM, 3 LOW, 2 LOWEST.
 
 INSERT INTO tasks (project_id, task_number, summary, description,
                    status, priority, start_date, due_date, progress,
@@ -437,23 +339,10 @@ FROM projects p,
 WHERE p.project_key = 'B2B'
 ON CONFLICT (project_id, task_number) DO NOTHING;
 
-
--- ============================================================================
--- 6a. SPREAD `updated` OVER TIME FOR COMPLETED TASKS
--- ============================================================================
--- Otherwise every DONE task carries `updated = NOW()` (the moment of seeding) and the dashboard's
--- completion trend collapses into a single bar in the current week. Setting `updated` to
--- due_date + 1 day spreads completions across the weeks the projects actually ran.
-
 UPDATE tasks
 SET updated = (due_date::timestamp) + INTERVAL '1 day'
 WHERE status = 'DONE'
   AND project_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'));
-
-
--- ============================================================================
--- 7.  TASK DEPENDENCIES (15 edges, covering about a third of the tasks)
--- ============================================================================
 
 INSERT INTO task_dependencies (task_id, dependency_id)
 SELECT t1.id, t2.id
@@ -461,19 +350,16 @@ FROM tasks t1
 JOIN projects p ON t1.project_id = p.id
 JOIN tasks t2 ON t2.project_id = p.id
 WHERE (p.project_key, t1.task_number, t2.task_number) IN (
-  -- ECOM: 3→1, 4→3, 8→4, 12→7, 15→14
   ('ECOM', 3,  1),
   ('ECOM', 4,  3),
   ('ECOM', 8,  4),
   ('ECOM', 12, 7),
   ('ECOM', 15, 14),
-  -- MAPP: 2→1, 4→2, 6→5, 8→7, 15→14
   ('MAPP', 2,  1),
   ('MAPP', 4,  2),
   ('MAPP', 6,  5),
   ('MAPP', 8,  7),
   ('MAPP', 15, 14),
-  -- B2B: 4→2, 5→3, 6→5, 8→4, 15→11
   ('B2B',  4,  2),
   ('B2B',  5,  3),
   ('B2B',  6,  5),
@@ -482,14 +368,6 @@ WHERE (p.project_key, t1.task_number, t2.task_number) IN (
 )
 ON CONFLICT DO NOTHING;
 
-
--- ============================================================================
--- 8.  COMMENTS
--- ============================================================================
--- Later statements identify a comment by (task, author, thread level), which is unique within
--- this data set. That avoids needing PL/pgSQL blocks or marker strings in the comment bodies.
-
--- Comment C1 - ECOM-3 (wireframes), author Daniel, top level
 INSERT INTO comments (content, task_id, author_id, timestamp)
 SELECT
   'The beta wireframes are ready — could the designers review them by the end of the week? Key question: do we keep the sticky CTA on the product card?',
@@ -506,7 +384,6 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 3
     WHERE c.task_id = t.id AND c.author_id = u.id AND c.parent_comment_id IS NULL
   );
 
--- Comment C2 - reply to C1 (ECOM-3), author Priya
 INSERT INTO comments (content, task_id, author_id, parent_comment_id, timestamp)
 SELECT
   'Took a look, looks good. Let''s keep the sticky CTA — analytics showed +7% conversion after we introduced it in v1. I added detailed notes in the Figma file.',
@@ -536,7 +413,6 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 3
     WHERE c.task_id = t.id AND c.author_id = u.id AND c.parent_comment_id IS NOT NULL
   );
 
--- Comment C3 - ECOM-8 (shopping cart), author Marcus, top level
 INSERT INTO comments (content, task_id, author_id, timestamp)
 SELECT
   'Question for a business decision — do we integrate with Stripe Checkout (hosted) or Stripe Elements (in our own UI)? Elements gives more control over styling, Checkout is faster to ship.',
@@ -553,7 +429,6 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 8
     WHERE c.task_id = t.id AND c.author_id = u.id AND c.parent_comment_id IS NULL
   );
 
--- Comment C4 - B2B-4 (OAuth), author Daniel, top level
 INSERT INTO comments (content, task_id, author_id, timestamp)
 SELECT
   'Decision approved: OAuth2 Client Credentials + JWT with a short TTL (15 min), key rotation once a quarter. Spring Authorization Server 1.2.',
@@ -570,7 +445,6 @@ WHERE p.project_key = 'B2B' AND t.task_number = 4
     WHERE c.task_id = t.id AND c.author_id = u.id AND c.parent_comment_id IS NULL
   );
 
--- Comment C5 - MAPP-5 (sign-in screen), author Priya, top level
 INSERT INTO comments (content, task_id, author_id, timestamp)
 SELECT
   'I''ll align the flow with the MAPP-4 decision (biometrics). Email/password first, then prompt to enable FaceID/TouchID after the first login.',
@@ -587,13 +461,6 @@ WHERE p.project_key = 'MAPP' AND t.task_number = 5
     WHERE c.task_id = t.id AND c.author_id = u.id AND c.parent_comment_id IS NULL
   );
 
-
--- ============================================================================
--- 9.  COMMENT REACTIONS
--- ============================================================================
--- Each reaction locates its comment by (project, task number, author, thread level).
-
--- LIKE on C1 (Emma)
 INSERT INTO comment_reactions (type, comment_id, user_id)
 SELECT 'LIKE', c.id, reactor.id
 FROM comments c
@@ -607,7 +474,6 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 3
   AND reactor.email = 'demo@flowlink.dev'
 ON CONFLICT DO NOTHING;
 
--- LIKE on C1 (Priya)
 INSERT INTO comment_reactions (type, comment_id, user_id)
 SELECT 'LIKE', c.id, reactor.id
 FROM comments c
@@ -621,7 +487,6 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 3
   AND reactor.email = 'priya.sharma@flowlink.dev'
 ON CONFLICT DO NOTHING;
 
--- LIKE on C2 (Daniel likes Priya's reply)
 INSERT INTO comment_reactions (type, comment_id, user_id)
 SELECT 'LIKE', c.id, reactor.id
 FROM comments c
@@ -635,7 +500,6 @@ WHERE p.project_key = 'ECOM' AND t.task_number = 3
   AND reactor.email = 'daniel.brooks@flowlink.dev'
 ON CONFLICT DO NOTHING;
 
--- LIKE on C4 (Emma)
 INSERT INTO comment_reactions (type, comment_id, user_id)
 SELECT 'LIKE', c.id, reactor.id
 FROM comments c
@@ -649,7 +513,6 @@ WHERE p.project_key = 'B2B' AND t.task_number = 4
   AND reactor.email = 'demo@flowlink.dev'
 ON CONFLICT DO NOTHING;
 
--- LIKE on C5 (Emma)
 INSERT INTO comment_reactions (type, comment_id, user_id)
 SELECT 'LIKE', c.id, reactor.id
 FROM comments c
@@ -662,13 +525,6 @@ WHERE p.project_key = 'MAPP' AND t.task_number = 5
   AND c.parent_comment_id IS NULL
   AND reactor.email = 'demo@flowlink.dev'
 ON CONFLICT DO NOTHING;
-
-
--- ============================================================================
--- 10. NOTIFICATIONS FOR THE MANAGER (Emma)
--- ============================================================================
-
--- Each row is guarded by NOT EXISTS on (user_id, message), so a re-run cannot duplicate it.
 
 INSERT INTO notifications (user_id, message, type, is_read, link, timestamp)
 SELECT u.id,
@@ -736,14 +592,6 @@ WHERE u.email = 'demo@flowlink.dev'
                   WHERE n.user_id = u.id
                     AND n.message = 'Task ECOM-3 was updated (status: IN_PROGRESS, progress: 50%)');
 
-
--- ============================================================================
--- 11. OPTIMISTIC LOCK VERSIONS
--- ============================================================================
--- User, Project, Task and Comment are all @Version entities. Hibernate seeds a new entity's
--- version to 0; a row inserted by hand leaves the column NULL, and the first update the
--- application makes to such a row fails while incrementing null. Do what the ORM would have done.
-
 UPDATE users SET version = 0
 WHERE version IS NULL AND email LIKE '%@flowlink.dev';
 
@@ -759,25 +607,4 @@ WHERE version IS NULL
   AND task_id IN (SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
                   WHERE p.project_key IN ('ECOM','MAPP','B2B'));
 
-
 COMMIT;
-
-
--- ============================================================================
--- SUMMARY (run by hand afterwards to check what was loaded)
--- ============================================================================
--- SELECT
---   (SELECT COUNT(*) FROM users     WHERE email LIKE '%@flowlink.dev')          AS accounts,
---   (SELECT COUNT(*) FROM projects  WHERE project_key IN ('ECOM','MAPP','B2B')) AS projects,
---   (SELECT COUNT(*) FROM tasks t JOIN projects p ON t.project_id = p.id
---          WHERE p.project_key IN ('ECOM','MAPP','B2B'))                        AS tasks,
---   (SELECT COUNT(*) FROM task_dependencies td
---          JOIN tasks t ON td.task_id = t.id
---          JOIN projects p ON t.project_id = p.id
---          WHERE p.project_key IN ('ECOM','MAPP','B2B'))                        AS dependencies,
---   (SELECT COUNT(*) FROM comments c
---          JOIN tasks t ON c.task_id = t.id
---          JOIN projects p ON t.project_id = p.id
---          WHERE p.project_key IN ('ECOM','MAPP','B2B'))                        AS comments,
---   (SELECT COUNT(*) FROM notifications n JOIN users u ON n.user_id = u.id
---          WHERE u.email = 'demo@flowlink.dev')                                 AS notifications;

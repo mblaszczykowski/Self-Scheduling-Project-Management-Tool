@@ -21,7 +21,7 @@ public class Comment {
     private Integer id;
 
     @Version
-    private Long version; // optimistic lock — concurrent edits surface as OptimisticLockException (409)
+    private Long version;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
@@ -66,14 +66,6 @@ public class Comment {
 
     public Integer getId() { return id; }
 
-    /**
-     * Exposed deliberately, and not only for completeness.
-     *
-     * <p>Spring Data decides whether an entity is new by reading its version property, and with no
-     * getter it falls back to reading the field directly. On an uninitialized Hibernate proxy that
-     * field is null, so {@code repository.delete(proxy)} concluded the entity was unsaved and
-     * silently did nothing. Going through a getter initializes the proxy and returns the real value.
-     */
     public Long getVersion() {
         return version;
     }
@@ -89,19 +81,14 @@ public class Comment {
     public void setEditedAt(Instant editedAt) { this.editedAt = editedAt; }
 
     public Task getTask() { return task; }
-    public void setTask(Task task) { this.task = task; }
 
     public User getAuthor() { return author; }
-    public void setAuthor(User author) { this.author = author; }
 
     public Comment getParentComment() { return parentComment; }
     public void setParentComment(Comment parentComment) { this.parentComment = parentComment; }
 
     public Set<CommentReaction> getReactions() { return Collections.unmodifiableSet(reactions); }
 
-    // Reactions are mutated through the aggregate so the in-memory collection always matches
-    // what will be flushed — the DTO built from getReactions() then reflects the change by
-    // construction, rather than depending on Hibernate's flush/collection-load ordering.
     public void addReaction(CommentReaction reaction) {
         if (reaction == null) return;
         reaction.setComment(this);

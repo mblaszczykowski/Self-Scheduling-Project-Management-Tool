@@ -21,8 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
@@ -30,7 +31,6 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserService {
-
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
@@ -54,7 +54,6 @@ public class UserService {
         this.entityMapper = entityMapper;
     }
 
-    /** Canonical form of an email address: identity is case-insensitive and untrimmed input is a typo. */
     public static String normalizeEmail(String email) {
         return email == null ? null : email.toLowerCase(Locale.ROOT).trim();
     }
@@ -73,10 +72,6 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
-    /**
-     * A member-safe view of another user, visible only to people who share a project with them.
-     * Returns the same "not found" as a nonexistent address, so the endpoint is not an oracle.
-     */
     public UserDTO getUserByEmailForRequester(String email, Integer requesterId) {
         var user = getRequiredUserByEmail(email);
         boolean canAccessProfile = user.getId().equals(requesterId)
@@ -87,7 +82,6 @@ public class UserService {
         return entityMapper.toUserDTO(user);
     }
 
-    /** @return the found users keyed by their normalized email; missing addresses are simply absent. */
     public Map<String, User> findByEmailsAsMap(Collection<String> emails) {
         if (emails == null || emails.isEmpty()) {
             return Map.of();
@@ -113,7 +107,6 @@ public class UserService {
     public RegistrationResult registerUser(UserRegistrationRequest request) {
         var email = normalizeEmail(request.email());
         if (userRepository.existsByEmailIgnoringCase(email)) {
-            // Deliberately vague: a precise "email already registered" is an enumeration oracle.
             throw new ValidationException("Registration failed. Please check your details.");
         }
         ValidationUtil.validatePassword(request.password());
@@ -130,12 +123,6 @@ public class UserService {
         return new RegistrationResult(tokenService.createAuthTokens(user.getId()), user.getId(), user.getEmail());
     }
 
-    /**
-     * Applies profile changes. Blank fields are left alone.
-     *
-     * <p>Both credential-bearing changes — the password and the email address — require the
-     * current password, and a password change revokes every existing session.
-     */
     @Transactional(rollbackFor = Exception.class)
     public CurrentUserDTO updateProfile(Integer userId,
                                         UpdateProfileRequest request,
@@ -144,12 +131,10 @@ public class UserService {
         boolean passwordChanged = false;
 
         if (!ValidationUtil.isNullOrEmpty(request.firstname())) {
-            ValidationUtil.validateName(request.firstname(), "First name");
             user.setFirstname(request.firstname().trim());
         }
 
         if (!ValidationUtil.isNullOrEmpty(request.lastname())) {
-            ValidationUtil.validateName(request.lastname(), "Last name");
             user.setLastname(request.lastname().trim());
         }
 
@@ -180,8 +165,6 @@ public class UserService {
         }
 
         if (passwordChanged) {
-            // The whole point of changing a password after a compromise is to end the other
-            // party's access; leaving their 7-day refresh token alive would defeat it.
             tokenService.revokeAllSessionsForUser(userId);
             log.info("Password changed for user {} - all sessions revoked", userId);
         }
@@ -226,28 +209,22 @@ public class UserService {
 
     private void replaceProfilePicture(User user, MultipartFile profilePicture) {
         var oldPicture = user.getProfilePicture();
-        // Not project-scoped: a profile picture is visible wherever its owner is.
         user.setProfilePicture(fileStorageService.storeFile(profilePicture, null, user.getId()));
         if (oldPicture != null) {
-            // Deferred like every other unlink: deleting inside the transaction meant a later
-            // rollback restored the row's pointer to a file that no longer existed, which is the
-            // exact failure AfterCommit was introduced to remove. An orphaned old file is harmless
-            // by comparison, so this stays best-effort.
             AfterCommit.run("delete replaced profile picture",
-                    () -> fileStorageService.deleteFilesSilently(java.util.List.of(oldPicture)));
+                    () -> fileStorageService.deleteFilesSilently(List.of(oldPicture)));
         }
     }
 
     private void validateImageMagicBytes(MultipartFile file) {
-        try (var input = file.getInputStream()) {
-            // Only the header is needed; reading a 5 MB upload into the heap to inspect four
-            // bytes was pure waste.
-            var header = input.readNBytes(FileValidationConstants.MAGIC_BYTE_PREFIX_LENGTH);
-            if (!FileValidationConstants.isValidImageByMagicBytes(header)) {
-                throw new ValidationException("File content doesn't match image type. Upload a valid image file.");
-            }
-        } catch (IOException e) {
+        byte[] header;
+        try {
+            header = FileValidationConstants.readHeader(file);
+        } catch (UncheckedIOException e) {
             throw new ValidationException("Could not validate image file");
+        }
+        if (!FileValidationConstants.isValidImageByMagicBytes(header)) {
+            throw new ValidationException("File content doesn't match image type. Upload a valid image file.");
         }
     }
 }

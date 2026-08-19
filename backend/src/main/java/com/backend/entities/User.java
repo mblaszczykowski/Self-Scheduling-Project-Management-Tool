@@ -14,7 +14,7 @@ public class User {
     private Integer id;
 
     @Version
-    private Long version; // profile save vs. preferences patch would otherwise clobber each other
+    private Long version;
 
     @Column(name = "first_name", nullable = false)
     private String firstname;
@@ -43,7 +43,6 @@ public class User {
     @Column(name = "email_on_project_invitation", nullable = false, columnDefinition = "boolean not null default true")
     private Boolean emailOnProjectInvitation = true;
 
-
     public User() {
     }
 
@@ -58,18 +57,9 @@ public class User {
         return id;
     }
 
-    /**
-     * Exposed deliberately, and not only for completeness.
-     *
-     * <p>Spring Data decides whether an entity is new by reading its version property, and with no
-     * getter it falls back to reading the field directly. On an uninitialized Hibernate proxy that
-     * field is null, so {@code repository.delete(proxy)} concluded the entity was unsaved and
-     * silently did nothing. Going through a getter initializes the proxy and returns the real value.
-     */
     public Long getVersion() {
         return version;
     }
-
 
     public void setId(Integer id) {
         this.id = id;
@@ -151,7 +141,6 @@ public class User {
         this.emailOnProjectInvitation = emailOnProjectInvitation;
     }
 
-    /** Whether this user wants an email for the given notification type, per their preferences. */
     public boolean wantsEmailFor(NotificationType type) {
         if (!Boolean.TRUE.equals(emailNotificationsEnabled)) {
             return false;
@@ -166,10 +155,6 @@ public class User {
         };
     }
 
-    // Id-based equality so a detached User compares equal to its managed twin — this entity
-    // lives in Project.members, a HashSet. hashCode is deliberately constant per type rather
-    // than derived from the id: an entity's id changes on persist, and a changing hashCode
-    // would corrupt any set it was already a member of.
     @Override
     public boolean equals(Object other) {
         if (this == other) return true;

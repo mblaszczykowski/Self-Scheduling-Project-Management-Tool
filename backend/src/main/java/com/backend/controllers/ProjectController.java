@@ -18,7 +18,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/projects")
 public class ProjectController {
-
     private final ProjectService projectService;
     private final RequestValidator requestValidator;
     private final PageRequests pageRequests;
@@ -31,12 +30,6 @@ public class ProjectController {
         this.pageRequests = pageRequests;
     }
 
-    /**
-     * Always paginated. The endpoint previously had two modes — paginated when {@code page} was
-     * present, the entire portfolio with every task otherwise — and no client ever sent
-     * {@code page}, so the unbounded branch was the only one that ran and the paginated one had
-     * never been executed at all.
-     */
     @GetMapping
     public ResponseEntity<PagedResponse<ProjectDTO>> getProjects(
             @CurrentUserId Integer userId,

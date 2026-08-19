@@ -19,22 +19,23 @@ import static com.backend.scheduling.ScheduleFixtures.task;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * The invariants that make a produced schedule trustworthy.
- *
- * <p>Assertions here are deliberately <em>strict</em>. The previous suite asserted precedence with
- * {@code !successor.start.isBefore(predecessor.due)} — but a due date is inclusive, so a successor
- * starting exactly on its predecessor's due date is a real one-day overlap, and an off-by-one
- * regression in the decoder would have passed every test in the file.
- */
 class SchedulingInvariantsTest {
-
     private final SchedulingService scheduling = new SchedulingService(new AppProperties());
+
+    @Test
+    @DisplayName("metricsByRule is reported in the order the rules were evaluated")
+    void metricsByRuleKeepsEvaluationOrder() {
+        var outcome = scheduling.optimize(
+                List.of(task("P-1").assignedTo("amy").build(), task("P-2").assignedTo("amy").build()),
+                List.of(), TODAY, 0.8, 0.2);
+
+        assertThat(outcome.metricsByRule().keySet())
+                .containsExactlyElementsOf(SsgsDecoder.candidateRules());
+    }
 
     @Nested
     @DisplayName("Precedence feasibility")
     class Precedence {
-
         @Test
         @DisplayName("a successor never starts before its predecessor has finished")
         void successorFollowsPredecessor() {
@@ -50,8 +51,6 @@ class SchedulingInvariantsTest {
         @Test
         @DisplayName("holds even when the successor has far higher priority than the predecessor")
         void priorityCannotOvertakePrecedence() {
-            // The defect this pins: scheduling from a single priority-sorted list rather than an
-            // eligible set let a high-priority successor be placed before its predecessor.
             var tasks = List.of(
                     task("P-1").priority(TaskPriority.LOWEST).from("2026-01-05").to("2026-01-09")
                             .assignedTo("a@x").build(),
@@ -120,8 +119,6 @@ class SchedulingInvariantsTest {
         @Test
         @DisplayName("a predecessor outside the optimized set still constrains it")
         void outsideAnchorIsRespected() {
-            // Previously a predecessor that was not loaded contributed nothing at all, so
-            // optimizing one project silently violated its cross-project dependencies.
             var anchor = task("OTHER-1").from("2026-01-05").to("2026-01-20").build();
             var tasks = List.of(task("P-1").from("2026-01-05").to("2026-01-09")
                     .dependsOn("OTHER-1").build());
@@ -137,7 +134,6 @@ class SchedulingInvariantsTest {
     @Nested
     @DisplayName("Resource feasibility")
     class Resources {
-
         @Test
         @DisplayName("no two tasks of the same person ever overlap")
         void sameAssigneeNeverOverlaps() {
@@ -183,13 +179,9 @@ class SchedulingInvariantsTest {
     @Nested
     @DisplayName("Before and after are measured on the same axis")
     class Comparability {
-
         @Test
         @DisplayName("a plan with nothing to optimize is reported unchanged")
         void nothingToOptimizeChangesNothing() {
-            // The defect this pins: the baseline was credited with work already consumed in the
-            // past while the candidate was charged for it in full, so a single overdue task with no
-            // contention was reported as having got twice as bad.
             var tasks = List.of(task("P-1").priority(TaskPriority.HIGHEST)
                     .from("2025-12-22").to("2025-12-26").assignedTo("dev@x").build());
 
@@ -234,7 +226,6 @@ class SchedulingInvariantsTest {
     @Nested
     @DisplayName("Modelling")
     class Modelling {
-
         @Test
         @DisplayName("a task planned for the future is not dragged to today")
         void futureWorkKeepsItsReleaseDate() {
@@ -289,12 +280,9 @@ class SchedulingInvariantsTest {
     @Nested
     @DisplayName("Objective value")
     class Objective {
-
         @Test
         @DisplayName("stays within [0, 1] even for a badly over-committed portfolio")
         void objectiveIsBounded() {
-            // The defect this pins: normalising weighted tardiness by total processing time has no
-            // upper bound, and a "normalised" Z was measured at 23.9.
             var tasks = new ArrayList<com.backend.dtos.TaskDTO>();
             for (int i = 1; i <= 60; i++) {
                 tasks.add(task("P-" + i).from("2026-01-05").to("2026-04-04")
@@ -341,7 +329,6 @@ class SchedulingInvariantsTest {
             var tardinessFocused = scheduling.optimize(tasks, List.of(), TODAY, 1.0, 0.0);
             var makespanFocused = scheduling.optimize(tasks, List.of(), TODAY, 0.0, 1.0);
 
-            // Both must be feasible, and each must be the best available under its own weighting.
             assertThat(tardinessFocused.chosenMetrics().feasible()).isTrue();
             assertThat(makespanFocused.chosenMetrics().feasible()).isTrue();
             for (var metrics : tardinessFocused.metricsByRule().values()) {
@@ -354,15 +341,6 @@ class SchedulingInvariantsTest {
     @Nested
     @DisplayName("What precedence feasibility does and does not cover")
     class PrecedenceLimits {
-
-        /**
-         * Documents a real limitation rather than asserting desired behaviour. The scheme is
-         * forward-only: it places a task at the earliest feasible day and has no notion of a
-         * latest finish, so it cannot pull a predecessor back to land in front of a successor
-         * that is already pinned. A board where a finished task depends on unfinished work is
-         * inconsistent before the optimizer runs; this pins what the optimizer does with it, so
-         * that changing the answer has to be a deliberate decision.
-         */
         @Test
         @DisplayName("a fixed successor does not pull its movable predecessor earlier")
         void fixedSuccessorDoesNotConstrainItsPredecessor() {
@@ -402,14 +380,6 @@ class SchedulingInvariantsTest {
     @Nested
     @DisplayName("The horizon actually bounds what it normalises")
     class Normalisation {
-
-        /**
-         * H used to be {@code max(max d_j, sum p_j)}, which ignores release dates. Work that
-         * cannot start until day 42 then finished past H, and because every task here shares one
-         * due date equal to the old H, {@code WT_max = sum(w_j * max(0, H - d_j))} collapsed to
-         * zero — so the tardiness term hit its divide-by-zero fallback and scored a schedule with
-         * 45 units of weighted tardiness as perfect.
-         */
         @Test
         @DisplayName("a plan with real tardiness cannot score a perfect tardiness objective")
         void tardinessIsNeverNormalisedAway() {
@@ -418,7 +388,6 @@ class SchedulingInvariantsTest {
                     task("P-2").from("2026-02-16").to("2026-02-19").dependsOn("P-1").build(),
                     task("P-3").from("2026-02-16").to("2026-02-19").dependsOn("P-2").build());
 
-            // alpha = 1 puts the whole objective on tardiness, so Z is the tardiness term alone.
             var outcome = scheduling.optimize(tasks, List.of(), TODAY, 1.0, 0.0);
 
             assertThat(outcome.chosenMetrics().weightedTardiness()).isGreaterThan(0);
@@ -431,8 +400,6 @@ class SchedulingInvariantsTest {
         @Test
         @DisplayName("the makespan term is a ratio, not something the clamp has to rescue")
         void makespanStaysWithinTheHorizon() {
-            // Released 42 days out, three days each, chained: the chain cannot finish before
-            // day 51, so an H that stopped at the last due date was not a bound at all.
             var tasks = List.of(
                     task("P-1").from("2026-02-16").to("2026-02-19").build(),
                     task("P-2").from("2026-02-16").to("2026-02-19").dependsOn("P-1").build(),
@@ -451,13 +418,6 @@ class SchedulingInvariantsTest {
     @Nested
     @DisplayName("Completed work does not consume present capacity")
     class PastWork {
-
-        /**
-         * The busy-day interval was written as {@code set(max(0, start), max(0, start) + p)},
-         * which slid a task that ran entirely in the past forward onto day 0 instead of clipping
-         * it away. A ten-day task finished five weeks ago booked its assignee solid for the next
-         * ten days, and the optimizer dutifully scheduled around someone who was free.
-         */
         @Test
         @DisplayName("a task finished weeks ago leaves its assignee free today")
         void completedPastWorkDoesNotBlockToday() {
@@ -476,7 +436,6 @@ class SchedulingInvariantsTest {
         @Test
         @DisplayName("work straddling today still blocks the part that is ahead")
         void straddlingWorkStillBlocksItsRemainder() {
-            // Fixed, started three days ago, ten days long: days 0..6 are genuinely still busy.
             var anchors = List.of(
                     task("OTHER-1").from("2026-01-02").to("2026-01-11")
                             .assignedTo("dev@x").build());
@@ -494,7 +453,6 @@ class SchedulingInvariantsTest {
     @Nested
     @DisplayName("Randomized portfolios")
     class Fuzzing {
-
         private static final long[] SEEDS = {1L, 2L, 3L, 4L, 5L};
         private static final String[] ASSIGNEES = {"a@x", "b@x", "c@x"};
         private static final int ROUNDS_PER_SEED = 20;
@@ -603,8 +561,6 @@ class SchedulingInvariantsTest {
     @Test
     @DisplayName("the reported conflict count does not depend on input order")
     void conflictCountIsOrderInvariant() {
-        // The defect this pins: counting "clashes with an earlier-iterated task" reported 2, 1 or 2
-        // conflicts for the same three overlapping tasks depending on the order they arrived in.
         var a = task("P-1").from("2026-02-02").to("2026-02-11").assignedTo("dev@x").build();
         var b = task("P-2").from("2026-02-02").to("2026-02-03").assignedTo("dev@x").build();
         var c = task("P-3").from("2026-02-05").to("2026-02-06").assignedTo("dev@x").build();
@@ -624,7 +580,6 @@ class SchedulingInvariantsTest {
         return placement.end() - placement.start();
     }
 
-    /** Strict: a successor must start on a day strictly after its predecessor's last worked day. */
     private static void assertPrecedenceFeasible(SchedulingService.Outcome outcome) {
         var graph = outcome.graph();
         for (var placement : outcome.chosen().all()) {
@@ -637,7 +592,6 @@ class SchedulingInvariantsTest {
         }
     }
 
-    /** Strict: every pair of same-assignee placements is checked, not just adjacent ones. */
     private static void assertResourceFeasible(SchedulingService.Outcome outcome) {
         var placements = new ArrayList<>(outcome.chosen().all());
         for (int i = 0; i < placements.size(); i++) {

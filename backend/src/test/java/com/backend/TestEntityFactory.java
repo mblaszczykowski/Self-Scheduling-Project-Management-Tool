@@ -6,9 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Builders for entities in unit tests, so a test body describes only what it is about. */
 public final class TestEntityFactory {
-
     private TestEntityFactory() {}
 
     public static User createUser(Integer id, String email) {

@@ -13,11 +13,9 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ValidationUtilTest {
-
     @Nested
     @DisplayName("isNullOrEmpty")
     class IsNullOrEmptyTests {
-
         @Test
         @DisplayName("should return true for null")
         void shouldReturnTrueForNull() {
@@ -50,7 +48,6 @@ class ValidationUtilTest {
     @Nested
     @DisplayName("isValidEmail")
     class IsValidEmailTests {
-
         @ParameterizedTest
         @ValueSource(strings = {
                 "test@example.com",
@@ -105,7 +102,6 @@ class ValidationUtilTest {
     @Nested
     @DisplayName("validatePassword")
     class ValidatePasswordTests {
-
         @Test
         @DisplayName("should accept valid password")
         void shouldAcceptValidPassword() {
@@ -222,72 +218,13 @@ class ValidationUtilTest {
     }
 
     @Nested
-    @DisplayName("validateName")
-    class ValidateNameTests {
-
-        @Test
-        @DisplayName("should accept valid name")
-        void shouldAcceptValidName() {
-            assertThatCode(() -> ValidationUtil.validateName("John", "First name")).doesNotThrowAnyException();
-        }
-
-        @Test
-        @DisplayName("should throw for null name")
-        void shouldThrowForNull() {
-            assertThatThrownBy(() -> ValidationUtil.validateName(null, "First name"))
-                    .isInstanceOf(ValidationException.class)
-                    .hasMessage("First name is required");
-        }
-
-        @Test
-        @DisplayName("should throw for empty name")
-        void shouldThrowForEmpty() {
-            assertThatThrownBy(() -> ValidationUtil.validateName("", "Last name"))
-                    .isInstanceOf(ValidationException.class)
-                    .hasMessage("Last name is required");
-        }
-
-        @Test
-        @DisplayName("should throw for name shorter than 2 characters")
-        void shouldThrowForShortName() {
-            assertThatThrownBy(() -> ValidationUtil.validateName("A", "First name"))
-                    .isInstanceOf(ValidationException.class)
-                    .hasMessage("First name must be at least 2 characters");
-        }
-
-        @Test
-        @DisplayName("should throw for name longer than 50 characters")
-        void shouldThrowForLongName() {
-            String longName = "A".repeat(51);
-            assertThatThrownBy(() -> ValidationUtil.validateName(longName, "First name"))
-                    .isInstanceOf(ValidationException.class)
-                    .hasMessage("First name must not exceed 50 characters");
-        }
-
-        @Test
-        @DisplayName("should accept name at minimum length (2 chars)")
-        void shouldAcceptMinLength() {
-            assertThatCode(() -> ValidationUtil.validateName("Jo", "First name")).doesNotThrowAnyException();
-        }
-
-        @Test
-        @DisplayName("should accept name at maximum length (50 chars)")
-        void shouldAcceptMaxLength() {
-            String maxName = "A".repeat(50);
-            assertThatCode(() -> ValidationUtil.validateName(maxName, "First name")).doesNotThrowAnyException();
-        }
-    }
-
-    @Nested
     @DisplayName("Security Edge Cases")
     class SecurityEdgeCaseTests {
-
         @Test
         @DisplayName("should handle unicode in email validation")
         void shouldHandleUnicodeEmail() {
             assertThat(ValidationUtil.isValidEmail("test@example.com")).isTrue();
 
-            // IDN domains are not supported by the simple regex
             assertThat(ValidationUtil.isValidEmail("test@日本語.jp")).isFalse();
         }
 
@@ -308,7 +245,6 @@ class ValidationUtilTest {
         @Test
         @DisplayName("should handle password with unicode characters")
         void shouldHandleUnicodePassword() {
-            // Unicode characters should work as special characters
             assertThatCode(() -> ValidationUtil.validatePassword("Password1日本語!")).doesNotThrowAnyException();
         }
 

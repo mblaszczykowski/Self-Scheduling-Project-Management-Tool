@@ -8,11 +8,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("HtmlSanitizer")
 class HtmlSanitizerTest {
-
     @Nested
     @DisplayName("Rich text keeps everything the editor can produce")
     class RichTextRoundTrip {
-
         @Test
         @DisplayName("keeps headings, which the comment safelist would discard")
         void keepsHeadings() {
@@ -65,8 +63,6 @@ class HtmlSanitizerTest {
             var cleaned = HtmlSanitizer.sanitizeRichText(
                     "<img src=\"/files/3f9e2b1c-4a5f.png\" alt=\"spec\">");
 
-            // Jsoup tests the protocol against the absolute URL, so without a base URI this src
-            // resolved to nothing and was stripped — emptying every embedded image on the next save.
             assertThat(cleaned).contains("src=\"/files/3f9e2b1c-4a5f.png\"");
         }
 
@@ -104,7 +100,6 @@ class HtmlSanitizerTest {
     @Nested
     @DisplayName("Rich text still strips every script vector")
     class RichTextStripsScripts {
-
         @Test
         @DisplayName("drops script elements and their contents")
         void dropsScriptTags() {
@@ -165,7 +160,6 @@ class HtmlSanitizerTest {
     @Nested
     @DisplayName("Null and comment handling")
     class Basics {
-
         @Test
         @DisplayName("passes null through untouched for both modes")
         void handlesNull() {

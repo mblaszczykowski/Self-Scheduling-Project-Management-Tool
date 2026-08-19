@@ -9,15 +9,6 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Applies an optimization by re-deriving it server-side.
- *
- * <p>The endpoint deliberately does not accept dates. It takes the same inputs as
- * {@code /simulate}, recomputes the schedule, and persists that — so what lands in the database
- * is feasible by construction, and a stale suggestion set (a dependency edited between simulate
- * and apply) cannot be written. {@code acceptedTaskKeys} narrows which of the recomputed shifts
- * to apply; omitting it applies all of them.
- */
 public record ApplyOptimizationRequest(
         @NotEmpty(message = "At least one project key is required")
         @Size(max = 50, message = "At most 50 projects can be optimized at once")

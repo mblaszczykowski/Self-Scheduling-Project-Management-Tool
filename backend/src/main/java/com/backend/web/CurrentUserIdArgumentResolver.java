@@ -12,7 +12,6 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 @Component
 public class CurrentUserIdArgumentResolver implements HandlerMethodArgumentResolver {
-
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
         return parameter.hasParameterAnnotation(CurrentUserId.class)
@@ -27,8 +26,6 @@ public class CurrentUserIdArgumentResolver implements HandlerMethodArgumentResol
         var userId = webRequest.getAttribute(TokenService.USER_ID_ATTRIBUTE,
                 RequestAttributes.SCOPE_REQUEST);
         if (userId == null) {
-            // Only reachable if an endpoint is added to the JWT exemption list but still asks
-            // for the current user — a wiring mistake, not a client error.
             throw new AuthorizationException("User not authenticated");
         }
         return userId;

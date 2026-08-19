@@ -5,9 +5,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
-/** Turns a {@link Schedule} into comparable numbers. */
 public final class ScheduleEvaluator {
-
     private ScheduleEvaluator() {}
 
     public static ScheduleMetrics evaluate(Schedule schedule,
@@ -25,12 +23,10 @@ public final class ScheduleEvaluator {
             if (task == null) {
                 continue;
             }
-            makespan = Math.max(makespan, placement.end());
             if (task.fixed()) {
-                // Completed work and outside anchors bound the timeline but are not what the
-                // optimizer is being judged on.
                 continue;
             }
+            makespan = Math.max(makespan, placement.end());
             totalTasks++;
             weightedTardiness += (double) task.priorityWeight() * placement.tardiness();
             if (placement.tardiness() > 0) {
@@ -45,16 +41,6 @@ public final class ScheduleEvaluator {
                 totalTasks, tasksLate, conflicts, conflicts == 0);
     }
 
-    /**
-     * Counts unordered pairs of same-assignee tasks whose day ranges overlap.
-     *
-     * <p>Order-invariant, which the previous "does this task clash with an earlier-iterated one"
-     * count was not: the same three overlapping tasks reported 2, 1 or 2 conflicts depending on
-     * the order the database happened to return them in, so adding a task to one project could
-     * change another project's reported conflict count.
-     *
-     * <p>Sweep line per assignee: O(k log k) in the number of tasks that person holds.
-     */
     private static int countResourceConflicts(Schedule schedule, PrecedenceGraph graph) {
         var byAssignee = new HashMap<String, List<Placement>>();
         for (var placement : schedule.all()) {
@@ -75,8 +61,6 @@ public final class ScheduleEvaluator {
                 var current = placements.get(i);
                 for (int j = i + 1; j < placements.size(); j++) {
                     var later = placements.get(j);
-                    // Sorted by start, so once a task starts at or after this one ends, so does
-                    // everything after it.
                     if (later.start() >= current.end()) {
                         break;
                     }

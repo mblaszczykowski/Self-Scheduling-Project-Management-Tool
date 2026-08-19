@@ -10,25 +10,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * The precedence structure of one scheduling problem, computed once and reused.
- *
- * <p>One authoritative implementation of topological order, transitive fan-out, connected
- * components and cycle detection. These were previously reimplemented in the optimizer, in the
- * critical-path helper and in four separate research harnesses; the copies drifted, and one of
- * them is exactly where a unit mismatch in the objective function crept in.
- *
- * <p>Iteration order follows insertion order of the input, so every derived quantity is
- * reproducible.
- */
 public final class PrecedenceGraph {
-
     private final Map<String, ScheduleTask> tasks;
     private final Map<String, List<String>> successors;
     private final List<String> topologicalOrder;
     private final Map<String, Integer> transitiveSuccessorCounts;
-    private final Map<String, Integer> componentByKey;
-    private final int componentCount;
 
     private PrecedenceGraph(Map<String, ScheduleTask> tasks,
                             Map<String, List<String>> successors,
@@ -37,15 +23,8 @@ public final class PrecedenceGraph {
         this.successors = successors;
         this.topologicalOrder = topologicalOrder;
         this.transitiveSuccessorCounts = computeTransitiveSuccessorCounts();
-        var components = computeComponents();
-        this.componentByKey = components.assignment();
-        this.componentCount = components.count();
     }
 
-    /**
-     * @throws ValidationException if the dependencies contain a cycle — an unschedulable input
-     *                             that must be reported, not silently mis-scheduled
-     */
     public static PrecedenceGraph of(List<ScheduleTask> input) {
         var tasks = new LinkedHashMap<String, ScheduleTask>();
         for (var task : input) {
@@ -60,8 +39,6 @@ public final class PrecedenceGraph {
         }
         for (var task : tasks.values()) {
             for (var predecessor : task.predecessors()) {
-                // A predecessor outside this problem imposes no ordering here; the caller is
-                // responsible for pulling in the ones that matter as fixed anchors.
                 if (!tasks.containsKey(predecessor)) {
                     continue;
                 }
@@ -70,7 +47,6 @@ public final class PrecedenceGraph {
             }
         }
 
-        // Kahn, in insertion order, so the topological order is deterministic.
         var order = new ArrayList<String>(tasks.size());
         var ready = new ArrayDeque<String>();
         for (var key : tasks.keySet()) {
@@ -103,7 +79,6 @@ public final class PrecedenceGraph {
         return tasks.get(key);
     }
 
-    /** Predecessors first. */
     public List<String> topologicalOrder() {
         return topologicalOrder;
     }
@@ -112,7 +87,6 @@ public final class PrecedenceGraph {
         return successors.getOrDefault(key, List.of());
     }
 
-    /** Predecessors of a task that are part of this graph. */
     public List<String> knownPredecessorsOf(String key) {
         var task = tasks.get(key);
         if (task == null) {
@@ -121,32 +95,10 @@ public final class PrecedenceGraph {
         return task.predecessors().stream().filter(tasks::containsKey).toList();
     }
 
-    /** How many tasks lie downstream of each task, transitively. */
     public Map<String, Integer> transitiveSuccessorCounts() {
         return transitiveSuccessorCounts;
     }
 
-    /**
-     * Index of the weakly-connected component each task belongs to.
-     *
-     * <p>Critical-path analysis needs this: a project's own finish time is the finish of its own
-     * component, not of the longest unrelated project that happened to be analysed alongside it.
-     */
-    public Map<String, Integer> componentByKey() {
-        return componentByKey;
-    }
-
-    public int componentCount() {
-        return componentCount;
-    }
-
-    /**
-     * Exact count of distinct downstream tasks per task.
-     *
-     * <p>Reachability is accumulated as bit sets in reverse topological order, which counts a task
-     * reachable by two different paths once. Summing {@code 1 + count(successor)} instead — the
-     * obvious shortcut — double-counts every diamond in the graph.
-     */
     private Map<String, Integer> computeTransitiveSuccessorCounts() {
         var indexByKey = new HashMap<String, Integer>(topologicalOrder.size() * 2);
         var keys = new ArrayList<>(tasks.keySet());
@@ -173,50 +125,4 @@ public final class PrecedenceGraph {
         }
         return Map.copyOf(counts);
     }
-
-    private Components computeComponents() {
-        var parent = new HashMap<String, String>();
-        for (var key : tasks.keySet()) {
-            parent.put(key, key);
-        }
-        for (var task : tasks.values()) {
-            for (var predecessor : task.predecessors()) {
-                if (tasks.containsKey(predecessor)) {
-                    union(parent, task.key(), predecessor);
-                }
-            }
-        }
-        var indexByRoot = new LinkedHashMap<String, Integer>();
-        var assignment = new LinkedHashMap<String, Integer>();
-        for (var key : tasks.keySet()) {
-            var root = find(parent, key);
-            assignment.put(key, indexByRoot.computeIfAbsent(root, r -> indexByRoot.size()));
-        }
-        return new Components(Map.copyOf(assignment), indexByRoot.size());
-    }
-
-    private static String find(Map<String, String> parent, String key) {
-        var root = key;
-        while (!parent.get(root).equals(root)) {
-            root = parent.get(root);
-        }
-        // Path compression keeps repeated lookups cheap on long dependency chains.
-        var current = key;
-        while (!parent.get(current).equals(root)) {
-            var next = parent.get(current);
-            parent.put(current, root);
-            current = next;
-        }
-        return root;
-    }
-
-    private static void union(Map<String, String> parent, String a, String b) {
-        var rootA = find(parent, a);
-        var rootB = find(parent, b);
-        if (!rootA.equals(rootB)) {
-            parent.put(rootA, rootB);
-        }
-    }
-
-    private record Components(Map<String, Integer> assignment, int count) {}
 }

@@ -57,7 +57,6 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CommentServiceTest {
-
     @Mock
     private CommentRepository commentRepository;
 
@@ -76,9 +75,6 @@ class CommentServiceTest {
     @Mock
     private AccessGuard accessGuard;
 
-    // The notification fan-out is exercised through the real NotificationService so that
-    // "one notification per person" can be asserted on the rows that would actually be written,
-    // rather than on the candidate list handed to a mock.
     @Mock
     private NotificationRepository notificationRepository;
 
@@ -149,7 +145,6 @@ class CommentServiceTest {
     @Nested
     @DisplayName("getCommentsByTask")
     class GetCommentsByTaskTests {
-
         @Test
         @DisplayName("returns one page of top-level comments with their whole reply tree nested underneath")
         void shouldReturnAPageOfCommentsWithNestedReplies() {
@@ -187,7 +182,6 @@ class CommentServiceTest {
             assertThat(firstDto.authorName()).isEqualTo("User 1");
             assertThat(firstDto.content()).isEqualTo("Comment 1");
             assertThat(firstDto.likeCount()).isEqualTo(1);
-            assertThat(firstDto.likedByUsernames()).containsExactly("User 2");
             assertThat(firstDto.likedByCurrentUser()).isTrue();
             assertThat(firstDto.replies()).extracting(CommentDTO::id).containsExactly(3);
             assertThat(firstDto.replies().getFirst().replies())
@@ -220,7 +214,6 @@ class CommentServiceTest {
 
             assertThat(page.getContent()).extracting(dto -> dto.replies().getFirst().id())
                     .containsExactly(3, 4);
-            // Two levels of the tree, two queries — not one per comment.
             verify(commentRepository, times(2)).findRepliesByParentIdsWithDetails(anyList());
         }
 
@@ -240,7 +233,6 @@ class CommentServiceTest {
     @Nested
     @DisplayName("addComment")
     class AddCommentTests {
-
         @Test
         @DisplayName("strips scripts from the stored content and returns the sanitized comment")
         void shouldSanitizeTheContentItStoresAndReturns() {
@@ -289,28 +281,6 @@ class CommentServiceTest {
             assertThat(result.content()).isEqualTo("A reply");
         }
 
-        @ParameterizedTest
-        @NullAndEmptySource
-        @ValueSource(strings = {"   ", "\n\t"})
-        @DisplayName("refuses blank content before touching the task or the files")
-        void shouldRefuseBlankContent(String content) {
-            assertThatThrownBy(() -> commentService.addComment(100, 1, content, null, null))
-                    .isInstanceOf(ValidationException.class)
-                    .hasMessageContaining("cannot be empty");
-
-            verifyNoInteractions(accessGuard, commentRepository, fileStorageService);
-        }
-
-        @Test
-        @DisplayName("refuses content longer than the allowed maximum")
-        void shouldRefuseOverlongContent() {
-            assertThatThrownBy(() -> commentService.addComment(100, 1, "x".repeat(10001), null, null))
-                    .isInstanceOf(ValidationException.class)
-                    .hasMessageContaining("10000");
-
-            verifyNoInteractions(accessGuard, commentRepository, fileStorageService);
-        }
-
         @Test
         @DisplayName("refuses to graft a reply onto a comment that lives on another task")
         void shouldRefuseAParentCommentFromAnotherTask() {
@@ -324,7 +294,6 @@ class CommentServiceTest {
                     .isInstanceOf(ResourceNotFoundException.class)
                     .hasMessageContaining("Parent comment not found");
 
-            // Rejected before anything is written to disk or to the database.
             verify(fileStorageService, never()).storeFiles(anyList(), any(), any());
             verify(commentRepository, never()).save(any());
             verifyNoInteractions(notificationRepository, taskActivityService);
@@ -382,7 +351,6 @@ class CommentServiceTest {
     @Nested
     @DisplayName("notifications about a new comment")
     class NewCommentNotificationTests {
-
         @BeforeEach
         void stubTheHappyPath() {
             when(accessGuard.getAccessibleTaskById(100, 1)).thenReturn(task);
@@ -430,8 +398,6 @@ class CommentServiceTest {
 
             commentService.addComment(100, 1, "A reply", null, 50);
 
-            // Both a COMMENT_REPLY and a TASK_COMMENT candidate target user 2; only the first
-            // one survives, so they are told once rather than twice.
             var notification = savedNotifications().getFirst();
             assertThat(notification.getUser()).isSameAs(otherUser);
             assertThat(notification.getType()).isEqualTo(NotificationType.COMMENT_REPLY);
@@ -480,7 +446,6 @@ class CommentServiceTest {
     @Nested
     @DisplayName("updateComment")
     class UpdateCommentTests {
-
         @Test
         @DisplayName("sanitizes the new content, stamps the edit time and keeps the old attachments")
         void shouldUpdateSanitizeAndStampTheEdit() {
@@ -551,15 +516,6 @@ class CommentServiceTest {
         }
 
         @Test
-        @DisplayName("refuses blank content without even loading the comment")
-        void shouldRefuseBlankContentBeforeLoadingTheComment() {
-            assertThatThrownBy(() -> commentService.updateComment(100, 1, 1, "  ", null))
-                    .isInstanceOf(ValidationException.class);
-
-            verifyNoInteractions(commentRepository, accessGuard, fileStorageService);
-        }
-
-        @Test
         @DisplayName("refuses a comment that does not exist")
         void shouldRefuseAMissingComment() {
             when(commentRepository.findByIdWithTaskAndProject(999)).thenReturn(Optional.empty());
@@ -573,7 +529,6 @@ class CommentServiceTest {
     @Nested
     @DisplayName("deleteComment")
     class DeleteCommentTests {
-
         @Test
         @DisplayName("removes the row first and unlinks the attachments only afterwards")
         void shouldDeleteTheRowBeforeUnlinkingTheFiles() {
@@ -673,7 +628,6 @@ class CommentServiceTest {
     @Nested
     @DisplayName("reactToComment")
     class ReactToCommentTests {
-
         private Comment comment;
 
         @BeforeEach
@@ -691,12 +645,10 @@ class CommentServiceTest {
             var result = commentService.reactToComment(100, 1, 2, ReactionType.LIKE);
 
             assertThat(result.likeCount()).isEqualTo(1);
-            assertThat(result.likedByUsernames()).containsExactly("User 2");
             assertThat(result.likedByCurrentUser()).isTrue();
             assertThat(result.dislikeCount()).isZero();
             assertThat(result.dislikedByCurrentUser()).isFalse();
 
-            // The change lives on the aggregate, not in a separate repository write.
             assertThat(comment.getReactions())
                     .singleElement()
                     .satisfies(reaction -> {
@@ -737,11 +689,9 @@ class CommentServiceTest {
             var result = commentService.reactToComment(100, 1, 2, ReactionType.LIKE);
 
             assertThat(result.likeCount()).isZero();
-            assertThat(result.likedByUsernames()).isEmpty();
             assertThat(result.likedByCurrentUser()).isFalse();
             assertThat(comment.getReactions()).isEmpty();
             assertThat(existing.getComment()).isNull();
-            // Toggling off is not news, and orphan removal takes care of the row.
             verifyNoInteractions(notificationRepository);
             verify(commentReactionRepository, never()).delete(any());
         }
@@ -760,7 +710,6 @@ class CommentServiceTest {
             assertThat(existing.getType()).isEqualTo(ReactionType.DISLIKE);
             assertThat(comment.getReactions()).hasSize(1);
             assertThat(result.dislikeCount()).isEqualTo(1);
-            assertThat(result.dislikedByUsernames()).containsExactly("User 2");
             assertThat(result.dislikedByCurrentUser()).isTrue();
             assertThat(result.likeCount()).isZero();
             assertThat(result.likedByCurrentUser()).isFalse();
@@ -779,10 +728,8 @@ class CommentServiceTest {
             var result = commentService.reactToComment(100, 1, 2, ReactionType.DISLIKE);
 
             assertThat(result.likeCount()).isEqualTo(1);
-            assertThat(result.likedByUsernames()).containsExactly("User 3");
             assertThat(result.likedByCurrentUser()).isFalse();
             assertThat(result.dislikeCount()).isEqualTo(1);
-            assertThat(result.dislikedByUsernames()).containsExactly("User 2");
             assertThat(result.dislikedByCurrentUser()).isTrue();
         }
 

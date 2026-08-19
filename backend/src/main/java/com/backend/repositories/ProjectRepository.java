@@ -13,19 +13,12 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ProjectRepository extends JpaRepository<Project, Integer> {
-
     boolean existsByProjectKey(String projectKey);
 
     @Query("SELECT p FROM Project p LEFT JOIN FETCH p.owner LEFT JOIN FETCH p.members " +
             "WHERE p.projectKey = :projectKey")
     Optional<Project> findByProjectKeyWithOwnerAndMembers(@Param("projectKey") String projectKey);
 
-    /**
-     * Locks the project row so concurrent task creation cannot hand out the same task number.
-     *
-     * <p>Deliberately fetches no collection: {@code FOR UPDATE} combined with an outer join on a
-     * to-many is a fragile combination, and the caller only needs the counter.
-     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Project p WHERE p.projectKey = :projectKey")
     Optional<Project> findByProjectKeyWithLock(@Param("projectKey") String projectKey);
@@ -37,9 +30,6 @@ public interface ProjectRepository extends JpaRepository<Project, Integer> {
             "ORDER BY p.projectKey")
     List<Project> findByProjectKeyIn(@Param("keys") List<String> keys);
 
-    // Do NOT fetch the members collection here: a to-many JOIN FETCH combined with a Pageable
-    // forces Hibernate to load the whole result set and paginate in memory (HHH000104). Only the
-    // to-one owner is fetched (pagination-safe); members are batch-loaded lazily during mapping.
     @Query(value = "SELECT p FROM Project p LEFT JOIN FETCH p.owner " +
             "WHERE p.owner.id = :userId OR p.id IN " +
             "(SELECT p2.id FROM Project p2 JOIN p2.members m2 WHERE m2.id = :userId) " +

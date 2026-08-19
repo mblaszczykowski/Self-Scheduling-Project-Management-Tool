@@ -55,20 +55,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The HTTP contract of {@link TaskController}, including the {@code PATCH .../schedule} endpoint and
- * the {@code ApiError} body — {@code fieldErrors} included — that a rejected request comes back as.
- * Only the service is mocked; the argument resolution, the bean validation and the exception
- * handling are the production ones.
- */
-// The servlet filters are deliberately out of the slice: JwtAuthenticationFilter would reject every
-// request here, since these tests carry the attribute the filter would have written, not a token.
 @WebMvcTest(controllers = TaskController.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = Filter.class))
 @Import({TaskControllerWebTest.SliceConfig.class, WebConfig.class, CurrentUserIdArgumentResolver.class})
 @DisplayName("TaskController over HTTP")
 class TaskControllerWebTest {
-
     private static final int USER_ID = 7;
     private static final String TASKS_URL = "/api/projects/{projectKey}/tasks";
     private static final String SCHEDULE_URL = "/api/projects/{projectKey}/tasks/{taskKey}/schedule";
@@ -79,11 +70,6 @@ class TaskControllerWebTest {
     @MockitoBean
     private TaskService taskService;
 
-    /**
-     * Spring's automatic reset of a {@code @MockitoBean} keys off annotations found on the class
-     * being run, and does not look at the enclosing class of a {@code @Nested} one — so without
-     * this the recorded invocations would leak from one nested case into the next.
-     */
     @BeforeEach
     void resetServiceMock() {
         reset(taskService);
@@ -105,7 +91,6 @@ class TaskControllerWebTest {
     @Nested
     @DisplayName("POST /api/projects/{projectKey}/tasks")
     class CreateTask {
-
         @Test
         @DisplayName("answers 201 Created and hands the service the parsed request, project key and caller id")
         void answers201CreatedWithTheParsedRequest() throws Exception {
@@ -190,7 +175,6 @@ class TaskControllerWebTest {
     @Nested
     @DisplayName("PATCH /api/projects/{projectKey}/tasks/{taskKey}/schedule")
     class UpdateSchedule {
-
         @Test
         @DisplayName("answers 200 with the moved task and passes both dates to the service")
         void answers200WithTheMovedTask() throws Exception {
@@ -283,7 +267,6 @@ class TaskControllerWebTest {
     @Nested
     @DisplayName("DELETE /api/projects/{projectKey}/tasks/{taskKey}")
     class DeleteTask {
-
         @Test
         @DisplayName("answers 204 No Content with an empty body")
         void answers204NoContent() throws Exception {
@@ -320,14 +303,8 @@ class TaskControllerWebTest {
         }
     }
 
-    /**
-     * The collaborators the controller needs that a {@code @WebMvcTest} slice does not
-     * component-scan. They are the real implementations, not mocks: the validation and the argument
-     * resolution are part of what is being asserted.
-     */
     @TestConfiguration
     static class SliceConfig {
-
         @Bean
         AppProperties appProperties() {
             return new AppProperties();

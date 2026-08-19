@@ -14,10 +14,13 @@ import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -29,17 +32,8 @@ import java.util.stream.Collectors;
 
 import com.backend.util.AfterCommit;
 
-/**
- * Stores uploads under a single directory with generated names, and records who each file
- * belongs to so downloads can be authorized.
- *
- * <p>The client's filename is discarded entirely rather than sanitised, which removes the whole
- * class of traversal and double-extension tricks. {@code svg} and {@code html} are absent from
- * the allowlist on purpose: they are the two types that would turn an upload into stored XSS.
- */
 @Service
 public class FileStorageService {
-
     private static final Logger log = LoggerFactory.getLogger(FileStorageService.class);
     private static final String URL_PREFIX = "/files/";
 
@@ -60,10 +54,6 @@ public class FileStorageService {
         }
     }
 
-    /**
-     * @param projectId the project the files belong to, or null for files that are not
-     *                  project-scoped (profile pictures)
-     */
     public List<String> storeFiles(List<MultipartFile> files, Integer projectId, Integer uploaderId) {
         if (files == null || files.isEmpty()) {
             return List.of();
@@ -72,13 +62,19 @@ public class FileStorageService {
             throw new ValidationException("Too many files. Maximum "
                     + FileValidationConstants.MAX_ATTACHMENTS_PER_REQUEST + " files per request");
         }
-        return files.stream()
-                .map(file -> storeFile(file, projectId, uploaderId))
-                .toList();
+        var extensions = files.stream().map(this::validateAndExtractExtension).toList();
+        var stored = new ArrayList<String>(files.size());
+        for (int i = 0; i < files.size(); i++) {
+            stored.add(writeFile(files.get(i), extensions.get(i), projectId, uploaderId));
+        }
+        return stored;
     }
 
     public String storeFile(MultipartFile file, Integer projectId, Integer uploaderId) {
-        var extension = validateAndExtractExtension(file);
+        return writeFile(file, validateAndExtractExtension(file), projectId, uploaderId);
+    }
+
+    private String writeFile(MultipartFile file, String extension, Integer projectId, Integer uploaderId) {
         var safeFileName = UUID.randomUUID() + "." + extension;
         var targetLocation = resolveAndValidatePath(safeFileName);
 
@@ -92,18 +88,10 @@ public class FileStorageService {
         return URL_PREFIX + safeFileName;
     }
 
-    /** @return the ownership record for a stored name, if one was recorded. */
     public Optional<StoredFile> findOwnership(String storedName) {
         return storedFileRepository.findByStoredName(storedName);
     }
 
-    /**
-     * Rejects any attachment reference that does not belong to the given project.
-     *
-     * <p>Attachment lists arrive from the client on every update. Without this check a user could
-     * graft another project's file onto their own task — and then delete the task, taking the
-     * other project's file off disk with it.
-     */
     public void requireAttachmentsBelongTo(Integer projectId, Collection<String> attachmentUrls) {
         if (attachmentUrls == null || attachmentUrls.isEmpty()) {
             return;
@@ -119,26 +107,14 @@ public class FileStorageService {
         for (var name : names) {
             var ownership = byName.get(name);
             if (ownership == null) {
-                // Uploaded before ownership was recorded (pre-V5). Accept, since rejecting would
-                // make historic attachments un-editable, but do not let it move between projects.
-                continue;
+                throw new ValidationException("Attachment does not belong to this project");
             }
-            // A row with no project is deliberately unscoped — a profile picture. Those are
-            // readable by every member through the member views, and their URLs travel in every
-            // UserDTO, which is exactly why claiming one as a task attachment has to be refused:
-            // whoever attaches a file also gets to detach it, and detaching unlinks it from disk.
-            // Any account could otherwise delete any other account's picture.
             if (ownership.getProjectId() == null || !ownership.getProjectId().equals(projectId)) {
                 throw new ValidationException("Attachment does not belong to this project");
             }
         }
     }
 
-    /**
-     * Validates that every declared attachment belongs to the project, stores any newly uploaded
-     * files against it, and returns the two combined into the attachment list a caller should
-     * save.
-     */
     public List<String> resolveAttachments(Integer projectId, List<String> declared,
                                            List<MultipartFile> newFiles, Integer uploaderId) {
         requireAttachmentsBelongTo(projectId, declared);
@@ -159,11 +135,6 @@ public class FileStorageService {
         storedFileRepository.deleteByStoredNameIn(Set.of(fileName));
     }
 
-    /**
-     * Best-effort deletion of several files. Callers use this <em>after</em> their transaction
-     * commits: unlinking a file is not transactional, so doing it first meant a later rollback
-     * left rows pointing at files that no longer existed.
-     */
     public void deleteFilesSilently(Collection<String> filePaths) {
         if (filePaths == null) {
             return;
@@ -177,13 +148,6 @@ public class FileStorageService {
         }
     }
 
-    /**
-     * Computes which files were removed from {@code before} and are absent in {@code after},
-     * and deletes them after the current transaction commits.
-     *
-     * <p>Shared by task and project updates: both track attachment lists and need the same
-     * diff-then-delete-after-commit logic.
-     */
     public void deleteRemovedAfterCommit(List<String> before, List<String> after, String description) {
         var removed = new ArrayList<>(before);
         removed.removeAll(new HashSet<>(after));
@@ -191,6 +155,41 @@ public class FileStorageService {
             return;
         }
         AfterCommit.run(description, () -> deleteFilesSilently(removed));
+    }
+
+    public int deleteUnreferencedFiles(Duration minimumAge) {
+        if (!Files.isDirectory(fileStorageLocation)) {
+            return 0;
+        }
+        var referenced = storedFileRepository.findAllStoredNames();
+        var cutoff = Instant.now().minus(minimumAge);
+        int deleted = 0;
+        try (var entries = Files.list(fileStorageLocation)) {
+            for (var path : entries.toList()) {
+                if (deleteIfUnreferencedAndStale(path, referenced, cutoff)) {
+                    deleted++;
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Could not list uploads to sweep: {}", e.getMessage());
+        }
+        return deleted;
+    }
+
+    private boolean deleteIfUnreferencedAndStale(Path path, Set<String> referenced, Instant cutoff) {
+        try {
+            var name = path.getFileName().toString();
+            if (!Files.isRegularFile(path) || referenced.contains(name)) {
+                return false;
+            }
+            if (Files.getLastModifiedTime(path).toInstant().isAfter(cutoff)) {
+                return false;
+            }
+            return Files.deleteIfExists(path);
+        } catch (IOException e) {
+            log.warn("Could not sweep upload {}: {}", path.getFileName(), e.getMessage());
+            return false;
+        }
     }
 
     public Path getFilePath(String fileName) {
@@ -251,15 +250,15 @@ public class FileStorageService {
         return filename.substring(lastDot + 1);
     }
 
-    /** Reads only the header: identifying a type needs a few bytes, not the whole upload. */
     private void validateMagicBytes(MultipartFile file, byte[] expectedMagicBytes) {
-        try (var input = file.getInputStream()) {
-            var header = input.readNBytes(FileValidationConstants.MAGIC_BYTE_PREFIX_LENGTH);
-            if (!FileValidationConstants.startsWithMagicBytes(header, expectedMagicBytes)) {
-                throw new ValidationException("File content doesn't match declared type");
-            }
-        } catch (IOException e) {
+        byte[] header;
+        try {
+            header = FileValidationConstants.readHeader(file);
+        } catch (UncheckedIOException e) {
             throw new FileStorageException("Could not validate file content");
+        }
+        if (!FileValidationConstants.startsWithMagicBytes(header, expectedMagicBytes)) {
+            throw new ValidationException("File content doesn't match declared type");
         }
     }
 }

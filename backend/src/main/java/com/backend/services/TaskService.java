@@ -33,7 +33,6 @@ import java.util.Objects;
 
 @Service
 public class TaskService {
-
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
     private final FileStorageService fileStorageService;
@@ -67,7 +66,6 @@ public class TaskService {
     @Transactional(rollbackFor = Exception.class)
     public TaskDTO createTask(String projectKey, TaskRequest request, Integer userId,
                               List<MultipartFile> files) {
-        // Locking the project row serialises task-number allocation.
         var project = projectRepository.findByProjectKeyWithLock(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         accessGuard.requireAccess(project, userId);
@@ -105,14 +103,6 @@ public class TaskService {
         return toDtoWithCriticality(savedTask);
     }
 
-    /**
-     * Replaces the task with the submitted representation.
-     *
-     * <p>This is a full {@code PUT}: an absent collection or scalar is a request to clear it. That
-     * is only safe because the one caller which could not send a complete body — the timeline drag —
-     * now has {@link #updateSchedule} instead. Reusing this endpoint for a partial change is what
-     * silently reset progress to 0, priority to MEDIUM, and dropped every attachment.
-     */
     @Transactional(rollbackFor = Exception.class)
     public TaskDTO updateTask(String projectKey, String taskKey, TaskRequest request,
                               Integer userId, List<MultipartFile> files) {
@@ -153,12 +143,6 @@ public class TaskService {
         return toDtoWithCriticality(updatedTask);
     }
 
-    /**
-     * Moves a task in time and changes nothing else.
-     *
-     * <p>Exists so that a timeline drag — which knows only the new dates — cannot express anything
-     * beyond them.
-     */
     @Transactional(rollbackFor = Exception.class)
     public TaskDTO updateSchedule(String projectKey, String taskKey, TaskScheduleRequest request,
                                   Integer userId) {
@@ -178,18 +162,8 @@ public class TaskService {
         return toDtoWithCriticality(updatedTask);
     }
 
-    /** One task's new dates, as produced by the optimizer. */
     public record ScheduleChange(String taskKey, LocalDate startDate, LocalDate dueDate) {}
 
-    /**
-     * Applies a batch of optimizer-derived date changes.
-     *
-     * <p>Routed through the same audit and notification path as a manual edit, so the activity feed
-     * does not lie about how a task's dates got there — bulk-rescheduling used to leave no trace and
-     * notify nobody. Assignees get one notification per task they own.
-     *
-     * @return how many tasks were actually changed
-     */
     @Transactional(rollbackFor = Exception.class)
     public int applySchedule(List<ScheduleChange> changes, Integer userId) {
         if (changes == null || changes.isEmpty()) {
@@ -231,8 +205,6 @@ public class TaskService {
             }
         }
 
-        // One notification per assignee, not one per task: a portfolio-wide reschedule would
-        // otherwise flood everyone involved.
         notificationService.notifyAll(pending);
         return applied;
     }
@@ -249,16 +221,11 @@ public class TaskService {
                     NotificationType.TASK_DELETED, null);
         }
 
-        // The task's own files and its comments' files. Missing the latter left them on disk with
-        // nothing referencing them; deleting the project later cascaded their stored_files rows
-        // away, and a file on disk with no ownership row is treated as pre-V5 legacy — readable by
-        // every authenticated account, including members who have since been removed.
         var attachments = new ArrayList<>(task.getAttachments());
         for (var comment : task.getComments()) {
             attachments.addAll(comment.getAttachments());
         }
         taskRepository.delete(task);
-        // Files come off disk only once the row is really gone.
         AfterCommit.run("delete attachments of " + taskKey,
                 () -> fileStorageService.deleteFilesSilently(attachments));
     }
@@ -270,14 +237,6 @@ public class TaskService {
         return task;
     }
 
-    /**
-     * Resolves an assignee, requiring them to be part of the project.
-     *
-     * <p>Without the membership check the endpoint doubled as an authenticated "is this address
-     * registered?" oracle, and let a caller fire a notification with arbitrary text at any user.
-     * The error message is deliberately the same whether the address is unknown or simply not a
-     * member.
-     */
     private User resolveAssignee(String email, Project project) {
         if (email == null || email.isBlank()) {
             return null;
@@ -289,12 +248,6 @@ public class TaskService {
         return assignee;
     }
 
-    /**
-     * Resolves dependency task keys, rejecting anything the caller cannot see.
-     *
-     * <p>Unparseable and unknown keys are rejected rather than silently dropped: quietly ignoring
-     * one means the client believes it saved a dependency that does not exist.
-     */
     private List<Task> resolveDependencies(List<String> dependencyKeys, Integer userId) {
         var keys = nullSafe(dependencyKeys).stream().filter(Objects::nonNull).distinct().toList();
         if (keys.isEmpty()) {
@@ -330,7 +283,6 @@ public class TaskService {
         return result;
     }
 
-    /** Batch-loads tasks by {@code {projectKey}-{taskNumber}}, one query per distinct project. */
     private List<Task> findTasksByKeys(List<String> taskKeys) {
         var byProject = new LinkedHashMap<String, List<Integer>>();
         for (var key : taskKeys) {
@@ -354,13 +306,6 @@ public class TaskService {
                 NotificationService.taskLink(task.getTaskKey()));
     }
 
-    /**
-     * Maps a task with its critical-path flag filled in.
-     *
-     * <p>Create and update responses used to hard-code {@code isCritical = null} while reads
-     * populated it, so a client that rendered the response of its own write lost the flag until the
-     * next refetch.
-     */
     private TaskDTO toDtoWithCriticality(Task task) {
         var projectTasks = taskRepository.findByProjectIdWithDetails(task.getProject().getId()).stream()
                 .map(t -> entityMapper.toTaskDTO(t, null))
@@ -372,5 +317,4 @@ public class TaskService {
     private static <T> List<T> nullSafe(List<T> list) {
         return list == null ? List.of() : list;
     }
-
 }

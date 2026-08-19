@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class EmailService {
-
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
     private final JavaMailSender mailSender;
@@ -27,12 +26,6 @@ public class EmailService {
         this.frontendBaseUrl = trimTrailingSlash(appProperties.getFrontend().getBaseUrl());
     }
 
-    /**
-     * Sends a notification email. Takes plain primitives (not a JPA entity) because it runs
-     * asynchronously on a separate thread and after the originating transaction has committed,
-     * where a managed/lazy entity would no longer be attached to a session. The recipient's
-     * preference check is the caller's responsibility (done while the entity is still managed).
-     */
     @Async("emailExecutor")
     public void sendNotificationEmail(String toEmail, String recipientFirstName,
                                       String message, NotificationType type, String link) {
@@ -206,11 +199,6 @@ public class EmailService {
         return wrapEmailShell(header, body, footer);
     }
 
-    /**
-     * The doctype, the page background, the 560px white card and its open/close rows: the outer
-     * shell shared verbatim by every email, with only the header, body and footer rows supplied
-     * by the caller.
-     */
     private String wrapEmailShell(String headerHtml, String bodyHtml, String footerHtml) {
         return """
 <!DOCTYPE html>
@@ -234,11 +222,6 @@ public class EmailService {
 """.formatted(headerHtml, bodyHtml, footerHtml);
     }
 
-    /**
-     * Turns an application-relative link into an absolute one the recipient can actually click,
-     * and refuses anything that is not a relative path — so a notification link can never become
-     * a redirect to another host or a {@code javascript:} URI.
-     */
     private String toAbsoluteLink(String link) {
         if (link == null || link.isBlank()) {
             return null;

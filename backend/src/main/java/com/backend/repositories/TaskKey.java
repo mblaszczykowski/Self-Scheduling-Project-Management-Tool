@@ -2,15 +2,7 @@ package com.backend.repositories;
 
 import java.util.Optional;
 
-/**
- * The two halves of a task key such as {@code WEB-14}.
- *
- * <p>One parser, because the {@code lastIndexOf('-')} + {@code parseInt} dance was written three
- * times — in the repository, in dependency resolution, and in the optimizer's apply path — and
- * all three swallowed malformed input differently.
- */
 public record TaskKey(String projectKey, int taskNumber) {
-
     public static Optional<TaskKey> parse(String taskKey) {
         if (taskKey == null) {
             return Optional.empty();

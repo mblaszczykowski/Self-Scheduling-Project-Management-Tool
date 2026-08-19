@@ -4,19 +4,14 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
-/**
- * Ownership record for one file on disk, so {@code /files/{name}} can be authorized rather than
- * relying on the name being unguessable.
- *
- * <p>A null {@code projectId} means the file is not scoped to a project — currently only profile
- * pictures, which are already visible to anyone who can see the user.
- */
 @Entity
 @Table(name = "stored_files",
         uniqueConstraints = @UniqueConstraint(name = "uk_stored_file_name", columnNames = "stored_name"),
-        indexes = @Index(name = "idx_stored_file_project", columnList = "project_id"))
+        indexes = {
+                @Index(name = "idx_stored_file_project", columnList = "project_id"),
+                @Index(name = "idx_stored_file_uploader", columnList = "uploaded_by")
+        })
 public class StoredFile {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -44,6 +39,5 @@ public class StoredFile {
 
     public String getStoredName() { return storedName; }
 
-    /** Null for files that are not project-scoped (profile pictures). */
     public Integer getProjectId() { return projectId; }
 }

@@ -23,9 +23,6 @@ import java.util.Set;
                 @Index(name = "idx_task_assignee", columnList = "assignee_id")
         }
 )
-// Only to-one associations are fetch-joined. The `dependencies` collection is loaded lazily
-// and batched (hibernate.default_batch_fetch_size): fetch-joining it here produced a cartesian
-// product / duplicate root rows and forced in-memory pagination on the paged search query.
 @NamedEntityGraph(
         name = "Task.withDetails",
         attributeNodes = {
@@ -39,7 +36,7 @@ public class Task {
     private Integer id;
 
     @Version
-    private Long version; // optimistic lock — concurrent edits surface as OptimisticLockException (409)
+    private Long version;
 
     @Column(name = "task_number", nullable = false)
     private Integer taskNumber;
@@ -120,14 +117,6 @@ public class Task {
 
     public Integer getId() { return id; }
 
-    /**
-     * Exposed deliberately, and not only for completeness.
-     *
-     * <p>Spring Data decides whether an entity is new by reading its version property, and with no
-     * getter it falls back to reading the field directly. On an uninitialized Hibernate proxy that
-     * field is null, so {@code repository.delete(proxy)} concluded the entity was unsaved and
-     * silently did nothing. Going through a getter initializes the proxy and returns the real value.
-     */
     public Long getVersion() {
         return version;
     }
@@ -201,7 +190,6 @@ public class Task {
     public TaskPriority getPriority() { return priority; }
     public void setPriority(TaskPriority priority) { this.priority = priority; }
 
-    // See User.equals for why hashCode is constant per type rather than id-derived.
     @Override
     public boolean equals(Object other) {
         if (this == other) return true;

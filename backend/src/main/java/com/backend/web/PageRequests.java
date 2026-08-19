@@ -5,16 +5,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
-/**
- * Builds {@link Pageable}s from request parameters, clamped to the configured bounds.
- *
- * <p>One place for it because {@code PageRequest.of} throws {@code IllegalArgumentException} for a
- * negative page or a zero size, which surfaced as a 500 with a stack trace for what is an ordinary
- * client mistake — and because the two paginated controllers had hard-coded different defaults.
- */
 @Component
 public class PageRequests {
-
     private final int defaultSize;
     private final int maxSize;
 

@@ -8,17 +8,10 @@ import com.backend.mapper.EntityMapper;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * The auditable state of a task at one instant.
- *
- * <p>Replaces a twenty-parameter {@code logFieldChanges(task, author, oldStatus, newStatus, ...)}
- * where ten adjacent old/new pairs sat one transposition away from a silently wrong audit row —
- * and where adding a field meant widening the signature, which is why description and attachment
- * changes were never recorded despite having enum constants reserved for them.
- */
 public record TaskSnapshot(
         TaskStatus status,
         TaskPriority priority,
+        Integer assigneeId,
         String assignee,
         Integer progress,
         LocalDate startDate,
@@ -33,6 +26,7 @@ public record TaskSnapshot(
         return new TaskSnapshot(
                 task.getStatus(),
                 task.getPriority(),
+                task.getAssignee() != null ? task.getAssignee().getId() : null,
                 task.getAssignee() != null ? task.getAssignee().getFullName() : null,
                 task.getProgress(),
                 task.getStartDate(),

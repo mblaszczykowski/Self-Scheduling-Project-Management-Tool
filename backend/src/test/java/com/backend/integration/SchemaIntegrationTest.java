@@ -30,14 +30,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Exercises the real schema: that the migrations apply, that Hibernate's {@code validate} agrees
- * with them (the context would not start otherwise), that every hand-written query parses and
- * runs, and that the delete paths actually work.
- */
 @Transactional
 class SchemaIntegrationTest extends PostgresIntegrationTest {
-
     @Autowired UserRepository userRepository;
     @Autowired ProjectRepository projectRepository;
     @Autowired TaskRepository taskRepository;
@@ -78,17 +72,11 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
         task.replaceAttachments(List.of("/files/a.pdf"));
         task = taskRepository.save(task);
 
-        // Every task gets an activity row on creation, which is exactly what used to make deleting
-        // any task impossible.
         taskActivityRepository.save(
                 new TaskActivity(task, owner, TaskActivityType.CREATED, null, null, null));
 
         commentRepository.save(new Comment(task, member, null, "A comment", List.of("/files/c.png")));
 
-        // Detach everything before the tests run. A delete in production happens in its own
-        // transaction, with only the entity being deleted loaded — child rows go via the database
-        // cascade, which Hibernate has no way to know about. Holding them in the same session would
-        // test a situation the application never creates.
         entityManager.flush();
         entityManager.clear();
     }
@@ -100,11 +88,6 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
         assertThat(taskActivityRepository.findByTaskIdWithAuthor(taskId, PageRequest.of(0, 10)))
                 .isNotEmpty();
 
-        // Before the foreign key gained ON DELETE CASCADE this failed outright: every task carries
-        // a CREATED activity row, so deleting any task at all violated the constraint.
-        // Deliberately the repository call the service makes, not entityManager.remove: reading
-        // the activity rows first puts a lazy Task proxy in the session, and Spring Data used to
-        // mistake that proxy for an unsaved entity and skip the delete entirely.
         taskRepository.delete(taskRepository.findById(taskId).orElseThrow());
         entityManager.flush();
         entityManager.clear();
@@ -125,7 +108,6 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(projectRepository.findById(projectId)).isEmpty();
         assertThat(taskRepository.findByProjectIdWithDetails(projectId)).isEmpty();
-        // The owner survives: a project references its owner, not the other way round.
         assertThat(userRepository.findById(owner.getId())).isPresent();
     }
 
@@ -135,8 +117,6 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
         var taskId = task.getId();
         var memberId = member.getId();
 
-        // Their comments go with them (comments.author_id cascades); the task they happened to be
-        // assigned to does not (tasks.assignee_id is SET NULL).
         userRepository.delete(userRepository.findById(memberId).orElseThrow());
         entityManager.flush();
         entityManager.clear();
@@ -150,8 +130,6 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
     @Test
     @DisplayName("a project owner cannot be deleted while they still own projects")
     void projectOwnerCannotBeDeleted() {
-        // RESTRICT rather than CASCADE: silently deleting someone's projects because their account
-        // was removed would be the wrong kind of tidy.
         var ownerId = owner.getId();
 
         assertThatThrownBy(() -> {
@@ -190,8 +168,6 @@ class SchemaIntegrationTest extends PostgresIntegrationTest {
     @Test
     @DisplayName("the LIKE escape character is honoured, so a literal underscore is not a wildcard")
     void likeEscapeIsHonoured() {
-        // "_irst" would match "First" if the underscore were treated as a single-character
-        // wildcard; escaped with '!' it must not.
         assertThat(taskRepository.searchAccessible(owner.getId(), "%!_irst%", PageRequest.of(0, 5)))
                 .isEmpty();
         assertThat(taskRepository.searchAccessible(owner.getId(), "%_irst%", PageRequest.of(0, 5)))

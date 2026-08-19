@@ -2,22 +2,17 @@ package com.backend.requests;
 
 import com.backend.entities.TaskPriority;
 import com.backend.entities.TaskStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Full representation of a task, as sent by {@code POST} and {@code PUT}.
- *
- * <p>{@code PUT} replaces the whole resource. Callers that only want to move a task in time use
- * {@code PATCH .../schedule} instead — that endpoint physically cannot touch anything else,
- * which is what stops a timeline drag from resetting fields it never intended to send.
- */
 public record TaskRequest(
         @NotBlank(message = "Summary is required")
         @Size(max = 200, message = "Summary must not exceed 200 characters")
@@ -37,10 +32,9 @@ public record TaskRequest(
         LocalDate dueDate,
         String assignee,
 
-        // labels are stored comma-joined in a varchar(255); bound both the count and each entry
-        // so the column cannot overflow.
         @Size(max = 10, message = "A task cannot have more than 10 labels")
-        List<@Size(max = 20, message = "A label must not exceed 20 characters") String> labels,
+        List<@Size(max = 20, message = "A label must not exceed 20 characters")
+                @Pattern(regexp = "[^,]*", message = "A label must not contain a comma") String> labels,
 
         @Size(max = 50, message = "A task cannot depend on more than 50 tasks")
         List<@NotBlank String> dependencyKeys,
@@ -48,6 +42,7 @@ public record TaskRequest(
         @Size(max = 50, message = "A task cannot have more than 50 attachments")
         List<@NotBlank String> attachments
 ) {
+    @JsonIgnore
     @AssertTrue(message = "Due date must not be before the start date")
     public boolean isDateRangeOrdered() {
         return startDate == null || dueDate == null || !dueDate.isBefore(startDate);

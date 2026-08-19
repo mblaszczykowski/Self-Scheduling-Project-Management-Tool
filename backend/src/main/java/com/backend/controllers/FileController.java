@@ -19,7 +19,6 @@ import java.nio.file.Files;
 @RestController
 @RequestMapping("/files")
 public class FileController {
-
     private final FileStorageService fileStorageService;
     private final AccessGuard accessGuard;
 
@@ -28,14 +27,6 @@ public class FileController {
         this.accessGuard = accessGuard;
     }
 
-    /**
-     * Streams a stored file to a caller who is allowed to see it.
-     *
-     * <p>Authorization, not just authentication: the caller must have access to the project the
-     * file belongs to. Previously the user id was resolved and then discarded, so any logged-in
-     * user who knew — or had once seen — a filename could download it indefinitely, including after
-     * being removed from the project.
-     */
     @GetMapping("/{fileName:.+}")
     public ResponseEntity<Resource> serveFile(@CurrentUserId Integer userId,
                                               @PathVariable String fileName) {
@@ -50,8 +41,6 @@ public class FileController {
 
             var contentType = Files.probeContentType(filePath);
             return ResponseEntity.ok()
-                    // Always an attachment, never inline: a browser must not be able to render an
-                    // uploaded document in the application's own origin.
                     .header(HttpHeaders.CONTENT_DISPOSITION,
                             "attachment; filename=\"" + sanitizeFilename(resource.getFilename()) + "\"")
                     .header(HttpHeaders.CONTENT_TYPE,
@@ -65,15 +54,10 @@ public class FileController {
     }
 
     private void requireAccess(String fileName, Integer userId) {
-        var ownership = fileStorageService.findOwnership(FileStorageService.extractFileName(fileName));
-        if (ownership.isEmpty()) {
-            // Uploaded before ownership was recorded. Keeping these readable to authenticated
-            // users preserves historic attachments rather than breaking them.
-            return;
-        }
-        var projectId = ownership.get().getProjectId();
+        var ownership = fileStorageService.findOwnership(FileStorageService.extractFileName(fileName))
+                .orElseThrow(() -> new ResourceNotFoundException("File not found"));
+        var projectId = ownership.getProjectId();
         if (projectId == null) {
-            // Not project-scoped: profile pictures, already visible wherever the user is.
             return;
         }
         accessGuard.requireProjectAccessById(projectId, userId);

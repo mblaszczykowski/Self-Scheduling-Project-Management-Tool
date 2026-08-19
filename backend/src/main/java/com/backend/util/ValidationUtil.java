@@ -67,17 +67,4 @@ public final class ValidationUtil {
         }
     }
 
-    public static void validateName(String name, String fieldName) {
-        if (isNullOrEmpty(name)) {
-            throw new ValidationException(fieldName + " is required");
-        }
-
-        if (name.length() < 2) {
-            throw new ValidationException(fieldName + " must be at least 2 characters");
-        }
-
-        if (name.length() > 50) {
-            throw new ValidationException(fieldName + " must not exceed 50 characters");
-        }
-    }
 }

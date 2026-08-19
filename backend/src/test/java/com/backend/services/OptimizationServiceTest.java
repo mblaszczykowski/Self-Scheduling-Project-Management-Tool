@@ -1,12 +1,15 @@
 package com.backend.services;
 
 import com.backend.config.AppProperties;
+import com.backend.dtos.OptimizationResultDTO;
 import com.backend.dtos.TaskDTO;
+import com.backend.dtos.TaskScheduleSuggestionDTO;
 import com.backend.entities.TaskPriority;
 import com.backend.entities.TaskStatus;
 import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.requests.ApplyOptimizationRequest;
+import com.backend.requests.OptimizationRequest;
 import com.backend.scheduling.SchedulingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,16 +31,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * The apply path — the only place the optimizer writes to the board.
- *
- * <p>Uses a real {@link SchedulingService}, because what is being tested is precisely the
- * agreement between the schedule the scheduler derives and the subset the caller approved. A
- * stubbed scheduler would let the test agree with itself.
- */
 @ExtendWith(MockitoExtension.class)
 class OptimizationServiceTest {
-
     private static final Integer USER_ID = 7;
     private static final LocalDate TODAY = LocalDate.now();
 
@@ -60,7 +55,17 @@ class OptimizationServiceTest {
                 null, null, List.of(), null, null, 0, TaskPriority.MEDIUM);
     }
 
-    /** Two tasks on one person, booked over each other, so any schedule has to move one. */
+    private static TaskDTO fixedTask(String key, String start, String due, String assignee) {
+        return new TaskDTO(null, null, key, "P", key, null, TaskStatus.DONE,
+                LocalDate.parse(start), LocalDate.parse(due), assignee, List.of(), List.of(),
+                null, null, List.of(), null, null, 100, TaskPriority.MEDIUM);
+    }
+
+    private static TaskDTO datelessTask(String key) {
+        return new TaskDTO(null, null, key, "P", key, null, TaskStatus.TODO, null, null, null,
+                List.of(), List.of(), null, null, List.of(), null, null, 0, TaskPriority.MEDIUM);
+    }
+
     private List<TaskDTO> doubleBookedPair() {
         var day = TODAY.plusDays(1).toString();
         var end = TODAY.plusDays(6).toString();
@@ -73,14 +78,23 @@ class OptimizationServiceTest {
         return new ApplyOptimizationRequest(List.of("P"), null, null, null, acceptedKeys);
     }
 
+    private static OptimizationRequest simulateRequest() {
+        return new OptimizationRequest(List.of("P"), null, null, null);
+    }
+
+    private static TaskScheduleSuggestionDTO suggestionFor(OptimizationResultDTO result, String taskKey) {
+        return result.suggestions().stream()
+                .filter(s -> s.taskKey().equals(taskKey))
+                .findFirst()
+                .orElseThrow();
+    }
+
     @Nested
     @DisplayName("What gets written")
     class Writes {
-
         @Test
         @DisplayName("a plan that changes nothing writes nothing")
         void unchangedPlanWritesNothing() {
-            // One task, sole owner of its assignee: the optimizer has nothing to improve.
             var tasks = List.of(task("P-1", TODAY.plusDays(1).toString(),
                     TODAY.plusDays(3).toString(), "dev@x", List.of()));
             when(inputLoader.load(List.of("P"), USER_ID))
@@ -91,7 +105,7 @@ class OptimizationServiceTest {
         }
 
         @Test
-        @DisplayName("accepting the whole plan writes exactly the tasks that moved")
+        @DisplayName("accepting the whole plan writes exactly the tasks that moved, with concrete non-overlapping dates")
         void acceptingEverythingWritesTheMovedTasks() {
             var tasks = doubleBookedPair();
             when(inputLoader.load(List.of("P"), USER_ID))
@@ -104,24 +118,23 @@ class OptimizationServiceTest {
             ArgumentCaptor<List<TaskService.ScheduleChange>> captor =
                     ArgumentCaptor.forClass(List.class);
             verify(taskService).applySchedule(captor.capture(), anyInt());
-            assertThat(captor.getValue()).isNotEmpty();
-            assertThat(captor.getValue()).allSatisfy(change ->
-                    assertThat(change.taskKey()).isIn("P-1", "P-2"));
+            var changes = captor.getValue();
+            assertThat(changes).allSatisfy(change -> assertThat(change.taskKey()).isIn("P-1", "P-2"));
+
+            var originalDue = TODAY.plusDays(6);
+            assertThat(changes).extracting(TaskService.ScheduleChange::taskKey).containsExactly("P-2");
+
+            var moved = changes.get(0);
+            assertThat(moved.startDate()).isEqualTo(originalDue.plusDays(1));
+            assertThat(moved.dueDate()).isEqualTo(originalDue.plusDays(6));
+
+            assertThat(moved.startDate()).isAfter(originalDue);
         }
     }
 
     @Nested
     @DisplayName("A preview that no longer matches the board")
     class StalePreview {
-
-        /**
-         * The endpoint re-derives the schedule instead of trusting dates from the browser, so the
-         * dates it writes are always fresh. The <em>set</em> of accepted keys is not: it comes
-         * from a preview that may predate an edit. Writing only the part of a fresh plan that the
-         * caller happens to have seen persists half a schedule, and the half left behind is what
-         * made the other half feasible — which is exactly the silently-infeasible write the
-         * re-derivation exists to prevent.
-         */
         @Test
         @DisplayName("is refused rather than applied in part")
         void partialAcceptanceOfAFreshPlanIsRefused() {
@@ -129,7 +142,6 @@ class OptimizationServiceTest {
             when(inputLoader.load(List.of("P"), USER_ID))
                     .thenReturn(new OptimizationInputLoader.Input(tasks, List.of()));
 
-            // The caller approved P-1 only; the current plan also needs P-2 to move.
             assertThatThrownBy(() -> optimization.apply(applyRequest(List.of("P-1")), USER_ID))
                     .isInstanceOf(ValidationException.class)
                     .hasMessageContaining("changed");
@@ -161,5 +173,51 @@ class OptimizationServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(taskService, never()).applySchedule(any(), anyInt());
+    }
+
+    @Nested
+    @DisplayName("simulate()")
+    class Simulate {
+        @Test
+        @DisplayName("flags the task that moved, leaves the untouched one unflagged, "
+                + "excludes fixed work, and reports the dateless task as skipped")
+        void reportsShiftedUntouchedFixedAndDatelessTasksCorrectly() {
+            var day = TODAY.plusDays(1);
+            var end = TODAY.plusDays(6);
+            var tasks = List.of(
+                    task("P-1", day.toString(), end.toString(), "dev@x", List.of()),
+                    task("P-2", day.toString(), end.toString(), "dev@x", List.of()),
+                    fixedTask("P-3", TODAY.minusDays(10).toString(), TODAY.minusDays(5).toString(), "dev@x"),
+                    datelessTask("P-4"));
+            when(inputLoader.load(List.of("P"), USER_ID))
+                    .thenReturn(new OptimizationInputLoader.Input(tasks, List.of()));
+
+            var result = optimization.simulate(simulateRequest(), USER_ID);
+
+            assertThat(result.skippedTaskKeys()).containsExactly("P-4");
+            assertThat(result.suggestions()).extracting(TaskScheduleSuggestionDTO::taskKey)
+                    .containsExactlyInAnyOrder("P-1", "P-2");
+
+            var unchanged = suggestionFor(result, "P-1");
+            assertThat(unchanged.wasShifted()).isFalse();
+            assertThat(unchanged.originalStartDate()).isEqualTo(day);
+            assertThat(unchanged.originalDueDate()).isEqualTo(end);
+            assertThat(unchanged.suggestedStartDate()).isEqualTo(day);
+            assertThat(unchanged.suggestedDueDate()).isEqualTo(end);
+
+            var moved = suggestionFor(result, "P-2");
+            assertThat(moved.wasShifted()).isTrue();
+            assertThat(moved.originalStartDate()).isEqualTo(day);
+            assertThat(moved.originalDueDate()).isEqualTo(end);
+            assertThat(moved.suggestedStartDate()).isEqualTo(end.plusDays(1));
+            assertThat(moved.suggestedDueDate()).isEqualTo(end.plusDays(6));
+
+            assertThat(result.originalMetrics().totalTasks()).isEqualTo(2);
+            assertThat(result.originalMetrics().resourceConflicts()).isPositive();
+            assertThat(result.originalMetrics().feasible()).isFalse();
+            assertThat(result.optimizedMetrics().totalTasks()).isEqualTo(2);
+            assertThat(result.optimizedMetrics().resourceConflicts()).isZero();
+            assertThat(result.optimizedMetrics().feasible()).isTrue();
+        }
     }
 }

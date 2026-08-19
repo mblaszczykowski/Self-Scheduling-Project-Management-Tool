@@ -46,7 +46,6 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
-
     @Mock
     private NotificationRepository notificationRepository;
 
@@ -56,7 +55,6 @@ class NotificationServiceTest {
     @Mock
     private EmailService emailService;
 
-    /** Real mapper: the DTO handed to the SSE stream is then the one production would push. */
     private final EntityMapper entityMapper = new EntityMapper();
 
     private NotificationService notificationService;
@@ -79,7 +77,6 @@ class NotificationServiceTest {
         }
     }
 
-    /** Mimics the id JPA would assign on insert, so the mapped DTO carries a real id. */
     private void assignIdsOnSave() {
         var nextId = new AtomicInteger(500);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> {
@@ -107,7 +104,6 @@ class NotificationServiceTest {
     @Nested
     @DisplayName("createNotification")
     class CreateNotificationTests {
-
         @Test
         @DisplayName("stores the notification with its recipient, message, type, link and a timestamp")
         void shouldStoreEveryFieldOfTheNotification() {
@@ -185,7 +181,6 @@ class NotificationServiceTest {
     @Nested
     @DisplayName("notifyAll")
     class NotifyAllTests {
-
         @Test
         @DisplayName("stores at most one notification per recipient and keeps the first entry")
         void shouldStoreOneNotificationPerRecipientKeepingTheFirstEntry() {
@@ -257,12 +252,10 @@ class NotificationServiceTest {
 
             assertThatCode(() -> notificationService.notifyAll(pending)).doesNotThrowAnyException();
 
-            // Both rows were written, and the surviving recipient still got both side effects.
             verify(notificationRepository, times(2)).save(any(Notification.class));
             verify(sseEmitterManager).sendNotification(eq(2), any());
             verify(emailService).sendNotificationEmail(eq("second@example.com"), eq("User"),
                     eq("second message"), eq(NotificationType.TASK_ASSIGNED), eq("/second"));
-            // The failing recipient's own follow-up work stopped at the exception.
             verify(emailService, never()).sendNotificationEmail(eq("first@example.com"), anyString(),
                     anyString(), any(), anyString());
         }
@@ -304,7 +297,6 @@ class NotificationServiceTest {
     @Nested
     @DisplayName("getNotifications")
     class GetNotificationsTests {
-
         @Test
         @DisplayName("maps the page of entities to DTOs and keeps the paging metadata")
         void shouldReturnAPageOfDtos() {
@@ -345,7 +337,6 @@ class NotificationServiceTest {
     @Nested
     @DisplayName("markNotificationsAsRead")
     class MarkNotificationsAsReadTests {
-
         private Collection<Integer> captureCollection(String method) {
             ArgumentCaptor<Collection<Integer>> captor = ArgumentCaptor.captor();
             if ("countOwnedBy".equals(method)) {
@@ -370,7 +361,6 @@ class NotificationServiceTest {
         @Test
         @DisplayName("refuses the whole batch when any id belongs to somebody else")
         void shouldRefuseTheBatchWhenAnyIdIsNotOwned() {
-            // Only one of the two ids is owned by user 1.
             when(notificationRepository.countOwnedBy(anyCollection(), eq(1))).thenReturn(1L);
 
             assertThatThrownBy(() -> notificationService.markNotificationsAsRead(List.of(11, 12), 1))
@@ -394,8 +384,6 @@ class NotificationServiceTest {
         @Test
         @DisplayName("collapses repeated ids before counting them, so duplicates are not a mismatch")
         void shouldDeduplicateIdsBeforeTheOwnershipCheck() {
-            // Two distinct ids owned; without de-duplication the count (2) would not match the
-            // four submitted ids and the caller would be rejected for their own notifications.
             when(notificationRepository.countOwnedBy(anyCollection(), eq(1))).thenReturn(2L);
 
             notificationService.markNotificationsAsRead(List.of(12, 11, 12, 11), 1);
@@ -431,7 +419,6 @@ class NotificationServiceTest {
     @Nested
     @DisplayName("markAllNotificationsAsRead")
     class MarkAllNotificationsAsReadTests {
-
         @Test
         @DisplayName("flips every unread notification for the caller in one statement")
         void shouldMarkEveryUnreadNotificationAsRead() {
@@ -445,7 +432,6 @@ class NotificationServiceTest {
         @Test
         @DisplayName("returns the authoritative remaining unread count from the database")
         void shouldReturnTheRemainingUnreadCount() {
-            // Simulates a notification landing between the bulk update and the recount.
             when(notificationRepository.countByUserIdAndIsReadFalse(1)).thenReturn(1L);
 
             var remaining = notificationService.markAllNotificationsAsRead(1);

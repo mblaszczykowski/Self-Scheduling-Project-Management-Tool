@@ -3,6 +3,7 @@ package com.backend.filter;
 import com.backend.config.JwtProperties;
 import com.backend.config.PublicEndpoints;
 import com.backend.web.CookieFactory;
+import com.backend.util.SecureTokens;
 import com.backend.web.FilterResponseUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
@@ -21,27 +22,15 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.time.Duration;
-import java.util.Base64;
 
-/**
- * Double-submit CSRF protection: a script-readable cookie must be echoed back in a header.
- *
- * <p>The cookie's lifetime matches the refresh token's, so an idle tab cannot come back to a
- * session that is still valid but a CSRF token that has quietly expired — which surfaced as an
- * unexplained 403 the client had no way to recover from.
- */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 3) // last of the functional filters, after authentication
+@Order(Ordered.HIGHEST_PRECEDENCE + 3)
 public class CsrfProtectionFilter extends OncePerRequestFilter {
-
     private static final Logger log = LoggerFactory.getLogger(CsrfProtectionFilter.class);
 
     private static final String CSRF_COOKIE_NAME = "XSRF-TOKEN";
     private static final String CSRF_HEADER_NAME = "X-CSRF-Token";
-    private static final int TOKEN_LENGTH = 32;
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final ObjectMapper objectMapper;
     private final CookieFactory cookieFactory;
@@ -59,7 +48,6 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-
         var path = request.getRequestURI();
         var method = request.getMethod();
 
@@ -110,8 +98,6 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
     }
 
     private static String generateCsrfToken() {
-        var bytes = new byte[TOKEN_LENGTH];
-        SECURE_RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        return SecureTokens.urlSafe(SecureTokens.DEFAULT_BYTES);
     }
 }

@@ -4,16 +4,21 @@ import com.backend.dtos.CommentDTO;
 import com.backend.dtos.PagedResponse;
 import com.backend.entities.ReactionType;
 import com.backend.services.CommentService;
+import com.backend.util.ValidationUtil;
 import com.backend.web.CurrentUserId;
 import com.backend.web.PageRequests;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 @RestController
+@Validated
 @RequestMapping("/api/tasks/{taskId}/comments")
 public class CommentController {
 
@@ -41,7 +46,11 @@ public class CommentController {
     public ResponseEntity<CommentDTO> addComment(
             @CurrentUserId Integer userId,
             @PathVariable Integer taskId,
-            @RequestPart("content") String content,
+            @RequestPart("content")
+            @NotBlank(message = "Comment content cannot be empty")
+            @Size(max = ValidationUtil.MAX_COMMENT_LENGTH,
+                    message = "Comment exceeds the maximum length of "
+                            + ValidationUtil.MAX_COMMENT_LENGTH + " characters") String content,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments,
             @RequestParam(value = "parentCommentId", required = false) Integer parentCommentId
     ) {
@@ -54,7 +63,11 @@ public class CommentController {
             @CurrentUserId Integer userId,
             @PathVariable Integer taskId,
             @PathVariable Integer commentId,
-            @RequestPart("content") String content,
+            @RequestPart("content")
+            @NotBlank(message = "Comment content cannot be empty")
+            @Size(max = ValidationUtil.MAX_COMMENT_LENGTH,
+                    message = "Comment exceeds the maximum length of "
+                            + ValidationUtil.MAX_COMMENT_LENGTH + " characters") String content,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) {
         return ResponseEntity.ok(

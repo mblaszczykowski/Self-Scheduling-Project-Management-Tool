@@ -36,10 +36,6 @@
               "schema" : {
                 "type" : "object",
                 "properties" : {
-                  "userId" : {
-                    "type" : "integer",
-                    "format" : "int32"
-                  },
                   "profile" : {
                     "type" : "string"
                   },
@@ -94,12 +90,10 @@
               "schema" : {
                 "type" : "object",
                 "properties" : {
-                  "userId" : {
-                    "type" : "integer",
-                    "format" : "int32"
-                  },
                   "content" : {
-                    "type" : "string"
+                    "type" : "string",
+                    "maxLength" : 10000,
+                    "minLength" : 0
                   },
                   "attachments" : {
                     "type" : "array",
@@ -112,7 +106,8 @@
                 "required" : [ "content" ]
               }
             }
-          }
+          },
+          "required" : true
         },
         "responses" : {
           "200" : {
@@ -196,10 +191,6 @@
               "schema" : {
                 "type" : "object",
                 "properties" : {
-                  "userId" : {
-                    "type" : "integer",
-                    "format" : "int32"
-                  },
                   "projectDTO" : {
                     "type" : "string"
                   },
@@ -272,10 +263,6 @@
               "schema" : {
                 "type" : "object",
                 "properties" : {
-                  "userId" : {
-                    "type" : "integer",
-                    "format" : "int32"
-                  },
                   "taskDTO" : {
                     "type" : "string"
                   },
@@ -426,12 +413,10 @@
               "schema" : {
                 "type" : "object",
                 "properties" : {
-                  "userId" : {
-                    "type" : "integer",
-                    "format" : "int32"
-                  },
                   "content" : {
-                    "type" : "string"
+                    "type" : "string",
+                    "maxLength" : 10000,
+                    "minLength" : 0
                   },
                   "attachments" : {
                     "type" : "array",
@@ -444,7 +429,8 @@
                 "required" : [ "content" ]
               }
             }
-          }
+          },
+          "required" : true
         },
         "responses" : {
           "200" : {
@@ -546,10 +532,6 @@
               "schema" : {
                 "type" : "object",
                 "properties" : {
-                  "userId" : {
-                    "type" : "integer",
-                    "format" : "int32"
-                  },
                   "projectDTO" : {
                     "type" : "string"
                   },
@@ -598,10 +580,6 @@
               "schema" : {
                 "type" : "object",
                 "properties" : {
-                  "userId" : {
-                    "type" : "integer",
-                    "format" : "int32"
-                  },
                   "taskDTO" : {
                     "type" : "string"
                   },
@@ -1040,11 +1018,11 @@
         "operationId" : "streamNotifications",
         "responses" : {
           "200" : {
-            "description" : "OK",
+            "description" : "Stream of notification events",
             "content" : {
               "text/event-stream" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/SseEmitter"
+                  "$ref" : "#/components/schemas/NotificationDTO"
                 }
               }
             }
@@ -1133,18 +1111,6 @@
           "dislikeCount" : {
             "type" : "integer",
             "format" : "int32"
-          },
-          "likedByUsernames" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "dislikedByUsernames" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
           },
           "likedByCurrentUser" : {
             "type" : "boolean"
@@ -1603,9 +1569,6 @@
           "dueDate" : {
             "type" : "string",
             "format" : "date"
-          },
-          "dateRangeOrdered" : {
-            "type" : "boolean"
           }
         },
         "required" : [ "dueDate", "startDate" ]
@@ -1867,15 +1830,6 @@
           },
           "hasNext" : {
             "type" : "boolean"
-          }
-        }
-      },
-      "SseEmitter" : {
-        "type" : "object",
-        "properties" : {
-          "timeout" : {
-            "type" : "integer",
-            "format" : "int64"
           }
         }
       }

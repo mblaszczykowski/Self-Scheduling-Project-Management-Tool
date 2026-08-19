@@ -9,14 +9,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-/**
- * Every case here is one that {@code PageRequest.of} rejects outright with an
- * {@code IllegalArgumentException} — which reached the client as a 500 and a stack trace for what
- * is an ordinary mistake in a query string. The clamping is the contract.
- */
 @DisplayName("PageRequests")
 class PageRequestsTest {
-
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 50;
 
@@ -33,7 +27,6 @@ class PageRequestsTest {
     @Nested
     @DisplayName("page number")
     class PageNumber {
-
         @Test
         @DisplayName("passes a valid page number through untouched")
         void passesAValidPageNumberThrough() {
@@ -58,7 +51,6 @@ class PageRequestsTest {
     @Nested
     @DisplayName("page size")
     class PageSize {
-
         @Test
         @DisplayName("passes a size within the configured bounds through untouched")
         void passesASizeWithinBoundsThrough() {
@@ -108,7 +100,6 @@ class PageRequestsTest {
     @Nested
     @DisplayName("both parameters out of range at once")
     class BothOutOfRange {
-
         @Test
         @DisplayName("produces a usable first page rather than an error")
         void producesAUsableFirstPage() {

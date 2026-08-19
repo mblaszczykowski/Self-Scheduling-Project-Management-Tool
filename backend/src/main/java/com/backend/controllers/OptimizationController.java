@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/optimization")
 public class OptimizationController {
-
     private final OptimizationService optimizationService;
 
     public OptimizationController(OptimizationService optimizationService) {
@@ -30,10 +29,6 @@ public class OptimizationController {
         return ResponseEntity.ok(optimizationService.simulate(request, userId));
     }
 
-    /**
-     * Applies an optimization by recomputing it server-side, rather than writing dates the browser
-     * echoed back.
-     */
     @PostMapping("/apply")
     public ResponseEntity<AppliedSchedule> apply(
             @CurrentUserId Integer userId,

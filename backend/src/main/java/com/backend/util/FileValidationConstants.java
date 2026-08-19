@@ -1,15 +1,17 @@
 package com.backend.util;
 
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Map;
 import java.util.Set;
 
 public final class FileValidationConstants {
-
     private FileValidationConstants() {}
 
     public static final int MAX_ATTACHMENTS_PER_REQUEST = 10;
 
-    /** Bytes of a file that must be read to identify its type — the longest magic prefix. */
     public static final int MAGIC_BYTE_PREFIX_LENGTH = 8;
 
     public static final Set<String> ALLOWED_EXTENSIONS = Set.of(
@@ -21,10 +23,10 @@ public final class FileValidationConstants {
     public static final byte[] JPEG_MAGIC = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
     public static final byte[] PNG_MAGIC = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
     public static final byte[] GIF_MAGIC = new byte[]{0x47, 0x49, 0x46};
-    public static final byte[] WEBP_RIFF_MAGIC = new byte[]{0x52, 0x49, 0x46, 0x46}; // RIFF header
-    public static final byte[] PDF_MAGIC = new byte[]{0x25, 0x50, 0x44, 0x46}; // %PDF
-    public static final byte[] ZIP_MAGIC = new byte[]{0x50, 0x4B, 0x03, 0x04}; // PK (docx, xlsx, pptx)
-    public static final byte[] OLE2_MAGIC = new byte[]{(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0}; // OLE2 (doc, xls, ppt)
+    public static final byte[] WEBP_RIFF_MAGIC = new byte[]{0x52, 0x49, 0x46, 0x46};
+    public static final byte[] PDF_MAGIC = new byte[]{0x25, 0x50, 0x44, 0x46};
+    public static final byte[] ZIP_MAGIC = new byte[]{0x50, 0x4B, 0x03, 0x04};
+    public static final byte[] OLE2_MAGIC = new byte[]{(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0};
 
     public static final Map<String, byte[]> MAGIC_BYTES_BY_EXTENSION = Map.ofEntries(
             Map.entry("jpg", JPEG_MAGIC),
@@ -40,6 +42,14 @@ public final class FileValidationConstants {
             Map.entry("xls", OLE2_MAGIC),
             Map.entry("ppt", OLE2_MAGIC)
     );
+
+    public static byte[] readHeader(MultipartFile file) {
+        try (var input = file.getInputStream()) {
+            return input.readNBytes(MAGIC_BYTE_PREFIX_LENGTH);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
 
     public static boolean startsWithMagicBytes(byte[] fileBytes, byte[] magicBytes) {
         if (fileBytes == null || fileBytes.length < magicBytes.length) {
