@@ -21,7 +21,7 @@ jobs:
       # Java 21 specifically: the build targets 21, and Mockito's bytecode instrumentation
       # fails on JVMs it has no support for, so a newer JDK breaks the mock-based tests.
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
