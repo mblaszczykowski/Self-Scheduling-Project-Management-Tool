@@ -1,0 +1,17 @@
+flowchart TD
+    Tasks["Task DTOs<br/>(entire portfolio)"] --> Model["ScheduleModel"]
+    Model --> Graph["PrecedenceGraph<br/>topological order + cycle check"]
+    Graph --> Decode["SsgsDecoder<br/>run once per priority rule"]
+    Decode --> R1["MORCPSP"]
+    Decode --> R2["AS_PLANNED"]
+    Decode --> R3["LFT"]
+    Decode --> R4["SPT"]
+    Decode --> R5["MTS"]
+    R1 --> Eval["ScheduleEvaluator<br/>Z = α·(WT / WTmax) + β·(Cmax / H)"]
+    R2 --> Eval
+    R3 --> Eval
+    R4 --> Eval
+    R5 --> Eval
+    Eval --> Pick["lowest Z wins"]
+    Pick --> Simulate["POST /optimization/simulate<br/>preview only"]
+    Pick --> Apply["POST /optimization/apply<br/>recomputed server-side, then persisted"]
