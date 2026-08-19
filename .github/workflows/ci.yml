@@ -16,7 +16,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Java 21 specifically: the build targets 21, and Mockito's bytecode instrumentation
       # fails on JVMs it has no support for, so a newer JDK breaks the mock-based tests.
@@ -43,7 +43,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node 20
         uses: actions/setup-node@v4
@@ -80,7 +80,7 @@ jobs:
   secret-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # A signing key was committed in plaintext once in this repository's history, so the guard
       # against it happening again is mechanical rather than a review habit.
@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend-test, frontend, secret-scan]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # docker-compose.yml declares JWT_SECRET and POSTGRES_PASSWORD as required, so compose
       # refuses to interpolate the file without them - even for a build. The images are built
