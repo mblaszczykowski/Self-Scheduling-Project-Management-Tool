@@ -5,7 +5,7 @@ import {
     createTask as apiCreateTask,
     deleteProject as apiDeleteProject,
     deleteTask as apiDeleteTask,
-    getProjects,
+    getAllProjects,
     updateProject as apiUpdateProject,
     updateTask as apiUpdateTask,
     updateTaskSchedule as apiUpdateTaskSchedule,
@@ -19,11 +19,9 @@ interface ProjectsContextValue {
     projects: Project[];
     projectsLoading: boolean;
     projectsError: string | null;
-    /** Forces a fetch. For a user-initiated retry; ordinary mutations invalidate instead. */
     retryProjects: () => Promise<void>;
     createTask: (projectKey: string, payload: TaskPayload, attachments?: File[]) => Promise<Task>;
     updateTask: (projectKey: string, taskKey: string, payload: TaskPayload, attachments?: File[]) => Promise<Task>;
-    /** Moves a task in time only — cannot clear the fields it does not send. */
     updateTaskSchedule: (projectKey: string, taskKey: string, startDate: string, dueDate: string) => Promise<Task>;
     deleteTask: (projectKey: string, taskKey: string) => Promise<void>;
     createProject: (payload: ProjectPayload, attachments?: File[]) => Promise<Project>;
@@ -41,29 +39,21 @@ export const useProjects = (): ProjectsContextValue => {
 
 export const PROJECTS_QUERY_KEY = ['projects'] as const;
 
-/** One page big enough for a real portfolio; the server clamps it to its own maximum. */
-const PROJECTS_PAGE_SIZE = 100;
-
-// One shared instance: `?? []` would mint a new array on every render while the query is loading
-// or failed, changing the context value's identity and re-rendering every consumer in the app.
 const NO_PROJECTS: Project[] = [];
 
 export const ProjectsProvider = ({ children }: { children: React.ReactNode }) => {
     const { user } = useAuth();
     const queryClient = useQueryClient();
 
-    // Server state is owned by react-query: caching, request dedup and background refetch replace
-    // a manual useState/useEffect fetch. The context's public shape hides that from consumers.
     const { data, isLoading: projectsLoading, error } = useQuery({
         queryKey: PROJECTS_QUERY_KEY,
-        queryFn: () => getProjects(0, PROJECTS_PAGE_SIZE),
+        queryFn: getAllProjects,
         enabled: !!user,
     });
 
-    const projects = data?.content ?? NO_PROJECTS;
+    const projects = data ?? NO_PROJECTS;
     const projectsError = error ? getErrorMessage(error, 'Failed to load projects') : null;
 
-    // Drop cached projects on logout so a different account cannot briefly see them.
     useEffect(() => {
         if (!user) queryClient.removeQueries({ queryKey: PROJECTS_QUERY_KEY });
     }, [user, queryClient]);

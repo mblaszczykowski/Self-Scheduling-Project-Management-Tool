@@ -9,21 +9,6 @@ const STATUS_PILL: Record<string, { label: string; color: string }> = {
     TODO:        { label: 'To Do',       color: 'bg-blue-50 text-blue-600' },
 };
 
-/*
- * Timeline: Jan=0-17% | Feb=17-33% | Mar=33-50% | Apr=50-67% | May=67-83% | Jun=83-100%
- * TODAY ≈ 52% (early April)
- *
- * Story: tasks were scheduled optimistically (overlapping predecessors / same dev).
- * The RCPSP solver pushes them LATER to respect dependencies & resource limits.
- *
- * WEB critical path: WEB-1(0-15) → WEB-2(15-37) → WEB-3(ghost 48-62)
- *   WEB-2 delayed (ends 37%, today 52%, only 80% done)
- *   WEB-3 scheduled at 30% (overlaps WEB-2!) → optimizer pushes to 48%
- *
- * MOB critical path: MOB-2(10-42) → MOB-3(ghost 50-62)
- *   MOB-1 runs parallel with slack (not critical)
- *   MOB-3 scheduled at 34% (before MOB-2 finishes!) → optimizer pushes to 50%
- */
 const PROJECTS = [
     {
         key: 'WEB', name: 'Website Redesign', progress: 60,

@@ -53,19 +53,19 @@ describe('summarizeOptimization', () => {
     test('groups by assignee, falling back to Unassigned, and excludes Unassigned from affectedPeople', () => {
         const s1 = suggestion({
             taskKey: 'T1', assignee: 'alice@x.com',
-            originalStartDate: '2024-06-01', suggestedStartDate: '2024-06-04', // +3
+            originalStartDate: '2024-06-01', suggestedStartDate: '2024-06-04',
         });
         const s2 = suggestion({
             taskKey: 'T2', assignee: 'alice@x.com',
-            originalStartDate: '2024-06-10', suggestedStartDate: '2024-06-08', // -2
+            originalStartDate: '2024-06-10', suggestedStartDate: '2024-06-08',
         });
         const s3 = suggestion({
             taskKey: 'T3', assignee: 'bob@x.com',
-            originalStartDate: '2024-06-05', suggestedStartDate: '2024-06-05', // 0
+            originalStartDate: '2024-06-05', suggestedStartDate: '2024-06-05',
         });
         const s4 = suggestion({
             taskKey: 'T4', assignee: null,
-            originalStartDate: '2024-06-01', suggestedStartDate: '2024-06-06', // +5
+            originalStartDate: '2024-06-01', suggestedStartDate: '2024-06-06',
         });
 
         const result = summarizeOptimization([s1, s2, s3, s4]);
@@ -76,7 +76,6 @@ describe('summarizeOptimization', () => {
         expect(result.byAssignee['Unassigned'].map((s) => s.suggestion.taskKey)).toEqual(['T4']);
         expect(result.affectedPeople).toBe(2);
 
-        // Absolute shifts are 3, 2, 0, 5: mean 2.5 rounds to 3, max is 5.
         expect(result.avgShift).toBe(3);
         expect(result.maxShift).toBe(5);
     });

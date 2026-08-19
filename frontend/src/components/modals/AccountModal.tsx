@@ -1,13 +1,13 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 import Modal from 'react-modal';
 import { ErrorMessage, Field, Form, Formik, FormikHelpers, FormikProps } from 'formik';
 import * as Yup from 'yup';
+import { HiOutlineX } from 'react-icons/hi';
 import { updateEmailPreferences, updateProfile } from '../../util/api';
 import { getImageUrl, getErrorMessage } from '../../util/helpers';
 import { showToast } from '../../util/toast';
 import Avatar from '../common/Avatar';
-import { CloseIcon } from '../common/Icons';
 import { inputClass } from '../common/formHelpers';
 import { withPasswordComplexity } from '../auth/passwordRules';
 import { ALLOWED_IMAGE_EXTENSIONS, IMAGE_ACCEPT, getFileValidationError } from '../../util/fileValidation';
@@ -31,21 +31,22 @@ interface EmailPrefs {
     emailOnProjectInvitation: boolean;
 }
 
-// Empty password fields must be treated as "no change", not as an 8-char
-// violation (Yup's .min runs on '' too). Transform '' -> undefined so a user
-// editing only their name/email/avatar can still submit.
 const emptyToUndefined = (value: string) => (value === '' ? undefined : value);
 
-const validationSchema = Yup.object().shape({
+const buildValidationSchema = (initialEmail: string) => Yup.object().shape({
     firstname: Yup.string().required('First name is required'),
     lastname: Yup.string().required('Last name is required'),
     email: Yup.string().email('Invalid email').required('Email is required'),
     newPassword: withPasswordComplexity(Yup.string().transform(emptyToUndefined)),
     currentPassword: Yup.string()
         .transform(emptyToUndefined)
-        .when('newPassword', {
-            is: (v: unknown) => !!v,
-            then: (schema: Yup.StringSchema) => schema.required('Enter your current password to set a new one'),
+        .when('email', {
+            is: (v: unknown) => v !== initialEmail,
+            then: (schema: Yup.StringSchema) => schema.required('Enter your current password to change your email'),
+            otherwise: (schema: Yup.StringSchema) => schema.when('newPassword', {
+                is: (v: unknown) => !!v,
+                then: (inner: Yup.StringSchema) => inner.required('Enter your current password to set a new one'),
+            }),
         }),
     confirmNewPassword: Yup.string()
         .transform(emptyToUndefined)
@@ -105,17 +106,20 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
     const formikRef = useRef<FormikProps<AccountFormValues>>(null);
 
     const emailTogglesDisabled = emailPrefsSaving || !emailPrefs.emailNotificationsEnabled;
+    const validationSchema = React.useMemo(() => buildValidationSchema(user.email), [user.email]);
 
-    // Closes unconditionally: used after a successful save and after the user confirms
-    // discarding unsaved changes, so neither path re-checks dirtiness.
+    useEffect(() => {
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = previousOverflow; };
+    }, []);
+
     const handleForceClose = React.useCallback(() => {
         setCloseConfirmOpen(false);
         setIsVisible(false);
         setTimeout(onClose, 200);
     }, [onClose, setIsVisible]);
 
-    // Entry point for every user-initiated close (Escape, overlay click, the × button, Cancel):
-    // a dirty form is confirmed rather than discarded silently.
     const handleCloseAttempt = React.useCallback(() => {
         if (formikRef.current?.dirty) {
             setCloseConfirmOpen(true);
@@ -139,8 +143,6 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
         { setSubmitting, setErrors }: FormikHelpers<AccountFormValues>,
     ) => {
         try {
-            // currentPassword is sent whenever it was filled in: the server requires it for a
-            // password change and, since login is by email, for an email change too.
             const updatedUser = await updateProfile({
                 firstname: values.firstname,
                 lastname: values.lastname,
@@ -155,8 +157,6 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                 : 'Account updated', 'success');
             handleForceClose();
         } catch (err) {
-            // Field-level failures are attached to the fields that caused them rather than being
-            // flattened into one toast.
             const fieldErrors = (err as ErrorLike).response?.data?.fieldErrors;
             if (fieldErrors && fieldErrors.length > 0) {
                 setErrors(Object.fromEntries(
@@ -239,7 +239,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                             title="Close"
                         >
-                            <CloseIcon className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                            <HiOutlineX className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                         </button>
                     </div>
                 </div>

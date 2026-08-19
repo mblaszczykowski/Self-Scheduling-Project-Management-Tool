@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HiOutlineExclamationCircle } from 'react-icons/hi';
 import AuthPage from './pages/AuthPage';
@@ -39,8 +39,6 @@ const LoadingSpinner = () => (
 const NotFoundPage = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
-    // A signed-out visitor has no dashboard to return to — ProtectedRoute would only bounce them on
-    // to the login screen — so offer that destination directly instead of a link that misleads.
     const [target, label] = user ? ['/dashboard', 'Back to dashboard'] : ['/login', 'Go to sign in'];
 
     return (
@@ -61,7 +59,11 @@ const NotFoundPage = () => {
 
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
     const { user } = useAuth();
-    if (!user) return <Navigate to="/login" replace />;
+    const location = useLocation();
+    if (!user) {
+        const next = encodeURIComponent(location.pathname + location.search);
+        return <Navigate to={`/login?next=${next}`} replace />;
+    }
     return children;
 };
 

@@ -4,7 +4,6 @@ import { OptimizationState } from '../../hooks/useScheduleOptimization';
 
 export type ResizeSide = 'left' | 'right';
 
-/** Payload rendered by the timeline tooltip (task bars and project bars). */
 export interface TimelineTooltipContent {
     type: 'task' | 'project';
     title: string;
@@ -37,7 +36,7 @@ export type TooltipHideHandler = () => void;
 
 export type OpenProjectModalHandler = (project: ProcessedProject) => void;
 export type OpenTaskModalHandler = (project: ProcessedProject, task: EnrichedTask | null) => void;
-export type ResizeMouseDownHandler = (
+export type ResizePointerDownHandler = (
     e: ReactPointerEvent,
     taskKey: string,
     projectKey: string,
@@ -51,18 +50,10 @@ export type FilteredTaskIds = Set<number>;
 export type FilteredProjectKeys = Set<string>;
 export type DivRef = RefObject<HTMLDivElement>;
 
-/**
- * Shared props threaded through the timeline (view -> row -> bar).
- *
- * Eleven props were removed from this file because nothing downstream read them — including a
- * `projectRowOffsets` array that had a dedicated memo, was returned, destructured, passed and
- * forwarded through three components, and was never used.
- */
 export interface TimelineViewProps {
     processedProjects: ProcessedProject[];
     allTasks: EnrichedTask[];
     draggingTaskKey: string | null;
-    /** Derived once by useEnrichedProjects rather than rebuilt here from the same data. */
     taskKeyMap: TaskKeyMap;
     projectKeyToProject: ProjectKeyMap;
     filteredTaskIds: FilteredTaskIds;
@@ -81,7 +72,7 @@ export interface TimelineViewProps {
     onTooltipMove: TooltipMoveHandler;
     onTooltipHide: TooltipHideHandler;
     onSidebarToggle: () => void;
-    onMouseDown: ResizeMouseDownHandler;
+    onPointerDown: ResizePointerDownHandler;
     shouldPreventClick: () => boolean;
     headerRef: DivRef;
     timelineRef: DivRef;
@@ -94,7 +85,6 @@ export interface TimelineViewProps {
 export interface TimelineHeaderProps {
     timelineStart: Date;
     timelineEnd: Date;
-    /** Shared day-area pixel width, identical to what the body rows use, so the two never desync. */
     timelineWidth: number;
     sidebarWidth: number;
     sidebarCollapsed: boolean;
@@ -122,7 +112,7 @@ export interface TimelineProjectRowProps {
     onTooltipShow: TooltipShowHandler;
     onTooltipMove: TooltipMoveHandler;
     onTooltipHide: TooltipHideHandler;
-    onMouseDown: ResizeMouseDownHandler;
+    onPointerDown: ResizePointerDownHandler;
     shouldPreventClick: () => boolean;
     optimization: OptimizationState;
 }
@@ -138,7 +128,7 @@ export interface TimelineTaskBarProps {
     onTooltipShow: TooltipShowHandler;
     onTooltipMove: TooltipMoveHandler;
     onTooltipHide: TooltipHideHandler;
-    onMouseDown: ResizeMouseDownHandler;
+    onPointerDown: ResizePointerDownHandler;
     shouldPreventClick: () => boolean;
     onOpenTaskModal: OpenTaskModalHandler;
     optimization: OptimizationState;
@@ -154,9 +144,6 @@ export interface DependencyOverlayProps {
     filteredTaskIds: FilteredTaskIds;
     filteredProjectKeys: FilteredProjectKeys;
     hasActiveFilters: boolean;
-    /** Not read directly — included so a sidebar toggle forces a recompute of the arrows' screen
-     *  coordinates, which otherwise go stale until some other layout change happens to fire the
-     *  ResizeObserver. */
     sidebarWidth: number;
     sidebarCollapsed: boolean;
 }
@@ -166,13 +153,12 @@ export interface TaskListViewProps {
     taskKeyToTaskMap: TaskKeyMap;
     projectKeyToProject: ProjectKeyMap;
     sortField: string;
-    sortOrder: string;
+    sortOrder: 'asc' | 'desc';
     hasActiveFilters: boolean;
     onSort: (field: string) => void;
     onTaskClick: (project: ProcessedProject | undefined, task: EnrichedTask) => void;
 }
 
-/** FilterBar receives the raw projects list plus enriched tasks for facet counts. */
 export interface FilterBarProps {
     projects: Project[];
     allTasks: EnrichedTask[];

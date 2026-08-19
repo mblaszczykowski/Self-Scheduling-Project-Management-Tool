@@ -19,8 +19,6 @@ const taskMatchesFilter = (task: EnrichedTask, filterField: string, filterValue:
         case 'labels':
             return task.labels.includes(filterValue);
         case 'assignee':
-            // FilterBar surfaces unassigned tasks under the 'Unassigned' option,
-            // but the raw value is null/'' — match it explicitly.
             return filterValue === 'Unassigned' ? !task.assignee : task.assignee === filterValue;
         case 'startDate':
         case 'dueDate': {
@@ -42,13 +40,6 @@ const PRIORITY_ORDER: Record<TaskPriority, number> = {
     LOWEST: 1, LOW: 2, MEDIUM: 3, HIGH: 4, HIGHEST: 5,
 };
 
-/**
- * A comparable value for one sort field.
- *
- * Dates become epoch millis rather than Date objects, with a missing or unparseable date sorting
- * last: subtracting Dates that include an Invalid Date yields NaN, and a NaN comparator leaves the
- * order implementation-defined instead of throwing, so the bug appears as a silently wrong list.
- */
 const getSortValue = (task: EnrichedTask, field: string): number | string => {
     if (field === 'startDate' || field === 'dueDate') {
         const raw = task[field];
@@ -117,9 +108,11 @@ const applySorting = (tasks: EnrichedTask[], sortField: string, sortOrder: strin
     return [...tasks].sort((a, b) => {
         const valueA = getSortValue(a, sortField);
         const valueB = getSortValue(b, sortField);
+        const missingA = valueA === Number.POSITIVE_INFINITY;
+        const missingB = valueB === Number.POSITIVE_INFINITY;
+        if (missingA !== missingB) return missingA ? 1 : -1;
         if (valueA < valueB) return -direction;
         if (valueA > valueB) return direction;
-        // Total order, so paging or re-rendering cannot reshuffle equal rows.
         return a.taskKey.localeCompare(b.taskKey);
     });
 };
@@ -157,8 +150,6 @@ export const useTaskFiltering = ({
         return result;
     }, [tasks, filters, searchQuery, assignedToMe, currentUser, sortField, sortOrder, urlParams]);
 
-    // A value, not a function. Every consumer called it during render — three times per render on
-    // the projects page — so the memoisation bought nothing and each call rebuilt a URLSearchParams.
     const hasActiveFilters = useMemo(() => {
         const hasStateFilters = Object.values(filters).some((value) => value && value !== 'All');
         const hasProjectFilter = !!new URLSearchParams(urlParams).get('projectKey');

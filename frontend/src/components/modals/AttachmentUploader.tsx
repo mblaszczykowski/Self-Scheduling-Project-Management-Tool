@@ -5,7 +5,10 @@ import { showToast } from '../../util/toast';
 import PreviewModal from '../common/PreviewModal';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import { Attachment } from '../../types';
-import { ATTACHMENT_ACCEPT, getAttachmentCountError, getFileValidationError } from '../../util/fileValidation';
+import {
+    ATTACHMENT_ACCEPT, MAX_ATTACHMENTS_PER_REQUEST, MAX_FILE_SIZE_LABEL,
+    getAttachmentCountError, getFileValidationError, getTotalAttachmentSizeError,
+} from '../../util/fileValidation';
 
 interface AttachmentUploaderProps {
     existingAttachments?: string[];
@@ -27,8 +30,6 @@ const AttachmentUploader = ({
     const [isDragging, setIsDragging] = useState(false);
     const [preview, setPreview] = useState<FileInfo | null>(null);
 
-    // Revoke object URLs created for the newly-added File previews on unmount so
-    // their blobs are released (the File objects are discarded with the form).
     const newAttachmentsRef = useRef(newAttachments);
     newAttachmentsRef.current = newAttachments;
     useEffect(() => () => {
@@ -51,7 +52,13 @@ const AttachmentUploader = ({
                 valid.push(file);
             }
         }
-        if (valid.length > 0 && onAddAttachments) {
+        if (valid.length === 0) return;
+        const sizeError = getTotalAttachmentSizeError(newAttachments, valid);
+        if (sizeError) {
+            showToast(sizeError, 'error');
+            return;
+        }
+        if (onAddAttachments) {
             onAddAttachments(valid);
         }
     };
@@ -104,7 +111,7 @@ const AttachmentUploader = ({
                 <label htmlFor={inputId} className="relative cursor-pointer flex flex-col items-center justify-center gap-1 py-5 px-3 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400">
                     <HiOutlineCloudUpload className="w-5 h-5 text-slate-300 dark:text-slate-600" />
                     <span className="text-sm text-slate-400 dark:text-slate-500">{label}</span>
-                    <span className="text-xs text-slate-300 dark:text-slate-600">Max 5MB per file, up to 10 files</span>
+                    <span className="text-xs text-slate-300 dark:text-slate-600">Max {MAX_FILE_SIZE_LABEL} per file, up to {MAX_ATTACHMENTS_PER_REQUEST} files</span>
                     <input
                         type="file"
                         id={inputId}

@@ -2,13 +2,6 @@ import { dayIndex, isTaskComplete, MS_PER_DAY } from './helpers';
 import { schedulePercentElapsed, timeOf } from './scheduleAnalysis';
 import { EnrichedTask, ProcessedProject } from '../types';
 
-// Pure, presentation-agnostic critical-path statistics for the dashboard. Kept out of the hook
-// layer so they're plain, unit-testable functions rather than React state. The scheduling-focused
-// half of the dashboard's maths lives in `scheduleAnalysis`.
-//
-// Everything here reads `EnrichedTask.isDelayed` instead of comparing due dates itself: whether a
-// task counts as late is decided once, in `useEnrichedProjects`, for the whole app.
-
 export interface TaskCounts {
     criticalTasks: number;
     delayedTasks: number;
@@ -27,14 +20,12 @@ export interface CriticalPathHealth {
     criticalHealthScore: number;
 }
 
-/** Progress a task with no start date is assumed to be expected at, for want of anything better. */
 const ASSUMED_EXPECTED_PROGRESS = 50;
 
 export const computeCriticalPathHealth = (allTasks: EnrichedTask[], today: Date): CriticalPathHealth => {
     const criticalTasksList = allTasks.filter(t => t.isCritical);
     const criticalDelayed = criticalTasksList.filter(t => t.isDelayed);
 
-    // Due soon, unfinished, and already behind where its own dates say it should be.
     const criticalAtRisk = criticalTasksList.filter(t => {
         if (!t.isUpcomingDeadline || isTaskComplete(t.status, t.progress)) return false;
         const expected = schedulePercentElapsed(t, today) ?? ASSUMED_EXPECTED_PROGRESS;
@@ -71,8 +62,6 @@ export const computeCriticalPathTimeline = (projects: ProcessedProject[]): Criti
 
         const starts = criticalTasks.map(t => timeOf(t.startDate)).filter((t): t is number => t !== null);
         const dues = criticalTasks.map(t => timeOf(t.dueDate)).filter((t): t is number => t !== null);
-        // Inclusive, matching calculateDuration: a critical path that starts and ends on the
-        // same day is one day long, not zero.
         const criticalPathDays = starts.length > 0 && dues.length > 0
             ? Math.round((Math.max(...dues) - Math.min(...starts)) / MS_PER_DAY) + 1
             : 0;
@@ -94,8 +83,6 @@ export const computeCriticalPathTimeline = (projects: ProcessedProject[]): Criti
 const DEADLINE_HORIZON_DAYS = 7;
 
 export const computeUpcomingCriticalDeadlines = (criticalTasksList: EnrichedTask[], today: Date): EnrichedTask[] => {
-    // Whole calendar days: comparing a UTC-parsed due date against a local timestamp dropped
-    // today's own deadlines west of Greenwich and made the window a day shorter east of it.
     const todayIndex = dayIndex(today);
     if (todayIndex === null) return [];
 
@@ -119,7 +106,6 @@ export const computeBlockedTasks = (allTasks: EnrichedTask[], taskByKey: Map<str
         if (isTaskComplete(task.status, task.progress)) return false;
         return task.dependencies.some(depKey => {
             const dep = taskByKey.get(depKey);
-            // A cancelled or finished predecessor no longer blocks anything.
             return dep !== undefined && !isTaskComplete(dep.status, dep.progress);
         });
     });

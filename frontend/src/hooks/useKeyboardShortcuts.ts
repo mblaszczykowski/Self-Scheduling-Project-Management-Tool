@@ -10,8 +10,6 @@ interface Shortcut {
 }
 
 const useKeyboardShortcuts = (shortcuts: Shortcut[]) => {
-    // Callers pass a fresh array literal each render; keep it in a ref so the
-    // document listener is added once and always sees the current shortcuts.
     const shortcutsRef = useRef(shortcuts);
     shortcutsRef.current = shortcuts;
 

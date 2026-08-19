@@ -75,9 +75,6 @@ const CommentItem = React.memo(({
     const [isVisible] = useAnimateIn();
     const commentRef = useRef<HTMLDivElement | null>(null);
     const isHighlighted = highlightCommentId === comment.id;
-    // A second click before the first reaction request resolves would fire two independent
-    // requests whose out-of-order resolution could leave the displayed state diverged from the
-    // server; this ignores clicks while one is already in flight.
     const [reactionPending, setReactionPending] = useState(false);
 
     const handleReact = async (reactionType: ReactionType) => {
@@ -173,7 +170,7 @@ const CommentItem = React.memo(({
                                 <ReactionButton
                                     type="LIKE"
                                     active={comment.likedByCurrentUser}
-                                    disabled={comment.dislikedByCurrentUser || reactionPending}
+                                    disabled={reactionPending}
                                     activeClass="text-slate-800 dark:text-slate-200 font-medium"
                                     count={comment.likeCount}
                                     icon={ThumbsUpIcon}
@@ -182,7 +179,7 @@ const CommentItem = React.memo(({
                                 <ReactionButton
                                     type="DISLIKE"
                                     active={comment.dislikedByCurrentUser}
-                                    disabled={comment.likedByCurrentUser || reactionPending}
+                                    disabled={reactionPending}
                                     activeClass="text-red-500 font-medium"
                                     count={comment.dislikeCount}
                                     icon={ThumbsDownIcon}

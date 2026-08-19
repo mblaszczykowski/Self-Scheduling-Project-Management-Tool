@@ -1,40 +1,6 @@
 import React, { useEffect, useId, useRef } from 'react';
 import { HiOutlineExclamation } from 'react-icons/hi';
-
-const FOCUSABLE_SELECTOR = [
-    'a[href]', 'button:not([disabled])', 'textarea:not([disabled])',
-    'input:not([disabled])', 'select:not([disabled])',
-    '[tabindex]:not([tabindex="-1"])',
-].join(', ');
-
-/**
- * Cycles Tab/Shift+Tab among the focusable elements inside `container`, so keyboard focus can't
- * leave an open dialog into the page behind it. Call it from a keydown listener alongside the
- * container's own Escape handling; shared here rather than duplicated in every dialog that needs
- * one (this one, and TaskProjectModal).
- */
-export const trapFocus = (container: HTMLElement, event: KeyboardEvent): void => {
-    if (event.key !== 'Tab') return;
-    const focusable = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-    if (focusable.length === 0) {
-        event.preventDefault();
-        return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    const active = document.activeElement;
-    // Both dialogs here start with focus on the container itself (tabIndex={-1}), not on one of
-    // the focusable descendants below — a boundary case too, or the very first Tab/Shift+Tab
-    // would fall through to native behaviour and escape before the trap ever engages.
-    const atEdgeOrOutside = active === container || !container.contains(active);
-    if (event.shiftKey && (active === first || atEdgeOrOutside)) {
-        event.preventDefault();
-        last.focus();
-    } else if (!event.shiftKey && (active === last || atEdgeOrOutside)) {
-        event.preventDefault();
-        first.focus();
-    }
-};
+import { trapFocus } from '../common/focusTrap';
 
 interface ConfirmDialogProps {
     isOpen: boolean;
@@ -57,8 +23,6 @@ const ConfirmDialog = ({
     cancelText = 'Cancel',
     variant = 'danger'
 }: ConfirmDialogProps) => {
-    // TaskProjectModal renders two of these at once, so the aria targets have to be unique per
-    // instance: a fixed id would point every dialog at the first one's heading.
     const dialogId = useId();
     const titleId = `${dialogId}-title`;
     const descriptionId = `${dialogId}-description`;
@@ -75,9 +39,13 @@ const ConfirmDialog = ({
         };
     }, [isOpen]);
 
-    // Escape dismisses the dialog, and Tab is trapped inside it. Both are caught in the capture
-    // phase and Escape is stopped there because the modal underneath (TaskProjectModal,
-    // PreviewModal) also listens on document, and only the topmost dialog should react to the key.
+    useEffect(() => {
+        if (!isOpen) return;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = previousOverflow; };
+    }, [isOpen]);
+
     useEffect(() => {
         if (!isOpen) return;
         const onKeyDown = (e: KeyboardEvent) => {

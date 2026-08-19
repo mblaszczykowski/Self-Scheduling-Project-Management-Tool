@@ -9,22 +9,10 @@ import {
 import { getErrorMessage } from '../util/helpers';
 import { Comment, ReactionType } from '../types';
 
-/**
- * Owns one task's comment thread: loading, mutating, and keeping the two in step.
- *
- * A real hook, unlike its predecessor — which called no hooks and simply returned a module
- * constant, so the `use` prefix advertised a lifecycle it did not have and forced every consumer to
- * list stable api functions in their dependency arrays.
- *
- * Mutations apply the server's response in place rather than refetching. The reaction endpoint
- * already returns the updated comment; discarding it and re-reading the list turned one click into
- * two round trips.
- */
 export function useComments(taskId: number | null) {
     const [comments, setComments] = useState<Comment[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // Guards against a slow earlier response overwriting a newer one.
     const requestIdRef = useRef(0);
 
     const load = useCallback(async () => {
@@ -50,10 +38,6 @@ export function useComments(taskId: number | null) {
     useEffect(() => {
         load();
         return () => {
-            // Any response still in flight belongs to the previous task.
-            // Reading the ref at cleanup time is the point, not a mistake: the lint rule guards
-            // against capturing a DOM node that has since changed, but this is a counter, and
-            // copying it into a local would increment a snapshot and stop invalidating anything.
             // eslint-disable-next-line react-hooks/exhaustive-deps
             requestIdRef.current++;
         };
@@ -72,7 +56,6 @@ export function useComments(taskId: number | null) {
                                           parentCommentId?: number | null) => {
         if (taskId == null) return;
         await apiCreateComment(taskId, content, attachments, parentCommentId);
-        // A new reply changes the tree's shape, so this is the one case worth re-reading.
         await load();
     }, [taskId, load]);
 

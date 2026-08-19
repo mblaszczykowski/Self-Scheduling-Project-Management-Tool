@@ -6,6 +6,7 @@ import {
     formatAssigneeName, getErrorMessage, PRIORITY_CONFIG, splitFullName, STATUS_CONFIG,
 } from '../../util/helpers';
 import Avatar from '../common/Avatar';
+import EmptyState from '../common/EmptyState';
 import { Activity, ActivityType, TaskPriority, TaskStatus } from '../../types';
 import {
     HiOutlinePlus,
@@ -21,8 +22,6 @@ import {
     HiOutlineFlag,
 } from 'react-icons/hi';
 
-// A full Record, not a Partial: a forgotten key here now fails to compile instead of silently
-// falling back to FALLBACK's neutral icon, which is how COMMENT_EDITED went unstyled before.
 const TYPE_CONFIG: Record<ActivityType, { icon: IconType; color: string; bg: string }> = {
     CREATED:              { icon: HiOutlinePlus, color: 'text-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-900/40' },
     STATUS_CHANGED:       { icon: HiOutlineSwitchHorizontal, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/40' },
@@ -41,9 +40,6 @@ const TYPE_CONFIG: Record<ActivityType, { icon: IconType; color: string; bg: str
 };
 
 const FALLBACK = { icon: HiOutlineSwitchHorizontal, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-700' };
-
-// Labels come from the shared status/priority config. This file used to re-type all seventeen of
-// them character-for-character, which is duplication waiting to drift.
 
 function formatValue(field: string | null | undefined, value: string | null | undefined) {
     if (!value || value === 'null') return null;
@@ -160,11 +156,7 @@ export default function ActivityTab({ taskId }: { taskId: number }) {
     }
 
     if (activities.length === 0) {
-        return (
-            <div className="py-6 text-center">
-                <p className="text-xs text-slate-300 dark:text-slate-600">No activity yet</p>
-            </div>
-        );
+        return <EmptyState size="sm" title="No activity yet" />;
     }
 
     return (

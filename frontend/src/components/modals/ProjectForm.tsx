@@ -78,6 +78,9 @@ const ProjectForm = ({
                                 name="projectKey"
                                 maxLength={10}
                                 placeholder="e.g. PROJ"
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                    setFieldValue('projectKey', e.target.value.toUpperCase());
+                                }}
                                 className={
                                     `${inputClass} uppercase font-mono tracking-wider`
                                 }
@@ -98,8 +101,6 @@ const ProjectForm = ({
                         {values.memberEmails.length > 0 && (
                             <ul className="space-y-2 mb-3">
                                 {values.memberEmails.map((email) => {
-                                    // The form carries addresses (that is all the server reads);
-                                    // names come from the loaded project when it has them.
                                     const known = project?.members.find(
                                         (candidate) => candidate.email === email,
                                     );

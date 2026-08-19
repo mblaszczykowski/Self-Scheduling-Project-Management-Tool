@@ -8,7 +8,6 @@ import { ProcessedProject } from '../types';
 
 interface Options {
     processedProjects: ProcessedProject[];
-    /** Commits the drag. Only the dates are sent, so nothing else can be reset by accident. */
     updateTaskSchedule: (projectKey: string, taskKey: string, startDate: string, dueDate: string) => Promise<unknown>;
 }
 
@@ -21,14 +20,6 @@ interface Draft {
     dueDate: string;
 }
 
-/**
- * Optimistic drag-to-reschedule.
- *
- * Each drag step updates a local preview only, and one request is sent when the drag ends —
- * replacing a per-step write-and-refetch that turned a single drag into N round trips. The
- * preview is overlaid on the rendered projects so the bar follows the cursor without the cache
- * being touched until the drag commits.
- */
 export function useTaskResizePreview({ processedProjects, updateTaskSchedule }: Options) {
     const [preview, setPreview] = useState<Draft | null>(null);
     const draftRef = useRef<Draft | null>(null);
@@ -59,7 +50,6 @@ export function useTaskResizePreview({ processedProjects, updateTaskSchedule }: 
 
         if (side === 'left') {
             const next = shift(draft.startDate);
-            // An edge may never cross the other one.
             if (next <= draft.dueDate) draft = { ...draft, startDate: next };
         } else {
             const next = shift(draft.dueDate);
@@ -83,8 +73,6 @@ export function useTaskResizePreview({ processedProjects, updateTaskSchedule }: 
         updateTaskSchedule(draft.projectKey, draft.taskKey, draft.startDate, draft.dueDate)
             .then(() => showToast('Task dates updated', 'success'))
             .catch(() => showToast('Could not update the task dates.', 'error'))
-            // Either way the refreshed cache — or the unchanged server state on failure — becomes
-            // the source of truth again.
             .finally(() => setPreview(null));
     }, [updateTaskSchedule]);
 

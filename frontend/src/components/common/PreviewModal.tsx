@@ -2,13 +2,12 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { HiOutlineDocument, HiOutlineDocumentText, HiOutlineDownload, HiOutlineX } from 'react-icons/hi';
 import { useAnimateIn } from '../../hooks/useAnimateIn';
 import { PreviewData } from '../../util/helpers';
+import { trapFocus } from './focusTrap';
 
 interface PreviewModalProps {
     preview: PreviewData | null;
     onClose: () => void;
 }
-
-const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
     const [isVisible, setIsVisible] = useAnimateIn();
@@ -30,8 +29,6 @@ const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
         closeTimerRef.current = setTimeout(onClose, 300);
     }, [onClose, setIsVisible]);
 
-    // A component unmounted mid-animation (e.g. the parent switches views) must not fire onClose
-    // against a caller that has already moved on.
     useEffect(() => () => {
         if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     }, []);
@@ -39,29 +36,15 @@ const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
+                e.stopPropagation();
                 handleClose();
                 return;
             }
-            // Minimal focus trap: Tab from the last focusable element wraps to the first, and
-            // Shift+Tab from the first wraps to the last.
-            if (e.key !== 'Tab' || !dialogRef.current) return;
-            const focusable = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
-            if (focusable.length === 0) return;
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-            if (e.shiftKey && document.activeElement === first) {
-                e.preventDefault();
-                last.focus();
-            } else if (!e.shiftKey && document.activeElement === last) {
-                e.preventDefault();
-                first.focus();
-            }
+            if (dialogRef.current) trapFocus(dialogRef.current, e);
         };
-        document.addEventListener('keydown', onKeyDown);
-        return () => document.removeEventListener('keydown', onKeyDown);
+        document.addEventListener('keydown', onKeyDown, true);
+        return () => document.removeEventListener('keydown', onKeyDown, true);
     }, [handleClose]);
-
-    // A preview with no URL has nothing to show; the modal would render a broken image.
 
     if (!preview || !preview.url) return null;
 
@@ -86,9 +69,6 @@ const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
                     {preview.fileType === 'image' ? (
                         <img src={preview.url} alt={preview.fileName} className="max-h-[70vh] max-w-full rounded-lg shadow-lg" />
                     ) : (
-                        // GET /files/{name} always sends Content-Disposition: attachment, which blocks
-                        // inline rendering in a navigation context, so a non-image preview in an
-                        // <iframe> shows a blank frame. Mirrors AttachmentThumbnail's non-image card.
                         <div className="flex flex-col items-center justify-center gap-3 min-w-[20rem] px-10 py-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
                             {preview.fileType === 'pdf'
                                 ? <HiOutlineDocumentText className="w-10 h-10 text-red-500" />

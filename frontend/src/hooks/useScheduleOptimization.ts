@@ -10,7 +10,6 @@ export interface OptimizationState {
     result: OptimizationResult | null;
     showGhostBars: boolean;
     error: string | null;
-    /** Shifted suggestions by task key, for O(1) ghost-bar lookups while rendering the timeline. */
     suggestionMap: Map<string, OptimizationSuggestion> | null;
 }
 
@@ -21,7 +20,6 @@ const INITIAL_STATE: OptimizationState = {
 
 interface Options {
     processedProjects: ProcessedProject[];
-    /** Invalidates the project cache after an applied schedule. */
     onApplied: () => void | Promise<unknown>;
 }
 
@@ -39,8 +37,6 @@ export function useScheduleOptimization({ processedProjects, onApplied }: Option
         setOptimization((previous) => ({ ...previous, loading: true, error: null }));
         try {
             const projectKeys = processedProjects.map((project) => project.projectKey);
-            // alpha/beta are omitted so the server's configured defaults apply; hard-coding them
-            // here made that configuration dead.
             const result = await simulateOptimization({ projectKeys });
 
             const suggestionMap = new Map<string, OptimizationSuggestion>();
@@ -70,8 +66,6 @@ export function useScheduleOptimization({ processedProjects, onApplied }: Option
 
         setOptimization((previous) => ({ ...previous, applying: true }));
         try {
-            // The server recomputes the schedule from these inputs rather than trusting dates the
-            // browser echoes back, so what is persisted is feasible by construction.
             const { tasksUpdated } = await applyOptimization({
                 projectKeys: processedProjects.map((project) => project.projectKey),
                 acceptedTaskKeys: [...suggestionMap.keys()],
@@ -90,7 +84,6 @@ export function useScheduleOptimization({ processedProjects, onApplied }: Option
 
     const handleRejectOptimization = useCallback(() => setOptimization(INITIAL_STATE), []);
 
-    // A proposal describes one particular arrangement of tasks; once that changes it is stale.
     const previousFingerprintRef = useRef<string | null>(null);
     useEffect(() => {
         const fingerprint = scheduleFingerprint(processedProjects);

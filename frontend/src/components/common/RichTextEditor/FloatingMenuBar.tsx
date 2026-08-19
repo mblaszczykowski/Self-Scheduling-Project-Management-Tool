@@ -3,7 +3,6 @@ import { TiptapFloatingMenu, Editor } from '@tiptap/react';
 import { FLOATING_MENU_ITEMS } from './toolbarConfig';
 import { runItemCommand } from './editorActions';
 
-// TipTap v3 types omit `editor` from the menu component; re-type it explicitly.
 const FloatingMenu = TiptapFloatingMenu as React.FC<{
     editor: Editor;
     options?: { placement?: string };

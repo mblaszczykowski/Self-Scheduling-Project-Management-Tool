@@ -9,7 +9,6 @@ import {
 } from './statsCompute';
 import { EnrichedTask, ProcessedProject } from '../types';
 
-// Bare 'YYYY-MM-DD' parses as UTC midnight, which keeps the day arithmetic exact in any timezone.
 const TODAY = new Date('2024-06-11');
 
 let nextId = 1;
@@ -80,7 +79,6 @@ describe('computeCriticalPathHealth', () => {
     });
 
     test('at risk means due soon and already behind its own dates', () => {
-        // K2 is 100% elapsed at 10% done; K3 is due soon too, but finished.
         expect(result.criticalAtRisk.map(t => t.taskKey)).toEqual(['K2']);
         expect(result.criticalDelayed.map(t => t.taskKey)).toEqual(['K1']);
     });
@@ -109,8 +107,6 @@ describe('computeCriticalPathTimeline', () => {
 
     const result = computeCriticalPathTimeline(projects);
 
-    // Inclusive of both endpoints, like calculateDuration: P1 runs 06-01 through 06-21 (21 days),
-    // P2 runs 06-01 through 06-06 (6). The exclusive form reported a same-day path as 0 days.
     test('spans the critical tasks only, longest path first', () => {
         expect(result.map(p => [p.projectKey, p.criticalPathDays])).toEqual([['P1', 21], ['P2', 6]]);
     });
@@ -164,7 +160,6 @@ describe('computeBlockedTasks', () => {
 
         const result = computeBlockedTasks(tasks, byKey(tasks));
 
-        // E's only dependency is done, and G is done itself.
         expect(result.blockedTasks.map(t => t.taskKey)).toEqual(['D']);
         expect(result.blockedCriticalTasks.map(t => t.taskKey)).toEqual(['D']);
     });
@@ -183,7 +178,6 @@ describe('computeBlockedTasks', () => {
             task({ taskKey: 'CANCELLED_SELF', status: 'WITHDRAWN', progress: 0, dependencies: ['OPEN_DEP'] }),
         ];
 
-        // Cancelled work is finished work: it cannot hold anything up, and it cannot itself wait.
         expect(computeBlockedTasks(tasks, byKey(tasks)).blockedTasks.map(t => t.taskKey)).toEqual([]);
     });
 });

@@ -66,7 +66,7 @@ const DashboardHero = ({ user, criticalCount, delayedCount, upcomingCriticalCoun
                                 count={delayedCount}
                             />
                             <QuickActionButton
-                                onClick={() => navigate('/projects?upcomingDeadline=true')}
+                                onClick={() => navigate('/projects?critical=true&upcomingDeadline=true')}
                                 icon={TrendingUpIcon}
                                 iconColor="text-blue-500"
                                 label="Critical Due"

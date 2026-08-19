@@ -31,8 +31,6 @@ const GhostTaskBar = ({ task, taskPosition, suggestion, timelineStart, onTooltip
     const arrowStartX = taskPosition.marginLeft + taskPosition.width;
     const arrowEndX = ghostPos.marginLeft;
     const goesRight = ghostCenter > origCenter;
-    // Where the connector stops, 2px short of the ghost bar: the line ends here and the
-    // arrowhead points at it.
     const arrowTipX = goesRight ? arrowEndX - 2 : arrowEndX + ghostPos.width + 2;
 
     return (
@@ -67,13 +65,12 @@ const GhostTaskBar = ({ task, taskPosition, suggestion, timelineStart, onTooltip
                 </svg>
             )}
             <div
-                className="absolute h-2.5 rounded-[3px] z-[2]"
+                className="absolute h-2.5 rounded-[3px] z-[2] opt-ghost"
                 style={{
                     marginLeft: `${ghostPos.marginLeft}px`,
                     width: `${ghostPos.width}px`,
                     background: 'linear-gradient(90deg, rgba(96,165,250,0.15), rgba(96,165,250,0.3), rgba(96,165,250,0.15))',
                     backgroundSize: '200% 100%',
-                    animation: 'optGhostShimmer 2.5s ease-in-out infinite',
                     border: '1.5px dashed rgba(96,165,250,0.6)',
                     boxShadow: '0 0 8px rgba(96,165,250,0.12)',
                 }}
@@ -106,7 +103,7 @@ const TimelineTaskBar = ({
     onTooltipShow,
     onTooltipMove,
     onTooltipHide,
-    onMouseDown,
+    onPointerDown,
     shouldPreventClick,
     onOpenTaskModal,
     optimization,
@@ -116,8 +113,6 @@ const TimelineTaskBar = ({
         task.dueDate,
         timelineStart
     );
-    // A task missing either date renders a zero-width bar at the timeline's left edge; its resize
-    // handles would still be hit-testable there with nothing visible to drag.
     const hasFullSpan = !!task.startDate && !!task.dueDate;
     const suggestion = optimization.showGhostBars
         ? optimization.suggestionMap?.get(task.taskKey)
@@ -188,11 +183,11 @@ const TimelineTaskBar = ({
                             {task.status && (
                                 <span
                                     className={`text-[10px] py-0.5 px-1.5 rounded-md font-medium ${
-                                        STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.color ||
+                                        STATUS_CONFIG[task.status]?.color ||
                                         'bg-slate-100 text-slate-600'
                                     }`}
                                 >
-                                    {STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.label ||
+                                    {STATUS_CONFIG[task.status]?.label ||
                                         task.status}
                                 </span>
                             )}
@@ -247,7 +242,7 @@ const TimelineTaskBar = ({
                         type: 'task',
                         title: task.summary,
                         subtitle: task.taskKey,
-                        status: STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.label ||
+                        status: STATUS_CONFIG[task.status]?.label ||
                             task.status,
                         isCritical: task.isCritical ?? undefined,
                         dates: `${formatShortDate(task.startDate)} -> ${
@@ -265,7 +260,7 @@ const TimelineTaskBar = ({
                                 className="absolute left-0 top-0 h-full w-2 cursor-w-resize"
                                 onPointerDown={e => {
                                     e.stopPropagation();
-                                    onMouseDown(
+                                    onPointerDown(
                                         e,
                                         task.taskKey,
                                         project.projectKey,
@@ -277,7 +272,7 @@ const TimelineTaskBar = ({
                                 className="absolute right-0 top-0 h-full w-2 cursor-e-resize"
                                 onPointerDown={e => {
                                     e.stopPropagation();
-                                    onMouseDown(
+                                    onPointerDown(
                                         e,
                                         task.taskKey,
                                         project.projectKey,
@@ -308,7 +303,7 @@ const TimelineTaskBar = ({
                             top: -14
                         }}
                     >
-                        <span className="text-[10px] py-0.5 px-1.5 rounded bg-amber-50 text-amber-600 font-medium flex items-center gap-0.5 border border-amber-200/60">
+                        <span className="text-[10px] py-0.5 px-1.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-medium flex items-center gap-0.5 border border-amber-200/60 dark:border-amber-800/60">
                             <AlertTriangleFilledIcon />
                             delayed
                         </span>

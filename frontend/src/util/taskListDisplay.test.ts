@@ -8,7 +8,6 @@ import {
 import { formatShortDate } from './helpers';
 import { EnrichedTask } from '../types';
 
-// Bare 'YYYY-MM-DD' parses as UTC midnight, which keeps the day arithmetic exact in any timezone.
 const TODAY = new Date('2024-06-11');
 
 let nextId = 1;
@@ -146,12 +145,9 @@ describe('computeScheduleHealth', () => {
         const result = computeScheduleHealth(
             task({ taskKey: 'A', startDate: '2024-06-11', dueDate: '2024-06-11', progress: 20 }), partWayThroughToday,
         );
-        // 18 of 24 hours through a 1-day span is 75% expected, 55 points ahead of 20% done.
         expect(result).toEqual({ status: 'critical', label: '55% behind', expected: 75 });
     });
 
-    // Fixture shared by the boundary checks below: a 10-day span, `today` sitting exactly on the
-    // due date, so elapsed is a clean 100% and `expected` is 100 for every case.
     const boundaryTask = (progress: number) =>
         task({ taskKey: 'A', startDate: '2024-06-01', dueDate: '2024-06-11', progress });
 
@@ -177,7 +173,6 @@ describe('computeScheduleHealth', () => {
 
     test('progress ahead of or matching the expected pace is on-track', () => {
         const aheadTask = task({ taskKey: 'A', startDate: '2024-06-01', dueDate: '2024-06-21', progress: 60 });
-        // 10 of 20 days elapsed is 50% expected; 60% done is ahead of that.
         expect(computeScheduleHealth(aheadTask, TODAY)).toEqual({ status: 'on-track', label: 'On track', expected: 50 });
 
         const exactPaceTask = task({ taskKey: 'A', startDate: '2024-06-01', dueDate: '2024-06-21', progress: 50 });
@@ -201,10 +196,10 @@ describe('getBlockingInfo', () => {
     });
 
     test('sorts blockers by how overdue they are, then by least complete, then by key', () => {
-        const b1 = task({ taskKey: 'B1', dueDate: '2024-06-09', progress: 40 }); // 2 days overdue
-        const b2 = task({ taskKey: 'B2', dueDate: '2024-06-10', progress: 20 }); // 1 day overdue
-        const b3 = task({ taskKey: 'B3', progress: 10 }); // no due date, sorts last
-        const b4 = task({ taskKey: 'B4', dueDate: '2024-06-09', progress: 10 }); // same due date as B1, lower progress
+        const b1 = task({ taskKey: 'B1', dueDate: '2024-06-09', progress: 40 });
+        const b2 = task({ taskKey: 'B2', dueDate: '2024-06-10', progress: 20 });
+        const b3 = task({ taskKey: 'B3', progress: 10 });
+        const b4 = task({ taskKey: 'B4', dueDate: '2024-06-09', progress: 10 });
         const doneViaStatus = task({ taskKey: 'DONE-STATUS', status: 'DONE', progress: 50 });
         const doneViaProgress = task({ taskKey: 'DONE-PROGRESS', progress: 100 });
 
@@ -247,12 +242,12 @@ describe('computeVelocityNeeded', () => {
     test('divides the remaining progress evenly over the remaining days', () => {
         expect(computeVelocityNeeded(
             task({ taskKey: 'A', startDate: '2024-06-01', dueDate: '2024-06-16', progress: 50 }), TODAY,
-        )).toBe(10); // 50 remaining / 5 days left
+        )).toBe(10);
     });
 
     test('rounds to the nearest whole percent', () => {
         expect(computeVelocityNeeded(
             task({ taskKey: 'A', startDate: '2024-06-01', dueDate: '2024-06-14', progress: 50 }), TODAY,
-        )).toBe(17); // 50 remaining / 3 days left = 16.67 -> 17
+        )).toBe(17);
     });
 });

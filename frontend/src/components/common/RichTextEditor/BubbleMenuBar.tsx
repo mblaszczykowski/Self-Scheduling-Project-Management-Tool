@@ -5,8 +5,6 @@ import { promptAndSetLink, runItemCommand, isItemActive } from './editorActions'
 
 const bubbleMenuButtons = [...BUBBLE_MENU_ITEMS, ...BUBBLE_MENU_EXTRAS];
 
-// TipTap v3 types omit `editor` from the menu component (it's forwarded to the
-// plugin at runtime); re-type it explicitly to accept the editor prop.
 const BubbleMenu = TiptapBubbleMenu as React.FC<{
     editor: Editor;
     className?: string;

@@ -1,30 +1,12 @@
 import { DELIVERED_STATUSES, MS_PER_DAY, isTaskComplete } from './helpers';
 import { EnrichedTask, ProcessedProject, TaskPriority, TaskStatus } from '../types';
 
-// Scheduling analysis behind the dashboard's cards: resource contention, schedule health, the CPM
-// slack pass, and the distributions the charts read.
-//
-// Like `statsCompute`, these live outside the hook layer so they stay plain, unit-testable
-// functions. Two rules keep them honest:
-//
-//  - They take `EnrichedTask`, never `Task`. "Delayed", "due soon" and "blocked by a late
-//    dependency" are decided once, in `useEnrichedProjects`, and only read here — so the dashboard
-//    and the projects page cannot drift apart on what those words mean.
-//  - They return no presentation values. Colours belong to the card that draws them; a bucket or a
-//    status is identified here by a stable id instead.
-
-/** Epoch millis for a date string, or null when it is absent or unparseable. */
 export const timeOf = (date?: string | null): number | null => {
     if (!date) return null;
     const parsed = new Date(date).getTime();
     return Number.isNaN(parsed) ? null : parsed;
 };
 
-/**
- * How far through its planned span a task should be by `today`, in percent — the yardstick every
- * "behind schedule" judgement here uses. Negative before the start date; null when the task has no
- * span to measure against. A one-day floor on the span keeps same-day tasks finite.
- */
 export const schedulePercentElapsed = (
     task: Pick<EnrichedTask, 'startDate' | 'dueDate'>,
     today: Date,
@@ -58,7 +40,6 @@ export interface ResourceConflicts {
     affectedAssignees: string[];
 }
 
-/** Pairs of unfinished tasks that book the same assignee on overlapping days. */
 export const computeResourceConflicts = (allTasks: EnrichedTask[]): ResourceConflicts => {
     const schedulePerAssignee = new Map<string, ScheduleEntry[]>();
 
@@ -80,13 +61,7 @@ export const computeResourceConflicts = (allTasks: EnrichedTask[]): ResourceConf
         entries.sort((a, b) => a.start - b.start);
         for (let i = 0; i < entries.length; i++) {
             for (let j = i + 1; j < entries.length; j++) {
-                // Sorted by start: once entry j starts after entry i ends, no later entry can
-                // overlap i either. Strictly after, because the end is inclusive — a task
-                // starting the day another one is due shares that day with it.
                 if (entries[j].start > entries[i].end) break;
-                // Both ends are inclusive, as everywhere else in the app: two tasks that meet
-                // on a single day are a real double-booking, and the exclusive form scored that
-                // as no conflict at all while under-counting every genuine overlap by a day.
                 const overlapDays = Math.floor(
                     (Math.min(entries[i].end, entries[j].end)
                         - Math.max(entries[i].start, entries[j].start)) / MS_PER_DAY
@@ -118,7 +93,6 @@ export interface BehindTask {
     taskKey: string;
     progress: number;
     expected: number;
-    /** Percentage points of progress the task is short of where its dates say it should be. */
     gap: number;
 }
 
@@ -136,7 +110,6 @@ export interface ScheduleHealth {
 export const SLIGHTLY_BEHIND_GAP = 15;
 export const BEHIND_GAP = 30;
 
-/** Progress against time elapsed, per unfinished task with a planned span. */
 export const computeScheduleHealth = (allTasks: EnrichedTask[], today: Date): ScheduleHealth => {
     let onTrack = 0, slightlyBehind = 0, behind = 0, criticallyBehind = 0, notStarted = 0, totalActive = 0;
     const behindTasks: BehindTask[] = [];
@@ -161,9 +134,6 @@ export const computeScheduleHealth = (allTasks: EnrichedTask[], today: Date): Sc
         }
     }
 
-    // Slightly-behind work counts as partial credit; anything worse counts for nothing. With
-    // nothing scheduled there is nothing behind, which scores as healthy rather than as 0% —
-    // matching computeCriticalPathHealth, which already reports 100 for an empty set.
     const score = totalActive === 0
         ? 100
         : Math.round(((onTrack + notStarted + slightlyBehind * 0.7) / totalActive) * 100);
@@ -190,7 +160,6 @@ export interface DependencyChainAnalysis {
     bottlenecks: Bottleneck[];
 }
 
-/** Deepest dependency chain, plus the unfinished tasks the most other work waits on. */
 export const computeDependencyChainAnalysis = (
     allTasks: EnrichedTask[],
     taskByKey: Map<string, EnrichedTask>,
@@ -202,13 +171,11 @@ export const computeDependencyChainAnalysis = (
         }
     }
 
-    // Memoised DFS. `onStack` is a path, not a visited set: a key has to be removed on the way back
-    // up, or a diamond-shaped graph would have its second branch cut short and under-report depth.
     const depthByKey = new Map<string, number>();
     const chainDepth = (taskKey: string, onStack: Set<string>): number => {
         const memoised = depthByKey.get(taskKey);
         if (memoised !== undefined) return memoised;
-        if (onStack.has(taskKey)) return 0; // cycle guard
+        if (onStack.has(taskKey)) return 0;
 
         onStack.add(taskKey);
         let deepest = 0;
@@ -253,11 +220,9 @@ export interface ProjectVelocity {
     status: VelocityStatus;
 }
 
-/** Stands in for an infinite rate when work remains but no time does. */
 const VELOCITY_OUT_OF_TIME = 999;
 const URGENT_VELOCITY = 15;
 
-/** Progress per day each project still needs in order to hit its own due dates. */
 export const computeProjectVelocity = (projects: ProcessedProject[], today: Date): ProjectVelocity[] => {
     const velocities: ProjectVelocity[] = [];
 
@@ -310,7 +275,6 @@ export interface PriorityCount {
     count: number;
 }
 
-/** Tasks per status, in order of first appearance, statuses with no tasks omitted. */
 export const computeStatusDistribution = (allTasks: EnrichedTask[]): StatusCount[] => {
     const counts = new Map<TaskStatus, number>();
     for (const task of allTasks) {
@@ -319,7 +283,6 @@ export const computeStatusDistribution = (allTasks: EnrichedTask[]): StatusCount
     return [...counts].map(([status, count]) => ({ status, count }));
 };
 
-/** Lowest-to-highest, so the chart reads as a scale rather than as arbitrary slices. */
 const PRIORITY_ORDER: TaskPriority[] = ['LOWEST', 'LOW', 'MEDIUM', 'HIGH', 'HIGHEST'];
 
 export const computePriorityDistribution = (allTasks: EnrichedTask[]): PriorityCount[] => {
@@ -339,11 +302,9 @@ export interface CompletionWeek {
 
 const TREND_WEEKS = 8;
 
-/** Tasks completed per week over the trailing eight weeks, oldest bucket first. */
 export const computeCompletionTrend = (allTasks: EnrichedTask[], today: Date): CompletionWeek[] => {
     const msPerWeek = 7 * MS_PER_DAY;
 
-    // Anchored at end-of-day so a task updated "today" lands in the most recent bucket.
     const anchor = new Date(today);
     anchor.setHours(23, 59, 59, 999);
 
@@ -353,8 +314,6 @@ export const computeCompletionTrend = (allTasks: EnrichedTask[], today: Date): C
     });
 
     for (const task of allTasks) {
-        // Delivered, not merely terminal: a withdrawn task is cancelled work and counting it
-        // would inflate the weekly completed figure the card reports.
         if (!DELIVERED_STATUSES.has(task.status)) continue;
         const updated = timeOf(task.updated);
         if (updated === null) continue;
@@ -390,15 +349,6 @@ const SLACK_RANGES: Array<{ id: SlackBucketId; label: string; min: number; max: 
 
 const EMPTY_SLACK: SlackDistribution = { buckets: [], avgSlack: 0, zeroSlackCount: 0, totalScheduled: 0 };
 
-/**
- * Total float per unfinished scheduled task, as reported by the server.
- *
- * The float itself is not derived here. The API computes it with the same critical-path pass that
- * decides `isCritical`, over the model the optimizer actually uses — per project rather than across
- * the whole portfolio, honouring each task's release date, and discounting duration by the progress
- * already made. A second pass on this side had none of that and disagreed with the badge the same
- * task carried everywhere else, so this now only buckets what the server sends.
- */
 export const computeSlackDistribution = (allTasks: EnrichedTask[]): SlackDistribution => {
     const slackValues = allTasks
         .filter(task => task.startDate && task.dueDate
@@ -437,7 +387,6 @@ export interface OptimizationOpportunity {
     recommendation: string;
 }
 
-/** How much room the schedule optimizer has to improve on the current plan, as a 0-100 score. */
 export const computeOptimizationOpportunity = (
     resourceConflicts: ResourceConflicts,
     scheduleHealth: ScheduleHealth,
@@ -450,8 +399,6 @@ export const computeOptimizationOpportunity = (
     const factors: OptimizationFactor[] = [];
     let rawScore = 0;
 
-    // Each factor contributes points up to its own cap, so no single symptom can claim the whole
-    // score; the caps are what set the relative weight of the four symptoms.
     const addFactor = (label: string, value: number, perUnit: number, cap: number, highAbove: number) => {
         if (value <= 0) return;
         const points = Math.min(value * perUnit, cap);
@@ -481,7 +428,6 @@ export interface AssigneeLoad {
     overdue: number;
 }
 
-/** The eight most loaded assignees, weighted so critical and overdue work dominates the order. */
 export const computeAssigneeLoad = (allTasks: EnrichedTask[]): AssigneeLoad[] => {
     const loadByAssignee = new Map<string, AssigneeLoad>();
 

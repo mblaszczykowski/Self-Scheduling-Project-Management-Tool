@@ -5,7 +5,6 @@ const STUB = 12;
 const RADIUS = 8;
 const CLEARANCE = 8;
 
-/** Screen-space geometry of a rendered task bar within the timeline. */
 interface BarInfo {
     right: number;
     left: number;
@@ -66,9 +65,6 @@ function buildRoundedPath(points: Point[], maxR: number): string {
     return d;
 }
 
-/**
- * Check if a vertical line at x from minY to maxY crosses any bar.
- */
 function verticalCrossesBars(x: number, sy: number, ey: number, allBars: BarInfo[]): boolean {
     const minY = Math.min(sy, ey);
     const maxY = Math.max(sy, ey);
@@ -78,17 +74,12 @@ function verticalCrossesBars(x: number, sy: number, ey: number, allBars: BarInfo
     );
 }
 
-/**
- * Find the best Y for a horizontal segment between sy and ey
- * that doesn't cross any bars in the x range [x1..x2].
- */
 function findClearMidY(sy: number, ey: number, x1: number, x2: number, allBars: BarInfo[]): number {
     const minY = Math.min(sy, ey);
     const maxY = Math.max(sy, ey);
     const minX = Math.min(x1, x2);
     const maxX = Math.max(x1, x2);
 
-    // Collect cy values of bars that overlap with horizontal x range
     const conflictCys = allBars
         .filter(b => b.cy > minY + CLEARANCE && b.cy < maxY - CLEARANCE &&
             b.right > minX - CLEARANCE && b.left < maxX + CLEARANCE)
@@ -97,7 +88,6 @@ function findClearMidY(sy: number, ey: number, x1: number, x2: number, allBars: 
 
     if (conflictCys.length === 0) return (sy + ey) / 2;
 
-    // Build candidate gaps: before first, between consecutive, after last
     const edges = [minY + CLEARANCE, ...conflictCys, maxY - CLEARANCE];
     let bestY = (sy + ey) / 2;
     let bestDist = Infinity;
@@ -105,7 +95,7 @@ function findClearMidY(sy: number, ey: number, x1: number, x2: number, allBars: 
     for (let i = 0; i < edges.length - 1; i++) {
         const gapCenter = (edges[i] + edges[i + 1]) / 2;
         const gapSize = edges[i + 1] - edges[i];
-        if (gapSize < CLEARANCE * 2) continue; // too narrow
+        if (gapSize < CLEARANCE * 2) continue;
         const dist = Math.abs(gapCenter - (sy + ey) / 2);
         if (dist < bestDist) {
             bestDist = dist;
@@ -121,15 +111,9 @@ function buildArrowPath(sx: number, sy: number, ex: number, ey: number, allBars:
         return `M ${sx} ${sy} L ${ex} ${ey}`;
     }
 
-    // Strategy: try vertical near target first (ex - STUB),
-    // then near source (sx + STUB), then find a clear channel.
-    // ALWAYS enter target from the left — never let horizontal
-    // go backward through the target bar.
-
     const nearTarget = ex - STUB;
     const nearSource = sx + STUB;
 
-    // --- CASE 1: Forward dep with vertical near target (cleanest) ---
     if (ex > sx + STUB * 4 && !verticalCrossesBars(nearTarget, sy, ey, allBars)) {
         return buildRoundedPath(
             [[sx, sy], [nearTarget, sy], [nearTarget, ey], [ex, ey]],
@@ -137,7 +121,6 @@ function buildArrowPath(sx: number, sy: number, ex: number, ey: number, allBars:
         );
     }
 
-    // --- CASE 2: Forward dep with vertical near source ---
     if (ex > sx + STUB * 4 && !verticalCrossesBars(nearSource, sy, ey, allBars)) {
         return buildRoundedPath(
             [[sx, sy], [nearSource, sy], [nearSource, ey], [ex, ey]],
@@ -145,9 +128,6 @@ function buildArrowPath(sx: number, sy: number, ex: number, ey: number, allBars:
         );
     }
 
-    // --- CASE 3: No single clear vertical channel. Use Z-route ---
-    // Route: right from source → down to midY → left/right to near target → down → enter target
-    // Vertical 1 near source, vertical 2 near target, horizontal at midY between rows.
     const x1 = nearSource;
     const x2 = nearTarget;
     const midY = findClearMidY(sy, ey, x1, x2, allBars);
@@ -192,8 +172,6 @@ const DependencyOverlay = ({
                 left: r.left - cr.left + sl,
                 cy: (r.top + r.bottom) / 2 - cr.top + st,
             };
-            // dataset entries are optional by definition; a bar without a key cannot be a
-            // dependency endpoint, so it only goes into the positional list.
             if (bar.dataset.taskKey) barMap.set(bar.dataset.taskKey, info);
             allBars.push(info);
         });
@@ -235,9 +213,6 @@ const DependencyOverlay = ({
             d: buildArrowPath(a.sx, a.sy, a.ex, a.ey, allBars),
         })));
         setDims({ w: el.scrollWidth, h: el.scrollHeight });
-        // sidebarWidth/sidebarCollapsed are not read here: the arrows are measured from the DOM,
-        // and toggling the sidebar moves every bar without changing the scroll container's own box,
-        // so the ResizeObserver never fires. They are dependencies so the measurement re-runs.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [containerRef, allTasks, draggingTaskKey, taskKeyMap, expandedProjects,
         projectKeyToProject, filteredTaskIds, filteredProjectKeys, hasActiveFilters,

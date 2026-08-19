@@ -7,13 +7,6 @@ const DEFAULT_FILTER_STATE: FilterState = {
 const DEFAULT_SORT_STATE: SortState = { field: 'id', order: 'asc' };
 const DEFAULT_VIEW_STATE: ViewState = { mode: 'timeline', sidebarCollapsed: false, expandedProjects: {} };
 
-/**
- * Reads persisted UI state, discarding anything that does not match the current shape.
- *
- * A stale or hand-edited entry would otherwise flow straight into state — a `mode` of `"kanban"`
- * reached the render switch and matched nothing. The version key means an old shape is dropped
- * rather than reinterpreted.
- */
 const STORAGE_VERSION = 'v2';
 
 function loadJson<T>(key: string, isValid: (value: unknown) => boolean): T | null {
@@ -31,7 +24,6 @@ function save(key: string, value: unknown): void {
     try {
         localStorage.setItem(`${key}_${STORAGE_VERSION}`, JSON.stringify(value));
     } catch {
-        // A full or unavailable storage quota must not break the page.
     }
 }
 
@@ -68,8 +60,6 @@ export function useProjectsPageState() {
 
     useEffect(() => {
         const { openFilterDropdown, searchQuery, ...toSave } = filterState;
-        // Debounced so typing in the search box doesn't write to localStorage on
-        // every keystroke.
         const timer = setTimeout(() => {
             save('flowlink_filters', toSave);
         }, 400);

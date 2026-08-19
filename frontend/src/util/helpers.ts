@@ -2,33 +2,19 @@ import config from '../config';
 import { TIMELINE_CONSTANTS } from '../config/timelineConstants';
 import { Attachment, ErrorLike, TaskPriority, TaskStatus, User } from '../types';
 
-/**
- * Just enough of a person to draw an avatar for them: a full {@link User}, or a name-only
- * stand-in for the places that only carry a display name (an activity author, a reaction).
- */
 export type AvatarSubject =
     Partial<Pick<User, 'firstname' | 'lastname' | 'email'>> & { profilePicture?: string | null };
 
 type DateInput = string | number | Date;
 
-/**
- * What the domain actually holds. Task and project dates are nullable on the server, so a helper
- * typed to reject null is not stricter — it just pushes the null past the compiler and into
- * `new Date(undefined)`, which is how "Invalid Date" ended up rendered on cards and timelines.
- */
 export type MaybeDate = DateInput | null | undefined;
 
-/** What a date renders as when there is no date. */
 export const NO_DATE = '\u2014';
 
 export const MS_PER_DAY = 86400000;
 
 const UPCOMING_DEADLINE_DAYS = 4;
 
-// Returns a YYYY-MM-DD string in the LOCAL calendar frame.
-// A date-only string is returned verbatim (no timezone shift); everything else
-// (Date, timestamp, datetime string) is formatted from local components so that
-// `new Date()` / drag-produced Dates map to the day the user actually sees.
 export const toDateString = (date: MaybeDate): string => {
     if (date === null || date === undefined) return '';
     if (typeof date === 'string') {
@@ -42,15 +28,6 @@ export const toDateString = (date: MaybeDate): string => {
     return `${d.getFullYear()}-${month}-${day}`;
 };
 
-/**
- * A calendar day as an integer, so day arithmetic never touches a clock.
- *
- * A date-only string parses as UTC midnight, while {@code new Date()} is local — comparing the two
- * directly shifts the day for everyone west of Greenwich, which is how a task became overdue at
- * 20:00 the evening before its due date. {@link toDateString} already resolves each form to the
- * calendar date a person would read off it; this turns that into a number so differences and
- * comparisons are exact.
- */
 export const dayIndex = (date: MaybeDate): number | null => {
     const iso = toDateString(date);
     if (!iso) return null;
@@ -59,13 +36,6 @@ export const dayIndex = (date: MaybeDate): number | null => {
     ) / MS_PER_DAY);
 };
 
-/**
- * Calendar-day arithmetic on a date-only string, staying in UTC throughout.
- *
- * Mutating a UTC-parsed date with local setters — {@code d.setDate(d.getDate() + 1)} — is the
- * trap: in New York that returns the same day back, so dragging a timeline bar one day did
- * nothing at all.
- */
 export const addDays = (date: string, days: number): string => {
     const parsed = new Date(date);
     if (Number.isNaN(parsed.getTime())) return '';
@@ -90,9 +60,6 @@ export const formatAssigneeName = (email?: string | null): string => {
         .join(' ');
 };
 
-// Splits a "First Last" display name into { firstname, lastname } for <Avatar>.
-// Tolerates single-word and multi-word names (everything after the first token
-// becomes the last name).
 export const splitFullName = (name?: string | null): { firstname: string; lastname: string } => {
     if (!name) return { firstname: '', lastname: '' };
     const parts = String(name).trim().split(/\s+/);
@@ -126,30 +93,14 @@ export const formatLongDate = (date: MaybeDate): string => {
     });
 };
 
-/**
- * Statuses that mean the work is finished, mirroring the scheduler's own TERMINAL_STATUSES in
- * backend/src/main/java/com/backend/scheduling/ScheduleModel.java.
- */
 export const TERMINAL_STATUSES: ReadonlySet<TaskStatus> = new Set<TaskStatus>([
     'DONE', 'RELEASED', 'WITHDRAWN',
 ]);
 
-/**
- * Statuses that mean the work was actually delivered, as opposed to merely no longer active.
- * WITHDRAWN is terminal but cancelled, so it must not count towards throughput or "completed"
- * tallies the way DONE and RELEASED do.
- */
 export const DELIVERED_STATUSES: ReadonlySet<TaskStatus> = new Set<TaskStatus>([
     'DONE', 'RELEASED',
 ]);
 
-/**
- * The single answer to "is this task finished", meaning it is no longer active work. Status and
- * progress are set independently, so a task can be DONE at 40% or at 100% without being DONE; both
- * count as finished, and every caller must agree or the same task reads as overdue in one place and
- * finished in another. For "was this delivered" — throughput, completion trends — use
- * {@link DELIVERED_STATUSES} instead, which excludes cancelled work.
- */
 export const isTaskComplete = (status?: TaskStatus | null, progress?: number | null): boolean =>
     (!!status && TERMINAL_STATUSES.has(status)) || (progress ?? 0) >= 100;
 
@@ -160,8 +111,6 @@ export const isOverdue = (
 ): boolean => {
     if (!dueDate || isTaskComplete(status, progress)) return false;
     const due = dayIndex(dueDate);
-    // Due dates are inclusive everywhere else in the app, so a task due today is not late until
-    // tomorrow. Comparing instants made it late from midnight UTC on its own due date.
     return due !== null && due < (dayIndex(new Date()) ?? 0);
 };
 
@@ -170,17 +119,10 @@ export const isUpcomingDeadline = (dueDate?: DateInput | null, daysThreshold = U
     const due = dayIndex(dueDate);
     const today = dayIndex(new Date());
     if (due === null || today === null) return false;
-    // Whole days apart, so the window does not widen or narrow with the time of day.
     const diffDays = due - today;
     return diffDays >= 0 && diffDays <= daysThreshold;
 };
 
-/**
- * Inclusive duration in days, or 0 when the range is missing or inverted.
- *
- * Returns a number rather than "a number or the string N/A": the union forced every consumer to
- * re-narrow it, and one of them compared it numerically anyway.
- */
 export const calculateDuration = (startDate?: string | null, dueDate?: string | null): number => {
     if (!startDate || !dueDate) return 0;
     const start = new Date(startDate).getTime();
@@ -199,8 +141,6 @@ export const getFileTypeFromPath = (path: unknown): 'image' | 'pdf' | 'file' => 
     return 'file';
 };
 
-// Normalise a File's MIME type into the same 'image' | 'pdf' | 'file' vocabulary
-// that getFileTypeFromPath returns, so callers can rely on a single set of values.
 const getFileTypeFromMime = (mimeType?: string): 'image' | 'pdf' | 'file' => {
     if (!mimeType) return 'file';
     if (mimeType === 'application/pdf') return 'pdf';
@@ -208,8 +148,6 @@ const getFileTypeFromMime = (mimeType?: string): 'image' | 'pdf' | 'file' => {
     return 'file';
 };
 
-// Cache blob URLs by File identity so we don't leak a new URL on every render.
-// WeakMap entries are garbage-collected when the File reference is dropped.
 const blobUrlCache: WeakMap<File, string> | null =
     typeof WeakMap !== 'undefined' ? new WeakMap() : null;
 
@@ -244,9 +182,6 @@ export const getFileInfo = (attachment?: Attachment | null): FileInfo => {
     return { isFile, url, fileName, fileType };
 };
 
-// Release the object URL created for a File preview. Call this when the owning
-// component unmounts / the file is removed so blob URLs don't accumulate for the
-// lifetime of the page.
 export const revokeFileUrl = (file: unknown): void => {
     if (!blobUrlCache || !(file instanceof File)) return;
     const url = blobUrlCache.get(file);
@@ -256,13 +191,6 @@ export const revokeFileUrl = (file: unknown): void => {
     }
 };
 
-/**
- * Presentation of one task status.
- *
- * `hex` is the canonical colour for canvas contexts (Chart.js) that cannot read Tailwind classes;
- * `color`/`dot` are the badge equivalents, and `pillBg`/`pillText` the softer form used by the
- * task form's inline selects.
- */
 export interface StatusStyle {
     label: string;
     color: string;
@@ -281,10 +209,7 @@ export interface PriorityStyle {
     pillText: string;
 }
 
-// The single source of truth for status and priority presentation. Typed as a Record over the
-// domain unions, so a status that is added to the model but forgotten here — or a key that is
-// simply misspelled — is a compile error rather than a silent fall-through to neutral grey.
-const STATUS_STYLES: Record<TaskStatus, StatusStyle> = ({
+export const STATUS_CONFIG: Record<TaskStatus, StatusStyle> = {
     'BACKLOG': { label: 'Backlog', color: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400', dot: 'bg-slate-400', hex: '#94a3b8' , pillBg: 'bg-slate-100 dark:bg-slate-800', pillText: 'text-slate-600 dark:text-slate-400' },
     'TODO': { label: 'To Do', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800', dot: 'bg-blue-500', hex: '#3b82f6' , pillBg: 'bg-blue-50 dark:bg-blue-950/60', pillText: 'text-blue-700 dark:text-blue-300' },
     'IN_PROGRESS': { label: 'In Progress', color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-800', dot: 'bg-amber-500', hex: '#f59e0b' , pillBg: 'bg-amber-50 dark:bg-amber-950/60', pillText: 'text-amber-700 dark:text-amber-300' },
@@ -297,15 +222,15 @@ const STATUS_STYLES: Record<TaskStatus, StatusStyle> = ({
     'RELEASED': { label: 'Released', color: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400', dot: 'bg-green-600', hex: '#16a34a' , pillBg: 'bg-green-50 dark:bg-green-950/60', pillText: 'text-green-700 dark:text-green-400' },
     'WITHDRAWN': { label: 'Withdrawn', color: 'bg-red-50 text-red-600 line-through dark:bg-red-950 dark:text-red-400', dot: 'bg-red-500', hex: '#ef4444' , pillBg: 'bg-red-50 dark:bg-red-950/60', pillText: 'text-red-600 dark:text-red-400' },
     'GATHERING_INTEREST': { label: 'Gathering Interest', color: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:ring-orange-800', dot: 'bg-orange-500', hex: '#f97316' , pillBg: 'bg-orange-50 dark:bg-orange-950/60', pillText: 'text-orange-700 dark:text-orange-300' },
-});
+};
 
-const PRIORITY_STYLES: Record<TaskPriority, PriorityStyle> = ({
+export const PRIORITY_CONFIG: Record<TaskPriority, PriorityStyle> = {
     'LOWEST': { label: 'Lowest', icon: '↓↓', color: 'bg-slate-100 text-slate-600', hex: '#94a3b8' , pillBg: 'bg-slate-100 dark:bg-slate-800', pillText: 'text-slate-600 dark:text-slate-400' },
     'LOW': { label: 'Low', icon: '↓', color: 'bg-blue-50 text-blue-600', hex: '#3b82f6' , pillBg: 'bg-blue-50 dark:bg-blue-950/60', pillText: 'text-blue-700 dark:text-blue-300' },
     'MEDIUM': { label: 'Medium', icon: '—', color: 'bg-amber-50 text-amber-600', hex: '#f59e0b' , pillBg: 'bg-amber-50 dark:bg-amber-950/60', pillText: 'text-amber-700 dark:text-amber-300' },
     'HIGH': { label: 'High', icon: '↑', color: 'bg-orange-50 text-orange-600', hex: '#f97316' , pillBg: 'bg-orange-50 dark:bg-orange-950/60', pillText: 'text-orange-700 dark:text-orange-300' },
     'HIGHEST': { label: 'Highest', icon: '↑↑', color: 'bg-red-50 text-red-600', hex: '#ef4444' , pillBg: 'bg-red-50 dark:bg-red-950/60', pillText: 'text-red-700 dark:text-red-300' },
-});
+};
 
 export const getAvatarColor = (user?: AvatarSubject | string | null): string => {
     const colors = [
@@ -370,14 +295,6 @@ export const calculateTaskPosition = (startDate: MaybeDate, dueDate: MaybeDate, 
     };
 };
 
-/**
- * A message worth showing a user.
- *
- * Field-level validation failures are surfaced rather than swallowed: the server sends them as
- * `fieldErrors: [{field, message}]`, and this helper previously looked for a differently named and
- * differently shaped `errors` map, so a form rejected by validation only ever showed the generic
- * "Invalid request data".
- */
 export const getErrorMessage = (err: unknown, defaultMessage = 'An unexpected error occurred'): string => {
     const e = (err ?? {}) as ErrorLike;
     const fieldErrors = e.response?.data?.fieldErrors;
@@ -392,37 +309,21 @@ export const getErrorMessage = (err: unknown, defaultMessage = 'An unexpected er
 };
 
 export const daysBetween = (date1: MaybeDate, date2: MaybeDate): number => {
-    // No known dates, no known distance. Callers sum and compare these, so a NaN here would
-    // silently poison every total it reached.
     const d1 = dayIndex(date1);
     const d2 = dayIndex(date2);
     if (d1 === null || d2 === null) return 0;
     return d2 - d1;
 };
 
-/**
- * Where to send the user after they sign in, taken from `?next=`.
- *
- * Resolved with the URL parser against our own origin rather than checked with string prefixes:
- * browsers treat a backslash in an http(s) URL as a slash, so `/\evil.com` starts with exactly one
- * "/" — passing any `startsWith('//')` guard — and still navigates off-site. Whatever does not
- * resolve back to this origin is discarded, which leaves `?next=` useless as a phishing hop.
- */
 export const safeNextPath = (search: string, fallback = '/dashboard'): string => {
     const raw = new URLSearchParams(search).get('next');
     if (!raw) return fallback;
     try {
         const target = new URL(raw, window.location.origin);
         if (target.origin !== window.location.origin) return fallback;
-        // Checking the origin is not enough on its own. Dot segments resolve away *before* the
-        // pathname is produced, so `/..//evil.com` resolves to this origin and still hands back
-        // `//evil.com` — protocol-relative, and off-site the moment anything navigates to it.
         if (target.pathname.startsWith('//')) return fallback;
         return target.pathname + target.search + target.hash;
     } catch {
         return fallback;
     }
 };
-
-export const STATUS_CONFIG = STATUS_STYLES;
-export const PRIORITY_CONFIG = PRIORITY_STYLES;

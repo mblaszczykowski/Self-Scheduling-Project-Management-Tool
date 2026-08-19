@@ -17,8 +17,6 @@ interface EntityMainColumnProps {
     onRemoveAttachment?: (attachment: Attachment) => void;
 }
 
-// Shared left column for the task and project forms: entity-key chip + name
-// field + character counter + description editor + attachment uploader.
 const EntityMainColumn = ({
     values,
     setFieldValue,

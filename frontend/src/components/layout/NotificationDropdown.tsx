@@ -96,15 +96,8 @@ function NotificationItem({ notification, onClose, onMarkSingleRead }: { notific
 
 interface NotificationDropdownProps {
     notifications: Notification[];
-    /**
-     * The server's count, which is what the badge shows.
-     *
-     * The list is one page; counting unread entries in it under-reported as soon as a user had
-     * more notifications than fit on that page.
-     */
     unreadCount: number;
     isOpen: boolean;
-    /** Named for what it does: the close path runs through onMarkAsRead + onClose. */
     onOpen: () => void;
     onClose: () => void;
     onMarkAsRead: () => void;
@@ -133,9 +126,8 @@ export default function NotificationDropdown({
         return { unreadNotifications: unread, readNotifications: read };
     }, [notifications]);
 
-    const handleBellClick = async () => {
+    const handleBellClick = () => {
         if (isOpen) {
-            await onMarkAsRead();
             onClose();
         } else {
             onOpen();
@@ -155,7 +147,6 @@ export default function NotificationDropdown({
                 ref={triggerRef}
                 type="button"
                 aria-expanded={isOpen}
-                aria-haspopup="true"
                 aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
                 className="relative p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 dark:focus-visible:ring-white transition-colors"
                 onClick={handleBellClick}

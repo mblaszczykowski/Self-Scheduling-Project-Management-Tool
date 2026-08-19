@@ -11,8 +11,6 @@ export const SectionHeader = ({ title, subtitle }: { title: string; subtitle?: s
     </div>
 );
 
-// A card title sits under the analytics grid's own <h3> dividers, so it is an <h4>: the outline
-// should read Analytics → Overview → Status Distribution, not two sibling h3s.
 export const ChartCard = ({ title, subtitle, children, className = "" }: { title: string; subtitle?: string; children: React.ReactNode; className?: string }) => {
     const [isVisible] = useAnimateIn();
 
@@ -29,14 +27,8 @@ export const ChartCard = ({ title, subtitle, children, className = "" }: { title
     );
 };
 
-/** The icon well shared by every card that pairs a metric with a tinted icon badge. */
 export const ICON_WELL_CLASS = 'w-14 h-14 rounded-xl flex items-center justify-center shrink-0';
 
-/**
- * The card's own background colour, for chart marks that have to punch through the surface they
- * sit on (doughnut segment borders). Canvas cannot read a Tailwind class, so the theme has to be
- * resolved to a literal here — matching `ChartCard`'s `bg-white dark:bg-slate-800`.
- */
 export const useChartSurfaceColor = (): string => (useTheme().theme === 'dark' ? '#1e293b' : '#ffffff');
 
 const CHART_TICK_COLOR_LIGHT = '#64748b';

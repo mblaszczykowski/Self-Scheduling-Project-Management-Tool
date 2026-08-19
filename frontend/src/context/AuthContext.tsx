@@ -10,13 +10,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-/**
- * The only way to read auth state.
- *
- * The raw context is deliberately not exported: consumers used to call
- * `useContext(AuthContext)` directly and destructure a possibly-undefined value, which made this
- * guard — and the clear error it produces outside a provider — dead code.
- */
 export const useAuth = (): AuthContextValue => {
     const context = useContext(AuthContext);
     if (!context) throw new Error('useAuth must be used within an AuthProvider');
@@ -33,7 +26,6 @@ export const AuthProvider = ({ children, initialUser }: {
         try {
             await logout();
         } catch (err) {
-            // The session is being discarded either way; a failed call must not trap the user.
             console.error('Logout request failed', err);
         } finally {
             setUser(null);

@@ -14,9 +14,6 @@ import {
     StatusCount,
 } from '../../../util/scheduleAnalysis';
 
-// The portfolio-wide cards: what the work looks like right now, and how much the optimizer could
-// still improve it. Each card owns the colours and chart options it draws with.
-
 const doughnutOptions: ChartOptions<'doughnut'> = {
     plugins: {
         legend: { display: false },
@@ -112,10 +109,6 @@ export const PriorityDistributionCard = ({ distribution }: { distribution: Prior
 export const ProjectProgressCard = ({ completion }: { completion: ProjectCompletion[] }) => {
     const tickColor = useChartTickColor();
 
-    // A module-level options object never changes identity, so react-chartjs-2 never re-runs
-    // chart.update() and the axis text keeps whichever theme was active at mount. Memoizing on the
-    // resolved tick colour gives the chart a fresh reference — and therefore an update — every time
-    // the theme actually changes.
     const options = useMemo<ChartOptions<'bar'>>(() => ({
         ...chartOptions,
         indexAxis: 'y',
@@ -165,8 +158,6 @@ export const CompletionTrendCard = ({ trend }: { trend: CompletionWeek[] }) => {
     const surfaceColor = useChartSurfaceColor();
     const tickColor = useChartTickColor();
 
-    // Same fresh-reference requirement as ProjectProgressCard's options: without it, this card's
-    // axis text would also survive a theme toggle unchanged.
     const options = useMemo<ChartOptions<'line'>>(() => ({
         ...chartOptions,
         plugins: {

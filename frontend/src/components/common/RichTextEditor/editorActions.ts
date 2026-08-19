@@ -1,16 +1,11 @@
 import { Editor, ChainedCommands } from '@tiptap/react';
 import { ToolbarItem } from './toolbarConfig';
 
-// TipTap commands are dispatched dynamically by name from the toolbar config.
-// This narrow, no-`any` shape lets us index the chain/can proxies by command
-// name while keeping ChainedCommands as the return type.
 type CommandMap = Record<string, (arg?: unknown) => ChainedCommands>;
 type CanMap = Record<string, () => boolean>;
 
 const SAFE_LINK_PROTOCOLS = ['http:', 'https:', 'mailto:'];
 
-// Reject javascript:/data:/etc. URLs before they're persisted as stored HTML.
-// A bare "example.com" (no scheme) is treated as https.
 const sanitizeLinkUrl = (raw: string): string | null => {
     const trimmed = raw.trim();
     if (!trimmed) return null;

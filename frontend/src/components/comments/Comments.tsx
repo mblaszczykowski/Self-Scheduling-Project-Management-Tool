@@ -6,6 +6,7 @@ import { getFileInfo, getErrorMessage, PreviewData } from '../../util/helpers';
 import { showToast } from '../../util/toast';
 import PreviewModal from '../common/PreviewModal';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
+import EmptyState from '../common/EmptyState';
 import ConfirmDialog from '../modals/ConfirmDialog';
 import CommentItem from './CommentItem';
 import CommentForm, { CommentFormValues } from './CommentForm';
@@ -24,7 +25,6 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
     const [showCommentForm, setShowCommentForm] = useState(false);
     const [preview, setPreview] = useState<PreviewData | null>(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
-
 
     const handleAddComment = useCallback(async (
         values: CommentFormValues,
@@ -72,8 +72,6 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
 
     const handleReactToComment = useCallback(async (commentId: number, reactionType: ReactionType) => {
         try {
-            // The endpoint returns the updated comment and the hook applies it in place, so no
-            // refetch of the whole thread is needed for a single click.
             await react(commentId, reactionType);
         } catch (err) {
             showToast(getErrorMessage(err, 'Could not save your reaction'), 'error');
@@ -85,9 +83,6 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
         setPreview({ url, fileName, fileType });
     }, []);
 
-    // Read-only preview of a comment's persisted attachments. No remove control
-    // is rendered here: posted attachments can't be removed in place (that never
-    // persisted), and newly-added files are managed inside CommentForm instead.
     const renderAttachmentPreview = useCallback((attachment: string, idx: number) => (
         <AttachmentThumbnail
             key={`${getFileInfo(attachment).fileName}-${idx}`}
@@ -170,9 +165,7 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
                     ))}
                 </div>
             ) : (
-                <div className="py-6 text-center">
-                    <p className="text-xs text-slate-300 dark:text-slate-600">No comments yet</p>
-                </div>
+                <EmptyState size="sm" title="No comments yet" />
             )}
 
             {preview && (

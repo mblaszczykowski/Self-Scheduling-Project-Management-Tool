@@ -9,8 +9,6 @@ import EmptyState from '../../common/EmptyState';
 import { BlockedTasks, CriticalPathProject, CrossProjectDependency } from '../../../util/statsCompute';
 import { AssigneeLoad, DependencyChainAnalysis } from '../../../util/scheduleAnalysis';
 
-// Cards about what the work waits on: dependency structure across projects, and who carries it.
-
 export const CriticalPathTimelineCard = ({ timeline }: { timeline: CriticalPathProject[] }) => (
     <ChartCard title="Critical Path Duration" subtitle="Timeline by project">
         <div className="space-y-3">
@@ -54,7 +52,6 @@ export const CriticalPathTimelineCard = ({ timeline }: { timeline: CriticalPathP
     </ChartCard>
 );
 
-/** Above this, a delay in any one task cascades far enough to be worth flagging. */
 const DEEP_CHAIN_THRESHOLD = 3;
 
 export const DependencyChainCard = ({ analysis }: { analysis: DependencyChainAnalysis }) => {
@@ -227,11 +224,12 @@ export const TeamWorkloadBarCard = ({ load }: { load: AssigneeLoad[] }) => {
                 stacked: true,
                 beginAtZero: true,
                 grid: { display: true, color: 'rgba(148, 163, 184, 0.1)' },
-                ticks: { ...chartOptions.scales.x.ticks, stepSize: 1 },
+                ticks: { ...chartOptions.scales.x.ticks, color: tickColor, stepSize: 1 },
             },
             y: {
                 ...chartOptions.scales.y,
                 stacked: true,
+                ticks: { ...chartOptions.scales.y.ticks, color: tickColor },
             },
         },
     };

@@ -49,8 +49,6 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
         onLogout();
     };
 
-    // Goes through the dedicated endpoint rather than the locally-loaded page, so it clears every
-    // unread notification server-side even when there are more than the page holds.
     const handleMarkNotificationsAsRead = useCallback(async () => {
         try {
             await markAllAsRead();
@@ -67,8 +65,6 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
         }
     }, [markAsRead]);
 
-    // Re-syncs the list from the server whenever the dropdown opens, so a stream that missed a
-    // push (a reconnect gap, a slow tab) doesn't leave stale entries showing.
     const handleOpenNotifications = useCallback(() => {
         setNotificationsOpen(true);
         refreshNotifications();

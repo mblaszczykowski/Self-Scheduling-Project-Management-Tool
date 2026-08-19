@@ -27,7 +27,7 @@ const TimelineView = ({
     onTooltipMove,
     onTooltipHide,
     onSidebarToggle,
-    onMouseDown,
+    onPointerDown,
     shouldPreventClick,
     headerRef,
     timelineRef,
@@ -36,7 +36,6 @@ const TimelineView = ({
     onOptimize,
     onScrollToToday,
 }: TimelineViewProps) => {
-    // A project-key filter already narrows filteredProjectKeys, so no separate check is needed.
     const visibleProjects = processedProjects
         .filter((project) => filteredProjectKeys.has(project.projectKey) || !hasActiveFilters);
 
@@ -104,7 +103,7 @@ const TimelineView = ({
                         onTooltipShow={onTooltipShow}
                         onTooltipMove={onTooltipMove}
                         onTooltipHide={onTooltipHide}
-                        onMouseDown={onMouseDown}
+                        onPointerDown={onPointerDown}
                         shouldPreventClick={shouldPreventClick}
                         optimization={optimization}
                     />

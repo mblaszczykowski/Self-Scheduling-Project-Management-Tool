@@ -1,8 +1,3 @@
-// Central domain types, mirroring the backend DTOs one-for-one.
-//
-// These are load-bearing: `util/api.ts` types every response with them, so a field that
-// drifts from the server becomes a compile error rather than an `undefined` at runtime.
-
 export type TaskStatus =
     | 'BACKLOG' | 'TODO' | 'IN_PROGRESS' | 'IN_TEST' | 'TO_TEST' | 'TO_REVIEW'
     | 'READY_TO_MERGE' | 'READY_TO_DEPLOY' | 'DONE' | 'RELEASED' | 'WITHDRAWN'
@@ -23,7 +18,6 @@ export type ActivityType =
 
 export type ReactionType = 'LIKE' | 'DISLIKE';
 
-/** A person as others see them — mirrors UserDTO. Notification preferences are not here. */
 export interface User {
     id: number;
     email: string;
@@ -32,7 +26,6 @@ export interface User {
     profilePicture?: string | null;
 }
 
-/** The signed-in user's own profile — mirrors CurrentUserDTO. */
 export interface CurrentUser extends User {
     emailNotificationsEnabled: boolean;
     emailOnTaskAssigned: boolean;
@@ -40,7 +33,6 @@ export interface CurrentUser extends User {
     emailOnProjectInvitation: boolean;
 }
 
-/** Mirrors TaskDTO. Collections are always present (the server never sends null for them). */
 export interface Task {
     id: number;
     taskNumber: number;
@@ -55,7 +47,6 @@ export interface Task {
     labels: string[];
     dependencyKeys: string[];
     isCritical?: boolean | null;
-    /** Total float in days from the server's critical-path pass; zero means on a critical path. */
     totalFloat?: number | null;
     attachments: string[];
     created?: string | null;
@@ -64,20 +55,16 @@ export interface Task {
     priority: TaskPriority;
 }
 
-/** A task with the display fields `useEnrichedProjects` derives. */
 export interface EnrichedTask extends Task {
     projectSummary?: string;
     duration: number;
-    /** Alias of `dependencyKeys`, kept because the timeline and list views read it by this name. */
     dependencies: string[];
     isDelayed: boolean;
     isUpcomingDeadline: boolean;
     isDelayedByDependency: boolean;
-    /** The assignee's real name, resolved against the project's members; falls back to the email. */
     assigneeName: string;
 }
 
-/** Mirrors ProjectDTO. */
 export interface Project {
     id: number;
     projectKey: string;
@@ -92,7 +79,6 @@ export interface Project {
     updated?: string | null;
 }
 
-/** A project with the date range and progress the dashboard and timeline compute. */
 export interface ProcessedProject extends Omit<Project, 'tasks'> {
     tasks: EnrichedTask[];
     projectProgress: number;
@@ -103,13 +89,10 @@ export interface ProcessedProject extends Omit<Project, 'tasks'> {
 export interface CommentReactionState {
     likeCount: number;
     dislikeCount: number;
-    likedByUsernames: string[];
-    dislikedByUsernames: string[];
     likedByCurrentUser: boolean;
     dislikedByCurrentUser: boolean;
 }
 
-/** Mirrors CommentDTO. */
 export interface Comment extends CommentReactionState {
     id: number;
     taskId: number;
@@ -123,7 +106,6 @@ export interface Comment extends CommentReactionState {
     replies: Comment[];
 }
 
-/** Mirrors NotificationDTO. */
 export interface Notification {
     id: number;
     message: string;
@@ -133,7 +115,6 @@ export interface Notification {
     link?: string | null;
 }
 
-/** Mirrors TaskActivityDTO. */
 export interface Activity {
     id: number;
     type: ActivityType;
@@ -145,7 +126,6 @@ export interface Activity {
     timestamp: string;
 }
 
-/** Mirrors PagedResponse<T>. */
 export interface Paged<T> {
     content: T[];
     page: number;
@@ -155,7 +135,6 @@ export interface Paged<T> {
     hasNext: boolean;
 }
 
-/** A file attachment is either an already-uploaded path (string) or a pending upload. */
 export type Attachment = string | File;
 
 export interface AttachmentsState {
@@ -181,7 +160,6 @@ export interface ProjectPayload {
     projectKey: string;
     summary: string;
     description?: string;
-    /** Emails, not user objects: the server only ever read the address. */
     memberEmails?: string[];
     dependencies?: string[];
     attachments?: string[];
@@ -191,7 +169,6 @@ export interface ProfilePayload {
     firstname?: string;
     lastname?: string;
     email?: string;
-    /** Required by the server for an email or password change. */
     currentPassword?: string;
     newPassword?: string;
 }
@@ -209,10 +186,6 @@ export interface RegistrationPayload {
     email: string;
     password: string;
 }
-
-// Declared once. These used to exist twice — nullable in the hook, non-nullable in the component —
-// which the compiler reported as two unrelated types sharing a name, and which made the
-// nullability difference real unsoundness masked only by a render-time guard.
 
 export type ModalType = 'task' | 'project';
 export type ModalMode = 'create' | 'edit';
@@ -239,7 +212,6 @@ export interface ModalFormValues {
     labels: string;
     created: string;
     updated: string;
-    /** Member email addresses — the only part of a member the server ever reads. */
     memberEmails: string[];
     newUserEmail: string;
 }
@@ -286,7 +258,6 @@ export interface OptimizationMetrics {
     tasksOnTime: number;
     tasksLate: number;
     resourceConflicts: number;
-    /** False when the plan double-books someone, which makes its other numbers optimistic. */
     feasible: boolean;
 }
 
@@ -295,9 +266,7 @@ export interface OptimizationResult {
     originalMetrics: OptimizationMetrics;
     optimizedMetrics: OptimizationMetrics;
     tasksShifted: number;
-    /** Which priority rule won, so the UI can say why this schedule was proposed. */
     chosenRule?: string | null;
-    /** Tasks left out for having no dates, so the counts in the UI can be explained. */
     skippedTaskKeys: string[];
 }
 
@@ -323,9 +292,6 @@ export interface SearchTaskResult {
     projectKey: string;
     summary: string;
     status?: TaskStatus | null;
-    priority?: TaskPriority | null;
-    /** The assignee's full name — search results carry a name, not the email other endpoints send. */
-    assigneeName?: string | null;
 }
 
 export interface SearchCommentResult {
@@ -342,13 +308,11 @@ export interface SearchResults {
     comments: SearchCommentResult[];
 }
 
-/** One field-level validation failure, as sent inside ApiError. */
 export interface ApiFieldError {
     field: string;
     message: string;
 }
 
-/** Mirrors ApiError — the single error shape the API emits. */
 export interface ApiError {
     status: number;
     error: string;
@@ -358,7 +322,6 @@ export interface ApiError {
     timestamp?: string;
 }
 
-/** Shape of an axios-style error, for getErrorMessage. */
 export interface ErrorLike {
     response?: { status?: number; data?: ApiError };
     message?: string;

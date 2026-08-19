@@ -124,8 +124,6 @@ export interface components {
       likeCount?: number;
       /** Format: int32 */
       dislikeCount?: number;
-      likedByUsernames?: string[];
-      dislikedByUsernames?: string[];
       likedByCurrentUser?: boolean;
       dislikedByCurrentUser?: boolean;
       replies?: components["schemas"]["CommentDTO"][];
@@ -289,7 +287,6 @@ export interface components {
       startDate: string;
       /** Format: date */
       dueDate: string;
-      dateRangeOrdered?: boolean;
     };
     PagedResponseCommentDTO: {
       content?: components["schemas"]["CommentDTO"][];
@@ -390,10 +387,6 @@ export interface components {
       totalPages?: number;
       hasNext?: boolean;
     };
-    SseEmitter: {
-      /** Format: int64 */
-      timeout?: number;
-    };
   };
   responses: never;
   parameters: never;
@@ -422,8 +415,6 @@ export interface operations {
     requestBody?: {
       content: {
         "multipart/form-data": {
-          /** Format: int32 */
-          userId?: number;
           profile: string;
           /** Format: binary */
           profilePicture?: string;
@@ -446,11 +437,9 @@ export interface operations {
         commentId: number;
       };
     };
-    requestBody?: {
+    requestBody: {
       content: {
         "multipart/form-data": {
-          /** Format: int32 */
-          userId?: number;
           content: string;
           attachments?: string[];
         };
@@ -503,8 +492,6 @@ export interface operations {
     requestBody?: {
       content: {
         "multipart/form-data": {
-          /** Format: int32 */
-          userId?: number;
           projectDTO: string;
           attachments?: string[];
         };
@@ -542,8 +529,6 @@ export interface operations {
     requestBody?: {
       content: {
         "multipart/form-data": {
-          /** Format: int32 */
-          userId?: number;
           taskDTO: string;
           attachments?: string[];
         };
@@ -615,11 +600,9 @@ export interface operations {
         taskId: number;
       };
     };
-    requestBody?: {
+    requestBody: {
       content: {
         "multipart/form-data": {
-          /** Format: int32 */
-          userId?: number;
           content: string;
           attachments?: string[];
         };
@@ -673,8 +656,6 @@ export interface operations {
     requestBody?: {
       content: {
         "multipart/form-data": {
-          /** Format: int32 */
-          userId?: number;
           projectDTO: string;
           attachments?: string[];
         };
@@ -698,8 +679,6 @@ export interface operations {
     requestBody?: {
       content: {
         "multipart/form-data": {
-          /** Format: int32 */
-          userId?: number;
           taskDTO: string;
           attachments?: string[];
         };
@@ -928,10 +907,10 @@ export interface operations {
   };
   streamNotifications: {
     responses: {
-      /** @description OK */
+      /** @description Stream of notification events */
       200: {
         content: {
-          "text/event-stream": components["schemas"]["SseEmitter"];
+          "text/event-stream": components["schemas"]["NotificationDTO"];
         };
       };
     };

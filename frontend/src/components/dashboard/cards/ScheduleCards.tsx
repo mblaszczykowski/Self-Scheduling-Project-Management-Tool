@@ -15,8 +15,6 @@ import {
     VelocityStatus,
 } from '../../../util/scheduleAnalysis';
 
-// Cards about time: is the plan achievable, and where is it already slipping.
-
 export const CriticalPathHealthCard = ({ health }: { health: CriticalPathHealth }) => {
     const score = health.criticalHealthScore;
     const tint = score >= 80 ? 'green' : score >= 60 ? 'yellow' : 'red';
@@ -53,9 +51,6 @@ const StatRow = ({ label, value, color }: { label: string; value: number; color:
 );
 
 export const ScheduleHealthCard = ({ health }: { health: ScheduleHealth }) => {
-    // With nothing active to measure, the score formula floors at 0 — which reads as a critical
-    // schedule rather than the true "no schedule to grade yet" state. A neutral empty state avoids
-    // showing a red 0% next to Critical Path Health's own empty-portfolio default of a green 100%.
     if (health.totalActive === 0) {
         return (
             <ChartCard title="Schedule Health" subtitle="Progress vs time elapsed">
@@ -150,7 +145,6 @@ export const SlackDistributionCard = ({ distribution }: { distribution: SlackDis
                             <div
                                 className="h-full rounded transition-all duration-500"
                                 style={{
-                                    // A non-empty bucket keeps a visible stub, so "few" never reads as "none".
                                     width: `${Math.max((bucket.count / maxCount) * 100, bucket.count > 0 ? 8 : 0)}%`,
                                     backgroundColor: SLACK_BUCKET_COLORS[bucket.id],
                                     opacity: 0.85,

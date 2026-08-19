@@ -7,7 +7,9 @@ import { showToast } from '../../util/toast';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import { Attachment } from '../../types';
 import { inputClass } from '../common/formHelpers';
-import { ATTACHMENT_ACCEPT, getAttachmentCountError, getFileValidationError } from '../../util/fileValidation';
+import {
+    ATTACHMENT_ACCEPT, getAttachmentCountError, getFileValidationError, getTotalAttachmentSizeError,
+} from '../../util/fileValidation';
 
 export interface CommentFormValues {
     content: string;
@@ -20,8 +22,11 @@ interface CommentFormProps {
     onCancel: () => void;
 }
 
+const MAX_COMMENT_LENGTH = 10000;
+
 const CommentSchema = Yup.object().shape({
-    content: Yup.string().trim().required('Comment cannot be empty'),
+    content: Yup.string().trim().required('Comment cannot be empty')
+        .max(MAX_COMMENT_LENGTH, `Comment cannot exceed ${MAX_COMMENT_LENGTH} characters`),
 });
 
 const CommentForm = ({
@@ -33,7 +38,6 @@ const CommentForm = ({
     const textareaId = useId();
     const [localAttachments, setLocalAttachments] = useState<File[]>([]);
 
-    // Revoke any preview object URLs still held when the form unmounts.
     const localAttachmentsRef = useRef(localAttachments);
     localAttachmentsRef.current = localAttachments;
     useEffect(() => () => {
@@ -58,7 +62,13 @@ const CommentForm = ({
                 valid.push(file);
             }
         }
-        if (valid.length > 0) setLocalAttachments(prev => [...prev, ...valid]);
+        if (valid.length === 0) return;
+        const sizeError = getTotalAttachmentSizeError(localAttachments, valid);
+        if (sizeError) {
+            showToast(sizeError, 'error');
+            return;
+        }
+        setLocalAttachments(prev => [...prev, ...valid]);
     };
 
     const handleRemoveLocalAttachment = (attachment: Attachment) => {
@@ -68,9 +78,6 @@ const CommentForm = ({
 
     const handleFormSubmit = (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>) => {
         onSubmit(values, actions, localAttachments);
-        // Revoke here, at the point the list is cleared: `localAttachmentsRef` is only kept in
-        // sync during render, so by the time the form unmounts it already reflects this empty
-        // array and the unmount cleanup below has nothing left to revoke.
         localAttachments.forEach(revokeFileUrl);
         setLocalAttachments([]);
     };
@@ -91,6 +98,7 @@ const CommentForm = ({
                         id={textareaId}
                         name="content"
                         rows={2}
+                        maxLength={MAX_COMMENT_LENGTH}
                         className={`${inputClass} resize-none`}
                         placeholder={
                             buttonText === 'Reply'

@@ -23,7 +23,6 @@ const keyframes = `
 }
 `;
 
-// formatShortDate renders its own placeholder for a missing date, so this is just the alias.
 const fmtDate = formatShortDate;
 
 const fmtNum = (v: number, decimals = 1): string => {
@@ -32,7 +31,7 @@ const fmtNum = (v: number, decimals = 1): string => {
 };
 
 const Arrow = () => (
-    <svg width="12" height="7" viewBox="0 0 12 7" className="text-slate-300 flex-shrink-0 mx-0.5">
+    <svg width="12" height="7" viewBox="0 0 12 7" className="text-slate-300 dark:text-slate-600 flex-shrink-0 mx-0.5">
         <path d="M0 3.5h9M7.5 1L10 3.5l-2.5 2.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
 );
@@ -49,18 +48,18 @@ interface BeforeAfterProps {
 const BeforeAfter = ({ label, before, after, unit = '', lowerIsBetter = true, infeasible = false }: BeforeAfterProps) => {
     const improved = lowerIsBetter ? after < before : after > before;
     const unchanged = Math.abs(after - before) < 0.01;
-    const afterColor = unchanged ? 'text-slate-500'
-        : improved ? 'text-emerald-600' : 'text-amber-600';
+    const afterColor = unchanged ? 'text-slate-500 dark:text-slate-400'
+        : improved ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400';
 
     return (
         <div className="flex flex-col items-center gap-0.5">
-            <span className="text-[10px] text-slate-400 font-medium">{label}</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{label}</span>
             <div className="flex items-center gap-0.5 tabular-nums">
-                <span className={`text-xs ${infeasible ? 'text-slate-300' : 'text-slate-400'}`}>
+                <span className={`text-xs ${infeasible ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400 dark:text-slate-500'}`}>
                     {infeasible ? 'n/a' : <>{fmtNum(before)}{unit}</>}
                 </span>
                 <Arrow />
-                <span className={`text-sm font-bold leading-none ${infeasible ? 'text-slate-600' : afterColor}`}>
+                <span className={`text-sm font-bold leading-none ${infeasible ? 'text-slate-600 dark:text-slate-300' : afterColor}`}>
                     {fmtNum(after)}{unit}
                 </span>
             </div>
@@ -100,9 +99,7 @@ interface OptimizationMetricsProps {
     optimizedMetrics?: OptimizationMetricsData;
     suggestions?: OptimizationSuggestion[];
     suggestionsCount: number;
-    /** Label of the ordering rule that won, shown so the proposal can justify itself. */
     chosenRule?: string | null;
-    /** Tasks with no dates, which the optimizer could not place. Named so the counts add up. */
     skippedTaskKeys?: string[];
     onAccept: () => void;
     onReject: () => void;
@@ -128,7 +125,6 @@ const OptimizationMetrics = ({
     const conflictsBefore = originalMetrics.resourceConflicts;
     const conflictsAfter = optimizedMetrics.resourceConflicts;
     const conflictsResolved = conflictsBefore - conflictsAfter;
-    // The server owns this judgement; the conflict count is only how it explains itself.
     const infeasible = !originalMetrics.feasible;
     const skippedCount = skippedTaskKeys?.length ?? 0;
     const onTimeBefore = originalMetrics.tasksOnTime;
@@ -344,7 +340,7 @@ const OptimizationMetrics = ({
                             infeasible={infeasible}
                         />
                         <BeforeAfter
-                            label="Total duration"
+                            label="Schedule span"
                             before={originalMetrics.makespan}
                             after={optimizedMetrics.makespan}
                             unit="d"
@@ -388,36 +384,36 @@ const OptimizationMetrics = ({
                                                     style={{ animation: `optFadeUp 0.25s ${80 + i * 30}ms cubic-bezier(0.22, 1, 0.36, 1) both` }}
                                                 >
                                                     <div className="flex items-center gap-2 min-w-0">
-                                                        <span className="text-xs font-semibold text-slate-400 flex-shrink-0">{s.taskKey}</span>
+                                                        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 flex-shrink-0">{s.taskKey}</span>
                                                         <span className="text-sm text-slate-700 dark:text-slate-200 truncate">{s.summary}</span>
                                                         {s.isCritical && (
-                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-500 font-semibold flex-shrink-0 border border-red-100">
+                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-50 dark:bg-red-950/40 text-red-500 dark:text-red-400 font-semibold flex-shrink-0 border border-red-100 dark:border-red-900/50">
                                                                 Critical
                                                             </span>
                                                         )}
                                                         {s.priorityWeight >= 8 && (
-                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 font-bold flex-shrink-0 border border-amber-200">
+                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-bold flex-shrink-0 border border-amber-200 dark:border-amber-800/60">
                                                                 High priority
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <span className="text-xs text-slate-400 tabular-nums">
+                                                    <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">
                                                         {fmtDate(s.originalStartDate)} – {fmtDate(s.originalDueDate)}
                                                     </span>
-                                                    <span className="text-xs text-blue-600 font-medium tabular-nums">
+                                                    <span className="text-xs text-blue-600 dark:text-blue-400 font-medium tabular-nums">
                                                         {fmtDate(s.suggestedStartDate)} – {fmtDate(s.suggestedDueDate)}
                                                     </span>
                                                     <span className={`text-xs font-semibold tabular-nums text-right ${
-                                                        shift > 0 ? 'text-amber-600' : shift < 0 ? 'text-emerald-600' : 'text-slate-400'
+                                                        shift > 0 ? 'text-amber-600 dark:text-amber-400' : shift < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
                                                     }`}>
                                                         {shift > 0 ? '+' : ''}{shift}d
                                                     </span>
                                                     <span className={`text-xs tabular-nums text-right ${
-                                                        s.tardinessDays > 0 ? 'text-red-500 font-semibold' : 'text-slate-300'
+                                                        s.tardinessDays > 0 ? 'text-red-500 dark:text-red-400 font-semibold' : 'text-slate-300 dark:text-slate-600'
                                                     }`}>
                                                         {s.tardinessDays > 0 ? `+${s.tardinessDays}d` : '—'}
                                                     </span>
-                                                    <span className="text-xs text-slate-500 truncate text-right" title={s.assignee || 'Unassigned'}>
+                                                    <span className="text-xs text-slate-500 dark:text-slate-400 truncate text-right" title={s.assignee || 'Unassigned'}>
                                                         {s.assignee ? formatAssigneeName(s.assignee) : '—'}
                                                     </span>
                                                 </div>

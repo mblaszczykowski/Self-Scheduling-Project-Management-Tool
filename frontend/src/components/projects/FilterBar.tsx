@@ -9,8 +9,6 @@ import { FilterBarProps } from './types';
 
 const iconClass = "w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0";
 
-// Status, priority and the other fixed-option filters never change at runtime, so their option
-// lists and icons are built once here rather than on every keystroke in the search box.
 const STATUS_ICON = <CheckCircleIcon className={iconClass} />;
 const ASSIGNEE_ICON = <UserIcon className={iconClass} />;
 const LABELS_ICON = <TagIcon className={iconClass} />;
@@ -88,8 +86,6 @@ const FilterBar = ({
             .map(v => ({ value: v, label: v })),
     [allTasks]);
 
-    // Derived once because both the visible chip and the button's accessible name need it —
-    // an aria-label replaces the rendered text, so the active value has to be part of it.
     const activeProjectLabel = projectKeyFilter
         ? projects.find(p => p.projectKey === projectKeyFilter)?.summary || projectKeyFilter
         : null;

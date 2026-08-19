@@ -7,7 +7,7 @@ import FormField from '../common/FormField';
 import { register, checkUserAuth } from '../../util/api';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../util/toast';
-import { getErrorMessage } from '../../util/helpers';
+import { getErrorMessage, safeNextPath } from '../../util/helpers';
 import { PASSWORD_RULES, withPasswordComplexity } from './passwordRules';
 
 interface RegisterValues {
@@ -28,6 +28,7 @@ const validationSchema = Yup.object().shape({
         .required('Last name is required.'),
     email: Yup.string()
         .email('Invalid email address format.')
+        .max(255, 'Max length is 255.')
         .required('Email is required.'),
     password: withPasswordComplexity(Yup.string()).required('Password is required.'),
 });
@@ -61,24 +62,21 @@ function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
     const [showPassword, setShowPassword] = useState(false);
     const { setUser } = useAuth();
     const navigate = useNavigate();
-    // Namespaced per instance so the login and register forms can coexist on one page
-    // without their labels pointing at each other's inputs.
     const uid = useId();
+    const [returnTo] = useState(() => safeNextPath(window.location.search));
 
     const handleSubmit = async (values: RegisterValues, { setSubmitting }: FormikHelpers<RegisterValues>) => {
         try {
             await register(values);
             const userData = await checkUserAuth();
             setUser(userData);
-            navigate('/dashboard');
+            navigate(returnTo, { replace: true });
         } catch (err) {
             showToast(getErrorMessage(err, 'Registration failed.'));
-
         } finally {
             setSubmitting(false);
         }
     };
-
 
     return (
         <Formik

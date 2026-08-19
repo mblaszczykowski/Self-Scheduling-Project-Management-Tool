@@ -91,8 +91,6 @@ describe('calculateDuration', () => {
         expect(calculateDuration('2024-01-01', '2024-01-01')).toBe(1);
         expect(calculateDuration('2024-01-01', '2024-01-05')).toBe(5);
     });
-    // 0 rather than a sentinel string: callers compare and sum durations, and only the
-    // formatter decides how "unknown" reads on screen.
     test('is zero when the span is unknown or nonsensical', () => {
         expect(calculateDuration(null, '2024-01-05')).toBe(0);
         expect(calculateDuration('2024-01-05', undefined)).toBe(0);
@@ -193,14 +191,10 @@ describe('safeNextPath', () => {
         expect(safeNextPath('?next=')).toBe('/dashboard');
     });
 
-    // Every one of these resolves to an off-site origin in a real browser. The backslash forms are
-    // the interesting ones: they start with a single "/", so a startsWith('//') guard lets them by.
     test.each([
         '//evil.com',
         '/\\evil.com',
         '/\\/evil.com',
-        // Dot segments resolve before the pathname exists, so these pass an origin check and
-        // still come back protocol-relative.
         '/..//evil.com',
         '/.//evil.com',
         '/a/../..//evil.com',
@@ -220,9 +214,6 @@ describe('safeNextPath', () => {
     });
 });
 
-// Task and project dates are nullable on the server. Before strictNullChecks these helpers were
-// typed to reject null and then handed it anyway, so `new Date(undefined)` reached the DOM and
-// cards rendered the literal string "Invalid Date".
 describe('missing dates', () => {
     test('a date that is not there renders as a placeholder, not "Invalid Date"', () => {
         expect(formatShortDate(null)).toBe(NO_DATE);
@@ -236,7 +227,6 @@ describe('missing dates', () => {
         expect(formatShortDate('2024-06-15')).not.toBe(NO_DATE);
     });
 
-    // Callers sum and compare these, so a NaN would silently poison every total it reached.
     test('an unknown span is zero days, never NaN', () => {
         expect(daysBetween(null, '2024-06-15')).toBe(0);
         expect(daysBetween('2024-06-15', undefined)).toBe(0);

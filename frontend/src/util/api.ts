@@ -20,21 +20,12 @@ import {
     TaskPayload,
 } from '../types';
 
-/**
- * The single HTTP boundary.
- *
- * Every function here declares what the server returns, so a DTO that drifts on the backend
- * becomes a compile error in the components that read it. Previously this file was untyped
- * JavaScript, which meant every response entered the app as `any` and the domain types in
- * `types.ts` were decorative everywhere except the two places that re-asserted them by hand.
- */
 const api = axios.create({
     baseURL: config.API_BASE_URL,
     withCredentials: true,
     timeout: config.REQUEST_TIMEOUT_MS,
 });
 
-/** Axios passes unknown config keys straight through, which is how the retry flags travel. */
 interface RetryableConfig extends InternalAxiosRequestConfig {
     _retry?: boolean;
     _skipRefresh?: boolean;
@@ -72,14 +63,6 @@ api.interceptors.request.use((requestConfig) => {
 
 let refreshPromise: Promise<unknown> | null = null;
 
-/**
- * Rotates the session, at most once at a time.
- *
- * Every caller shares one in-flight request. Refresh tokens are single-use and presenting a
- * consumed one is treated as replay, which revokes the whole token family — so two refreshes racing
- * each other would sign the user out rather than renew them. The flag and the promise are read
- * together with no await in between, so there is no window for a second refresh to start.
- */
 const refreshSession = (): Promise<unknown> => {
     if (!refreshPromise) {
         refreshPromise = api.post('/api/auth/refresh')
@@ -88,17 +71,11 @@ const refreshSession = (): Promise<unknown> => {
     return refreshPromise;
 };
 
-/**
- * Endpoints for which a 401 must not trigger a refresh: the two that mint the session, and
- * logout — where refreshing only to then discard the session produces a misleading "your session
- * expired" toast instead of a clean sign-out.
- */
 const NO_REFRESH_PATHS = ['/api/auth/login', '/api/auth/refresh', '/api/auth/logout'];
 
 const redirectToLogin = () => {
     const publicPaths = ['/login', '/register', '/'];
     if (publicPaths.includes(window.location.pathname)) return;
-    // Remember where the user was so they land back there after signing in.
     const next = encodeURIComponent(window.location.pathname + window.location.search);
     window.location.href = `/login?expired=true&next=${next}`;
 };
@@ -120,8 +97,6 @@ api.interceptors.response.use(
 
         try {
             await refreshSession();
-            // Retrying is safe even for a POST: the 401 came from the authentication filter,
-            // before any handler ran, so the request was never processed.
             return api(originalRequest);
         } catch (refreshError) {
             redirectToLogin();
@@ -152,15 +127,6 @@ export const register = (payload: RegistrationPayload) =>
 
 export const getCurrentUser = () => api.get<CurrentUser>('/api/users/me').then(body);
 
-/**
- * The boot-time auth probe.
- *
- * Skips the interceptor's automatic refresh so an anonymous visitor is not hard-redirected before
- * the router's own auth gate runs — but a returning user whose 15-minute access token has expired
- * still has a valid refresh token, so one explicit rotation is attempted before giving up. Without
- * that second step every reload past the access token's lifetime forced a fresh login and the
- * seven-day refresh token was never used.
- */
 export const checkUserAuth = async (): Promise<CurrentUser> => {
     const probe = () =>
         api.get<CurrentUser>('/api/users/me', { _skipRefresh: true } as AxiosRequestConfig).then(body);
@@ -186,6 +152,23 @@ export const updateEmailPreferences = (preferences: EmailPreferencesPayload) =>
 export const getProjects = (page = 0, size = 100) =>
     api.get<Paged<Project>>('/api/projects', { params: { page, size } }).then(body);
 
+const PROJECT_PAGE_SIZE = 100;
+const MAX_PROJECT_PAGES = 50;
+
+export const getAllProjects = async (): Promise<Project[]> => {
+    const first = await getProjects(0, PROJECT_PAGE_SIZE);
+    if (!first.hasNext) {
+        return first.content;
+    }
+    const wanted = Math.min(first.totalPages, MAX_PROJECT_PAGES);
+    if (first.totalPages > MAX_PROJECT_PAGES) {
+        console.warn('Loaded only the first %d of %d project pages', wanted, first.totalPages);
+    }
+    const rest = await Promise.all(
+        Array.from({ length: wanted - 1 }, (_, index) => getProjects(index + 1, PROJECT_PAGE_SIZE)));
+    return [first, ...rest].flatMap((page) => page.content);
+};
+
 export const createProject = (payload: ProjectPayload, attachments: File[] = []) =>
     api.post<Project>('/api/projects', multipart(payload, attachments, 'projectDTO'), MULTIPART)
         .then(body);
@@ -206,12 +189,6 @@ export const updateTask = (projectKey: string, taskKey: string, payload: TaskPay
     api.put<Task>(`/api/projects/${encodeURIComponent(projectKey)}/tasks/${encodeURIComponent(taskKey)}`,
         multipart(payload, attachments, 'taskDTO'), MULTIPART).then(body);
 
-/**
- * Moves a task in time and nothing else.
- *
- * The timeline drag uses this rather than the full update, which is what stops a drag from
- * resetting the fields it never intended to send.
- */
 export const updateTaskSchedule = (projectKey: string, taskKey: string,
                                    startDate: string, dueDate: string) =>
     api.patch<Task>(
@@ -258,19 +235,14 @@ export const getTaskActivities = (taskId: number, page = 0, size = 50) =>
 export const getNotifications = (page = 0, size = 50) =>
     api.get<Paged<Notification>>('/api/notifications', { params: { page, size } }).then(body);
 
-/** From the database, so the badge does not under-count once a user passes one page. */
 export const getUnreadNotificationCount = () =>
     api.get<{ count: number }>('/api/notifications/unread-count').then(body);
 
 export const markNotificationsAsRead = (notificationIds: number[]) =>
     api.post<void>('/api/notifications/mark-as-read', notificationIds).then(body);
 
-/**
- * Clears every unread notification, not just the page the client happens to hold, and answers with
- * the remaining count so the badge is set from the server rather than decremented locally.
- */
 export const markAllNotificationsRead = () =>
-    api.post<{ unreadCount: number }>('/api/notifications/mark-all-read').then(body);
+    api.post<{ count: number }>('/api/notifications/mark-all-read').then(body);
 
 export const globalSearch = (query: string) =>
     api.get<SearchResults>('/api/search', { params: { q: query } }).then(body);
@@ -278,10 +250,6 @@ export const globalSearch = (query: string) =>
 export const simulateOptimization = (request: OptimizationRequest) =>
     api.post<OptimizationResult>('/api/optimization/simulate', request).then(body);
 
-/**
- * Applies an optimization by asking the server to recompute it, rather than sending dates back.
- * What lands in the database is then feasible by construction.
- */
 export const applyOptimization = (request: ApplyOptimizationRequest) =>
     api.post<{ tasksUpdated: number }>('/api/optimization/apply', request).then(body);
 

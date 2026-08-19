@@ -29,7 +29,6 @@ const columns = [
     ['dependencies', 'Dependencies', 'min-w-[240px]'],
 ];
 
-/** Mini timeline showing elapsed vs remaining */
 const ScheduleBar = ({ startDate, dueDate, progress }: { startDate?: string | null; dueDate?: string | null; progress: number }) => {
     if (!startDate || !dueDate) return null;
     const now = new Date();
@@ -83,8 +82,6 @@ const TaskListView = ({
     onTaskClick,
 }: TaskListViewProps) => {
     const taskInsights = useMemo(() => {
-        // One pass over every known task to count dependents per key, rather than scanning them
-        // all again for each rendered row.
         const dependentsCount = new Map<string, number>();
         taskKeyToTaskMap.forEach((task) => {
             task.dependencies.forEach((dependencyKey) => {
@@ -92,7 +89,6 @@ const TaskListView = ({
             });
         });
 
-        // "Now" is read once per recomputation rather than per row per helper.
         const now = new Date();
         const insights = new Map<string, TaskInsight>();
         filteredTasks.forEach((task) => {
@@ -140,22 +136,12 @@ const TaskListView = ({
                                     </>
                                 );
                                 return (
-                                    // aria-sort tells assistive tech which column the order is keyed on and in
-                                    // which direction; only the sortable columns advertise it.
                                     <th key={field}
                                         aria-sort={nonsortable ? undefined : isSorted ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
                                         className={`text-left text-[11px] font-semibold uppercase tracking-wider ${nonsortable ? 'px-4 py-2.5' : ''} select-none ${width} ${isSorted ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'} transition-colors`}>
                                         {nonsortable ? (
                                             <div className="flex items-center gap-1">{heading}</div>
                                         ) : (
-                                            // A real button rather than a handler on the <th>, so sorting is
-                                            // reachable by keyboard; it carries the cell padding so the mouse
-                                            // target stays the whole header cell.
-                                            // `uppercase` is repeated here on purpose: Tailwind's preflight
-                                            // sets `button { text-transform: none }`, and an explicit
-                                            // declaration beats the value inherited from the <th>, so the
-                                            // sortable headings dropped to title case while the plain one
-                                            // stayed upper.
                                             <button type="button" onClick={() => onSort(field)}
                                                 className="w-full px-4 py-2.5 flex items-center gap-1 uppercase cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
                                                 {heading}
@@ -178,20 +164,14 @@ const TaskListView = ({
                                 .find((member) => member.email === task.assignee);
 
                             return (
-                                // The row stays a table row rather than taking role="button": overriding the
-                                // role would drop it out of the table's row/rowgroup structure and break table
-                                // navigation. tabIndex + aria-label + Enter/Space give it the keyboard path.
                                 <tr key={task.taskKey}
                                     tabIndex={0}
                                     aria-label={`Open task ${task.taskKey}: ${task.summary}`}
                                     onClick={() => onTaskClick(project, task)}
                                     onKeyDown={(e) => {
-                                        // The dependency chips inside the row are focusable too and their Enter
-                                        // press bubbles up here; only act when the row itself holds focus, so
-                                        // opening a chip does not also open this task.
                                         if (e.target !== e.currentTarget) return;
                                         if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault(); // Space would otherwise scroll the page
+                                            e.preventDefault();
                                             onTaskClick(project, task);
                                         }
                                     }}
@@ -220,16 +200,16 @@ const TaskListView = ({
                                     </td>
 
                                     <td className="px-4 py-3">
-                                        <span className={`inline-flex items-center gap-1.5 py-[3px] px-2 rounded-md text-[11px] font-semibold ${STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.color || 'bg-slate-100 text-slate-600'}`}>
-                                            <span className={`w-[6px] h-[6px] rounded-full ${STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.dot || 'bg-slate-400'}`} />
-                                            {STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG]?.label || task.status}
+                                        <span className={`inline-flex items-center gap-1.5 py-[3px] px-2 rounded-md text-[11px] font-semibold ${STATUS_CONFIG[task.status]?.color || 'bg-slate-100 text-slate-600'}`}>
+                                            <span className={`w-[6px] h-[6px] rounded-full ${STATUS_CONFIG[task.status]?.dot || 'bg-slate-400'}`} />
+                                            {STATUS_CONFIG[task.status]?.label || task.status}
                                         </span>
                                     </td>
 
                                     <td className="px-4 py-3">
-                                        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-xs font-bold ${PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG]?.color || 'bg-slate-100 text-slate-600'}`}
-                                            title={PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG]?.label || task.priority}>
-                                            {PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG]?.icon}
+                                        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-xs font-bold ${PRIORITY_CONFIG[task.priority]?.color || 'bg-slate-100 text-slate-600'}`}
+                                            title={PRIORITY_CONFIG[task.priority]?.label || task.priority}>
+                                            {PRIORITY_CONFIG[task.priority]?.icon}
                                         </span>
                                     </td>
 
@@ -408,4 +388,4 @@ const FooterStats = React.memo(({ tasks }: { tasks: EnrichedTask[] }) => {
     );
 });
 
-export default TaskListView;
+export default React.memo(TaskListView);

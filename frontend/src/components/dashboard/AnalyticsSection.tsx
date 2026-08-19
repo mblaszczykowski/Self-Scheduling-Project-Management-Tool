@@ -24,9 +24,6 @@ import {
 } from './cards/DependencyCards';
 import { DashboardStats } from '../../hooks/useDashboardStats';
 
-// Layout only. The cards are siblings with no shared state, so each one takes just the slice of
-// `stats` it draws and lives in the file for its section.
-
 const SectionDivider = ({ title }: { title: string }) => (
     <div className="col-span-full pt-6 pb-2 first:pt-0">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3>
@@ -63,6 +60,4 @@ const AnalyticsSection = ({ stats }: { stats: DashboardStats }) => (
     </section>
 );
 
-// Memoized: it depends only on the stable `stats` object, so unrelated DashboardPage re-renders
-// (e.g. opening a modal) no longer re-render every card.
 export default React.memo(AnalyticsSection);

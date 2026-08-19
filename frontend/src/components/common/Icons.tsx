@@ -1,10 +1,5 @@
 import React from 'react';
 
-/**
- * Every icon spreads its remaining props onto the <svg> it renders, so the props type has to be
- * the full SVG element surface — otherwise `aria-hidden`, `focusable`, `role` or an event handler
- * is rejected at the call site even though it reaches the DOM node correctly.
- */
 type IconProps = React.SVGProps<SVGSVGElement>;
 
 export const CalendarIcon = ({ className = "w-4 h-4", ...props }: IconProps) => (

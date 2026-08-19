@@ -22,15 +22,9 @@ import {
     computeStatusDistribution,
 } from '../util/scheduleAnalysis';
 
-/**
- * The enrichment the projects page already computes. The dashboard consumes it rather than walking
- * projects→tasks a second time, so both pages agree on what "delayed" means by construction.
- */
 export type EnrichedProjects = ReturnType<typeof useEnrichedProjects>;
 
-/** Composes the dashboard's statistics; every computation itself is a pure function elsewhere. */
 export const useDashboardStats = ({ processedProjects, allTasks, taskKeyToTaskMap }: EnrichedProjects) => {
-    // Only the calendar day matters, so the memo survives re-renders within the same day.
     const todayStr = new Date().toDateString();
 
     return useMemo(() => {

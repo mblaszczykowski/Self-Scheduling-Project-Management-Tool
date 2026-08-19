@@ -27,7 +27,6 @@ import {
     FilterTooltipState, TimelineTooltipContent, TooltipState,
 } from '../components/projects/types';
 
-// Lazy so TipTap (loaded by the modal's rich-text editor) stays out of the page bundle.
 const TaskProjectModal = React.lazy(() => import('../components/modals/TaskProjectModal'));
 
 const ProjectsPage = () => {
@@ -51,14 +50,6 @@ const ProjectsPage = () => {
     const { allTasks, processedProjects, taskKeyToTaskMap, projectKeyToProject } =
         useEnrichedProjects(projects);
 
-    /**
-     * Opens a modal and records the selection in the URL.
-     *
-     * Merges into the existing query string rather than replacing it. `navigate('?selectedIssue=…')`
-     * discards every other parameter, which silently dropped `commentId` before the comment thread
-     * could read it (so deep-links from search never worked) and reset an active project filter
-     * behind the open modal.
-     */
     const openModal = useCallback((
         type: ModalType,
         mode: ModalMode,
@@ -104,10 +95,7 @@ const ProjectsPage = () => {
     const { optimization, handleOptimize, handleAcceptOptimization, handleRejectOptimization } =
         useScheduleOptimization({ processedProjects, onApplied: retryProjects });
 
-    // Escape is deliberately absent: the task/project modal owns that key and checks for unsaved
-    // changes first. A second listener here closed the modal unconditionally in the same event,
-    // so the confirmation never rendered and the edits were lost.
-    useKeyboardShortcuts([
+    useKeyboardShortcuts(modalOpen ? [] : [
         { key: 'n', handler: () => openModal('task', 'create') },
         { key: 'p', handler: () => openModal('project', 'create') },
         { key: '/', handler: () => document.querySelector<HTMLElement>('[data-search-input]')?.focus() },
@@ -115,7 +103,6 @@ const ProjectsPage = () => {
         { key: '2', handler: () => setViewState((previous) => ({ ...previous, mode: 'list' })) },
     ]);
 
-    // The timeline is unusable on a narrow screen, so fall back to the list.
     useEffect(() => {
         const applyMobileFallback = () => {
             if (window.innerWidth < 640) {
@@ -158,10 +145,6 @@ const ProjectsPage = () => {
         suggestions: optimization.suggestionMap,
     });
 
-    // Every handler below is memoised because the timeline tree is wrapped in React.memo. A fresh
-    // function identity on each render makes those wrappers unable to bail out, and the tooltip
-    // updates on every mousemove — so one hover across a bar re-rendered every project row and
-    // every task bar on the board.
     const toggleExpand = useCallback((projectKey: string) => setViewState((previous) => ({
         ...previous,
         expandedProjects: {
@@ -211,8 +194,6 @@ const ProjectsPage = () => {
         ? openModal('task', 'edit', project, task)
         : openModal('task', 'create', project)), [openModal]);
     const openTaskFromList = useCallback(
-        // A dependency row can point at a task whose project is not on screen, so the project is
-        // optional here; openModal already treats a missing one as "no project context".
         (project: Project | undefined, task: Task) =>
             openModal('task', 'edit', project ?? null, task), [openModal]);
 
@@ -354,7 +335,7 @@ const ProjectsPage = () => {
                                 onTooltipMove={moveTooltip}
                                 onTooltipHide={hideTooltip}
                                 onSidebarToggle={toggleSidebar}
-                                onMouseDown={startResize}
+                                onPointerDown={startResize}
                                 shouldPreventClick={shouldPreventClick}
                                 headerRef={headerRef}
                                 timelineRef={timelineRef}

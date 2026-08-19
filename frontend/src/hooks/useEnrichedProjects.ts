@@ -5,21 +5,12 @@ import {
 import { computeProjectDateRange, computeProjectProgress } from '../util/projectUtils';
 import { EnrichedTask, ProcessedProject, Project } from '../types';
 
-/** Epoch millis for a date string, or +Infinity when there is no date, so sorts stay total. */
 const startOrder = (date?: string | null): number => {
     if (!date) return Number.POSITIVE_INFINITY;
     const parsed = new Date(date).getTime();
     return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
 };
 
-/**
- * Derives the display fields the timeline, list and dashboard all read from.
- *
- * <p>Both sorts here are guarded against missing and unparseable dates. A comparator that returns
- * NaN — which `new Date(undefined).getTime() - ...` does — leaves the sort order
- * implementation-defined rather than throwing, so the bug shows up as a list that is quietly in the
- * wrong order.
- */
 export function useEnrichedProjects(projects: Project[]) {
     return useMemo(() => {
         const allTasks: EnrichedTask[] = [];
@@ -27,9 +18,6 @@ export function useEnrichedProjects(projects: Project[]) {
         const projectKeyToProject = new Map<string, ProcessedProject>();
 
         const processedProjects: ProcessedProject[] = projects.map((project) => {
-            // The API sends the assignee as an email; the project's member list is the only place
-            // their real name is available, so it is resolved once here rather than guessed from
-            // the address at each render site.
             const nameByEmail = new Map<string, string>();
             for (const member of project.members ?? []) {
                 if (member.email) nameByEmail.set(member.email, `${member.firstname} ${member.lastname}`.trim());
@@ -83,7 +71,6 @@ export function useEnrichedProjects(projects: Project[]) {
             return processed;
         });
 
-        // Second pass: a task is blocked-by-a-late-dependency only once every task is known.
         processedProjects.forEach((project) => {
             project.tasks.forEach((task) => {
                 task.isDelayedByDependency = task.dependencies

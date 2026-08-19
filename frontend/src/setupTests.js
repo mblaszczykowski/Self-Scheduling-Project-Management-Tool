@@ -1,12 +1,5 @@
-// jest-dom adds custom jest matchers for asserting on DOM nodes.
-// allows you to do things like:
-// expect(element).toHaveTextContent(/react/i)
-// learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
 
-// Mock window.location so a test can assert on a redirect instead of navigating jsdom away.
-// Every field a real Location exposes is present: code that reads origin or search to make a
-// security decision must see a realistic value here, not undefined, or the test proves nothing.
 delete window.location;
 window.location = {
     href: 'http://localhost/',
@@ -23,13 +16,11 @@ window.location = {
     reload: jest.fn(),
 };
 
-// Mock document.visibilityState
 Object.defineProperty(document, 'visibilityState', {
     writable: true,
     value: 'visible',
 });
 
-// Mock document.cookie
 let cookies = {};
 Object.defineProperty(document, 'cookie', {
     get: () => Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join('; '),
@@ -44,17 +35,14 @@ Object.defineProperty(document, 'cookie', {
     },
 });
 
-// Helper to clear cookies between tests
 global.clearMockCookies = () => {
     cookies = {};
 };
 
-// Helper to set mock cookies
 global.setMockCookie = (name, value) => {
     cookies[name] = value;
 };
 
-// Mock console.error to avoid noisy test output for expected errors
 const originalConsoleError = console.error;
 beforeAll(() => {
     console.error = (...args) => {

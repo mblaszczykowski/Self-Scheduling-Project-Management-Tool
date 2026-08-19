@@ -51,9 +51,6 @@ export default function MobileMenu({
     );
 }
 
-// Declared at module scope on purpose: a component defined inside MobileMenu's body is a fresh
-// component type on every render, so React tears the links down and rebuilds them instead of
-// updating them, dropping their DOM state and restarting the menu's slide-in.
 function MobileNavLink({ to, isActive, onClick, children }: { to: string; isActive: boolean; onClick: () => void; children: React.ReactNode }) {
     return (
         <Link

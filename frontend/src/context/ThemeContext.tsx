@@ -10,13 +10,6 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-/**
- * The only way to read theme state.
- *
- * The raw context is deliberately not exported: consumers used to destructure a possibly-undefined
- * value directly, which made this guard — and the clear error it produces outside a provider —
- * dead code.
- */
 export const useTheme = (): ThemeContextValue => {
     const context = useContext(ThemeContext);
     if (!context) throw new Error('useTheme must be used within a ThemeProvider');

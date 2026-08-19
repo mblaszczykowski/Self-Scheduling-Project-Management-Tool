@@ -1,8 +1,5 @@
 import { Task } from '../types';
 
-// Task dates are ISO date-only strings (YYYY-MM-DD), which sort lexicographically.
-// Comparing the strings directly avoids parsing into Date (and the timezone
-// round-trip / NaN-on-bad-input crash that Math.min(...new Date()) caused).
 export const computeProjectDateRange = (tasks?: Task[]) => {
     const valid = (tasks || []).filter(t => t.startDate && t.dueDate);
     if (!valid.length) return { projectStartDate: null, projectDueDate: null };

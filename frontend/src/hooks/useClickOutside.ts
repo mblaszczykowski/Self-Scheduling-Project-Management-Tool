@@ -4,9 +4,6 @@ export const useClickOutside = (
     ref: RefObject<HTMLElement | null>,
     onClickOutside: (e: MouseEvent | TouchEvent) => void,
 ) => {
-    // Keep the latest callback in a ref so the listener subscribes exactly once
-    // (deps: [ref]) instead of re-adding whenever the caller passes a new
-    // callback identity.
     const callbackRef = useRef(onClickOutside);
     callbackRef.current = onClickOutside;
 

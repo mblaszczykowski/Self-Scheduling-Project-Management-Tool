@@ -1,4 +1,4 @@
-import { RefObject, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { MS_PER_DAY } from '../util/helpers';
 import { TIMELINE_CONSTANTS } from '../config/timelineConstants';
 import { OptimizationSuggestion, ProcessedProject } from '../types';
@@ -14,14 +14,9 @@ const timeOf = (date?: string | null): number | null => {
 
 interface Options {
     processedProjects: ProcessedProject[];
-    /** Ghost bars extend the visible range, so proposed dates count towards the bounds. */
     suggestions: Map<string, OptimizationSuggestion> | null;
 }
 
-/**
- * Computes the timeline's date range and pixel width, and keeps the sticky header's horizontal
- * scroll in step with the body.
- */
 export function useTimelineViewport({ processedProjects, suggestions }: Options) {
     const headerRef = useRef<HTMLDivElement | null>(null);
     const timelineRef = useRef<HTMLDivElement | null>(null);
@@ -64,8 +59,6 @@ export function useTimelineViewport({ processedProjects, suggestions }: Options)
             timelineStart = new Date(today.getFullYear(), today.getMonth(), 1);
             timelineEnd = new Date(today.getFullYear(), today.getMonth() + MIN_MONTHS, 0);
         } else {
-            // Reduce rather than spread: Math.min(...dates) overflows the argument limit on a
-            // portfolio with tens of thousands of dates.
             const earliest = new Date(dates.reduce((a, b) => Math.min(a, b)));
             const latest = new Date(dates.reduce((a, b) => Math.max(a, b)));
             timelineStart = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
@@ -79,11 +72,8 @@ export function useTimelineViewport({ processedProjects, suggestions }: Options)
             }
         }
 
-        // Inclusive day count spanned by the two whole-month bounds above, matching the day-cell
-        // count TimelineHeader sums from the same months.
         const totalDays =
             Math.round((timelineEnd.getTime() - timelineStart.getTime()) / MS_PER_DAY) + 1;
-        // The shared day-area width: both TimelineHeader and the body rows apply this unmodified.
         const timelineWidth = totalDays * DAY_WIDTH + TIMELINE_END_PADDING;
 
         return { timelineStart, timelineEnd, timelineWidth };
@@ -100,8 +90,8 @@ export function useTimelineViewport({ processedProjects, suggestions }: Options)
 
     return {
         ...bounds,
-        headerRef: headerRef as RefObject<HTMLDivElement>,
-        timelineRef: timelineRef as RefObject<HTMLDivElement>,
+        headerRef,
+        timelineRef,
         syncScroll,
         scrollToToday,
     };

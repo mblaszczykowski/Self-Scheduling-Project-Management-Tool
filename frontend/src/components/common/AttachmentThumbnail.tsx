@@ -10,12 +10,6 @@ interface AttachmentThumbnailProps {
     variant?: 'default' | 'compact';
 }
 
-/**
- * Wrapper around whatever represents the attachment on screen. It becomes a real <button> only
- * when there is a preview to open, so an inert control never lands in the tab order, and it is
- * always a sibling of the remove control rather than its ancestor — nesting a button inside a
- * button is invalid markup.
- */
 const PreviewTarget = ({ fileName, className, onOpen, children }: {
     fileName: string;
     className: string;
@@ -43,8 +37,6 @@ const AttachmentThumbnail = ({
     variant = 'default',
 }: AttachmentThumbnailProps) => {
     const { url, fileName, fileType } = getFileInfo(attachment);
-    // getFileInfo only withholds a URL when there is no attachment to show, and a thumbnail
-    // without one would render a broken image.
     if (!url) return null;
 
     const handleRemove = (e: React.MouseEvent) => {
@@ -103,7 +95,6 @@ const AttachmentThumbnail = ({
         );
     }
 
-    // default variant (used in AttachmentUploader)
     return (
         <div className="relative group">
             {fileType === 'image' ? (

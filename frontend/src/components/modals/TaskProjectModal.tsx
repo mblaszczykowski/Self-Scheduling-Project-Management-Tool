@@ -6,7 +6,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useProjects } from '../../context/ProjectsContext';
 import TaskForm from './TaskForm';
 import ProjectForm from './ProjectForm';
-import ConfirmDialog, { trapFocus } from './ConfirmDialog';
+import ConfirmDialog from './ConfirmDialog';
+import { trapFocus } from '../common/focusTrap';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import useAttachments from '../../hooks/useAttachments';
 import useModalFormInit from '../../hooks/useModalFormInit';
@@ -16,8 +17,6 @@ import {
     Attachment, ModalFormValues, ModalMode, ModalType, Project, ProjectPayload, Task, TaskPayload,
 } from '../../types';
 
-// The one definition of "a valid email address" on the client, so a member email is held to the
-// same standard as every other email field in the app (they all validate with Yup's `.email()`).
 const EMAIL_SCHEMA = Yup.string().email();
 
 interface TaskProjectModalProps {
@@ -73,9 +72,6 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
     }, []);
 
     const handleCloseAttempt = useCallback(() => {
-        // `touched` is populated by onBlur, so requiring it here missed every edit made through
-        // a control that never blurs in normal use (the Status/Priority <select> overlays, the
-        // Progress range) — Formik's own `dirty` already tracks any value change and is enough.
         const isDirty = formikRef.current?.dirty || uiState.isDirty;
         if (isDirty) {
             setUiState(prev => ({ ...prev, closeConfirmOpen: true }));
@@ -92,9 +88,6 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
 
     useClickOutside(modalRef, handleCloseAttempt);
 
-    // Close on Escape (parity with the react-modal based AccountModal), and keep Tab from
-    // leaving the dialog into the obscured page behind it. Skipped while a ConfirmDialog is
-    // open on top: that dialog traps focus within itself instead.
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') { handleCloseAttempt(); return; }
@@ -140,7 +133,6 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                 }
             } else {
                 const payload: ProjectPayload = {
-                    // The key is immutable after creation, so an edit resubmits the existing one.
                     projectKey: (project?.projectKey ?? values.projectKey).toUpperCase(),
                     summary: values.summary,
                     description: values.description,
@@ -193,6 +185,11 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
         handleRemoveAttachment(attachment);
         setUiState(prev => ({ ...prev, isDirty: true }));
     }, [handleRemoveAttachment]);
+
+    const onDependenciesChange = useCallback((update: React.SetStateAction<string[]>) => {
+        setDependencies(update);
+        setUiState(prev => ({ ...prev, isDirty: true }));
+    }, [setDependencies]);
 
     const handleAddMember = (
         email: string,
@@ -280,7 +277,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                                         projects={projects}
                                         currentUser={user}
                                         dependencies={dependencies}
-                                        setDependencies={setDependencies}
+                                        setDependencies={onDependenciesChange}
                                         existingAttachments={attachments.existing}
                                         newAttachments={attachments.new}
                                         onAddAttachments={onAddAttachments}
@@ -296,7 +293,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                                         projects={projects}
                                         currentUser={user}
                                         dependencies={dependencies}
-                                        setDependencies={setDependencies}
+                                        setDependencies={onDependenciesChange}
                                         existingAttachments={attachments.existing}
                                         newAttachments={attachments.new}
                                         onAddAttachments={onAddAttachments}

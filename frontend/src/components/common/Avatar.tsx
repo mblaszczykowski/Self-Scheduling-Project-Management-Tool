@@ -3,7 +3,6 @@ import { AvatarSubject, getAvatarColor, getAvatarInitials, getImageUrl } from '.
 
 export type AvatarSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg';
 
-// `sm` and `md` used to be the same box, so a caller asking for `md` silently got `sm`.
 const sizeMap: Record<AvatarSize, { container: string; text: string }> = {
     xxs: { container: 'h-4 w-4', text: 'text-[8px]' },
     xs: { container: 'h-5 w-5', text: 'text-[10px]' },
@@ -11,7 +10,6 @@ const sizeMap: Record<AvatarSize, { container: string; text: string }> = {
     md: { container: 'h-8 w-8', text: 'text-xs' },
     lg: { container: 'h-20 w-20', text: 'text-2xl' },
 };
-
 
 interface AvatarProps {
     user?: AvatarSubject | null;
@@ -27,8 +25,6 @@ const Avatar = ({ user, profilePicture, size = 'sm', className = '', onError: ex
     const pic = profilePicture ?? user?.profilePicture;
     const { container, text } = sizeMap[size];
 
-    // A new image source should get a fresh chance to load (e.g. after a
-    // profile-picture change on an already-mounted Avatar).
     useEffect(() => { setHasError(false); }, [pic]);
 
     const handleError = () => {

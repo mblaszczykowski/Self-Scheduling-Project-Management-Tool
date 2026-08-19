@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { formatShortDate } from '../../util/helpers';
+import { DELIVERED_STATUSES, formatShortDate, isTaskComplete } from '../../util/helpers';
 import Avatar from '../common/Avatar';
 import { ChevronRightIcon } from '../common/Icons';
 import { EnrichedTask, ProcessedProject } from '../../types';
@@ -27,8 +27,6 @@ const ProjectCard = ({
 }: ProjectCardProps) => {
     const navigate = useNavigate();
 
-    // "Overdue", "due soon" and progress are all read off the enriched task rather than recomputed:
-    // useEnrichedProjects is the one place that decides what those words mean.
     const health = useMemo(() => {
         if (project.tasks.length === 0) return { label: 'No tasks', color: 'text-slate-400 dark:text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800' };
         const overdueCount = project.tasks.filter(t => t.isDelayed).length;
@@ -43,18 +41,16 @@ const ProjectCard = ({
         if (project.tasks.length === 0) return null;
         return {
             total: project.tasks.length,
-            done: project.tasks.filter(t => t.status === 'DONE' || t.status === 'RELEASED').length,
+            done: project.tasks.filter(t => DELIVERED_STATUSES.has(t.status)).length,
             inProgress: project.tasks.filter(t => t.status === 'IN_PROGRESS').length,
         };
     }, [project.tasks]);
 
     const nextDeadline = useMemo(() => {
         const now = Date.now();
-        // flatMap rather than filter+sort: it carries the parsed timestamp out with the task, so
-        // the comparator neither re-parses the date nor has to re-establish that it exists.
         const upcoming = project.tasks
             .flatMap(task => {
-                if (!task.dueDate || task.progress >= 100) return [];
+                if (!task.dueDate || isTaskComplete(task.status, task.progress)) return [];
                 const due = new Date(task.dueDate).getTime();
                 return due >= now ? [{ task, due }] : [];
             })
@@ -77,7 +73,7 @@ const ProjectCard = ({
             onClick={openEditor}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault(); // Space would otherwise scroll the page
+                    e.preventDefault();
                     openEditor();
                 }
             }}

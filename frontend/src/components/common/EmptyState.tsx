@@ -39,9 +39,7 @@ interface EmptyStateProps {
     action?: () => void;
     actionLabel?: string;
     className?: string;
-    /** 'sm' fits inside a dashboard card, where a full-page empty state would dwarf the card. */
     size?: 'sm' | 'md';
-    /** 'danger' for a state that is a failure rather than an absence — a load error, say. */
     tone?: 'neutral' | 'danger';
 }
 
@@ -73,7 +71,6 @@ const EmptyState = ({
     const palette = TONES[tone];
     const Icon = CustomIcon || iconMap[variant] || iconMap.list;
     const displayTitle = title || defaultMessages[variant]?.title || defaultMessages.list.title;
-    // At 'sm' the title carries the whole message, so an unasked-for default would only add noise.
     const displayDescription = description
         || (compact ? '' : defaultMessages[variant]?.description || defaultMessages.list.description);
 

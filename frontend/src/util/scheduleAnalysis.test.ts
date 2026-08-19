@@ -14,8 +14,6 @@ import {
 } from './scheduleAnalysis';
 import { EnrichedTask, ProcessedProject } from '../types';
 
-// All fixture dates are bare 'YYYY-MM-DD', which parses as UTC midnight, so the day arithmetic
-// under test is exact in every timezone the suite might run in.
 const TODAY = new Date('2024-06-11');
 
 let nextId = 1;
@@ -54,8 +52,6 @@ const project = (projectKey: string, tasks: EnrichedTask[]): ProcessedProject =>
 const byKey = (tasks: EnrichedTask[]) => new Map(tasks.map(t => [t.taskKey, t]));
 
 describe('computeSlackDistribution', () => {
-    // Float itself is computed server-side (CriticalPathAnalyzer) and arrives as `totalFloat`;
-    // what is under test here is the bucketing and which tasks are counted at all.
     test('buckets each task by the float the server reported', () => {
         const result = computeSlackDistribution([
             task({ taskKey: 'A', totalFloat: 0, startDate: '2024-06-01', dueDate: '2024-06-06' }),
@@ -127,7 +123,6 @@ describe('computeResourceConflicts', () => {
         task({ taskKey: 'A-3', assignee: 'alice@x.com', startDate: '2024-06-20', dueDate: '2024-06-25' }),
         task({ taskKey: 'B-1', assignee: 'bob@x.com', startDate: '2024-06-01', dueDate: '2024-06-05' }),
         task({ taskKey: 'B-2', assignee: 'bob@x.com', startDate: '2024-06-03', dueDate: '2024-06-04' }),
-        // Neither of these can double-book anyone: nobody owns the first, and the second is over.
         task({ taskKey: 'X-1', startDate: '2024-06-01', dueDate: '2024-06-10' }),
         task({ taskKey: 'X-2', assignee: 'alice@x.com', progress: 100, startDate: '2024-06-01', dueDate: '2024-06-10' }),
     ];
@@ -147,7 +142,6 @@ describe('computeResourceConflicts', () => {
             overlapDays: 3,
             involvesCritical: true,
         });
-        // B-1 06-01..06-05 and B-2 06-03..06-04 share 06-03 and 06-04.
         expect(result.conflicts[1].overlapDays).toBe(2);
     });
 
@@ -164,11 +158,6 @@ describe('computeResourceConflicts', () => {
         expect(computeResourceConflicts(backToBack).totalConflicts).toBe(0);
     });
 
-    // Due dates are inclusive, so a task ending on the 5th and one starting on the 5th both want
-    // carol that day. The optimizer agrees — its decoder occupies [start, start + duration) with
-    // an inclusive duration, so it refuses to place the second task on that boundary day — and
-    // the dashboard used to disagree with it, reporting zero conflicts for a board the scheduler
-    // considered infeasible.
     test('sharing only the boundary day is still a double-booking', () => {
         const touching = [
             task({ taskKey: 'C-1', assignee: 'carol@x.com', startDate: '2024-06-01', dueDate: '2024-06-05' }),
@@ -189,7 +178,6 @@ describe('computeResourceConflicts', () => {
 });
 
 describe('computeScheduleHealth', () => {
-    // Every task below spans 2024-06-01 → 2024-06-11 unless stated, so on TODAY it is 100% elapsed.
     const tasks = [
         task({ taskKey: 'CRIT', startDate: '2024-06-01', dueDate: '2024-06-11', progress: 40 }),
         task({ taskKey: 'BEHIND', startDate: '2024-06-01', dueDate: '2024-06-11', progress: 80 }),
@@ -203,7 +191,7 @@ describe('computeScheduleHealth', () => {
     const result = computeScheduleHealth(tasks, TODAY);
 
     test('buckets active tasks by how far behind their own dates they are', () => {
-        expect(result.totalActive).toBe(5); // FINISHED and UNDATED are not tracked
+        expect(result.totalActive).toBe(5);
         expect(result.onTrack).toBe(1);
         expect(result.slightlyBehind).toBe(1);
         expect(result.behind).toBe(1);
@@ -212,7 +200,6 @@ describe('computeScheduleHealth', () => {
     });
 
     test('scores slightly-behind work at partial credit', () => {
-        // (onTrack 1 + notStarted 1 + slightlyBehind 1 × 0.7) / 5 active
         expect(result.scheduleHealthScore).toBe(54);
     });
 
@@ -223,9 +210,6 @@ describe('computeScheduleHealth', () => {
         ]);
     });
 
-    // Nothing scheduled means nothing behind, so this reports healthy rather than 0% — the same
-    // convention computeCriticalPathHealth uses for an empty set. The two cards sat side by side
-    // reading 100% and 0% off the same empty portfolio before this agreed.
     test('an empty schedule scores as healthy, not as critically behind', () => {
         expect(computeScheduleHealth([], TODAY))
             .toMatchObject({ scheduleHealthScore: 100, totalActive: 0 });
@@ -234,7 +218,6 @@ describe('computeScheduleHealth', () => {
 
 describe('computeDependencyChainAnalysis', () => {
     test('measures depth through the deepest branch of a diamond', () => {
-        // Deliberately listed successors-first, so the DFS descends rather than reading a memo.
         const tasks = [
             task({ taskKey: 'D', dependencies: ['B', 'C'] }),
             task({ taskKey: 'B', dependencies: ['A'] }),
@@ -269,8 +252,6 @@ describe('computeDependencyChainAnalysis', () => {
             task({ taskKey: 'B', dependencies: ['A'] }),
         ];
 
-        // The guard stops the walk when it meets a key already on the path, so depth is bounded
-        // by the number of tasks rather than growing without end.
         expect(computeDependencyChainAnalysis(tasks, byKey(tasks)).longestChainLength).toBe(2);
     });
 });
@@ -288,8 +269,8 @@ describe('computeProjectVelocity', () => {
         expect(velocity).toEqual({
             projectKey: 'P',
             activeTasks: 2,
-            avgVelocityNeeded: 13, // 150 points of progress left over 12 remaining task-days
-            urgentCount: 1, // V-2 needs 50%/day
+            avgVelocityNeeded: 13,
+            urgentCount: 1,
             status: 'tight',
         });
     });
@@ -354,7 +335,6 @@ describe('computeCompletionTrend', () => {
             task({ taskKey: 'CANCELLED', status: 'WITHDRAWN', updated: '2024-06-11T10:00:00' }),
         ];
 
-        // WITHDRAWN is terminal but cancelled; counting it would inflate "weekly completed tasks".
         const trend = computeCompletionTrend(tasks, new Date('2024-06-11T12:00:00'));
 
         expect(trend[7]).toEqual({ label: '6/11', count: 1 });
@@ -373,8 +353,6 @@ describe('computeAssigneeLoad', () => {
 
         const load = computeAssigneeLoad(tasks);
 
-        // Alice weighs 10 + 5 + 2 = 17, Bob only 4; carol's finished work and the unassigned task
-        // are not a load on anyone.
         expect(load).toEqual([
             { assignee: 'alice@x.com', total: 2, critical: 1, overdue: 1 },
             { assignee: 'bob@x.com', total: 4, critical: 0, overdue: 0 },
@@ -398,7 +376,6 @@ describe('computeOptimizationOpportunity', () => {
             [task({ taskKey: 'A', isDelayed: true }), task({ taskKey: 'B', isDelayed: true })],
         );
 
-        // 3 conflicts would score 36 but the cap is 35; + 16 behind + 20 overdue + 15 critical.
         expect(result.score).toBe(86);
         expect(result.recommendation).toBe('Strongly recommended — significant improvements possible');
         expect(result.factors).toEqual([

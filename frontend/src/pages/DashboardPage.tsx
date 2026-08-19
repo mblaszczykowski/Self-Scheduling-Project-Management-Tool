@@ -1,4 +1,4 @@
-import React, { Suspense, useMemo } from 'react';
+import React, { Suspense, useCallback, useMemo } from 'react';
 import { useLogout } from '../hooks/useLogout';
 import {
     ArcElement, BarElement, CategoryScale, Chart as ChartJS, Filler, Legend,
@@ -20,8 +20,8 @@ import { useDashboardStats } from '../hooks/useDashboardStats';
 import { useModal } from '../hooks/useModal';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 import ErrorBoundary from '../components/common/ErrorBoundary';
+import { ProcessedProject } from '../types';
 
-// Lazy so TipTap (loaded by the modal's rich-text editor) stays out of the page bundle.
 const TaskProjectModal = React.lazy(() => import('../components/modals/TaskProjectModal'));
 
 ChartJS.register(
@@ -40,10 +40,13 @@ const DashboardPage = () => {
         openModal, closeModal,
     } = useModal();
 
-    useKeyboardShortcuts([
+    useKeyboardShortcuts(modalOpen ? [] : [
         { key: 'n', handler: () => openModal('task', 'create') },
         { key: 'p', handler: () => openModal('project', 'create') },
     ]);
+
+    const handleEditProject = useCallback(
+        (p: ProcessedProject) => openModal('project', 'edit', p), [openModal]);
 
     const enriched = useEnrichedProjects(projects);
     const stats = useDashboardStats(enriched);
@@ -102,7 +105,7 @@ const DashboardPage = () => {
                                                 project={project}
                                                 completionPercentage={completionByProject.get(project.projectKey) ?? 0}
                                                 animationDelay={index * 50}
-                                                onEditProject={(p) => openModal('project', 'edit', p)}
+                                                onEditProject={handleEditProject}
                                             />
                                         ))}
                                     </div>

@@ -25,7 +25,7 @@ const TimelineProjectRow = ({
     onTooltipShow,
     onTooltipMove,
     onTooltipHide,
-    onMouseDown,
+    onPointerDown,
     shouldPreventClick,
     optimization,
 }: TimelineProjectRowProps) => {
@@ -64,6 +64,7 @@ const TimelineProjectRow = ({
                                     + ' text-xs font-bold text-slate-700 dark:text-slate-200'
                                 }
                                 title={project.summary}
+                                aria-label={isExpanded ? 'Collapse tasks' : 'Expand tasks'}
                             >
                                 {project.projectKey.substring(0, 3)}
                             </button>
@@ -187,7 +188,7 @@ const TimelineProjectRow = ({
                                 onTooltipShow={onTooltipShow}
                                 onTooltipMove={onTooltipMove}
                                 onTooltipHide={onTooltipHide}
-                                onMouseDown={onMouseDown}
+                                onPointerDown={onPointerDown}
                                 shouldPreventClick={shouldPreventClick}
                                 onOpenTaskModal={onOpenTaskModal}
                                 optimization={optimization}

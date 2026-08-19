@@ -82,9 +82,6 @@ const ProgressRing = ({ value, size = 38, stroke = 3.5 }: { value: number; size?
 
 const DueBadge = ({ date }: { date?: string }) => {
     if (!date) return null;
-    // Whole-calendar-day arithmetic, not instants: `daysBetween` compares the due date's own day
-    // to today's day in the same (UTC) frame, so the badge doesn't flip to "1d overdue" on a task
-    // due today just because it's already past midnight UTC.
     const diff = daysBetween(new Date(), date);
     let text: string, cls: string;
     if (diff < 0)        { text = `${Math.abs(diff)}d overdue`; cls = 'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/50'; }
@@ -94,7 +91,6 @@ const DueBadge = ({ date }: { date?: string }) => {
     return <span className={`ml-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${cls} animate-pulse`}>{text}</span>;
 };
 
-// Mirrors the backend's own limits on TaskRequest.labels (max 10 labels, 20 chars each).
 const MAX_LABELS = 10;
 const MAX_LABEL_LENGTH = 20;
 
@@ -141,20 +137,11 @@ const TaskForm = ({
     entityKey,
 }: TaskFormProps) => {
     const [activeActivityTab, setActiveActivityTab] = useState('comments');
-    // `.flatMap` builds a new array every render; without memoizing it, `depTasks` below — which
-    // depends on this array's identity — recomputed on every render regardless of whether
-    // `projects` had actually changed.
     const allTasks = useMemo(() => projects.flatMap(p => p.tasks || []), [projects]);
 
-    // Ids are namespaced per instance so two forms on one page can't hand each other's
-    // labels to the wrong control.
     const uid = useId();
     const idFor = (name: string) => `${uid}-${name}`;
 
-    // The sidebar fields are rendered inside the modal's <Formik>, so the error state is read
-    // from context rather than threaded through props. ErrorMessage renders nothing until a
-    // field is both touched and invalid — aria-describedby only points at it under the same
-    // condition, so it never references a missing element.
     const { errors, touched } = useFormikContext<ModalFormValues>();
     const hasError = (name: 'projectKey' | 'startDate' | 'dueDate') => !!(touched[name] && errors[name]);
 
@@ -233,8 +220,8 @@ const TaskForm = ({
                     <PropRow label="Status" htmlFor={idFor('status')}>
                         <div className="relative cursor-pointer group/pill">
                             <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${STATUS_CONFIG[values.status]?.pillBg || 'bg-slate-100'} ${STATUS_CONFIG[values.status]?.pillText || 'text-slate-600'}`}>
-                                <span className={`w-[7px] h-[7px] rounded-full ring-1 ring-current/20 ${STATUS_CONFIG[values.status as keyof typeof STATUS_CONFIG]?.dot || 'bg-slate-400'}`} />
-                                {STATUS_CONFIG[values.status as keyof typeof STATUS_CONFIG]?.label || values.status}
+                                <span className={`w-[7px] h-[7px] rounded-full ring-1 ring-current/20 ${STATUS_CONFIG[values.status]?.dot || 'bg-slate-400'}`} />
+                                {STATUS_CONFIG[values.status]?.label || values.status}
                             </div>
                             <Field as="select" id={idFor('status')} name="status"
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
@@ -248,8 +235,8 @@ const TaskForm = ({
                     <PropRow label="Priority" htmlFor={idFor('priority')}>
                         <div className="relative cursor-pointer group/pill">
                             <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${PRIORITY_CONFIG[values.priority]?.pillBg || 'bg-slate-100'} ${PRIORITY_CONFIG[values.priority]?.pillText || 'text-slate-600'}`}>
-                                <span className="text-xs leading-none">{PRIORITY_CONFIG[values.priority as keyof typeof PRIORITY_CONFIG]?.icon}</span>
-                                {PRIORITY_CONFIG[values.priority as keyof typeof PRIORITY_CONFIG]?.label || values.priority}
+                                <span className="text-xs leading-none">{PRIORITY_CONFIG[values.priority]?.icon}</span>
+                                {PRIORITY_CONFIG[values.priority]?.label || values.priority}
                             </div>
                             <Field as="select" id={idFor('priority')} name="priority"
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">

@@ -7,10 +7,6 @@ import config from '../../config';
 import { SearchResults } from '../../types';
 import { getErrorMessage, STATUS_CONFIG } from '../../util/helpers';
 
-// Status presentation comes from the shared config. The private map this replaced covered five
-// of the twelve statuses — one of which ("IN_REVIEW") is not a status at all — so seven real
-// statuses fell back to neutral grey and the labels disagreed with the rest of the app.
-
 export default function SearchBar() {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResults | null>(null);
@@ -40,8 +36,6 @@ export default function SearchBar() {
         setLoading(true);
         try {
             const data = await globalSearch(searchQuery.trim());
-            // Ignore stale responses so a slow earlier query can't overwrite a
-            // newer one's results (out-of-order guard).
             if (requestId !== requestIdRef.current) return;
             setResults(data);
             setError(null);

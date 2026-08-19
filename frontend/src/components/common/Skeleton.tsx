@@ -1,6 +1,5 @@
 import React from 'react';
 
-// Internal building blocks: only `DashboardSkeleton` below is imported outside this file.
 const Skeleton = ({ className = '' }) => (
     <div className={`animate-pulse bg-slate-200 dark:bg-slate-700 rounded ${className}`} />
 );

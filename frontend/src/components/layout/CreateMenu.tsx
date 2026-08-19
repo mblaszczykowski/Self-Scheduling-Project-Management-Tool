@@ -22,8 +22,6 @@ export default function CreateMenu({
     const menuRef = useRef<HTMLDivElement | null>(null);
     useClickOutside(dropdownRef, onClose);
 
-    // Real commands, unlike the notification list: a `menu` role needs a menuitem to land focus on
-    // when it opens, and arrow keys to move between them.
     useEffect(() => {
         if (!isOpen) return;
         const firstItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');

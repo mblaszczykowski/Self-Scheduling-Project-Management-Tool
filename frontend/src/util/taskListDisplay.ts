@@ -2,17 +2,11 @@ import { daysBetween, formatShortDate, isTaskComplete } from './helpers';
 import { BEHIND_GAP, schedulePercentElapsed, SLIGHTLY_BEHIND_GAP } from './scheduleAnalysis';
 import { EnrichedTask, TaskStatus } from '../types';
 
-// Pure display logic behind the task list/table view: the relative due-date label, the progress
-// bar's colour, per-task schedule health, the blocking-dependency lookup, and the "velocity
-// needed" figure. Kept out of the component so each is a plain, unit-testable function, and so
-// "is this task finished" is answered once, via `isTaskComplete`, everywhere below.
-
 export interface RelativeDue {
     text: string;
     cls: string;
 }
 
-/** How a task's due date reads relative to `today`: an overdue count, a near-term countdown, the plain date once it's far off, or the plain date once the task is finished. */
 export const relativeDue = (
     dueDate: string | null | undefined,
     status: TaskStatus | null | undefined,
@@ -33,7 +27,6 @@ export const relativeDue = (
     return { text: formatShortDate(dueDate), cls: 'text-slate-500 dark:text-slate-400' };
 };
 
-/** Progress-bar fill colour for one row. */
 export const getProgressColor = (task: EnrichedTask): string => {
     if (isTaskComplete(task.status, task.progress)) return 'bg-green-500';
     if (task.isDelayed) return 'bg-red-400';
@@ -50,12 +43,6 @@ export interface ScheduleHealth {
     expected: number;
 }
 
-/**
- * How a task's progress compares to how far its own start/due dates say it should be, expressed as
- * a percentage-points gap. Built on `schedulePercentElapsed` and the `BEHIND_GAP`/
- * `SLIGHTLY_BEHIND_GAP` thresholds — the same yardstick the dashboard's schedule-health cards use —
- * so "how far behind counts as critical" has one definition.
- */
 export const computeScheduleHealth = (task: EnrichedTask, today: Date): ScheduleHealth | null => {
     if (!task.startDate || !task.dueDate || isTaskComplete(task.status, task.progress)) return null;
     const elapsedPercent = schedulePercentElapsed(task, today);
@@ -77,7 +64,6 @@ export interface BlockingInfo {
 
 const NO_DUE_DATE = Number.MAX_SAFE_INTEGER;
 
-/** Unfinished dependencies of a task, worst (most overdue, then least complete) first. */
 export const getBlockingInfo = (
     task: EnrichedTask,
     taskKeyToTaskMap: Map<string, EnrichedTask>,
@@ -90,7 +76,6 @@ export const getBlockingInfo = (
             !!dependency && !isTaskComplete(dependency.status, dependency.progress));
     if (blockers.length === 0) return null;
 
-    // Most overdue first, then least complete; the task key keeps the order total.
     blockers.sort((a, b) => {
         const aDue = a.dueDate ? daysBetween(today, a.dueDate) : NO_DUE_DATE;
         const bDue = b.dueDate ? daysBetween(today, b.dueDate) : NO_DUE_DATE;
@@ -99,10 +84,6 @@ export const getBlockingInfo = (
     return { blockers, worst: blockers[0], count: blockers.length };
 };
 
-/**
- * Percent progress per remaining day needed to finish by the due date, or null when that figure
- * does not apply: missing dates, a finished task, or no days left to make it.
- */
 export const computeVelocityNeeded = (
     task: Pick<EnrichedTask, 'startDate' | 'dueDate' | 'progress' | 'status'>,
     today: Date,
