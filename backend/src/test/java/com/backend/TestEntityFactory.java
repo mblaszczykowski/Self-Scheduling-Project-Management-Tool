@@ -3,7 +3,6 @@ package com.backend;
 import com.backend.entities.*;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -72,20 +71,5 @@ public final class TestEntityFactory {
         all.addAll(List.of(members));
         project.replaceMembers(all);
         return project;
-    }
-
-    public static RefreshToken createRefreshToken(String tokenHash, User user, String familyId) {
-        return new RefreshToken(tokenHash, user, familyId, Instant.now(),
-                Instant.now().plus(7, ChronoUnit.DAYS));
-    }
-
-    public static RefreshToken createExpiredRefreshToken(String tokenHash, User user, String familyId) {
-        return new RefreshToken(tokenHash, user, familyId,
-                Instant.now().minus(8, ChronoUnit.DAYS),
-                Instant.now().minus(1, ChronoUnit.DAYS));
-    }
-
-    public static StoredFile createStoredFile(String storedName, Integer projectId, Integer uploaderId) {
-        return new StoredFile(storedName, projectId, uploaderId);
     }
 }

@@ -276,7 +276,7 @@ class SchedulingInvariantsTest {
         void datelessTaskIsReported() {
             var dated = task("P-1").from("2026-02-02").to("2026-02-06").build();
             var undated = new com.backend.dtos.TaskDTO(null, null, "P-2", "P", "P-2", null,
-                    TaskStatus.TODO, null, null, null, List.of(), List.of(), null, List.of(),
+                    TaskStatus.TODO, null, null, null, List.of(), List.of(), null, null, List.of(),
                     null, null, 0, TaskPriority.MEDIUM);
 
             var outcome = scheduling.optimize(List.of(dated, undated), List.of(), TODAY, 0.8, 0.2);

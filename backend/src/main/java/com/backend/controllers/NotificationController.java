@@ -68,4 +68,15 @@ public class NotificationController {
         notificationService.markNotificationsAsRead(notificationIds, userId);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * Marks every unread notification for the caller read, for a user with more unread
+     * notifications than fit on the one page {@code mark-as-read} can reach. Returns the
+     * authoritative remaining count so the client can set its badge from the response instead of
+     * decrementing it locally.
+     */
+    @PostMapping("/mark-all-read")
+    public ResponseEntity<UnreadCount> markAllRead(@CurrentUserId Integer userId) {
+        return ResponseEntity.ok(new UnreadCount(notificationService.markAllNotificationsAsRead(userId)));
+    }
 }

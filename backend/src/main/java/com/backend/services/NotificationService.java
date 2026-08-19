@@ -40,6 +40,21 @@ public class NotificationService {
     /** One notification to send: the recipient plus everything needed to render it. */
     public record Pending(User recipient, String message, NotificationType type, String link) {}
 
+    /** Deep link to a project's page. */
+    public static String projectLink(String projectKey) {
+        return "/projects?projectKey=" + projectKey;
+    }
+
+    /** Deep link to a task, opened as the selected issue. */
+    public static String taskLink(String taskKey) {
+        return "/projects?selectedIssue=" + taskKey;
+    }
+
+    /** Deep link to a task with one of its comments highlighted. */
+    public static String taskCommentLink(String taskKey, Integer commentId) {
+        return "/projects?selectedIssue=" + taskKey + "&commentId=" + commentId;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void createNotification(User recipient, String message, NotificationType type, String link) {
         notifyAll(List.of(new Pending(recipient, message, type, link)));
@@ -130,5 +145,19 @@ public class NotificationService {
             throw new AuthorizationException("Access denied to notification");
         }
         notificationRepository.markReadForUser(distinctIds, userId);
+    }
+
+    /**
+     * Marks every unread notification for the user read in one statement. The client falls back
+     * to this when it has more unread notifications than fit on the one page it has loaded, since
+     * {@link #markNotificationsAsRead} can only ever mark ids the client already knows about.
+     *
+     * @return how many notifications are still unread for the user afterward, so the caller can
+     *         set its badge from the database rather than assuming zero
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public long markAllNotificationsAsRead(Integer userId) {
+        notificationRepository.markAllReadForUser(userId);
+        return notificationRepository.countByUserIdAndIsReadFalse(userId);
     }
 }

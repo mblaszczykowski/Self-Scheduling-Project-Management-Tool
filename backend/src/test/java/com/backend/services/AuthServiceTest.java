@@ -6,7 +6,7 @@ import com.backend.config.CookieProperties;
 import com.backend.config.PasswordEncoderConfig;
 import com.backend.dtos.LoginResponse;
 import com.backend.entities.User;
-import com.backend.exception.AuthorizationException;
+import com.backend.exception.UnauthenticatedException;
 import com.backend.exception.TooManyAttemptsException;
 import com.backend.exception.ValidationException;
 import com.backend.requests.LoginRequest;
@@ -392,13 +392,13 @@ class AuthServiceTest {
 
         @Test
         @DisplayName("turns a failed rotation into a 401 that carries the rotation's own reason")
-        void failedRotationBecomesAuthorizationException() {
+        void failedRotationBecomesUnauthenticated() {
             when(request.getCookies()).thenReturn(new Cookie[]{new Cookie("refreshToken", "stale")});
             when(tokenService.rotateRefreshToken("stale"))
                     .thenReturn(TokenService.RotationResult.failed("Session expired. Please sign in again."));
 
             assertThatThrownBy(() -> authService.refreshAccessToken(request))
-                    .isInstanceOf(AuthorizationException.class)
+                    .isInstanceOf(UnauthenticatedException.class)
                     .hasMessage("Session expired. Please sign in again.");
 
             verify(tokenService, never()).buildCookies(any(), any());
@@ -410,7 +410,7 @@ class AuthServiceTest {
             when(request.getCookies()).thenReturn(null);
 
             assertThatThrownBy(() -> authService.refreshAccessToken(request))
-                    .isInstanceOf(AuthorizationException.class)
+                    .isInstanceOf(UnauthenticatedException.class)
                     .hasMessage("Refresh token not provided");
 
             verifyNoInteractions(tokenService);
@@ -425,7 +425,7 @@ class AuthServiceTest {
             });
 
             assertThatThrownBy(() -> authService.refreshAccessToken(request))
-                    .isInstanceOf(AuthorizationException.class)
+                    .isInstanceOf(UnauthenticatedException.class)
                     .hasMessage("Refresh token not provided");
 
             verifyNoInteractions(tokenService);

@@ -77,13 +77,23 @@ public class SchedulingService {
                 Map.copyOf(metricsByRule));
     }
 
-    /** Critical-path flags for one project's tasks, independent of any optimization run. */
-    public Set<String> criticalTaskKeys(List<TaskDTO> tasks, LocalDate horizonStart) {
+    /**
+     * Critical-path flags and per-task total float for one project's tasks, independent of any
+     * optimization run. Float is reported alongside the flag rather than discarded, so the clients
+     * that need slack do not have to re-derive it from a model they cannot see.
+     */
+    public CriticalPathAnalyzer.Analysis analyzeCriticalPath(List<TaskDTO> tasks, LocalDate horizonStart) {
         var model = ScheduleModel.build(tasks, List.of(), horizonStart);
         if (model.scheduleTasks().isEmpty()) {
-            return Set.of();
+            return CriticalPathAnalyzer.Analysis.empty();
         }
-        return CriticalPathAnalyzer.criticalTaskKeys(PrecedenceGraph.of(model.scheduleTasks()));
+        return CriticalPathAnalyzer.analyze(PrecedenceGraph.of(model.scheduleTasks()));
+    }
+
+    /** Stamps a task DTO with the critical-path flag and total float an analysis computed for it. */
+    public TaskDTO applyCriticality(TaskDTO task, CriticalPathAnalyzer.Analysis analysis) {
+        return task.withCriticality(analysis.criticalKeys().contains(task.taskKey()),
+                analysis.totalFloat().get(task.taskKey()));
     }
 
     /**

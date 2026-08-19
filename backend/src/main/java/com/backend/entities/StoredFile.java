@@ -42,14 +42,8 @@ public class StoredFile {
         this.uploadedBy = uploadedBy;
     }
 
-    public Long getId() { return id; }
-
     public String getStoredName() { return storedName; }
 
     /** Null for files that are not project-scoped (profile pictures). */
     public Integer getProjectId() { return projectId; }
-
-    public Integer getUploadedBy() { return uploadedBy; }
-
-    public Instant getCreatedAt() { return createdAt; }
 }

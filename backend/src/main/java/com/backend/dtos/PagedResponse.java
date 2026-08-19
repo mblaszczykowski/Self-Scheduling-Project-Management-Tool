@@ -21,9 +21,4 @@ public record PagedResponse<T>(
         return new PagedResponse<>(page.getContent(), page.getNumber(), page.getSize(),
                 page.getTotalElements(), page.getTotalPages(), page.hasNext());
     }
-
-    /** Wrap a full (non-paginated) list as a single page. */
-    public static <T> PagedResponse<T> ofList(List<T> items) {
-        return new PagedResponse<>(items, 0, items.size(), items.size(), items.isEmpty() ? 0 : 1, false);
-    }
 }

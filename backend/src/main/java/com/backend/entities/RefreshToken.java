@@ -74,15 +74,9 @@ public class RefreshToken {
 
     public Instant getFamilyStartedAt() { return familyStartedAt; }
 
-    public Instant getExpiryDate() { return expiryDate; }
-
-    public Instant getConsumedAt() { return consumedAt; }
-
     public boolean isConsumed() { return consumedAt != null; }
 
     public void markConsumed() { this.consumedAt = Instant.now(); }
 
     public boolean isExpired(Instant now) { return expiryDate.isBefore(now); }
-
-    public Instant getCreatedAt() { return createdAt; }
 }

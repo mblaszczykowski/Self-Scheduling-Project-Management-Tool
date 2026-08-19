@@ -49,7 +49,7 @@ public interface ProjectRepository extends JpaRepository<Project, Integer> {
                     "(SELECT p2.id FROM Project p2 JOIN p2.members m2 WHERE m2.id = :userId)")
     Page<Project> findAllAccessibleByUserPaged(@Param("userId") Integer userId, Pageable pageable);
 
-    @Query("SELECT COUNT(p) > 0 FROM Project p LEFT JOIN p.members m " +
+    @Query("SELECT COUNT(p) > 0 FROM Project p " +
             "WHERE (p.owner.id = :userId1 OR :userId1 IN (SELECT m1.id FROM p.members m1)) " +
             "AND (p.owner.id = :userId2 OR :userId2 IN (SELECT m2.id FROM p.members m2))")
     boolean doUsersShareProject(@Param("userId1") Integer userId1, @Param("userId2") Integer userId2);

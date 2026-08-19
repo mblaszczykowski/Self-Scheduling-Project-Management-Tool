@@ -3,6 +3,7 @@ package com.backend.services;
 import com.backend.dtos.LoginResponse;
 import com.backend.entities.User;
 import com.backend.exception.AuthorizationException;
+import com.backend.exception.UnauthenticatedException;
 import com.backend.exception.TooManyAttemptsException;
 import com.backend.exception.ValidationException;
 import com.backend.requests.LoginRequest;
@@ -85,11 +86,11 @@ public class AuthService {
      */
     public TokenService.AuthTokens refreshAccessToken(HttpServletRequest request) {
         var presented = TokenService.readRefreshCookie(request)
-                .orElseThrow(() -> new AuthorizationException("Refresh token not provided"));
+                .orElseThrow(() -> new UnauthenticatedException("Refresh token not provided"));
 
         var rotation = tokenService.rotateRefreshToken(presented);
         if (!rotation.succeeded()) {
-            throw new AuthorizationException(rotation.failureMessage());
+            throw new UnauthenticatedException(rotation.failureMessage());
         }
         return tokenService.buildCookies(rotation.userId(), rotation.refreshToken());
     }

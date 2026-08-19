@@ -245,7 +245,7 @@ class TaskActivityServiceTest {
         }
 
         @Test
-        @DisplayName("logs an attachments change as a file count")
+        @DisplayName("logs an attachments change by contents")
         void logsAnAttachmentsChange() {
             var before = new Snap().build();
             var afterSnap = new Snap();
@@ -257,7 +257,35 @@ class TaskActivityServiceTest {
             assertThat(activities).hasSize(1);
             assertThat(activities.getFirst().getType()).isEqualTo(TaskActivityType.ATTACHMENTS_CHANGED);
             assertThat(activities.getFirst().getOldValue()).isNull();
-            assertThat(activities.getFirst().getNewValue()).isEqualTo("1 file");
+            assertThat(activities.getFirst().getNewValue()).isEqualTo("/files/a.pdf");
+        }
+
+        @Test
+        @DisplayName("detects swapping one attachment for another, which a count comparison missed")
+        void detectsASameCountAttachmentSwap() {
+            var beforeSnap = new Snap();
+            beforeSnap.attachments = List.of("/files/a.pdf", "/files/b.pdf");
+            var afterSnap = new Snap();
+            afterSnap.attachments = List.of("/files/c.pdf", "/files/b.pdf");
+
+            taskActivityService.logFieldChanges(task, author, beforeSnap.build(), afterSnap.build());
+
+            var activities = loggedActivities();
+            assertThat(activities).hasSize(1);
+            assertThat(activities.getFirst().getType()).isEqualTo(TaskActivityType.ATTACHMENTS_CHANGED);
+        }
+
+        @Test
+        @DisplayName("ignores a pure reordering of the same attachments")
+        void ignoresAttachmentReordering() {
+            var beforeSnap = new Snap();
+            beforeSnap.attachments = List.of("/files/a.pdf", "/files/b.pdf");
+            var afterSnap = new Snap();
+            afterSnap.attachments = List.of("/files/b.pdf", "/files/a.pdf");
+
+            taskActivityService.logFieldChanges(task, author, beforeSnap.build(), afterSnap.build());
+
+            verify(taskActivityRepository, never()).save(any());
         }
 
         @Test

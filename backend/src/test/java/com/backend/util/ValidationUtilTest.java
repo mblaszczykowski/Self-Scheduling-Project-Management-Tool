@@ -8,7 +8,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ValidationUtilTest {
 
@@ -19,29 +21,29 @@ class ValidationUtilTest {
         @Test
         @DisplayName("should return true for null")
         void shouldReturnTrueForNull() {
-            assertTrue(ValidationUtil.isNullOrEmpty(null));
+            assertThat(ValidationUtil.isNullOrEmpty(null)).isTrue();
         }
 
         @Test
         @DisplayName("should return true for empty string")
         void shouldReturnTrueForEmptyString() {
-            assertTrue(ValidationUtil.isNullOrEmpty(""));
+            assertThat(ValidationUtil.isNullOrEmpty("")).isTrue();
         }
 
         @Test
         @DisplayName("should return true for whitespace-only string")
         void shouldReturnTrueForWhitespace() {
-            assertTrue(ValidationUtil.isNullOrEmpty("   "));
-            assertTrue(ValidationUtil.isNullOrEmpty("\t"));
-            assertTrue(ValidationUtil.isNullOrEmpty("\n"));
-            assertTrue(ValidationUtil.isNullOrEmpty("  \t\n  "));
+            assertThat(ValidationUtil.isNullOrEmpty("   ")).isTrue();
+            assertThat(ValidationUtil.isNullOrEmpty("\t")).isTrue();
+            assertThat(ValidationUtil.isNullOrEmpty("\n")).isTrue();
+            assertThat(ValidationUtil.isNullOrEmpty("  \t\n  ")).isTrue();
         }
 
         @Test
         @DisplayName("should return false for non-empty string")
         void shouldReturnFalseForNonEmpty() {
-            assertFalse(ValidationUtil.isNullOrEmpty("hello"));
-            assertFalse(ValidationUtil.isNullOrEmpty(" hello "));
+            assertThat(ValidationUtil.isNullOrEmpty("hello")).isFalse();
+            assertThat(ValidationUtil.isNullOrEmpty(" hello ")).isFalse();
         }
     }
 
@@ -59,7 +61,7 @@ class ValidationUtilTest {
         })
         @DisplayName("should return true for valid email formats")
         void shouldReturnTrueForValidEmails(String email) {
-            assertTrue(ValidationUtil.isValidEmail(email));
+            assertThat(ValidationUtil.isValidEmail(email)).isTrue();
         }
 
         @ParameterizedTest
@@ -74,14 +76,14 @@ class ValidationUtilTest {
         })
         @DisplayName("should return false for invalid email formats")
         void shouldReturnFalseForInvalidEmails(String email) {
-            assertFalse(ValidationUtil.isValidEmail(email));
+            assertThat(ValidationUtil.isValidEmail(email)).isFalse();
         }
 
         @ParameterizedTest
         @NullAndEmptySource
         @DisplayName("should return false for null or empty")
         void shouldReturnFalseForNullOrEmpty(String email) {
-            assertFalse(ValidationUtil.isValidEmail(email));
+            assertThat(ValidationUtil.isValidEmail(email)).isFalse();
         }
 
         @Test
@@ -89,14 +91,14 @@ class ValidationUtilTest {
         void shouldReturnFalseForTooLongEmail() {
             String longLocalPart = "a".repeat(250);
             String longEmail = longLocalPart + "@example.com";
-            assertFalse(ValidationUtil.isValidEmail(longEmail));
+            assertThat(ValidationUtil.isValidEmail(longEmail)).isFalse();
         }
 
         @Test
         @DisplayName("should be case insensitive for domain")
         void shouldBeCaseInsensitive() {
-            assertTrue(ValidationUtil.isValidEmail("TEST@EXAMPLE.COM"));
-            assertTrue(ValidationUtil.isValidEmail("test@EXAMPLE.com"));
+            assertThat(ValidationUtil.isValidEmail("TEST@EXAMPLE.COM")).isTrue();
+            assertThat(ValidationUtil.isValidEmail("test@EXAMPLE.com")).isTrue();
         }
     }
 
@@ -107,88 +109,88 @@ class ValidationUtilTest {
         @Test
         @DisplayName("should accept valid password")
         void shouldAcceptValidPassword() {
-            assertDoesNotThrow(() -> ValidationUtil.validatePassword("ValidPass123!"));
+            assertThatCode(() -> ValidationUtil.validatePassword("ValidPass123!")).doesNotThrowAnyException();
         }
 
         @Test
         @DisplayName("should throw for null password")
         void shouldThrowForNull() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePassword(null));
-            assertEquals("Password is required", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validatePassword(null))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Password is required");
         }
 
         @Test
         @DisplayName("should throw for empty password")
         void shouldThrowForEmpty() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePassword(""));
-            assertEquals("Password is required", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validatePassword(""))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Password is required");
         }
 
         @Test
         @DisplayName("should throw for whitespace-only password")
         void shouldThrowForWhitespace() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePassword("   "));
-            assertEquals("Password is required", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validatePassword("   "))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Password is required");
         }
 
         @Test
         @DisplayName("should throw for password shorter than 8 characters")
         void shouldThrowForShortPassword() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePassword("Short1!"));
-            assertEquals("Password must be at least 8 characters long", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validatePassword("Short1!"))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Password must be at least 8 characters long");
         }
 
         @Test
         @DisplayName("should throw for password longer than 128 characters")
         void shouldThrowForLongPassword() {
             String longPassword = "A1!" + "a".repeat(126);
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePassword(longPassword));
-            assertEquals("Password must not exceed 128 characters", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validatePassword(longPassword))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Password must not exceed 128 characters");
         }
 
         @Test
         @DisplayName("should throw for password without uppercase letter")
         void shouldThrowForNoUppercase() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePassword("lowercase123!"));
-            assertEquals("Password must contain at least one uppercase letter", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validatePassword("lowercase123!"))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Password must contain at least one uppercase letter");
         }
 
         @Test
         @DisplayName("should throw for password without lowercase letter")
         void shouldThrowForNoLowercase() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePassword("UPPERCASE123!"));
-            assertEquals("Password must contain at least one lowercase letter", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validatePassword("UPPERCASE123!"))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Password must contain at least one lowercase letter");
         }
 
         @Test
         @DisplayName("should throw for password without digit")
         void shouldThrowForNoDigit() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePassword("NoDigitsHere!"));
-            assertEquals("Password must contain at least one number", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validatePassword("NoDigitsHere!"))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Password must contain at least one number");
         }
 
         @Test
         @DisplayName("should throw for password without special character")
         void shouldThrowForNoSpecialChar() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePassword("NoSpecial123"));
-            assertEquals("Password must contain at least one special character", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validatePassword("NoSpecial123"))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Password must contain at least one special character");
         }
 
         @Test
         @DisplayName("should throw for password containing spaces")
         void shouldThrowForSpaces() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validatePassword("Has Space123!"));
-            assertEquals("Password must not contain spaces", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validatePassword("Has Space123!"))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Password must not contain spaces");
         }
 
         @ParameterizedTest
@@ -202,20 +204,20 @@ class ValidationUtilTest {
         })
         @DisplayName("should accept various valid passwords")
         void shouldAcceptVariousValidPasswords(String password) {
-            assertDoesNotThrow(() -> ValidationUtil.validatePassword(password));
+            assertThatCode(() -> ValidationUtil.validatePassword(password)).doesNotThrowAnyException();
         }
 
         @Test
         @DisplayName("should accept password at minimum length (8 chars)")
         void shouldAcceptMinLength() {
-            assertDoesNotThrow(() -> ValidationUtil.validatePassword("Aa1!aaaa"));
+            assertThatCode(() -> ValidationUtil.validatePassword("Aa1!aaaa")).doesNotThrowAnyException();
         }
 
         @Test
         @DisplayName("should accept password at maximum length (128 chars)")
         void shouldAcceptMaxLength() {
             String maxPassword = "Aa1!" + "a".repeat(124);
-            assertDoesNotThrow(() -> ValidationUtil.validatePassword(maxPassword));
+            assertThatCode(() -> ValidationUtil.validatePassword(maxPassword)).doesNotThrowAnyException();
         }
     }
 
@@ -226,53 +228,53 @@ class ValidationUtilTest {
         @Test
         @DisplayName("should accept valid name")
         void shouldAcceptValidName() {
-            assertDoesNotThrow(() -> ValidationUtil.validateName("John", "First name"));
+            assertThatCode(() -> ValidationUtil.validateName("John", "First name")).doesNotThrowAnyException();
         }
 
         @Test
         @DisplayName("should throw for null name")
         void shouldThrowForNull() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validateName(null, "First name"));
-            assertEquals("First name is required", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validateName(null, "First name"))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("First name is required");
         }
 
         @Test
         @DisplayName("should throw for empty name")
         void shouldThrowForEmpty() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validateName("", "Last name"));
-            assertEquals("Last name is required", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validateName("", "Last name"))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("Last name is required");
         }
 
         @Test
         @DisplayName("should throw for name shorter than 2 characters")
         void shouldThrowForShortName() {
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validateName("A", "First name"));
-            assertEquals("First name must be at least 2 characters", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validateName("A", "First name"))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("First name must be at least 2 characters");
         }
 
         @Test
         @DisplayName("should throw for name longer than 50 characters")
         void shouldThrowForLongName() {
             String longName = "A".repeat(51);
-            ValidationException ex = assertThrows(ValidationException.class,
-                    () -> ValidationUtil.validateName(longName, "First name"));
-            assertEquals("First name must not exceed 50 characters", ex.getMessage());
+            assertThatThrownBy(() -> ValidationUtil.validateName(longName, "First name"))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessage("First name must not exceed 50 characters");
         }
 
         @Test
         @DisplayName("should accept name at minimum length (2 chars)")
         void shouldAcceptMinLength() {
-            assertDoesNotThrow(() -> ValidationUtil.validateName("Jo", "First name"));
+            assertThatCode(() -> ValidationUtil.validateName("Jo", "First name")).doesNotThrowAnyException();
         }
 
         @Test
         @DisplayName("should accept name at maximum length (50 chars)")
         void shouldAcceptMaxLength() {
             String maxName = "A".repeat(50);
-            assertDoesNotThrow(() -> ValidationUtil.validateName(maxName, "First name"));
+            assertThatCode(() -> ValidationUtil.validateName(maxName, "First name")).doesNotThrowAnyException();
         }
     }
 
@@ -283,31 +285,31 @@ class ValidationUtilTest {
         @Test
         @DisplayName("should handle unicode in email validation")
         void shouldHandleUnicodeEmail() {
-            assertTrue(ValidationUtil.isValidEmail("test@example.com"));
+            assertThat(ValidationUtil.isValidEmail("test@example.com")).isTrue();
 
             // IDN domains are not supported by the simple regex
-            assertFalse(ValidationUtil.isValidEmail("test@日本語.jp"));
+            assertThat(ValidationUtil.isValidEmail("test@日本語.jp")).isFalse();
         }
 
         @Test
         @DisplayName("should reject email with SQL injection attempt")
         void shouldRejectSqlInjectionEmail() {
-            assertFalse(ValidationUtil.isValidEmail("'; DROP TABLE users;--@example.com"));
-            assertFalse(ValidationUtil.isValidEmail("test@example.com; DROP TABLE"));
+            assertThat(ValidationUtil.isValidEmail("'; DROP TABLE users;--@example.com")).isFalse();
+            assertThat(ValidationUtil.isValidEmail("test@example.com; DROP TABLE")).isFalse();
         }
 
         @Test
         @DisplayName("should reject email with XSS attempt")
         void shouldRejectXssEmail() {
-            assertFalse(ValidationUtil.isValidEmail("<script>alert('xss')</script>@example.com"));
-            assertFalse(ValidationUtil.isValidEmail("test@<script>alert('xss')</script>.com"));
+            assertThat(ValidationUtil.isValidEmail("<script>alert('xss')</script>@example.com")).isFalse();
+            assertThat(ValidationUtil.isValidEmail("test@<script>alert('xss')</script>.com")).isFalse();
         }
 
         @Test
         @DisplayName("should handle password with unicode characters")
         void shouldHandleUnicodePassword() {
             // Unicode characters should work as special characters
-            assertDoesNotThrow(() -> ValidationUtil.validatePassword("Password1日本語!"));
+            assertThatCode(() -> ValidationUtil.validatePassword("Password1日本語!")).doesNotThrowAnyException();
         }
 
         @Test
@@ -316,10 +318,10 @@ class ValidationUtilTest {
             String veryLongString = "a".repeat(10000);
 
             long startTime = System.currentTimeMillis();
-            assertFalse(ValidationUtil.isValidEmail(veryLongString + "@example.com"));
+            assertThat(ValidationUtil.isValidEmail(veryLongString + "@example.com")).isFalse();
             long duration = System.currentTimeMillis() - startTime;
 
-            assertTrue(duration < 1000, "Email validation took too long: " + duration + "ms");
+            assertThat(duration).as("Email validation took too long: " + duration + "ms").isLessThan(1000);
         }
     }
 }

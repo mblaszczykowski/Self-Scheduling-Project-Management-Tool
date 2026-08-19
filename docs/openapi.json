@@ -1,0 +1,1884 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "FlowLink API",
+    "description" : "Project and portfolio management with a resource-constrained scheduling optimizer.",
+    "version" : "v1"
+  },
+  "servers" : [ {
+    "url" : "http://localhost",
+    "description" : "Generated server url"
+  } ],
+  "paths" : {
+    "/api/users/me" : {
+      "get" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "getCurrentUser",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CurrentUserDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "updateProfile",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "userId" : {
+                    "type" : "integer",
+                    "format" : "int32"
+                  },
+                  "profile" : {
+                    "type" : "string"
+                  },
+                  "profilePicture" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "profile" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CurrentUserDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{taskId}/comments/{commentId}" : {
+      "put" : {
+        "tags" : [ "comment-controller" ],
+        "operationId" : "updateComment",
+        "parameters" : [ {
+          "name" : "taskId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "commentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "userId" : {
+                    "type" : "integer",
+                    "format" : "int32"
+                  },
+                  "content" : {
+                    "type" : "string"
+                  },
+                  "attachments" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string",
+                      "format" : "binary"
+                    }
+                  }
+                },
+                "required" : [ "content" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CommentDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "comment-controller" ],
+        "operationId" : "deleteComment",
+        "parameters" : [ {
+          "name" : "taskId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "commentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectKey}" : {
+      "get" : {
+        "tags" : [ "project-controller" ],
+        "operationId" : "getProject",
+        "parameters" : [ {
+          "name" : "projectKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProjectDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "project-controller" ],
+        "operationId" : "updateProject",
+        "parameters" : [ {
+          "name" : "projectKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "userId" : {
+                    "type" : "integer",
+                    "format" : "int32"
+                  },
+                  "projectDTO" : {
+                    "type" : "string"
+                  },
+                  "attachments" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string",
+                      "format" : "binary"
+                    }
+                  }
+                },
+                "required" : [ "projectDTO" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProjectDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "project-controller" ],
+        "operationId" : "deleteProject",
+        "parameters" : [ {
+          "name" : "projectKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectKey}/tasks/{taskKey}" : {
+      "put" : {
+        "tags" : [ "task-controller" ],
+        "operationId" : "updateTask",
+        "parameters" : [ {
+          "name" : "projectKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "taskKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "userId" : {
+                    "type" : "integer",
+                    "format" : "int32"
+                  },
+                  "taskDTO" : {
+                    "type" : "string"
+                  },
+                  "attachments" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string",
+                      "format" : "binary"
+                    }
+                  }
+                },
+                "required" : [ "taskDTO" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TaskDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "task-controller" ],
+        "operationId" : "deleteTask",
+        "parameters" : [ {
+          "name" : "projectKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "taskKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/api/users" : {
+      "post" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "register",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UserRegistrationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{taskId}/comments" : {
+      "get" : {
+        "tags" : [ "comment-controller" ],
+        "operationId" : "getComments",
+        "parameters" : [ {
+          "name" : "taskId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PagedResponseCommentDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "comment-controller" ],
+        "operationId" : "addComment",
+        "parameters" : [ {
+          "name" : "taskId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "parentCommentId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "userId" : {
+                    "type" : "integer",
+                    "format" : "int32"
+                  },
+                  "content" : {
+                    "type" : "string"
+                  },
+                  "attachments" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string",
+                      "format" : "binary"
+                    }
+                  }
+                },
+                "required" : [ "content" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CommentDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{taskId}/comments/{commentId}/reactions" : {
+      "post" : {
+        "tags" : [ "comment-controller" ],
+        "operationId" : "reactToComment",
+        "parameters" : [ {
+          "name" : "taskId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "commentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "type",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "LIKE", "DISLIKE" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CommentDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects" : {
+      "get" : {
+        "tags" : [ "project-controller" ],
+        "operationId" : "getProjects",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PagedResponseProjectDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "project-controller" ],
+        "operationId" : "createProject",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "userId" : {
+                    "type" : "integer",
+                    "format" : "int32"
+                  },
+                  "projectDTO" : {
+                    "type" : "string"
+                  },
+                  "attachments" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string",
+                      "format" : "binary"
+                    }
+                  }
+                },
+                "required" : [ "projectDTO" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProjectDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectKey}/tasks" : {
+      "post" : {
+        "tags" : [ "task-controller" ],
+        "operationId" : "createTask",
+        "parameters" : [ {
+          "name" : "projectKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "userId" : {
+                    "type" : "integer",
+                    "format" : "int32"
+                  },
+                  "taskDTO" : {
+                    "type" : "string"
+                  },
+                  "attachments" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string",
+                      "format" : "binary"
+                    }
+                  }
+                },
+                "required" : [ "taskDTO" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TaskDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/optimization/simulate" : {
+      "post" : {
+        "tags" : [ "optimization-controller" ],
+        "operationId" : "simulate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OptimizationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OptimizationResultDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/optimization/apply" : {
+      "post" : {
+        "tags" : [ "optimization-controller" ],
+        "operationId" : "apply",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ApplyOptimizationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppliedSchedule"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/mark-as-read" : {
+      "post" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "markAsRead",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/api/notifications/mark-all-read" : {
+      "post" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "markAllRead",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UnreadCount"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "refresh",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "logout",
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/login" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "login",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/email-preferences" : {
+      "patch" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "updateEmailPreferences",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EmailPreferencesRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CurrentUserDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectKey}/tasks/{taskKey}/schedule" : {
+      "patch" : {
+        "tags" : [ "task-controller" ],
+        "operationId" : "updateSchedule",
+        "parameters" : [ {
+          "name" : "projectKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "taskKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TaskScheduleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TaskDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{fileName}" : {
+      "get" : {
+        "tags" : [ "file-controller" ],
+        "operationId" : "serveFile",
+        "parameters" : [ {
+          "name" : "fileName",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/lookup" : {
+      "get" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "lookupByEmail",
+        "parameters" : [ {
+          "name" : "email",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{taskId}/activities" : {
+      "get" : {
+        "tags" : [ "task-activity-controller" ],
+        "operationId" : "getActivities",
+        "parameters" : [ {
+          "name" : "taskId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PagedResponseTaskActivityDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search" : {
+      "get" : {
+        "tags" : [ "search-controller" ],
+        "operationId" : "search",
+        "parameters" : [ {
+          "name" : "q",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SearchResultDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications" : {
+      "get" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "getNotifications",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PagedResponseNotificationDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/unread-count" : {
+      "get" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "getUnreadCount",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UnreadCount"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/stream" : {
+      "get" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "streamNotifications",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "text/event-stream" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SseEmitter"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "CurrentUserDTO" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "firstname" : {
+            "type" : "string"
+          },
+          "lastname" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "profilePicture" : {
+            "type" : "string"
+          },
+          "emailNotificationsEnabled" : {
+            "type" : "boolean"
+          },
+          "emailOnTaskAssigned" : {
+            "type" : "boolean"
+          },
+          "emailOnCommentReply" : {
+            "type" : "boolean"
+          },
+          "emailOnProjectInvitation" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "CommentDTO" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "taskId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "authorId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "authorName" : {
+            "type" : "string"
+          },
+          "authorProfilePicture" : {
+            "type" : "string"
+          },
+          "content" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "editedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "attachments" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "likeCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "dislikeCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "likedByUsernames" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "dislikedByUsernames" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "likedByCurrentUser" : {
+            "type" : "boolean"
+          },
+          "dislikedByCurrentUser" : {
+            "type" : "boolean"
+          },
+          "replies" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CommentDTO"
+            }
+          }
+        }
+      },
+      "ProjectDTO" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "projectKey" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "tasks" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TaskDTO"
+            }
+          },
+          "members" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/UserDTO"
+            }
+          },
+          "attachments" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "owner" : {
+            "$ref" : "#/components/schemas/UserDTO"
+          },
+          "dependencies" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "created" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updated" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "TaskDTO" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "taskNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "taskKey" : {
+            "type" : "string"
+          },
+          "projectKey" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "BACKLOG", "GATHERING_INTEREST", "TODO", "WITHDRAWN", "IN_PROGRESS", "TO_REVIEW", "TO_TEST", "IN_TEST", "READY_TO_MERGE", "READY_TO_DEPLOY", "RELEASED", "DONE" ]
+          },
+          "startDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "dueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "assignee" : {
+            "type" : "string"
+          },
+          "labels" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "dependencyKeys" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "isCritical" : {
+            "type" : "boolean"
+          },
+          "totalFloat" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "attachments" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "created" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updated" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "progress" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "priority" : {
+            "type" : "string",
+            "enum" : [ "LOWEST", "LOW", "MEDIUM", "HIGH", "HIGHEST" ]
+          }
+        }
+      },
+      "UserDTO" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "firstname" : {
+            "type" : "string"
+          },
+          "lastname" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "profilePicture" : {
+            "type" : "string"
+          }
+        }
+      },
+      "UserRegistrationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "firstname" : {
+            "type" : "string",
+            "maxLength" : 50,
+            "minLength" : 2
+          },
+          "lastname" : {
+            "type" : "string",
+            "maxLength" : 50,
+            "minLength" : 2
+          },
+          "email" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "password" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 8
+          }
+        }
+      },
+      "LoginResponse" : {
+        "type" : "object",
+        "properties" : {
+          "message" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
+      "OptimizationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "projectKeys" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 50,
+            "minItems" : 0
+          },
+          "alpha" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "beta" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "horizonStart" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }
+      },
+      "OptimizationMetricsDTO" : {
+        "type" : "object",
+        "properties" : {
+          "weightedTardiness" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "makespan" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "objectiveValue" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "totalTasks" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "tasksOnTime" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "tasksLate" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "resourceConflicts" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "feasible" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "OptimizationResultDTO" : {
+        "type" : "object",
+        "properties" : {
+          "suggestions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TaskScheduleSuggestionDTO"
+            }
+          },
+          "originalMetrics" : {
+            "$ref" : "#/components/schemas/OptimizationMetricsDTO"
+          },
+          "optimizedMetrics" : {
+            "$ref" : "#/components/schemas/OptimizationMetricsDTO"
+          },
+          "tasksShifted" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "chosenRule" : {
+            "type" : "string"
+          },
+          "skippedTaskKeys" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "TaskScheduleSuggestionDTO" : {
+        "type" : "object",
+        "properties" : {
+          "taskKey" : {
+            "type" : "string"
+          },
+          "projectKey" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "type" : "string"
+          },
+          "assignee" : {
+            "type" : "string"
+          },
+          "originalStartDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "originalDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "suggestedStartDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "suggestedDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "priorityWeight" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "tardinessDays" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "isCritical" : {
+            "type" : "boolean"
+          },
+          "wasShifted" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ApplyOptimizationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "projectKeys" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 50,
+            "minItems" : 0
+          },
+          "alpha" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "beta" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "horizonStart" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "acceptedTaskKeys" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 5000,
+            "minItems" : 0
+          }
+        }
+      },
+      "AppliedSchedule" : {
+        "type" : "object",
+        "properties" : {
+          "tasksUpdated" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "UnreadCount" : {
+        "type" : "object",
+        "properties" : {
+          "count" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "MessageResponse" : {
+        "type" : "object",
+        "properties" : {
+          "message" : {
+            "type" : "string"
+          }
+        }
+      },
+      "LoginRequest" : {
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "password" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        }
+      },
+      "EmailPreferencesRequest" : {
+        "type" : "object",
+        "properties" : {
+          "emailNotificationsEnabled" : {
+            "type" : "boolean"
+          },
+          "emailOnTaskAssigned" : {
+            "type" : "boolean"
+          },
+          "emailOnCommentReply" : {
+            "type" : "boolean"
+          },
+          "emailOnProjectInvitation" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "TaskScheduleRequest" : {
+        "type" : "object",
+        "properties" : {
+          "startDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "dueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "dateRangeOrdered" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "dueDate", "startDate" ]
+      },
+      "PagedResponseCommentDTO" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CommentDTO"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "PagedResponseTaskActivityDTO" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TaskActivityDTO"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "TaskActivityDTO" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "CREATED", "STATUS_CHANGED", "PRIORITY_CHANGED", "ASSIGNEE_CHANGED", "PROGRESS_CHANGED", "DATES_CHANGED", "SUMMARY_CHANGED", "DESCRIPTION_CHANGED", "LABELS_CHANGED", "DEPENDENCIES_CHANGED", "ATTACHMENTS_CHANGED", "COMMENT_ADDED", "COMMENT_EDITED", "COMMENT_DELETED" ]
+          },
+          "fieldName" : {
+            "type" : "string"
+          },
+          "oldValue" : {
+            "type" : "string"
+          },
+          "newValue" : {
+            "type" : "string"
+          },
+          "authorName" : {
+            "type" : "string"
+          },
+          "authorProfilePicture" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "CommentResult" : {
+        "type" : "object",
+        "properties" : {
+          "commentId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "taskId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "taskKey" : {
+            "type" : "string"
+          },
+          "authorName" : {
+            "type" : "string"
+          },
+          "snippet" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ProjectResult" : {
+        "type" : "object",
+        "properties" : {
+          "projectKey" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          }
+        }
+      },
+      "SearchResultDTO" : {
+        "type" : "object",
+        "properties" : {
+          "projects" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ProjectResult"
+            }
+          },
+          "tasks" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TaskResult"
+            }
+          },
+          "comments" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CommentResult"
+            }
+          }
+        }
+      },
+      "TaskResult" : {
+        "type" : "object",
+        "properties" : {
+          "taskKey" : {
+            "type" : "string"
+          },
+          "projectKey" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "priority" : {
+            "type" : "string"
+          },
+          "assigneeName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PagedResponseProjectDTO" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ProjectDTO"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "NotificationDTO" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "isRead" : {
+            "type" : "boolean"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "PROJECT_INVITATION", "PROJECT_UPDATED", "MEMBER_REMOVED", "TASK_ASSIGNED", "TASK_UPDATED", "TASK_COMMENT", "TASK_DELETED", "COMMENT_REPLY", "COMMENT_REACTION" ]
+          },
+          "link" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PagedResponseNotificationDTO" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NotificationDTO"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "SseEmitter" : {
+        "type" : "object",
+        "properties" : {
+          "timeout" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      }
+    }
+  }
+}

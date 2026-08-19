@@ -92,7 +92,7 @@ class TaskControllerWebTest {
     private static TaskDTO sampleTask(LocalDate startDate, LocalDate dueDate) {
         return new TaskDTO(100, 1, "PROJ-1", "PROJ", "Sample summary", "Sample description",
                 TaskStatus.IN_PROGRESS, startDate, dueDate, "member@example.com",
-                List.of("bug"), List.of(), Boolean.TRUE, List.of(),
+                List.of("bug"), List.of(), Boolean.TRUE, null, List.of(),
                 Instant.parse("2026-01-01T10:00:00Z"), Instant.parse("2026-01-02T10:00:00Z"),
                 40, TaskPriority.HIGH);
     }

@@ -66,7 +66,7 @@ public class TaskActivityService {
         logChange(task, author, TaskActivityType.DEPENDENCIES_CHANGED, "dependencies",
                 joinList(before.dependencyKeys()), joinList(after.dependencyKeys()));
         logChange(task, author, TaskActivityType.ATTACHMENTS_CHANGED, "attachments",
-                countText(before.attachments()), countText(after.attachments()));
+                joinSorted(before.attachments()), joinSorted(after.attachments()));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -124,11 +124,10 @@ public class TaskActivityService {
         return description.length() + " characters";
     }
 
-    private static String countText(List<String> attachments) {
-        if (attachments == null || attachments.isEmpty()) {
-            return null;
-        }
-        return attachments.size() + (attachments.size() == 1 ? " file" : " files");
+    /** Attachment order is an append artefact, so the set is compared rather than the sequence. */
+    private static String joinSorted(List<String> values) {
+        return values == null || values.isEmpty() ? null : values.stream().sorted()
+                .collect(java.util.stream.Collectors.joining(", "));
     }
 
     private static String blankToNull(String value) {

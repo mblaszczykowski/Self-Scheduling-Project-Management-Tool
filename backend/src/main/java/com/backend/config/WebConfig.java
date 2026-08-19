@@ -40,7 +40,7 @@ public class WebConfig implements WebMvcConfigurer {
                 )
                 // Set-Cookie is applied by the browser automatically and is not script-readable,
                 // so it does not belong in exposedHeaders.
-                .exposedHeaders("X-CSRF-Token", "Cache-Control", "Content-Type")
+                .exposedHeaders("Cache-Control", "Content-Type")
                 .allowCredentials(true)
                 .maxAge(600);
     }

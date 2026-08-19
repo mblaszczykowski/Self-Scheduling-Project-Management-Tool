@@ -1,5 +1,7 @@
 package com.backend.config;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -76,8 +78,8 @@ public class AppProperties {
     }
 
     public static class Optimization {
-        private double defaultAlpha = 0.8;
-        private double defaultBeta = 0.2;
+        @DecimalMin("0.0") @DecimalMax("1.0") private double defaultAlpha = 0.8;
+        @DecimalMin("0.0") @DecimalMax("1.0") private double defaultBeta = 0.2;
         /** Upper bound on the scheduling horizon H, in days. */
         @Min(1) private int maxHorizonDays = 3650;
         /** Floor on H so urgency stays well-defined for tiny portfolios. */

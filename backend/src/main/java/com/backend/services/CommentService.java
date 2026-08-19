@@ -14,9 +14,8 @@ import com.backend.repositories.CommentReactionRepository;
 import com.backend.repositories.CommentRepository;
 import com.backend.security.AccessGuard;
 import com.backend.util.AfterCommit;
+import com.backend.util.HtmlSanitizer;
 import com.backend.util.ValidationUtil;
-import org.jsoup.Jsoup;
-import org.jsoup.safety.Safelist;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -177,7 +176,8 @@ public class CommentService {
         if (isNewReaction && !comment.getAuthor().getId().equals(userId)) {
             notificationService.createNotification(comment.getAuthor(),
                     "Someone reacted to your comment on task: " + comment.getTask().getSummary(),
-                    NotificationType.COMMENT_REACTION, commentLink(comment.getTask(), commentId));
+                    NotificationType.COMMENT_REACTION,
+                    NotificationService.taskCommentLink(comment.getTask().getTaskKey(), commentId));
         }
 
         return entityMapper.toCommentDTO(comment, userId);
@@ -210,7 +210,7 @@ public class CommentService {
     }
 
     private static String sanitize(String content) {
-        return Jsoup.clean(content, Safelist.basicWithImages());
+        return HtmlSanitizer.sanitizeComment(content);
     }
 
     /**
@@ -219,7 +219,7 @@ public class CommentService {
      */
     private void notifyAboutNewComment(Task task, Comment parentComment, User author, Integer commentId) {
         var pending = new ArrayList<NotificationService.Pending>(2);
-        var link = commentLink(task, commentId);
+        var link = NotificationService.taskCommentLink(task.getTaskKey(), commentId);
 
         if (parentComment != null && !parentComment.getAuthor().getId().equals(author.getId())) {
             pending.add(new NotificationService.Pending(parentComment.getAuthor(),
@@ -232,10 +232,6 @@ public class CommentService {
                     NotificationType.TASK_COMMENT, link));
         }
         notificationService.notifyAll(pending);
-    }
-
-    private static String commentLink(Task task, Integer commentId) {
-        return "/projects?selectedIssue=" + task.getTaskKey() + "&commentId=" + commentId;
     }
 
     /**

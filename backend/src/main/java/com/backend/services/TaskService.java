@@ -19,6 +19,7 @@ import com.backend.scheduling.SchedulingService;
 import com.backend.security.AccessGuard;
 import com.backend.util.AfterCommit;
 import com.backend.util.GraphCycles;
+import com.backend.util.HtmlSanitizer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,7 +30,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 @Service
 public class TaskService {
@@ -78,24 +78,23 @@ public class TaskService {
         task.setProject(project);
         task.setTaskNumber(project.allocateNextTaskNumber());
         task.setSummary(request.summary());
-        task.setDescription(request.description());
+        task.setDescription(HtmlSanitizer.sanitizeRichText(request.description()));
         task.setStatus(Objects.requireNonNullElse(request.status(), TaskStatus.BACKLOG));
         task.setPriority(Objects.requireNonNullElse(request.priority(), TaskPriority.MEDIUM));
         task.setProgress(Objects.requireNonNullElse(request.progress(), 0));
         task.setStartDate(request.startDate());
         task.setDueDate(request.dueDate());
-        task.setLabels(joinLabels(request.labels()));
+        task.setLabels(EntityMapper.joinLabels(request.labels()));
         task.setAssignee(resolveAssignee(request.assignee(), project));
 
         var declaredAttachments = nullSafe(request.attachments());
-        fileStorageService.requireAttachmentsBelongTo(project.getId(), declaredAttachments);
 
         if (!nullSafe(request.dependencyKeys()).isEmpty()) {
             task.replaceDependencies(resolveDependencies(request.dependencyKeys(), userId));
         }
 
-        var attachments = new ArrayList<>(declaredAttachments);
-        attachments.addAll(fileStorageService.storeFiles(files, project.getId(), userId));
+        var attachments = fileStorageService.resolveAttachments(
+                project.getId(), declaredAttachments, files, userId);
         task.replaceAttachments(attachments);
 
         var savedTask = taskRepository.save(task);
@@ -125,24 +124,23 @@ public class TaskService {
         var previousAttachments = List.copyOf(task.getAttachments());
 
         task.setSummary(request.summary());
-        task.setDescription(request.description());
+        task.setDescription(HtmlSanitizer.sanitizeRichText(request.description()));
         task.setStatus(Objects.requireNonNullElse(request.status(), TaskStatus.BACKLOG));
         task.setPriority(Objects.requireNonNullElse(request.priority(), TaskPriority.MEDIUM));
         task.setProgress(Objects.requireNonNullElse(request.progress(), 0));
         task.setStartDate(request.startDate());
         task.setDueDate(request.dueDate());
-        task.setLabels(joinLabels(request.labels()));
+        task.setLabels(EntityMapper.joinLabels(request.labels()));
         task.setAssignee(resolveAssignee(request.assignee(), project));
 
         var declaredAttachments = nullSafe(request.attachments());
-        fileStorageService.requireAttachmentsBelongTo(project.getId(), declaredAttachments);
 
         var dependencies = resolveDependencies(request.dependencyKeys(), userId);
         validateNoCycles(task, dependencies);
         task.replaceDependencies(dependencies);
 
-        var attachments = new ArrayList<>(declaredAttachments);
-        attachments.addAll(fileStorageService.storeFiles(files, project.getId(), userId));
+        var attachments = fileStorageService.resolveAttachments(
+                project.getId(), declaredAttachments, files, userId);
         task.replaceAttachments(attachments);
 
         var updatedTask = taskRepository.save(task);
@@ -229,7 +227,7 @@ public class TaskService {
                 pending.add(new NotificationService.Pending(assignee,
                         "Your task dates were updated by schedule optimization",
                         NotificationType.TASK_UPDATED,
-                        "/projects?selectedIssue=" + task.getTaskKey()));
+                        NotificationService.taskLink(task.getTaskKey())));
             }
         }
 
@@ -303,17 +301,7 @@ public class TaskService {
             return List.of();
         }
 
-        var byProject = new LinkedHashMap<String, List<Integer>>();
-        for (var key : keys) {
-            var parsed = TaskKey.parse(key)
-                    .orElseThrow(() -> new ValidationException("Invalid task key: " + key));
-            byProject.computeIfAbsent(parsed.projectKey(), k -> new ArrayList<>()).add(parsed.taskNumber());
-        }
-
-        var resolved = new ArrayList<Task>();
-        for (var entry : byProject.entrySet()) {
-            resolved.addAll(taskRepository.findByProjectKeyAndTaskNumbers(entry.getKey(), entry.getValue()));
-        }
+        var resolved = findTasksByKeys(keys);
         if (resolved.size() != keys.size()) {
             throw new ValidationException("One or more dependency tasks do not exist");
         }
@@ -335,19 +323,26 @@ public class TaskService {
     }
 
     private Map<String, Task> loadTasksByKey(List<String> taskKeys) {
+        var result = new LinkedHashMap<String, Task>();
+        for (var task : findTasksByKeys(taskKeys)) {
+            result.put(task.getTaskKey(), task);
+        }
+        return result;
+    }
+
+    /** Batch-loads tasks by {@code {projectKey}-{taskNumber}}, one query per distinct project. */
+    private List<Task> findTasksByKeys(List<String> taskKeys) {
         var byProject = new LinkedHashMap<String, List<Integer>>();
         for (var key : taskKeys) {
             var parsed = TaskKey.parse(key)
                     .orElseThrow(() -> new ValidationException("Invalid task key: " + key));
             byProject.computeIfAbsent(parsed.projectKey(), k -> new ArrayList<>()).add(parsed.taskNumber());
         }
-        var result = new LinkedHashMap<String, Task>();
+        var tasks = new ArrayList<Task>();
         for (var entry : byProject.entrySet()) {
-            for (var task : taskRepository.findByProjectKeyAndTaskNumbers(entry.getKey(), entry.getValue())) {
-                result.put(task.getTaskKey(), task);
-            }
+            tasks.addAll(taskRepository.findByProjectKeyAndTaskNumbers(entry.getKey(), entry.getValue()));
         }
-        return result;
+        return tasks;
     }
 
     private void notifyAssignee(Task task, Integer actorId, String message, NotificationType type) {
@@ -356,7 +351,7 @@ public class TaskService {
             return;
         }
         notificationService.createNotification(assignee, message, type,
-                "/projects?selectedIssue=" + task.getTaskKey());
+                NotificationService.taskLink(task.getTaskKey()));
     }
 
     /**
@@ -370,22 +365,8 @@ public class TaskService {
         var projectTasks = taskRepository.findByProjectIdWithDetails(task.getProject().getId()).stream()
                 .map(t -> entityMapper.toTaskDTO(t, null))
                 .toList();
-        var critical = schedulingService.criticalTaskKeys(projectTasks, LocalDate.now());
-        return entityMapper.toTaskDTO(task, critical.contains(task.getTaskKey()));
-    }
-
-    private static String joinLabels(List<String> labels) {
-        var cleaned = nullSafe(labels).stream()
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(label -> !label.isEmpty())
-                .toList();
-        for (var label : cleaned) {
-            if (label.contains(",")) {
-                throw new ValidationException("Labels cannot contain commas");
-            }
-        }
-        return cleaned.isEmpty() ? null : String.join(",", cleaned);
+        var analysis = schedulingService.analyzeCriticalPath(projectTasks, LocalDate.now());
+        return schedulingService.applyCriticality(entityMapper.toTaskDTO(task, null), analysis);
     }
 
     private static <T> List<T> nullSafe(List<T> list) {

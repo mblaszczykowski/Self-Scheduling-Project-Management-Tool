@@ -110,9 +110,8 @@ public class OptimizationService {
             if (placement == null) {
                 continue;
             }
-            var suggestedStart = horizonStart.plusDays(placement.start());
-            var suggestedDue = suggestedDueDate(horizonStart, placement);
-            if (suggestedStart.equals(dto.startDate()) && suggestedDue.equals(dto.dueDate())) {
+            var dates = suggestedDatesFor(dto, horizonStart, placement);
+            if (!dates.changed()) {
                 continue;
             }
             if (accepted != null && !accepted.contains(dto.taskKey())) {
@@ -126,7 +125,7 @@ public class OptimizationService {
                         "The schedule has changed since it was previewed. Re-run the optimization "
                                 + "to review the current plan before applying it.");
             }
-            changes.add(new TaskService.ScheduleChange(dto.taskKey(), suggestedStart, suggestedDue));
+            changes.add(new TaskService.ScheduleChange(dto.taskKey(), dates.start(), dates.due()));
         }
 
         if (changes.isEmpty()) {
@@ -170,10 +169,7 @@ public class OptimizationService {
                 continue;
             }
 
-            var suggestedStart = horizonStart.plusDays(placement.start());
-            var suggestedDue = suggestedDueDate(horizonStart, placement);
-            boolean wasShifted = !suggestedStart.equals(dto.startDate())
-                    || !suggestedDue.equals(dto.dueDate());
+            var dates = suggestedDatesFor(dto, horizonStart, placement);
 
             suggestions.add(new TaskScheduleSuggestionDTO(
                     dto.taskKey(),
@@ -182,14 +178,24 @@ public class OptimizationService {
                     dto.assignee(),
                     dto.startDate(),
                     dto.dueDate(),
-                    suggestedStart,
-                    suggestedDue,
+                    dates.start(),
+                    dates.due(),
                     scheduleTask.priorityWeight(),
                     placement.tardiness(),
                     critical.contains(dto.taskKey()),
-                    wasShifted));
+                    dates.changed()));
         }
         return suggestions;
+    }
+
+    /** A placement's suggested dates, and whether they differ from the task's current ones. */
+    private record SuggestedDates(LocalDate start, LocalDate due, boolean changed) {}
+
+    private static SuggestedDates suggestedDatesFor(TaskDTO dto, LocalDate horizonStart, Placement placement) {
+        var start = horizonStart.plusDays(placement.start());
+        var due = suggestedDueDate(horizonStart, placement);
+        boolean changed = !start.equals(dto.startDate()) || !due.equals(dto.dueDate());
+        return new SuggestedDates(start, due, changed);
     }
 
     /** {@code end} is exclusive, and a due date is inclusive, so the last worked day is end - 1. */

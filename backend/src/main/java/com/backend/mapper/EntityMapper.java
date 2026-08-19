@@ -2,6 +2,7 @@ package com.backend.mapper;
 
 import com.backend.dtos.*;
 import com.backend.entities.*;
+import com.backend.exception.ValidationException;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Entity to DTO mapping. Collections are always emitted as lists, never null, so no consumer
@@ -77,6 +79,7 @@ public class EntityMapper {
                 parseLabels(task.getLabels()),
                 extractDependencyKeys(task),
                 isCritical,
+                null,
                 toListOrEmpty(task.getAttachments()),
                 task.getCreated(),
                 task.getUpdated(),
@@ -131,6 +134,35 @@ public class EntityMapper {
     }
 
     private CommentDTO buildCommentDTO(Comment comment, List<CommentDTO> replies, Integer currentUserId) {
+        var reactions = summarizeReactions(comment, currentUserId);
+        var author = comment.getAuthor();
+        var task = comment.getTask();
+
+        return new CommentDTO(
+                comment.getId(),
+                task != null ? task.getId() : null,
+                author != null ? author.getId() : null,
+                author != null ? author.getFullName() : null,
+                author != null ? author.getProfilePicture() : null,
+                comment.getContent(),
+                comment.getTimestamp(),
+                comment.getEditedAt(),
+                toListOrEmpty(comment.getAttachments()),
+                reactions.liked().size(),
+                reactions.disliked().size(),
+                reactions.liked(),
+                reactions.disliked(),
+                reactions.likedByCurrentUser(),
+                reactions.dislikedByCurrentUser(),
+                replies
+        );
+    }
+
+    /** Who liked and disliked a comment, and whether the current user is among them. */
+    private record ReactionSummary(List<String> liked, List<String> disliked,
+                                   boolean likedByCurrentUser, boolean dislikedByCurrentUser) {}
+
+    private static ReactionSummary summarizeReactions(Comment comment, Integer currentUserId) {
         var likedByUsernames = new ArrayList<String>();
         var dislikedByUsernames = new ArrayList<String>();
         boolean likedByCurrentUser = false;
@@ -149,27 +181,7 @@ public class EntityMapper {
             }
         }
 
-        var author = comment.getAuthor();
-        var task = comment.getTask();
-
-        return new CommentDTO(
-                comment.getId(),
-                task != null ? task.getId() : null,
-                author != null ? author.getId() : null,
-                author != null ? author.getFullName() : null,
-                author != null ? author.getProfilePicture() : null,
-                comment.getContent(),
-                comment.getTimestamp(),
-                comment.getEditedAt(),
-                toListOrEmpty(comment.getAttachments()),
-                likedByUsernames.size(),
-                dislikedByUsernames.size(),
-                likedByUsernames,
-                dislikedByUsernames,
-                likedByCurrentUser,
-                dislikedByCurrentUser,
-                replies
-        );
+        return new ReactionSummary(likedByUsernames, dislikedByUsernames, likedByCurrentUser, dislikedByCurrentUser);
     }
 
     /** Task keys of this task's predecessors; empty when it has none. */
@@ -185,6 +197,21 @@ public class EntityMapper {
                 .map(String::trim)
                 .filter(label -> !label.isEmpty())
                 .toList();
+    }
+
+    /** Inverse of {@link #parseLabels}: joins labels into the comma-separated stored form. */
+    public static String joinLabels(List<String> labels) {
+        var cleaned = (labels == null ? List.<String>of() : labels).stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(label -> !label.isEmpty())
+                .toList();
+        for (var label : cleaned) {
+            if (label.contains(",")) {
+                throw new ValidationException("Labels cannot contain commas");
+            }
+        }
+        return cleaned.isEmpty() ? null : String.join(",", cleaned);
     }
 
     private static <T> List<T> toListOrEmpty(Collection<T> collection) {

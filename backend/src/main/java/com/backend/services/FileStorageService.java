@@ -134,6 +134,19 @@ public class FileStorageService {
         }
     }
 
+    /**
+     * Validates that every declared attachment belongs to the project, stores any newly uploaded
+     * files against it, and returns the two combined into the attachment list a caller should
+     * save.
+     */
+    public List<String> resolveAttachments(Integer projectId, List<String> declared,
+                                           List<MultipartFile> newFiles, Integer uploaderId) {
+        requireAttachmentsBelongTo(projectId, declared);
+        var merged = new ArrayList<>(declared);
+        merged.addAll(storeFiles(newFiles, projectId, uploaderId));
+        return merged;
+    }
+
     public void deleteFile(String filePath) {
         var fileName = extractFileName(filePath);
         rejectPathTraversalAttempts(fileName);

@@ -24,6 +24,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
     @Query("UPDATE Notification n SET n.isRead = true WHERE n.id IN :ids AND n.user.id = :userId")
     int markReadForUser(@Param("ids") Collection<Integer> ids, @Param("userId") Integer userId);
 
+    /** Flips every unread notification for the user, for the "mark all read" bulk action. */
+    @Modifying
+    @Query("UPDATE Notification n SET n.isRead = true WHERE n.user.id = :userId AND n.isRead = false")
+    int markAllReadForUser(@Param("userId") Integer userId);
+
     @Query("SELECT COUNT(n) FROM Notification n WHERE n.id IN :ids AND n.user.id = :userId")
     long countOwnedBy(@Param("ids") Collection<Integer> ids, @Param("userId") Integer userId);
 }

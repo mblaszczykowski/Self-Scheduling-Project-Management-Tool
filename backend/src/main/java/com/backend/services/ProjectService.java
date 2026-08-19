@@ -5,6 +5,7 @@ import com.backend.dtos.TaskDTO;
 import com.backend.entities.NotificationType;
 import com.backend.entities.Project;
 import com.backend.entities.User;
+import com.backend.exception.ResourceNotFoundException;
 import com.backend.exception.ValidationException;
 import com.backend.mapper.EntityMapper;
 import com.backend.repositories.ProjectRepository;
@@ -15,6 +16,7 @@ import com.backend.security.AccessGuard;
 import com.backend.services.RateLimitService.Bucket;
 import com.backend.util.AfterCommit;
 import com.backend.util.GraphCycles;
+import com.backend.util.HtmlSanitizer;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -92,7 +96,7 @@ public class ProjectService {
         var project = new Project();
         project.setProjectKey(request.projectKey());
         project.setSummary(request.summary());
-        project.setDescription(request.description());
+        project.setDescription(HtmlSanitizer.sanitizeRichText(request.description()));
         project.setOwner(owner);
         project.setNextTaskNumber(1);
 
@@ -117,15 +121,15 @@ public class ProjectService {
         var project = accessGuard.getOwnedProject(projectKey, userId);
         var owner = project.getOwner();
 
-        boolean detailsChanged = !java.util.Objects.equals(project.getSummary(), request.summary())
-                || !java.util.Objects.equals(project.getDescription(), request.description());
+        var description = HtmlSanitizer.sanitizeRichText(request.description());
+        boolean detailsChanged = !Objects.equals(project.getSummary(), request.summary())
+                || !Objects.equals(project.getDescription(), description);
 
         project.setSummary(request.summary());
-        project.setDescription(request.description());
+        project.setDescription(description);
 
         var previousAttachments = List.copyOf(project.getAttachments());
-        var declared = request.attachments() == null ? List.<String>of() : request.attachments();
-        fileStorageService.requireAttachmentsBelongTo(project.getId(), declared);
+        var declared = request.attachments();
 
         var addedMembers = new LinkedHashSet<User>();
         var removedMembers = new LinkedHashSet<User>();
@@ -155,42 +159,23 @@ public class ProjectService {
             applyDependencies(project, request.dependencies(), userId);
         }
 
-        var updatedAttachments = new ArrayList<>(declared);
-        updatedAttachments.addAll(fileStorageService.storeFiles(attachments, project.getId(), userId));
+        List<String> updatedAttachments;
+        if (declared != null) {
+            updatedAttachments = fileStorageService.resolveAttachments(
+                    project.getId(), declared, attachments, userId);
+        } else {
+            // No declared list to validate ownership against here: every file in
+            // previousAttachments already belongs to this project.
+            updatedAttachments = new ArrayList<>(previousAttachments);
+            updatedAttachments.addAll(fileStorageService.storeFiles(attachments, project.getId(), userId));
+        }
         project.replaceAttachments(updatedAttachments);
 
         var updated = projectRepository.save(project);
         fileStorageService.deleteRemovedAfterCommit(previousAttachments, updatedAttachments,
                 "delete detached project attachments");
 
-        // One notification per person, and only for something they can actually see: a member who
-        // was just invited does not also need "the project was updated", and nobody needs it when
-        // only the member list changed.
-        var pending = new ArrayList<NotificationService.Pending>();
-        var link = "/projects?projectKey=" + updated.getProjectKey();
-        for (var member : addedMembers) {
-            pending.add(new NotificationService.Pending(member,
-                    "You have been added to project: " + updated.getSummary(),
-                    NotificationType.PROJECT_INVITATION, link));
-        }
-        for (var member : removedMembers) {
-            pending.add(new NotificationService.Pending(member,
-                    "You have been removed from project: " + updated.getSummary(),
-                    NotificationType.MEMBER_REMOVED, null));
-        }
-        if (detailsChanged) {
-            var justInvited = addedMembers.stream().map(User::getId).collect(Collectors.toSet());
-            for (var member : updated.getMembers()) {
-                // Skip the actor, and skip anyone who is being invited in this same request: their
-                // invitation already tells them everything "the project was updated" would.
-                if (member.getId().equals(userId) || justInvited.contains(member.getId())) {
-                    continue;
-                }
-                pending.add(new NotificationService.Pending(member,
-                        "Project '" + updated.getSummary() + "' has been updated",
-                        NotificationType.PROJECT_UPDATED, link));
-            }
-        }
+        var pending = buildMembershipNotifications(updated, addedMembers, removedMembers, detailsChanged, userId);
         notificationService.notifyAll(pending);
         sendInvitationsAfterCommit(unregistered, updated.getSummary(), owner);
 
@@ -209,6 +194,41 @@ public class ProjectService {
         // commit left the project intact with every attachment URL pointing at nothing.
         AfterCommit.run("delete attachments of project " + projectKey,
                 () -> fileStorageService.deleteFilesSilently(attachments));
+    }
+
+    /**
+     * One notification per person, and only for something they can actually see: a member who
+     * was just invited does not also need "the project was updated", and nobody needs it when
+     * only the member list changed.
+     */
+    private List<NotificationService.Pending> buildMembershipNotifications(
+            Project updated, Set<User> added, Set<User> removed, boolean detailsChanged, Integer actorId) {
+        var pending = new ArrayList<NotificationService.Pending>();
+        var link = NotificationService.projectLink(updated.getProjectKey());
+        for (var member : added) {
+            pending.add(new NotificationService.Pending(member,
+                    "You have been added to project: " + updated.getSummary(),
+                    NotificationType.PROJECT_INVITATION, link));
+        }
+        for (var member : removed) {
+            pending.add(new NotificationService.Pending(member,
+                    "You have been removed from project: " + updated.getSummary(),
+                    NotificationType.MEMBER_REMOVED, null));
+        }
+        if (detailsChanged) {
+            var justInvited = added.stream().map(User::getId).collect(Collectors.toSet());
+            for (var member : updated.getMembers()) {
+                // Skip the actor, and skip anyone who is being invited in this same request: their
+                // invitation already tells them everything "the project was updated" would.
+                if (member.getId().equals(actorId) || justInvited.contains(member.getId())) {
+                    continue;
+                }
+                pending.add(new NotificationService.Pending(member,
+                        "Project '" + updated.getSummary() + "' has been updated",
+                        NotificationType.PROJECT_UPDATED, link));
+            }
+        }
+        return pending;
     }
 
     private record MemberResolution(Set<User> members, Set<String> unregisteredEmails) {}
@@ -270,10 +290,14 @@ public class ProjectService {
             project.clearDependencies();
             return;
         }
-        var dependencies = dependencyKeys.stream()
-                .distinct()
-                .map(key -> accessGuard.getAccessibleProject(key, userId))
-                .toList();
+        var keys = dependencyKeys.stream().distinct().toList();
+        var found = projectRepository.findByProjectKeyIn(keys);
+        if (found.size() != keys.size()) {
+            throw new ResourceNotFoundException("Project not found");
+        }
+        found.forEach(dependency -> accessGuard.requireAccess(dependency, userId));
+        var byKey = found.stream().collect(Collectors.toMap(Project::getProjectKey, dependency -> dependency));
+        var dependencies = keys.stream().map(byKey::get).toList();
         validateNoProjectCycles(project, dependencies);
         project.replaceDependencies(dependencies);
     }
@@ -288,7 +312,7 @@ public class ProjectService {
     }
 
     private void notifyMembersAdded(Project project, Set<User> members, User owner) {
-        var link = "/projects?projectKey=" + project.getProjectKey();
+        var link = NotificationService.projectLink(project.getProjectKey());
         var pending = members.stream()
                 .filter(member -> !member.getId().equals(owner.getId()))
                 .map(member -> new NotificationService.Pending(member,
@@ -312,10 +336,10 @@ public class ProjectService {
                 emails.forEach(email -> emailService.sendInvitationEmail(email, projectName, inviterName)));
     }
 
-    private java.util.Map<Integer, List<TaskDTO>> loadTasksFor(List<Project> projects) {
+    private Map<Integer, List<TaskDTO>> loadTasksFor(List<Project> projects) {
         var projectIds = projects.stream().map(Project::getId).toList();
         if (projectIds.isEmpty()) {
-            return java.util.Map.of();
+            return Map.of();
         }
         return taskRepository.findByProjectIdsWithDetails(projectIds).stream()
                 .distinct()
@@ -326,9 +350,9 @@ public class ProjectService {
 
     /** Single canonical project mapping: enrich the tasks with critical-path flags, then map. */
     private ProjectDTO toDto(Project project, List<TaskDTO> tasks) {
-        var critical = schedulingService.criticalTaskKeys(tasks, LocalDate.now());
+        var analysis = schedulingService.analyzeCriticalPath(tasks, LocalDate.now());
         var enriched = tasks.stream()
-                .map(task -> task.withIsCritical(critical.contains(task.taskKey())))
+                .map(task -> schedulingService.applyCriticality(task, analysis))
                 .toList();
         return entityMapper.toProjectDTO(project, enriched);
     }

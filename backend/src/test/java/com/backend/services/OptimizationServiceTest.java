@@ -57,7 +57,7 @@ class OptimizationServiceTest {
                                 List<String> dependsOn) {
         return new TaskDTO(null, null, key, "P", key, null, TaskStatus.TODO,
                 LocalDate.parse(start), LocalDate.parse(due), assignee, List.of(), dependsOn,
-                null, List.of(), null, null, 0, TaskPriority.MEDIUM);
+                null, null, List.of(), null, null, 0, TaskPriority.MEDIUM);
     }
 
     /** Two tasks on one person, booked over each other, so any schedule has to move one. */

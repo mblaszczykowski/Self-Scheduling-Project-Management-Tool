@@ -77,58 +77,50 @@ public class EmailService {
     }
 
     private String buildInvitationHtml(String email, String projectName, String inviterName) {
-        return """
-                <!DOCTYPE html>
-                <html lang="en">
-                <head><meta charset="UTF-8"></head>
-                <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                  <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; padding: 40px 0;">
-                    <tr>
-                      <td align="center">
-                        <table role="presentation" width="560" cellpadding="0" cellspacing="0"
-                               style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
-                          <tr>
-                            <td style="background-color: #0f172a; padding: 24px 32px;">
-                              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700;">FlowLink</h1>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 32px;">
-                              <p style="margin: 0 0 8px 0; color: #64748b; font-size: 14px;">Hello,</p>
-                              <p style="margin: 0 0 16px 0; color: #1e293b; font-size: 15px; line-height: 1.6;">
-                                <strong>%s</strong> has invited you to collaborate on the project
-                                <strong>"%s"</strong> in FlowLink.
-                              </p>
-                              <p style="margin: 0 0 24px 0; color: #1e293b; font-size: 15px; line-height: 1.6;">
-                                Create a free account to get started:
-                              </p>
-                              <a href="%s/register"
-                                 style="display: inline-block; padding: 12px 28px; background-color: #0f172a;
-                                        color: #ffffff; text-decoration: none; border-radius: 8px;
-                                        font-size: 14px; font-weight: 600;">
-                                Join FlowLink
-                              </a>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 20px 32px; border-top: 1px solid #e2e8f0;">
-                              <p style="margin: 0; color: #94a3b8; font-size: 12px; text-align: center;">
-                                This invitation was sent to %s. If you didn't expect this, you can safely ignore it.
-                              </p>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>
-                  </table>
-                </body>
-                </html>
-                """.formatted(
+        var header = """
+          <tr>
+            <td style="background-color: #0f172a; padding: 24px 32px;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700;">FlowLink</h1>
+            </td>
+          </tr>
+""".stripTrailing();
+
+        var body = """
+          <tr>
+            <td style="padding: 32px;">
+              <p style="margin: 0 0 8px 0; color: #64748b; font-size: 14px;">Hello,</p>
+              <p style="margin: 0 0 16px 0; color: #1e293b; font-size: 15px; line-height: 1.6;">
+                <strong>%s</strong> has invited you to collaborate on the project
+                <strong>"%s"</strong> in FlowLink.
+              </p>
+              <p style="margin: 0 0 24px 0; color: #1e293b; font-size: 15px; line-height: 1.6;">
+                Create a free account to get started:
+              </p>
+              <a href="%s/register"
+                 style="display: inline-block; padding: 12px 28px; background-color: #0f172a;
+                        color: #ffffff; text-decoration: none; border-radius: 8px;
+                        font-size: 14px; font-weight: 600;">
+                Join FlowLink
+              </a>
+            </td>
+          </tr>
+""".stripTrailing().formatted(
                 escapeHtml(inviterName),
                 escapeHtml(projectName),
-                escapeHtml(frontendBaseUrl),
-                escapeHtml(email)
+                escapeHtml(frontendBaseUrl)
         );
+
+        var footer = """
+          <tr>
+            <td style="padding: 20px 32px; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; color: #94a3b8; font-size: 12px; text-align: center;">
+                This invitation was sent to %s. If you didn't expect this, you can safely ignore it.
+              </p>
+            </td>
+          </tr>
+""".stripTrailing().formatted(escapeHtml(email));
+
+        return wrapEmailShell(header, body, footer);
     }
 
     private String getSubjectForType(NotificationType type) {
@@ -163,62 +155,83 @@ public class EmailService {
                     """.formatted(escapeHtml(absoluteLink));
         }
 
-        return """
-                <!DOCTYPE html>
-                <html lang="en">
-                <head><meta charset="UTF-8"></head>
-                <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                  <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; padding: 40px 0;">
-                    <tr>
-                      <td align="center">
-                        <table role="presentation" width="560" cellpadding="0" cellspacing="0"
-                               style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
-                          <!-- Header -->
-                          <tr>
-                            <td style="background-color: #0f172a; padding: 24px 32px;">
-                              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.025em;">
-                                FlowLink
-                              </h1>
-                            </td>
-                          </tr>
-                          <!-- Body -->
-                          <tr>
-                            <td style="padding: 32px;">
-                              <table role="presentation" width="100%%" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td>
-                                    <p style="margin: 0 0 8px 0; color: #64748b; font-size: 14px;">
-                                      Hi %s,
-                                    </p>
-                                    <p style="margin: 0; color: #1e293b; font-size: 15px; line-height: 1.6;">
-                                      %s
-                                    </p>
-                                  </td>
-                                </tr>
-                                %s
-                              </table>
-                            </td>
-                          </tr>
-                          <!-- Footer -->
-                          <tr>
-                            <td style="padding: 20px 32px; border-top: 1px solid #e2e8f0;">
-                              <p style="margin: 0; color: #94a3b8; font-size: 12px; text-align: center;">
-                                You received this email because of your notification preferences in FlowLink.
-                                You can update your email settings in your account preferences.
-                              </p>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>
-                  </table>
-                </body>
-                </html>
-                """.formatted(
+        var header = """
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 24px 32px;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.025em;">
+                FlowLink
+              </h1>
+            </td>
+          </tr>
+""".stripTrailing();
+
+        var body = """
+          <!-- Body -->
+          <tr>
+            <td style="padding: 32px;">
+              <table role="presentation" width="100%%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <p style="margin: 0 0 8px 0; color: #64748b; font-size: 14px;">
+                      Hi %s,
+                    </p>
+                    <p style="margin: 0; color: #1e293b; font-size: 15px; line-height: 1.6;">
+                      %s
+                    </p>
+                  </td>
+                </tr>
+                %s
+              </table>
+            </td>
+          </tr>
+""".stripTrailing().formatted(
                 escapeHtml(recipientFirstName),
                 escapeHtml(message),
                 buttonHtml
         );
+
+        var footer = """
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 32px; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; color: #94a3b8; font-size: 12px; text-align: center;">
+                You received this email because of your notification preferences in FlowLink.
+                You can update your email settings in your account preferences.
+              </p>
+            </td>
+          </tr>
+""".stripTrailing();
+
+        return wrapEmailShell(header, body, footer);
+    }
+
+    /**
+     * The doctype, the page background, the 560px white card and its open/close rows: the outer
+     * shell shared verbatim by every email, with only the header, body and footer rows supplied
+     * by the caller.
+     */
+    private String wrapEmailShell(String headerHtml, String bodyHtml, String footerHtml) {
+        return """
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"></head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; padding: 40px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0"
+               style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
+%s
+%s
+%s
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+""".formatted(headerHtml, bodyHtml, footerHtml);
     }
 
     /**

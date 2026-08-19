@@ -53,7 +53,8 @@ public class RateLimitService {
         }
         int max = limitFor(bucket);
         long now = System.currentTimeMillis();
-        var entry = buckets.get(bucket).compute(key, (k, existing) -> {
+        var bucketMap = buckets.get(bucket);
+        var entry = bucketMap.compute(key, (k, existing) -> {
             if (existing == null || now - existing.windowStart > config.getWindowMs()) {
                 return new Entry(now);
             }
@@ -91,6 +92,15 @@ public class RateLimitService {
         };
     }
 
+    /**
+     * Reclaims entries whose window has long closed. This sweep is the only thing that bounds a
+     * bucket's size, deliberately: a capacity cap that evicted the oldest entry would hand that
+     * key a fresh budget the moment the map filled, and the LOGIN bucket is keyed partly on a
+     * caller-supplied email, so flooding it with distinct keys would reset the limiter for whoever
+     * happened to be oldest — trading a memory bound for a rate-limit bypass. Bounding key
+     * cardinality safely needs a coarser key or a store with its own eviction, not an eviction
+     * policy layered over this map.
+     */
     @Scheduled(fixedRate = 60_000)
     public void cleanupExpiredEntries() {
         long now = System.currentTimeMillis();

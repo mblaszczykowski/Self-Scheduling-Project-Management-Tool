@@ -3,7 +3,6 @@ package com.backend.entities;
 import jakarta.persistence.*;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -43,9 +42,6 @@ public class Comment {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_comment_id")
     private Comment parentComment;
-
-    @OneToMany(mappedBy = "parentComment")
-    private List<Comment> replies = new ArrayList<>();
 
     @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<CommentReaction> reactions = new HashSet<>();
@@ -100,8 +96,6 @@ public class Comment {
 
     public Comment getParentComment() { return parentComment; }
     public void setParentComment(Comment parentComment) { this.parentComment = parentComment; }
-
-    public List<Comment> getReplies() { return Collections.unmodifiableList(replies); }
 
     public Set<CommentReaction> getReactions() { return Collections.unmodifiableSet(reactions); }
 

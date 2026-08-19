@@ -8,6 +8,6 @@ public record SearchResultDTO(
     List<CommentResult> comments
 ) {
     public record ProjectResult(String projectKey, String summary, String description) {}
-    public record TaskResult(String taskKey, String projectKey, String summary, String status, String priority, String assignee) {}
+    public record TaskResult(String taskKey, String projectKey, String summary, String status, String priority, String assigneeName) {}
     public record CommentResult(Integer commentId, Integer taskId, String taskKey, String authorName, String snippet) {}
 }

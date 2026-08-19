@@ -1,11 +1,11 @@
 package com.backend.entities;
 
 public enum TaskPriority {
-    LOWEST(1, "Lowest"),
-    LOW(3, "Low"),
-    MEDIUM(5, "Medium"),
-    HIGH(8, "High"),
-    HIGHEST(10, "Highest");
+    LOWEST(1),
+    LOW(3),
+    MEDIUM(5),
+    HIGH(8),
+    HIGHEST(10);
 
     /**
      * The scheduling weight w_j on a 1..10 scale, as defined by the MORCPSP model.
@@ -15,18 +15,12 @@ public enum TaskPriority {
      * {@code getWeight()} would silently have got the wrong weights.
      */
     private final int weight;
-    private final String displayName;
 
-    TaskPriority(int weight, String displayName) {
+    TaskPriority(int weight) {
         this.weight = weight;
-        this.displayName = displayName;
     }
 
     public int getWeight() {
         return weight;
-    }
-
-    public String getDisplayName() {
-        return displayName;
     }
 }

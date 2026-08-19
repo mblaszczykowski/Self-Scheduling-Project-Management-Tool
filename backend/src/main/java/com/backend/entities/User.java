@@ -6,12 +6,7 @@ import org.hibernate.Hibernate;
 import java.util.Objects;
 
 @Entity
-@Table(name = "users", uniqueConstraints = {
-        @UniqueConstraint(
-                name = "user_email_unique",
-                columnNames = "email"
-        )
-})
+@Table(name = "users")
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

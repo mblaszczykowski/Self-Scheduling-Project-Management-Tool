@@ -145,7 +145,6 @@ public class TokenService {
             refreshTokenRepository.deleteFamily(stored.getFamilyId());
             return RotationResult.failed(INVALID_REFRESH_TOKEN);
         }
-        stored.markConsumed();
 
         if (stored.isExpired(now)) {
             refreshTokenRepository.deleteFamily(stored.getFamilyId());

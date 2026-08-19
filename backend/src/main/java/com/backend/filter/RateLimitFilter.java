@@ -62,13 +62,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         // Login is keyed on (ip, email); the email is only available to AuthService, which owns
         // that check. Here we only guard the endpoints keyed purely on the client address.
-        if (path.startsWith("/api/optimization/")
+        if (!isPreflight(method) && path.startsWith("/api/optimization/")
                 && !rateLimitService.allow(Bucket.OPTIMIZE, clientIp)) {
             reject(response, clientIp, path, "Too many optimization requests. Please try again later.");
             return;
         }
 
-        if (path.startsWith("/api/search")
+        if (!isPreflight(method) && path.startsWith("/api/search")
                 && !rateLimitService.allow(Bucket.SEARCH, clientIp)) {
             reject(response, clientIp, path, "Too many search requests. Please try again later.");
             return;
@@ -88,6 +88,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 || "PUT".equalsIgnoreCase(method)
                 || "PATCH".equalsIgnoreCase(method)
                 || "DELETE".equalsIgnoreCase(method);
+    }
+
+    private static boolean isPreflight(String method) {
+        return "OPTIONS".equalsIgnoreCase(method);
     }
 
     private void reject(HttpServletResponse response, String clientIp, String path, String message)

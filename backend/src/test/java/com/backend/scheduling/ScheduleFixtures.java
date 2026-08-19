@@ -47,7 +47,7 @@ final class ScheduleFixtures {
 
         TaskDTO build() {
             return new TaskDTO(null, null, key, projectKey, key, null, status, start, due,
-                    assignee, List.of(), dependencies, null, List.of(), null, null, progress, priority);
+                    assignee, List.of(), dependencies, null, null, List.of(), null, null, progress, priority);
         }
     }
 }

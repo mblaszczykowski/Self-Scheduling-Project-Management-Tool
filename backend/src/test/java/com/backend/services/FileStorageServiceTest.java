@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -113,6 +114,32 @@ class FileStorageServiceTest {
             assertThatCode(() -> fileStorage.requireAttachmentsBelongTo(PROJECT_ID, List.of()))
                     .doesNotThrowAnyException();
             org.mockito.Mockito.verifyNoInteractions(storedFileRepository);
+        }
+    }
+
+    @Nested
+    @DisplayName("Resolving the attachment list for an update")
+    class ResolvingAttachments {
+
+        @Test
+        @DisplayName("keeps a declared attachment that already belongs to the project")
+        void keepsAnAlreadyOwnedDeclaredAttachment() {
+            repositoryHolds(ownedBy("keep.png", PROJECT_ID));
+
+            var resolved = fileStorage.resolveAttachments(
+                    PROJECT_ID, List.of("/files/keep.png"), List.of(), 1);
+
+            assertThat(resolved).containsExactly("/files/keep.png");
+        }
+
+        @Test
+        @DisplayName("refuses a declared attachment stolen from another project, storing nothing")
+        void refusesAForeignDeclaredAttachment() {
+            repositoryHolds(ownedBy("theirs.png", 99));
+
+            assertThatThrownBy(() -> fileStorage.resolveAttachments(
+                    PROJECT_ID, List.of("/files/theirs.png"), List.of(), 1))
+                    .isInstanceOf(ValidationException.class);
         }
     }
 

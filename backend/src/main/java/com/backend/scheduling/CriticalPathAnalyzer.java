@@ -26,19 +26,26 @@ public final class CriticalPathAnalyzer {
             Map<String, Integer> earliestStart,
             Map<String, Integer> totalFloat,
             Set<String> criticalKeys
-    ) {}
+    ) {
+        public static Analysis empty() {
+            return new Analysis(Map.of(), Map.of(), Set.of());
+        }
+    }
 
     public static Analysis analyze(PrecedenceGraph graph) {
         if (graph.tasks().isEmpty()) {
-            return new Analysis(Map.of(), Map.of(), Set.of());
+            return Analysis.empty();
         }
 
         var earliestStart = new HashMap<String, Integer>();
         var earliestFinish = new HashMap<String, Integer>();
 
-        // Forward pass in topological order: every predecessor is final before it is read.
+        // Forward pass in topological order: every predecessor is final before it is read. The seed
+        // is the task's own release date, matching SsgsDecoder.earliestFeasibleStart — seeding at 0
+        // reported an earliest start before the task's own start date, and inverted which of two
+        // differently-released predecessors was reported as the bottleneck.
         for (var key : graph.topologicalOrder()) {
-            int start = 0;
+            int start = graph.task(key).releaseOffset();
             for (var predecessor : graph.knownPredecessorsOf(key)) {
                 start = Math.max(start, earliestFinish.getOrDefault(predecessor, 0));
             }

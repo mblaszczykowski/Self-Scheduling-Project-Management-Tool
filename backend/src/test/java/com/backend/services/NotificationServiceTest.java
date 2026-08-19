@@ -427,4 +427,41 @@ class NotificationServiceTest {
             verifyNoInteractions(notificationRepository);
         }
     }
+
+    @Nested
+    @DisplayName("markAllNotificationsAsRead")
+    class MarkAllNotificationsAsReadTests {
+
+        @Test
+        @DisplayName("flips every unread notification for the caller in one statement")
+        void shouldMarkEveryUnreadNotificationAsRead() {
+            when(notificationRepository.countByUserIdAndIsReadFalse(1)).thenReturn(0L);
+
+            notificationService.markAllNotificationsAsRead(1);
+
+            verify(notificationRepository).markAllReadForUser(1);
+        }
+
+        @Test
+        @DisplayName("returns the authoritative remaining unread count from the database")
+        void shouldReturnTheRemainingUnreadCount() {
+            // Simulates a notification landing between the bulk update and the recount.
+            when(notificationRepository.countByUserIdAndIsReadFalse(1)).thenReturn(1L);
+
+            var remaining = notificationService.markAllNotificationsAsRead(1);
+
+            assertThat(remaining).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("only ever touches the caller's own notifications")
+        void shouldScopeToTheCallersOwnNotifications() {
+            when(notificationRepository.countByUserIdAndIsReadFalse(2)).thenReturn(0L);
+
+            notificationService.markAllNotificationsAsRead(2);
+
+            verify(notificationRepository).markAllReadForUser(2);
+            verify(notificationRepository, never()).markAllReadForUser(1);
+        }
+    }
 }

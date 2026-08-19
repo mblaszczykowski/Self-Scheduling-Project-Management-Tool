@@ -1,6 +1,7 @@
 package com.backend.services;
 
 import com.backend.TestEntityFactory;
+import com.backend.dtos.TaskDTO;
 import com.backend.entities.NotificationType;
 import com.backend.entities.Project;
 import com.backend.entities.User;
@@ -11,6 +12,7 @@ import com.backend.mapper.EntityMapper;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
 import com.backend.requests.ProjectRequest;
+import com.backend.scheduling.CriticalPathAnalyzer;
 import com.backend.scheduling.SchedulingService;
 import com.backend.security.AccessGuard;
 import com.backend.config.AppProperties;
@@ -37,7 +39,9 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -85,8 +89,28 @@ class ProjectServiceTest {
 
         when(userService.getRequiredUserById(OWNER_ID)).thenReturn(owner);
         when(fileStorageService.storeFiles(any(), any(), any())).thenReturn(List.of());
+        // Mirrors the real FileStorageService.resolveAttachments: validate then merge in the
+        // newly stored files, delegating to this same mock so per-test stubs/verifies on
+        // requireAttachmentsBelongTo and storeFiles keep working unchanged.
+        when(fileStorageService.resolveAttachments(any(), any(), any(), any())).thenAnswer(invocation -> {
+            Integer projectId = invocation.getArgument(0);
+            List<String> declared = invocation.getArgument(1);
+            var newFiles = invocation.getArgument(2, List.class);
+            Integer uploaderId = invocation.getArgument(3);
+            fileStorageService.requireAttachmentsBelongTo(projectId, declared);
+            var merged = new java.util.ArrayList<>(declared);
+            merged.addAll(fileStorageService.storeFiles(newFiles, projectId, uploaderId));
+            return merged;
+        });
         when(taskRepository.findByProjectIdWithDetails(anyInt())).thenReturn(List.of());
-        when(schedulingService.criticalTaskKeys(anyList(), any())).thenReturn(java.util.Set.of());
+        when(schedulingService.analyzeCriticalPath(anyList(), any()))
+                .thenReturn(CriticalPathAnalyzer.Analysis.empty());
+        when(schedulingService.applyCriticality(any(), any())).thenAnswer(invocation -> {
+            TaskDTO dto = invocation.getArgument(0);
+            CriticalPathAnalyzer.Analysis analysis = invocation.getArgument(1);
+            return dto.withCriticality(analysis.criticalKeys().contains(dto.taskKey()),
+                    analysis.totalFloat().get(dto.taskKey()));
+        });
         when(projectRepository.save(any(Project.class))).thenAnswer(call -> call.getArgument(0));
     }
 
@@ -201,7 +225,7 @@ class ProjectServiceTest {
         @DisplayName("resolves a dependency through the access guard rather than by raw key")
         void resolvesDependenciesThroughTheGuard() {
             var dependency = TestEntityFactory.createProject(20, "API", owner);
-            when(accessGuard.getAccessibleProject("API", OWNER_ID)).thenReturn(dependency);
+            when(projectRepository.findByProjectKeyIn(List.of("API"))).thenReturn(List.of(dependency));
 
             projectService.createProject(
                     request("NEW", "New project", null, null, List.of("API"), null),
@@ -209,19 +233,47 @@ class ProjectServiceTest {
 
             // Going through the guard is what stops a caller writing a dependency row that points
             // at another tenant's project.
-            verify(accessGuard).getAccessibleProject("API", OWNER_ID);
+            verify(accessGuard).requireAccess(dependency, OWNER_ID);
         }
 
         @Test
         @DisplayName("propagates the guard's refusal for a dependency the caller cannot see")
         void rejectsInaccessibleDependency() {
-            when(accessGuard.getAccessibleProject("SECRET", OWNER_ID))
-                    .thenThrow(new ResourceNotFoundException("Project not found"));
+            var secret = TestEntityFactory.createProject(30, "SECRET", owner);
+            when(projectRepository.findByProjectKeyIn(List.of("SECRET"))).thenReturn(List.of(secret));
+            doThrow(new ResourceNotFoundException("Project not found"))
+                    .when(accessGuard).requireAccess(secret, OWNER_ID);
 
             assertThatThrownBy(() -> projectService.createProject(
                     request("NEW", "New project", null, null, List.of("SECRET"), null),
                     OWNER_ID, List.of()))
                     .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("refuses a dependency key that does not resolve to any project")
+        void rejectsUnknownDependencyKey() {
+            when(projectRepository.findByProjectKeyIn(List.of("GHOST"))).thenReturn(List.of());
+
+            assertThatThrownBy(() -> projectService.createProject(
+                    request("NEW", "New project", null, null, List.of("GHOST"), null),
+                    OWNER_ID, List.of()))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("resolves every dependency key in one query rather than one query per key")
+        void batchesDependencyLookups() {
+            var api = TestEntityFactory.createProject(20, "API", owner);
+            var web = TestEntityFactory.createProject(21, "WEB2", owner);
+            when(projectRepository.findByProjectKeyIn(List.of("API", "WEB2")))
+                    .thenReturn(List.of(api, web));
+
+            projectService.createProject(
+                    request("NEW", "New project", null, null, List.of("API", "WEB2"), null),
+                    OWNER_ID, List.of());
+
+            verify(projectRepository, times(1)).findByProjectKeyIn(anyList());
         }
 
         @Test
@@ -287,6 +339,51 @@ class ProjectServiceTest {
                     List.of("/files/old.pdf", "/files/keep.pdf"),
                     List.of("/files/keep.pdf"),
                     "delete detached project attachments");
+        }
+
+        @Test
+        @DisplayName("leaves attachments alone when the request omits the collection entirely")
+        void omittedAttachmentsAreLeftUntouched() {
+            project.replaceAttachments(List.of("/files/a.pdf", "/files/b.pdf"));
+
+            var result = projectService.updateProject("WEB",
+                    request("WEB", "Renamed", null, null, null, null),
+                    OWNER_ID, List.of());
+
+            // ProjectRequest documents an absent collection as "leave that aspect untouched", the
+            // same as memberEmails and dependencies. Coercing null to an empty list here detached
+            // every attachment and then deleted the files from disk after commit.
+            assertThat(result.attachments()).containsExactly("/files/a.pdf", "/files/b.pdf");
+            assertThat(project.getAttachments()).containsExactly("/files/a.pdf", "/files/b.pdf");
+        }
+
+        @Test
+        @DisplayName("deletes nothing when the request omits the attachment collection")
+        void omittedAttachmentsDeleteNoFiles() {
+            project.replaceAttachments(List.of("/files/a.pdf", "/files/b.pdf"));
+
+            projectService.updateProject("WEB",
+                    request("WEB", "Renamed", null, null, null, null),
+                    OWNER_ID, List.of());
+
+            verify(fileStorageService).deleteRemovedAfterCommit(
+                    List.of("/files/a.pdf", "/files/b.pdf"),
+                    List.of("/files/a.pdf", "/files/b.pdf"),
+                    "delete detached project attachments");
+        }
+
+        @Test
+        @DisplayName("clears attachments when the request declares an empty collection")
+        void emptyAttachmentCollectionClears() {
+            project.replaceAttachments(List.of("/files/a.pdf"));
+
+            var result = projectService.updateProject("WEB",
+                    request("WEB", "Project WEB", null, null, null, List.of()),
+                    OWNER_ID, List.of());
+
+            // Present-but-empty still means "the new complete contents", which is how a caller
+            // removes the last attachment — the distinction omitting the field must not blur.
+            assertThat(result.attachments()).isEmpty();
         }
 
         @Test
@@ -385,7 +482,7 @@ class ProjectServiceTest {
         void refusesDependencyCycle() {
             var other = TestEntityFactory.createProject(20, "API", owner);
             other.replaceDependencies(List.of(project));
-            when(accessGuard.getAccessibleProject("API", OWNER_ID)).thenReturn(other);
+            when(projectRepository.findByProjectKeyIn(List.of("API"))).thenReturn(List.of(other));
 
             assertThatThrownBy(() -> projectService.updateProject("WEB",
                     request("WEB", "Project WEB", null, null, List.of("API"), null),
@@ -407,8 +504,10 @@ class ProjectServiceTest {
             task.setDueDate(java.time.LocalDate.of(2026, 1, 9));
             when(accessGuard.getAccessibleProject("WEB", MEMBER_ID)).thenReturn(project);
             when(taskRepository.findByProjectIdWithDetails(10)).thenReturn(List.of(task));
-            when(schedulingService.criticalTaskKeys(anyList(), any()))
-                    .thenReturn(java.util.Set.of("WEB-1"));
+            when(schedulingService.analyzeCriticalPath(anyList(), any()))
+                    .thenReturn(new CriticalPathAnalyzer.Analysis(
+                            java.util.Map.of("WEB-1", 0), java.util.Map.of("WEB-1", 0),
+                            java.util.Set.of("WEB-1")));
 
             var result = projectService.getProjectByKey("WEB", MEMBER_ID);
 

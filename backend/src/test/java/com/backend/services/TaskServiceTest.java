@@ -15,6 +15,7 @@ import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
 import com.backend.requests.TaskRequest;
 import com.backend.requests.TaskScheduleRequest;
+import com.backend.scheduling.CriticalPathAnalyzer;
 import com.backend.scheduling.SchedulingService;
 import com.backend.security.AccessGuard;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -43,6 +45,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -106,6 +109,30 @@ class TaskServiceTest {
         member = TestEntityFactory.createUser(2, "member@example.com");
         outsider = TestEntityFactory.createUser(3, "outsider@example.com");
         project = TestEntityFactory.createProjectWithMembers(10, "PROJ", owner, member);
+
+        lenient().when(schedulingService.analyzeCriticalPath(anyList(), any(LocalDate.class)))
+                .thenReturn(CriticalPathAnalyzer.Analysis.empty());
+        lenient().when(schedulingService.applyCriticality(any(TaskDTO.class), any(CriticalPathAnalyzer.Analysis.class)))
+                .thenAnswer(invocation -> {
+                    TaskDTO dto = invocation.getArgument(0);
+                    CriticalPathAnalyzer.Analysis analysis = invocation.getArgument(1);
+                    return dto.withCriticality(analysis.criticalKeys().contains(dto.taskKey()),
+                            analysis.totalFloat().get(dto.taskKey()));
+                });
+        // Mirrors the real FileStorageService.resolveAttachments: validate then merge in the
+        // newly stored files, delegating to this same mock so per-test stubs/verifies on
+        // requireAttachmentsBelongTo and storeFiles keep working unchanged.
+        lenient().when(fileStorageService.resolveAttachments(any(), anyList(), any(), any()))
+                .thenAnswer(invocation -> {
+                    Integer projectId = invocation.getArgument(0);
+                    List<String> declared = invocation.getArgument(1);
+                    var newFiles = invocation.getArgument(2, List.class);
+                    Integer uploaderId = invocation.getArgument(3);
+                    fileStorageService.requireAttachmentsBelongTo(projectId, declared);
+                    var merged = new java.util.ArrayList<>(declared);
+                    merged.addAll(fileStorageService.storeFiles(newFiles, projectId, uploaderId));
+                    return merged;
+                });
     }
 
     /** A task request in which a test names only the fields it is about. */
@@ -351,8 +378,9 @@ class TaskServiceTest {
             givenAuthor(owner);
             givenTaskIsSavedAsIs();
             when(taskRepository.findByProjectIdWithDetails(10)).thenReturn(List.of(sibling));
-            when(schedulingService.criticalTaskKeys(anyList(), any(LocalDate.class)))
-                    .thenReturn(Set.of("PROJ-1"));
+            when(schedulingService.analyzeCriticalPath(anyList(), any(LocalDate.class)))
+                    .thenReturn(new CriticalPathAnalyzer.Analysis(
+                            Map.of("PROJ-1", 0), Map.of("PROJ-1", 0), Set.of("PROJ-1")));
 
             var result = taskService.createTask("PROJ", request().build(), 1, null);
 
@@ -362,7 +390,7 @@ class TaskServiceTest {
             // The flags are computed over the whole project, not over the single written task.
             @SuppressWarnings("unchecked")
             ArgumentCaptor<List<TaskDTO>> analysed = ArgumentCaptor.forClass(List.class);
-            verify(schedulingService).criticalTaskKeys(analysed.capture(), any(LocalDate.class));
+            verify(schedulingService).analyzeCriticalPath(analysed.capture(), any(LocalDate.class));
             assertThat(analysed.getValue()).extracting(TaskDTO::taskKey).containsExactly("PROJ-2");
         }
 

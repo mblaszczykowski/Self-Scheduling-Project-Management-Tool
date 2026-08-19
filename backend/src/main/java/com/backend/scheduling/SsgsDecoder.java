@@ -196,10 +196,14 @@ public final class SsgsDecoder {
     /**
      * The MORCPSP composite score: {@code w_j * urgency + dependencyWeight * normalisedFanOut}.
      *
-     * <p>Both factors are in [0, 1] and {@code w_j} is in [1, 10], so business priority stays the
-     * dominant driver while downstream fan-out breaks ties meaningfully. The fan-out term is
-     * normalised by the largest fan-out in the problem, so it cannot grow without bound and swamp
-     * the priority signal on a densely linked portfolio.
+     * <p>Both factors are in [0, 1] and {@code w_j} is in [1, 10], so at a glance fan-out looks
+     * like it can only ever break ties between similarly-urgent tasks. At the shipped
+     * {@code app.optimization.dependency-weight} of 5.0 that is not true for the two lowest
+     * priority bands: a LOWEST task (w=1) with no urgency but maximum fan-out
+     * ({@code 1*0 + 5*1 = 5}) outranks a LOW task (w=3) due today with no fan-out of its own
+     * ({@code 3*1 + 5*0 = 3}) — fan-out has outweighed a full swing in urgency. The fan-out term
+     * is normalised by the largest fan-out in the problem, so it cannot grow without bound and
+     * swamp the priority signal on a densely linked portfolio.
      */
     private Map<String, Double> compositeScores(PrecedenceGraph graph, ScheduleObjective.Horizon horizon) {
         var successorCounts = graph.transitiveSuccessorCounts();
