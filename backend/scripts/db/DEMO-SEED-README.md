@@ -40,8 +40,8 @@ that is reachable from the internet.
 | Reactions | 5 |
 | Notifications for the manager | 6 |
 
-Priority mix across the 45 tasks: 5 HIGHEST, 9 HIGH, 18 MEDIUM, 9 LOW, 4 LOWEST. Eight statuses are
-represented — `BACKLOG` (34, the bulk of the planned work), plus one each of
+Priority mix across the 45 tasks: 5 HIGHEST, 9 HIGH, 18 MEDIUM, 9 LOW, 4 LOWEST. Nine statuses are
+represented — `BACKLOG` (31, the bulk of the planned work), `IN_PROGRESS` (3), plus one each of
 `GATHERING_INTEREST`, `TODO`, `TO_REVIEW`, `TO_TEST`, `IN_TEST` and `READY_TO_MERGE`, and 5 `DONE`
 — so the list and board views show more than a single column.
 

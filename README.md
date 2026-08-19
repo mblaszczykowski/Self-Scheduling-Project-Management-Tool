@@ -3,16 +3,22 @@
 *A self-scheduling project management tool.*
 
 ![FlowLink dashboard: three projects, critical/delayed/at-risk counts, and analytics charts](docs/screenshots/dashboard.png)
+*Dashboard — portfolio-wide risk counts and per-project progress at a glance.*
 
-![Gantt timeline before optimization: overlapping assignments across a project's tasks, with dependency arrows and delayed-task flags](docs/screenshots/timeline.png)
+![Gantt timeline before optimization: a dependency chain with two overdue tasks flagged, alongside a task that is still comfortably on schedule](docs/screenshots/timeline.png)
+*Gantt timeline — dependency chains and overdue tasks in red, work that still has slack in blue.*
 
-![Schedule optimization result: 18 resource conflicts resolved to 0, delayed tasks and their dependencies shifted to ghost-bar suggestions](docs/screenshots/schedule-optimizer.png)
+![Schedule optimization result: 17 resource conflicts resolved to 0, delayed tasks and their dependencies shifted to ghost-bar suggestions](docs/screenshots/schedule-optimizer.png)
+*Schedule optimizer — one run resolves all 17 resource conflicts; ghost bars show the proposed shift.*
 
 ![List view: the same tasks as a table, with per-row schedule slip, blocked-by dependencies and days-overdue called out inline](docs/screenshots/list.png)
+*List view — the same tasks as a sortable table, with slip and blocking dependencies called out per row.*
 
 ![Task detail modal with a rich text editor, schedule, and a threaded comment discussion](docs/screenshots/task-detail.png)
+*Task detail — rich text description, schedule, and a threaded comment discussion.*
 
 ![Analytics: status and priority distribution, project progress, completion trend and optimization opportunity score](docs/screenshots/analytics.png)
+*Analytics — status and priority breakdowns, completion trend, and optimization opportunity score.*
 
 FlowLink is a project and portfolio management application. It tracks projects, tasks and task
 dependencies, renders them on a Gantt-style timeline, and adds threaded comments with reactions,
@@ -154,8 +160,8 @@ lowest-scoring candidate wins.
 
 `POST /optimization/simulate` runs this whole pipeline and returns the proposed dates without
 writing anything, which is what lets the UI show them as ghost bars alongside the current plan
-before anyone commits to them (the screenshot at the top shows the result: 18 conflicts resolved,
-37 of 40 tasks rescheduled). `POST /optimization/apply` does not trust dates echoed back by the
+before anyone commits to them (the screenshot at the top shows the result: 17 conflicts resolved,
+36 of 40 tasks rescheduled). `POST /optimization/apply` does not trust dates echoed back by the
 browser — it recomputes the schedule server-side from the current
 data and persists that, so what ends up in the database is feasible by construction rather than
 whatever the client last saw.
