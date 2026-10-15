@@ -71,6 +71,7 @@ const AttachmentUploader = ({
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         validateAndAdd(Array.from(e.target.files ?? []));
+        e.target.value = '';
     };
 
     const openPreview = (attachment: Attachment) => {
@@ -109,9 +110,9 @@ const AttachmentUploader = ({
                 {/* sr-only rather than hidden below: display:none takes the input out of the tab
                     order, which made uploading mouse-only. */}
                 <label htmlFor={inputId} className="relative cursor-pointer flex flex-col items-center justify-center gap-1 py-5 px-3 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400">
-                    <HiOutlineCloudUpload className="w-5 h-5 text-slate-300 dark:text-slate-600" />
-                    <span className="text-sm text-slate-400 dark:text-slate-500">{label}</span>
-                    <span className="text-xs text-slate-300 dark:text-slate-600">Max {MAX_FILE_SIZE_LABEL} per file, up to {MAX_ATTACHMENTS_PER_REQUEST} files</span>
+                    <HiOutlineCloudUpload className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                    <span className="text-sm text-slate-600 dark:text-slate-300">{label}</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-300">Max {MAX_FILE_SIZE_LABEL} per file, up to {MAX_ATTACHMENTS_PER_REQUEST} files</span>
                     <input
                         type="file"
                         id={inputId}

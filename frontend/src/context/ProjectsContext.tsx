@@ -46,8 +46,8 @@ export const ProjectsProvider = ({ children }: { children: React.ReactNode }) =>
     const queryClient = useQueryClient();
 
     const { data, isLoading: projectsLoading, error } = useQuery({
-        queryKey: PROJECTS_QUERY_KEY,
-        queryFn: getAllProjects,
+        queryKey: [...PROJECTS_QUERY_KEY, user?.id],
+        queryFn: ({ signal }) => getAllProjects(signal),
         enabled: !!user,
     });
 

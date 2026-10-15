@@ -1,21 +1,23 @@
 # FlowLink
 
-*A self-scheduling project management tool.*
+*Project management with resource-aware schedule optimization.*
 
 ![FlowLink dashboard: three projects, critical/delayed/at-risk counts, and analytics charts](docs/screenshots/dashboard.png)
 *Dashboard — portfolio-wide risk counts and per-project progress at a glance.*
 
-![Gantt timeline filtered to one project: a dependency chain with overdue tasks flagged in red, alongside tasks that are still comfortably on schedule in blue](docs/screenshots/timeline.png)
-*Gantt timeline, filtered to one project — dependency chains and overdue tasks in red, work that still has slack in blue.*
+![Gantt timeline filtered to one project, with task bars, dependency arrows and overdue labels](docs/screenshots/timeline.png)
+*Gantt timeline, filtered to one project — dependencies, task status, progress and overdue labels.*
 
-![Schedule optimization result: 17 resource conflicts resolved to 0, delayed tasks and their dependencies shifted to ghost-bar suggestions](docs/screenshots/schedule-optimizer.png)
-*Schedule optimizer — one run resolves all 17 resource conflicts; ghost bars show the proposed shift.*
+![Schedule optimization result: resource conflicts and proposed dates shown as ghost-bar suggestions](docs/screenshots/schedule-optimizer.png)
+*Schedule optimizer — compare the current plan with proposed dates before applying changes.*
 
 ![List view: the same tasks as a table, with per-row schedule slip, blocked-by dependencies and days-overdue called out inline](docs/screenshots/list.png)
 *List view — the same tasks as a sortable table, with slip and blocking dependencies called out per row.*
 
 ![Task detail modal with a rich text editor, schedule, and a threaded comment discussion](docs/screenshots/task-detail.png)
 *Task detail — rich text description, schedule, and a threaded comment discussion.*
+
+[More screenshots: dark mode, sign in, profile and mobile](docs/screenshots/README.md).
 
 FlowLink is a project and portfolio management application. It tracks projects, tasks and task
 dependencies, renders them on a Gantt-style timeline, and adds threaded comments with reactions,
@@ -28,9 +30,10 @@ dependencies are precedence constraints — and searches for a schedule that min
 combination of priority-weighted tardiness and makespan. It runs as a simulation first, so the
 proposed dates can be reviewed before anything is written.
 
-- **Backend**: Spring Boot 3.5.12, Java 21, PostgreSQL 16, Flyway, Maven.
-- **Frontend**: React 18.3 in TypeScript, TanStack Query v5, TailwindCSS, React Router 6, Axios,
-  Chart.js, Tiptap, Formik + Yup. Built with Create React App (`react-scripts` 5).
+- **Backend**: Spring Boot 3.5.16, Java 21, PostgreSQL 16, Flyway, Maven.
+- **Frontend**: React 18.3 in TypeScript, TanStack Query v5, TailwindCSS, React Router 7, Axios,
+  Chart.js, Tiptap, Formik + Yup. Built with Vite 8 and Tailwind CSS 4.
+- **Browser support**: Safari 16.4+, Chrome 111+ and Firefox 128+ (Tailwind CSS 4 requirements).
 - **Auth**: JWT in HTTP-only cookies — access token 15 min, refresh token 7 days rotated per use,
   double-submit CSRF, 30-day absolute session cap.
 
@@ -70,13 +73,14 @@ candidate against a single objective: a weighted combination of priority-weighte
 makespan, both normalised to `[0, 1]` so portfolios of different sizes stay comparable. The
 lowest-scoring candidate wins.
 
-`POST /optimization/simulate` runs this whole pipeline and returns the proposed dates without
+`POST /api/optimization/simulate` runs this whole pipeline and returns the proposed dates without
 writing anything, which is what lets the UI show them as ghost bars alongside the current plan
-before anyone commits to them (the screenshot at the top shows the result: 17 conflicts resolved,
-36 of 40 tasks rescheduled). `POST /optimization/apply` does not trust dates echoed back by the
+before anyone commits to them (the screenshot at the top shows a preview of the seeded demo portfolio). `POST /api/optimization/apply` does not trust dates echoed back by the
 browser — it recomputes the schedule server-side from the current
 data and persists that, so what ends up in the database is feasible by construction rather than
-whatever the client last saw.
+whatever the client last saw. The UI sends the `previewToken` returned by simulation; if any scheduling input changed, apply returns a conflict and requires a fresh preview. API clients omitting the optional token receive a newly computed plan.
+
+Task duration is the inclusive interval between start and due date. Progress is a reporting value and does not reduce this interval during optimization: applying the same plan repeatedly must not shrink an unchanged task. The configured maximum scheduling horizon is enforced; a plan that cannot fit is rejected with a validation response. The solver tries five heuristics and does not guarantee a global optimum.
 
 Every reported metric — on-time count, weighted delay and schedule span — is measured only over
 the work the optimizer actually controls; completed tasks, withdrawn tasks and cross-project
@@ -91,8 +95,7 @@ alternative zero float, which on a board of chains and independent tasks meant n
 
 ## Authentication
 
-JWTs live in HTTP-only cookies rather than local storage, so they are invisible to JavaScript and
-immune to token-stealing XSS. A short-lived access token authenticates requests; a long-lived
+JWTs live in HTTP-only cookies rather than local storage, so JavaScript cannot read the authentication cookies. A short-lived access token authenticates requests; a long-lived
 refresh token, rotated on every use, keeps the session alive without asking for a password again.
 Login sets three cookies: `accessToken` (HttpOnly, 15 min), `refreshToken` (HttpOnly, 7 days) and
 `XSRF-TOKEN` (script-readable, so the frontend can echo it into the CSRF header).
@@ -107,6 +110,8 @@ concurrently — the concurrent failures are queued behind that single in-flight
 replayed once it resolves, rather than each firing its own refresh — and retries the original
 request. It skips this dance for `/api/auth/login`, `/api/auth/refresh` and `/api/auth/logout`,
 where refreshing first would be pointless or actively wrong.
+
+Access JWTs also carry a session reference (`sid`). Every authenticated request checks the corresponding persisted refresh-token record using its unique hash index. Rotation retains consumed records, so concurrent requests keep working; logout, replay detection and password changes revoke the session immediately. Already-open notification streams are also closed when the session is revoked.
 
 Refresh tokens are never stored in plaintext: only a SHA-256 hash of 256 bits of `SecureRandom`
 output is persisted, so a stolen database backup does not also hand over every live session. Every
@@ -176,8 +181,7 @@ Consequences worth knowing:
 - **Never hand-edit the schema.** Add a new `V{n}__description.sql` file instead.
 - **Never edit an applied migration.** Flyway records a checksum per version and refuses to start
   if one changes.
-- `spring.flyway.baseline-on-migrate=true` with `baseline-version=1` lets Flyway adopt a database
-  that predates it (one built by the old auto-DDL) by treating its state as `V1`.
+- Existing non-empty databases are refused by default. To adopt a database built by the old auto-DDL, back it up, verify its complete schema against `V1__baseline.sql`, and explicitly set `FLYWAY_BASELINE_ON_MIGRATE=true` for the first start only. Remove the override afterwards; a baseline skips V1 rather than repairing an old schema.
 
 Every foreign key carries an explicit `ON DELETE` action rather than the database default, so
 deleting a task or project needs no application-level cleanup choreography: owned records (a
@@ -272,9 +276,10 @@ files.
   `PageRequests`, `RequestValidator`, `FilterResponseUtil`.
 - **filter/** — servlet filters, ordered:
   1. `SecurityHeadersFilter` (`HIGHEST_PRECEDENCE`)
-  2. `RateLimitFilter` (+1)
-  3. `JwtAuthenticationFilter` (+2)
-  4. `CsrfProtectionFilter` (+3)
+  2. CORS filter (including errors and preflight responses)
+  3. `RateLimitFilter`
+  4. `CsrfProtectionFilter` (issues the CSRF cookie even on an unauthenticated GET)
+  5. `JwtAuthenticationFilter`
 - **exception/** — custom exceptions (`AuthorizationException`, `FileStorageException`,
   `ResourceNotFoundException`, `TooManyAttemptsException`, `UnauthenticatedException`,
   `ValidationException`) and `GlobalExceptionHandler`.
@@ -309,9 +314,8 @@ files.
   regenerates it and fails the build on any diff, so it can never quietly drift from what the
   backend actually serves.
 - **types/apiContract.ts** — the compile-time half of that guarantee: for each domain type in
-  `types.ts` it asserts, at the type level, that its keys are exactly the generated schema's keys
-  (via a conditional type that resolves to `true` on a match and to a readable tuple like
-  `['missing on the client:', ...]` otherwise). A field renamed or removed on the backend fails
+  `types.ts` it asserts, at the type level, that every field read by the client exists in the generated schema
+  (via a conditional type that resolves to `true` on a match and to a readable tuple naming missing fields otherwise). Status and priority values are also checked for an exact enum match. A field renamed or removed on the backend fails
   `tsc` at the exact commit that caused it, field name and all, instead of surfacing as a runtime
   `undefined` weeks later.
 
@@ -337,9 +341,7 @@ Every push and pull request against `main` runs four jobs (`.github/workflows/ci
 
 - **Backend tests** — the full Maven suite on Java 21, including the Testcontainers-backed
   integration tests against a real `postgres:16-alpine` rather than an in-memory substitute.
-- **Frontend** — `tsc --noEmit` over the *entire* project. `react-scripts` only type-checks what
-  it bundles, so an unreferenced module or a test file can hide a type error from the build; a
-  plain `tsc` run can't miss it. Also ESLint, the Jest suite and a production build.
+- **Frontend** — `tsc --noEmit` over the entire project, ESLint, Jest, `npm audit`, and a Vite production build.
 - **API contract check** — regenerates `frontend/src/types/api.generated.ts` from the backend's
   `docs/openapi.json` and fails the build on any diff (see
   [Frontend structure](#frontend-structure) for the compile-time half of this check). Paired with
@@ -351,18 +353,18 @@ Every push and pull request against `main` runs four jobs (`.github/workflows/ci
   permanent (rewriting published history to erase them wasn't worth it), so the scan is scoped to
   the tree, not the git log, and a passing run stays meaningful rather than permanently red.
 
-A **Docker build** job then builds both images and depends on all three, so a change that passes
-every test but breaks the container build still fails CI. Dependabot watches four ecosystems
+A **Docker build** job depends on the code and secret checks, starts both production images plus PostgreSQL, seeds its isolated demo database and runs Chromium browser tests. A build, health, proxy, cookie or UI integration failure therefore fails CI. Dependabot watches four ecosystems
 (Maven, npm, GitHub Actions, Docker) weekly, with dependency groups tuned to avoid PR
 storms — Spring Boot's starters, React's matched trio, the `@tiptap/*` family and
 `@testing-library/*` are each bumped as one PR instead of several conflicting ones.
 
-At the time of writing: 619 backend tests and 176 frontend tests, all green; the frontend is
-TypeScript in `strict` mode with zero uses of `any` anywhere in `src/`.
+The frontend uses TypeScript in `strict` mode. The dated review, findings, verification results and remaining architectural limits are in [the application review](docs/REVIEW.md).
 
 ## Quick start with Docker
 
-This is the supported path. It builds both images, starts PostgreSQL, applies the database
+Requires Docker Engine with BuildKit/buildx and Docker Compose v2. Docker Desktop includes them; a standalone Colima/Homebrew setup needs the `docker-buildx` and `docker-compose` CLI plugins available to Docker. A missing buildx plugin cannot build the Maven cache mount.
+
+This path builds both images, starts PostgreSQL, applies the database
 migrations and publishes the site through nginx.
 
 ```bash
@@ -383,8 +385,7 @@ openssl rand -base64 24    # -> POSTGRES_PASSWORD
 [Configuration](#configuration)). `docker compose up` fails with a named error if either variable
 is missing.
 
-For a plain-HTTP localhost stack, also set `COOKIE_SECURE=false` in `.env`, or login will silently
-appear to succeed while every request after it is unauthenticated.
+For a plain-HTTP localhost stack, set `COOKIE_SECURE=false` in `.env`. Keep it true for HTTPS deployments.
 
 ```bash
 docker compose up --build
@@ -394,11 +395,13 @@ The site is then on <http://localhost> (change the published port with `HTTP_POR
 the built SPA and reverse-proxies `/api/` and `/files/` to the backend, so the browser only ever
 talks to one origin.
 
-The database port is deliberately not published. To attach `psql` or a GUI client for one session:
+The database port is deliberately not published. To run `psql` against the running database:
 
 ```bash
-docker compose run --rm --publish 5432:5432 db
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 ```
+
+For a host GUI, add a local `docker-compose.override.yml` publishing `127.0.0.1:5432:5432` under `db.ports`, then recreate that service. `compose run db` creates a second database container and must not be used to expose a running database volume.
 
 Useful operations:
 
@@ -413,7 +416,7 @@ docker compose down -v              # stop and delete all data
 `backend/scripts/db/demo-seed.sql` loads a realistic portfolio — four accounts, three projects,
 45 tasks with dependencies and deliberate resource conflicts — for demos and manual testing. See
 `backend/scripts/db/DEMO-SEED-README.md`. It is idempotent — it clears its own data before
-inserting — and it must never contain DDL, since Flyway alone owns the schema.
+inserting — and it refuses databases with other accounts or projects. Use a dedicated demo database. The seed must never contain DDL, since Flyway alone owns the schema.
 
 ## Local development
 
@@ -435,7 +438,7 @@ Two processes, plus a PostgreSQL you provide.
   ```
 
   Verify with `mvn -version`, which prints the JDK Maven actually runs on.
-- **Node 20 or newer.**
+- **Node 22.12+ or Node 24 LTS.** CI and Docker use Node 24.
 - **Docker** running, if you want to run the backend integration tests (see below).
 - **PostgreSQL 16** for the backend to talk to, unless you point `DATABASE_URL` at the compose
   database.
@@ -469,7 +472,7 @@ endpoint exposed).
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm start
 ```
 
@@ -517,7 +520,7 @@ npm run typecheck                        # tsc --noEmit, no test runner involved
 npm run lint                             # eslint over src/
 ```
 
-The test files live next to the code they cover, as `*.test.ts` under `src/util/`.
+The Jest tests live alongside components, hooks, contexts and utilities as `*.test.ts` and `*.test.tsx`. Browser tests are in `frontend/e2e/`; see [browser verification](docs/VERIFICATION.md).
 
 ## Configuration
 
@@ -542,6 +545,7 @@ committed.
 | `DATABASE_URL` | `jdbc:postgresql://localhost:5432/flowlink` | Compose derives this from `POSTGRES_DB`. |
 | `DATABASE_USER` | `postgres` | |
 | `DATABASE_PASSWORD` | *(empty)* | |
+| `FLYWAY_BASELINE_ON_MIGRATE` | `false` | One-time adoption of a verified legacy schema only. |
 | `HIKARI_MIN_IDLE` | `5` | Connection pool floor. |
 | `HIKARI_MAX_POOL` | `20` | Connection pool ceiling. |
 
@@ -578,7 +582,7 @@ trusted, which is what makes it safe for an hourly `ScheduledMaintenance` sweep 
 unreferenced uploads older than six hours — a row-less file on disk is an orphan, never a
 legitimate attachment still in use. Responses are always sent with
 `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`, so an uploaded document
-can never be rendered inline in the app's own origin.
+can never be rendered inline in the app's own origin. Private file responses disable browser/proxy caching. Profile pictures are visible to their owner and users who share a project; project attachments require current project membership.
 
 ### Rate limiting
 
@@ -586,6 +590,7 @@ Per client address per window, except login, which is additionally scoped per ac
 
 | Variable | Default |
 |---|---|
+| `RATE_LIMIT_MAX_KEYS` | `100000` |
 | `RATE_LIMIT_WINDOW_MS` | `900000` (15 min) |
 | `RATE_LIMIT_LOGIN` | `5` |
 | `RATE_LIMIT_REGISTER` | `3` |

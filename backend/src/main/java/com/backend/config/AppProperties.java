@@ -1,5 +1,9 @@
 package com.backend.config;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -14,15 +18,15 @@ import java.util.List;
 @ConfigurationProperties(prefix = "app")
 @Validated
 public class AppProperties {
-    private Pagination pagination = new Pagination();
-    private Sse sse = new Sse();
-    private Optimization optimization = new Optimization();
-    private Cors cors = new Cors();
-    private RateLimit rateLimit = new RateLimit();
-    private Mail mail = new Mail();
-    private Storage storage = new Storage();
-    private Frontend frontend = new Frontend();
-    private Session session = new Session();
+    @Valid @NotNull private Pagination pagination = new Pagination();
+    @Valid @NotNull private Sse sse = new Sse();
+    @Valid @NotNull private Optimization optimization = new Optimization();
+    @Valid @NotNull private Cors cors = new Cors();
+    @Valid @NotNull private RateLimit rateLimit = new RateLimit();
+    @Valid @NotNull private Mail mail = new Mail();
+    @Valid @NotNull private Storage storage = new Storage();
+    @Valid @NotNull private Frontend frontend = new Frontend();
+    @Valid @NotNull private Session session = new Session();
 
     public Pagination getPagination() { return pagination; }
     public void setPagination(Pagination pagination) { this.pagination = pagination; }
@@ -44,7 +48,24 @@ public class AppProperties {
     public void setSession(Session session) { this.session = session; }
 
     public static class Cors {
-        private List<String> allowedOrigins = List.of("http://localhost:3000");
+        @NotEmpty private List<@NotBlank String> allowedOrigins = List.of("http://localhost:3000");
+
+        @AssertTrue(message = "CORS origins must be explicit HTTP(S) origins without paths or wildcards")
+        public boolean isOriginConfigurationValid() {
+            if (allowedOrigins == null) return false;
+            return allowedOrigins.stream().allMatch(origin -> {
+                if (origin == null || origin.contains("*")) return false;
+                try {
+                    var uri = java.net.URI.create(origin);
+                    return ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme()))
+                            && uri.getHost() != null && uri.getUserInfo() == null
+                            && uri.getRawQuery() == null && uri.getRawFragment() == null
+                            && (uri.getRawPath() == null || uri.getRawPath().isEmpty());
+                } catch (IllegalArgumentException ex) {
+                    return false;
+                }
+            });
+        }
 
         public List<String> getAllowedOrigins() { return allowedOrigins; }
         public void setAllowedOrigins(List<String> allowedOrigins) { this.allowedOrigins = allowedOrigins; }
@@ -103,6 +124,10 @@ public class AppProperties {
         @Min(1) private int optimize = 30;
         @Min(1) private int search = 120;
         @Min(1) private int invitation = 50;
+        @Min(1) private int maxKeysPerBucket = 100_000;
+
+        public int getMaxKeysPerBucket() { return maxKeysPerBucket; }
+        public void setMaxKeysPerBucket(int maxKeysPerBucket) { this.maxKeysPerBucket = maxKeysPerBucket; }
 
         public long getWindowMs() { return windowMs; }
         public void setWindowMs(long windowMs) { this.windowMs = windowMs; }

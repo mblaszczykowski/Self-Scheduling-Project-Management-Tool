@@ -8,7 +8,7 @@ import {
 import { formatShortDate } from './helpers';
 import { EnrichedTask } from '../types';
 
-const TODAY = new Date('2024-06-11');
+const TODAY = new Date(2024, 5, 11);
 
 let nextId = 1;
 
@@ -34,13 +34,13 @@ const task = (overrides: Partial<EnrichedTask> & Pick<EnrichedTask, 'taskKey'>):
 
 describe('relativeDue', () => {
     test('no due date renders a placeholder', () => {
-        expect(relativeDue(null, 'TODO', 0, TODAY)).toEqual({ text: '—', cls: 'text-slate-400' });
+        expect(relativeDue(null, 'TODO', 0, TODAY)).toEqual({ text: '—', cls: 'text-slate-600' });
     });
 
     test('a terminal status shows the plain date even when the due date is in the past', () => {
         const result = relativeDue('2024-06-01', 'DONE', 40, TODAY);
         expect(result.text).toBe(formatShortDate('2024-06-01'));
-        expect(result.cls).toBe('text-slate-500 dark:text-slate-400');
+        expect(result.cls).toBe('text-slate-600 dark:text-slate-300');
     });
 
     test('100% progress with a non-terminal status also counts as finished', () => {
@@ -50,27 +50,27 @@ describe('relativeDue', () => {
 
     test('2 days overdue', () => {
         expect(relativeDue('2024-06-09', 'TODO', 10, TODAY))
-            .toEqual({ text: '2d overdue', cls: 'text-red-600 dark:text-red-400 font-semibold' });
+            .toEqual({ text: '2d overdue', cls: 'text-red-700 dark:text-red-400 font-semibold' });
     });
 
     test('due yesterday', () => {
         expect(relativeDue('2024-06-10', 'TODO', 10, TODAY))
-            .toEqual({ text: 'Yesterday', cls: 'text-red-600 dark:text-red-400 font-semibold' });
+            .toEqual({ text: 'Yesterday', cls: 'text-red-700 dark:text-red-400 font-semibold' });
     });
 
     test('due today', () => {
         expect(relativeDue('2024-06-11', 'TODO', 10, TODAY))
-            .toEqual({ text: 'Today', cls: 'text-amber-600 dark:text-amber-400 font-semibold' });
+            .toEqual({ text: 'Today', cls: 'text-amber-800 dark:text-amber-400 font-semibold' });
     });
 
     test('due tomorrow', () => {
         expect(relativeDue('2024-06-12', 'TODO', 10, TODAY))
-            .toEqual({ text: 'Tomorrow', cls: 'text-amber-600 dark:text-amber-400' });
+            .toEqual({ text: 'Tomorrow', cls: 'text-amber-800 dark:text-amber-400' });
     });
 
     test('due within 3 days', () => {
         expect(relativeDue('2024-06-14', 'TODO', 10, TODAY))
-            .toEqual({ text: 'in 3d', cls: 'text-amber-600 dark:text-amber-400' });
+            .toEqual({ text: 'in 3d', cls: 'text-amber-800 dark:text-amber-400' });
     });
 
     test('due within 7 days but past the 3-day amber window', () => {
@@ -81,7 +81,7 @@ describe('relativeDue', () => {
     test('far enough out that the plain date is shown', () => {
         const result = relativeDue('2024-06-25', 'TODO', 10, TODAY);
         expect(result.text).toBe(formatShortDate('2024-06-25'));
-        expect(result.cls).toBe('text-slate-500 dark:text-slate-400');
+        expect(result.cls).toBe('text-slate-600 dark:text-slate-300');
     });
 });
 
@@ -141,7 +141,7 @@ describe('computeScheduleHealth', () => {
     });
 
     test('a same-day span floors the span to one day rather than dividing by zero', () => {
-        const partWayThroughToday = new Date('2024-06-11T18:00:00.000Z');
+        const partWayThroughToday = new Date(2024, 5, 11, 18);
         const result = computeScheduleHealth(
             task({ taskKey: 'A', startDate: '2024-06-11', dueDate: '2024-06-11', progress: 20 }), partWayThroughToday,
         );

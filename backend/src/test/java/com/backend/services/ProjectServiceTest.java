@@ -75,7 +75,8 @@ class ProjectServiceTest {
         rateLimitService = new RateLimitService(new AppProperties());
         projectService = new ProjectService(projectRepository, userService, taskRepository,
                 fileStorageService, schedulingService, new EntityMapper(), accessGuard,
-                notificationService, emailService, rateLimitService);
+                notificationService, emailService, rateLimitService,
+                org.mockito.Mockito.mock(DependencyGraphLock.class));
 
         lenient().when(userService.getRequiredUserById(OWNER_ID)).thenReturn(owner);
         lenient().when(fileStorageService.storeFiles(any(), any(), any())).thenReturn(List.of());
@@ -530,4 +531,45 @@ class ProjectServiceTest {
                 .flatMap(collection -> ((java.util.Collection<NotificationService.Pending>) collection).stream())
                 .toList();
     }
+
+    @Test
+    void removingAMemberUnassignsTheirTasksAndKeepsOtherAssignments() {
+        var removedTask = TestEntityFactory.createTask(100, 1, project);
+        removedTask.setAssignee(member);
+        var ownerTask = TestEntityFactory.createTask(101, 2, project);
+        ownerTask.setAssignee(owner);
+        when(accessGuard.getOwnedProject("WEB", OWNER_ID)).thenReturn(project);
+        when(taskRepository.findByProjectIdWithDetails(10)).thenReturn(List.of(removedTask, ownerTask));
+
+        projectService.updateProject("WEB", request("WEB", project.getSummary(),
+                project.getDescription(), List.of(), null, null), OWNER_ID, List.of());
+
+        assertThat(removedTask.getAssignee()).isNull();
+        assertThat(ownerTask.getAssignee()).isSameAs(owner);
+        assertThat(project.hasAccess(MEMBER_ID)).isFalse();
+    }
+
+    @Test
+    void changingAnImmutableProjectKeyIsRejectedInsteadOfSilentlyIgnored() {
+        when(accessGuard.getOwnedProject("WEB", OWNER_ID)).thenReturn(project);
+        assertThatThrownBy(() -> projectService.updateProject("WEB",
+                request("OTHER", "Renamed", null, null, null, null), OWNER_ID, List.of()))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("cannot be changed");
+        verify(projectRepository, never()).save(any());
+    }
+
+
+    @Test
+    void appendingUploadsCannotExceedTheProjectAttachmentLimit() {
+        project.replaceAttachments(java.util.stream.IntStream.range(0, 50)
+                .mapToObj(i -> "/files/" + i + ".pdf").toList());
+        when(accessGuard.getOwnedProject("WEB", OWNER_ID)).thenReturn(project);
+        var upload = new org.springframework.mock.web.MockMultipartFile("attachments", "x.pdf", "application/pdf", new byte[]{1});
+
+        assertThatThrownBy(() -> projectService.updateProject("WEB", request("WEB", "Project", null,
+                null, null, null), OWNER_ID, List.of(upload)))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("50 attachments");
+        verify(fileStorageService, never()).storeFiles(any(), any(), any());
+    }
+
 }

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -30,20 +31,23 @@ public class SseEmitterManager {
     public SseEmitter createEmitter(Integer userId) {
         var emitter = new SseEmitter(timeoutMs);
 
-        var userEmitters = emitters.computeIfAbsent(userId, key -> new CopyOnWriteArrayList<>());
-        userEmitters.add(emitter);
-
-        while (userEmitters.size() > maxPerUser) {
-            var oldest = userEmitters.get(0);
-            userEmitters.remove(oldest);
-            log.debug("Retiring oldest SSE stream for user {} (cap {})", userId, maxPerUser);
-            completeQuietly(oldest);
-        }
-
         Runnable removeEmitter = () -> removeEmitter(userId, emitter);
         emitter.onCompletion(removeEmitter);
         emitter.onTimeout(removeEmitter);
         emitter.onError(e -> removeEmitter.run());
+
+        var retired = new ArrayList<SseEmitter>();
+        emitters.compute(userId, (key, existing) -> {
+            var userEmitters = existing != null ? existing : new CopyOnWriteArrayList<SseEmitter>();
+            userEmitters.add(emitter);
+            while (userEmitters.size() > maxPerUser) {
+                retired.add(userEmitters.remove(0));
+            }
+            return userEmitters;
+        });
+        // Completing an emitter may invoke its removal callback. Do that outside compute so
+        // callbacks cannot mutate the same map entry while it is being registered.
+        retired.forEach(SseEmitterManager::completeQuietly);
 
         try {
             emitter.send(SseEmitter.event().name("connected").data("ok"));
@@ -53,6 +57,13 @@ public class SseEmitterManager {
         }
 
         return emitter;
+    }
+
+    public void disconnectUser(Integer userId) {
+        var userEmitters = emitters.remove(userId);
+        if (userEmitters != null) {
+            userEmitters.forEach(SseEmitterManager::completeQuietly);
+        }
     }
 
     public void sendNotification(Integer userId, NotificationDTO notification) {

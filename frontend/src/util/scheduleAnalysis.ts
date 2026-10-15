@@ -1,4 +1,4 @@
-import { DELIVERED_STATUSES, MS_PER_DAY, isTaskComplete } from './helpers';
+import { DELIVERED_STATUSES, MS_PER_DAY, dayIndex, daysBetween, isTaskComplete } from './helpers';
 import { EnrichedTask, ProcessedProject, TaskPriority, TaskStatus } from '../types';
 
 export const timeOf = (date?: string | null): number | null => {
@@ -11,11 +11,13 @@ export const schedulePercentElapsed = (
     task: Pick<EnrichedTask, 'startDate' | 'dueDate'>,
     today: Date,
 ): number | null => {
-    const start = timeOf(task.startDate);
-    const due = timeOf(task.dueDate);
-    if (start === null || due === null) return null;
-    const spanDays = Math.max((due - start) / MS_PER_DAY, 1);
-    return ((today.getTime() - start) / MS_PER_DAY / spanDays) * 100;
+    const start = dayIndex(task.startDate);
+    const due = dayIndex(task.dueDate);
+    const current = dayIndex(today);
+    if (start === null || due === null || current === null) return null;
+    const spanDays = Math.max(due - start, 1);
+    const fractionOfDay = (today.getHours() * 3600 + today.getMinutes() * 60 + today.getSeconds()) / 86400;
+    return ((current - start + fractionOfDay) / spanDays) * 100;
 };
 
 interface ScheduleEntry {
@@ -237,7 +239,7 @@ export const computeProjectVelocity = (projects: ProcessedProject[], today: Date
             if (!task.startDate || due === null || isTaskComplete(task.status, task.progress)) continue;
 
             activeTasks++;
-            const daysLeft = Math.max(0, (due - today.getTime()) / MS_PER_DAY);
+            const daysLeft = Math.max(0, daysBetween(today, task.dueDate));
             const remaining = 100 - task.progress;
             totalRemaining += remaining;
             totalDaysLeft += daysLeft;

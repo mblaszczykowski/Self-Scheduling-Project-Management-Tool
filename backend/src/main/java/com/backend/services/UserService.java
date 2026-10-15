@@ -105,15 +105,23 @@ public class UserService {
 
     @Transactional(rollbackFor = Exception.class)
     public RegistrationResult registerUser(UserRegistrationRequest request) {
+        if (request == null) {
+            throw new ValidationException("Registration details are required");
+        }
         var email = normalizeEmail(request.email());
+        if (!ValidationUtil.isValidEmail(email)) {
+            throw new ValidationException("Invalid email format");
+        }
+        var firstname = validateName(request.firstname(), "First name");
+        var lastname = validateName(request.lastname(), "Last name");
         if (userRepository.existsByEmailIgnoringCase(email)) {
             throw new ValidationException("Registration failed. Please check your details.");
         }
         ValidationUtil.validatePassword(request.password());
 
         var user = new User(
-                request.firstname().trim(),
-                request.lastname().trim(),
+                firstname,
+                lastname,
                 email,
                 passwordEncoder.encode(request.password())
         );
@@ -131,11 +139,11 @@ public class UserService {
         boolean passwordChanged = false;
 
         if (!ValidationUtil.isNullOrEmpty(request.firstname())) {
-            user.setFirstname(request.firstname().trim());
+            user.setFirstname(validateName(request.firstname(), "First name"));
         }
 
         if (!ValidationUtil.isNullOrEmpty(request.lastname())) {
-            user.setLastname(request.lastname().trim());
+            user.setLastname(validateName(request.lastname(), "Last name"));
         }
 
         var newEmail = normalizeEmail(request.email());
@@ -192,7 +200,16 @@ public class UserService {
         return entityMapper.toCurrentUserDTO(user);
     }
 
+    private static String validateName(String name, String field) {
+        var normalized = name == null ? "" : name.trim();
+        if (normalized.length() < 2 || normalized.length() > 50) {
+            throw new ValidationException(field + " must be between 2 and 50 characters");
+        }
+        return normalized;
+    }
+
     private void requireCurrentPassword(User user, String currentPassword, String message) {
+        ValidationUtil.validatePasswordLength(currentPassword);
         if (ValidationUtil.isNullOrEmpty(currentPassword)
                 || !passwordEncoder.matches(currentPassword, user.getPassword())) {
             throw new ValidationException(message);

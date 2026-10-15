@@ -16,7 +16,7 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
     const location = useLocation();
     const highlightCommentId = new URLSearchParams(location.search).get('commentId');
     const {
-        comments, loading, error, reload,
+        comments, loading, loadingMore, hasMore, loadMore, error, reload,
         addComment, editComment, removeComment, react,
     } = useComments(taskId);
 
@@ -37,8 +37,10 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
             resetForm();
             if (parentCommentId) setReplyingCommentId(null);
             setShowCommentForm(false);
+            return true;
         } catch (err) {
             showToast(getErrorMessage(err, 'Failed to add comment'), 'error');
+            return false;
         } finally {
             setSubmitting(false);
         }
@@ -48,8 +50,10 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
         try {
             await editComment(comment.id, values.content, attachments);
             setEditingComment(null);
+            return true;
         } catch (err) {
             showToast(getErrorMessage(err, 'Failed to update comment'), 'error');
+            return false;
         } finally {
             setSubmitting(false);
         }
@@ -100,13 +104,14 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
                         Comments
                     </span>
                     {comments.length > 0 && (
-                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded-md tabular-nums">
+                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded-md tabular-nums">
                             {comments.length}
                         </span>
                     )}
                 </div>
                 {!showCommentForm && (
                     <button
+                        type="button"
                         onClick={() => setShowCommentForm(true)}
                         className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                     >
@@ -132,12 +137,13 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
             {loading ? (
                 <div className="py-8 text-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-200 dark:border-slate-700 border-t-slate-500 dark:border-t-slate-400 mx-auto" />
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Loading comments...</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">Loading comments...</p>
                 </div>
-            ) : error !== null ? (
+            ) : error !== null && comments.length === 0 ? (
                 <div className="py-6 text-center">
-                    <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
+                    <p className="text-xs text-red-700 dark:text-red-400">{error}</p>
                     <button
+                        type="button"
                         onClick={reload}
                         className="mt-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                     >
@@ -166,6 +172,14 @@ export default function Comments({ taskId, currentUserId }: { taskId: number; cu
                 </div>
             ) : (
                 <EmptyState size="sm" title="No comments yet" />
+            )}
+
+            {comments.length > 0 && error && <p role="alert" className="mt-3 text-xs text-red-700">{error}</p>}
+            {hasMore && !loading && (
+                <button type="button" onClick={loadMore} disabled={loadingMore}
+                    className="mt-3 text-xs font-medium text-blue-600 dark:text-blue-400 disabled:opacity-50">
+                    {loadingMore ? 'Loading comments...' : 'Load more comments'}
+                </button>
             )}
 
             {preview && (

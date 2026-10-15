@@ -23,23 +23,23 @@ import {
 } from 'react-icons/hi';
 
 const TYPE_CONFIG: Record<ActivityType, { icon: IconType; color: string; bg: string }> = {
-    CREATED:              { icon: HiOutlinePlus, color: 'text-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-900/40' },
+    CREATED:              { icon: HiOutlinePlus, color: 'text-emerald-700', bg: 'bg-emerald-100 dark:bg-emerald-900/40' },
     STATUS_CHANGED:       { icon: HiOutlineSwitchHorizontal, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/40' },
-    PRIORITY_CHANGED:     { icon: HiOutlineFlag, color: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/40' },
+    PRIORITY_CHANGED:     { icon: HiOutlineFlag, color: 'text-amber-800', bg: 'bg-amber-100 dark:bg-amber-900/40' },
     ASSIGNEE_CHANGED:     { icon: HiOutlineUserAdd, color: 'text-violet-500', bg: 'bg-violet-100 dark:bg-violet-900/40' },
     PROGRESS_CHANGED:     { icon: HiOutlineTrendingUp, color: 'text-cyan-500', bg: 'bg-cyan-100 dark:bg-cyan-900/40' },
-    DATES_CHANGED:        { icon: HiOutlineCalendar, color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/40' },
-    SUMMARY_CHANGED:      { icon: HiOutlinePencil, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-700' },
-    DESCRIPTION_CHANGED:  { icon: HiOutlinePencil, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-700' },
+    DATES_CHANGED:        { icon: HiOutlineCalendar, color: 'text-orange-800', bg: 'bg-orange-100 dark:bg-orange-900/40' },
+    SUMMARY_CHANGED:      { icon: HiOutlinePencil, color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-700' },
+    DESCRIPTION_CHANGED:  { icon: HiOutlinePencil, color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-700' },
     LABELS_CHANGED:       { icon: HiOutlineTag, color: 'text-pink-500', bg: 'bg-pink-100 dark:bg-pink-900/40' },
     DEPENDENCIES_CHANGED: { icon: HiOutlineLink, color: 'text-indigo-500', bg: 'bg-indigo-100 dark:bg-indigo-900/40' },
-    ATTACHMENTS_CHANGED:  { icon: HiOutlineLink, color: 'text-teal-500', bg: 'bg-teal-100 dark:bg-teal-900/40' },
+    ATTACHMENTS_CHANGED:  { icon: HiOutlineLink, color: 'text-teal-700', bg: 'bg-teal-100 dark:bg-teal-900/40' },
     COMMENT_ADDED:        { icon: HiOutlineChatAlt2, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/40' },
     COMMENT_EDITED:       { icon: HiOutlinePencil, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/40' },
-    COMMENT_DELETED:      { icon: HiOutlineTrash, color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/40' },
+    COMMENT_DELETED:      { icon: HiOutlineTrash, color: 'text-red-700', bg: 'bg-red-100 dark:bg-red-900/40' },
 };
 
-const FALLBACK = { icon: HiOutlineSwitchHorizontal, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-700' };
+const FALLBACK = { icon: HiOutlineSwitchHorizontal, color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-700' };
 
 function formatValue(field: string | null | undefined, value: string | null | undefined) {
     if (!value || value === 'null') return null;
@@ -50,9 +50,9 @@ function formatValue(field: string | null | undefined, value: string | null | un
 }
 
 function ValuePill({ value, variant = 'default' }: { value?: string | null; variant?: 'default' | 'old' }) {
-    if (!value) return <span className="text-slate-400 dark:text-slate-500 italic">none</span>;
+    if (!value) return <span className="text-slate-600 dark:text-slate-300 italic">none</span>;
     const cls = variant === 'old'
-        ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 line-through'
+        ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 line-through'
         : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400';
     return <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{value}</span>;
 }
@@ -111,15 +111,21 @@ export default function ActivityTab({ taskId }: { taskId: number }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const requestIdRef = useRef(0);
+    const [nextPage, setNextPage] = useState(0);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     const fetchActivities = useCallback(async () => {
         const requestId = ++requestIdRef.current;
         setLoading(true);
+        setLoadingMore(false);
         setError(null);
         try {
             const page = await getTaskActivities(taskId);
             if (requestId !== requestIdRef.current) return;
             setActivities(page.content);
+            setNextPage(1);
+            setHasMore(page.hasNext);
         } catch (err) {
             if (requestId !== requestIdRef.current) return;
             setError(getErrorMessage(err, 'Could not load history'));
@@ -130,22 +136,48 @@ export default function ActivityTab({ taskId }: { taskId: number }) {
 
     useEffect(() => {
         fetchActivities();
+        return () => {
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            requestIdRef.current++;
+        };
     }, [fetchActivities]);
+
+    const loadMore = async () => {
+        if (loadingMore || !hasMore) return;
+        const requestId = requestIdRef.current;
+        setLoadingMore(true);
+        setError(null);
+        try {
+            const page = await getTaskActivities(taskId, nextPage);
+            if (requestId !== requestIdRef.current) return;
+            setActivities(previous => {
+                const ids = new Set(previous.map(activity => activity.id));
+                return [...previous, ...page.content.filter(activity => !ids.has(activity.id))];
+            });
+            setHasMore(page.hasNext);
+            setNextPage(nextPage + 1);
+        } catch (err) {
+            if (requestId === requestIdRef.current) setError(getErrorMessage(err, 'Could not load more history'));
+        } finally {
+            if (requestId === requestIdRef.current) setLoadingMore(false);
+        }
+    };
 
     if (loading) {
         return (
             <div className="py-8 text-center">
                 <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-200 dark:border-slate-700 border-t-slate-500 dark:border-t-slate-400 mx-auto" />
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Loading history...</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">Loading history...</p>
             </div>
         );
     }
 
-    if (error !== null) {
+    if (error !== null && activities.length === 0) {
         return (
             <div className="py-6 text-center">
-                <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
+                <p className="text-xs text-red-700 dark:text-red-400">{error}</p>
                 <button
+                    type="button"
                     onClick={fetchActivities}
                     className="mt-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                 >
@@ -171,17 +203,17 @@ export default function ActivityTab({ taskId }: { taskId: number }) {
 
                     return (
                         <div key={activity.id} className="relative flex gap-3 py-2 group">
-                            <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center flex-shrink-0 ${cfg.bg} ring-2 ring-white dark:ring-slate-900`}>
+                            <div className={`relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 ${cfg.bg} ring-2 ring-white dark:ring-slate-900`}>
                                 <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
                             </div>
 
                             <div className="flex-1 min-w-0 pt-0.5">
-                                <div className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                                <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                                     <ActivityDescription activity={activity} />
                                 </div>
                                 <div className="flex items-center gap-2 mt-0.5">
                                     <Avatar user={authorParts} profilePicture={activity.authorProfilePicture} size="xs" className="w-4 h-4 text-[8px]" />
-                                    <span className="text-xs text-slate-400 dark:text-slate-500">
+                                    <span className="text-xs text-slate-600 dark:text-slate-300">
                                         {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
                                     </span>
                                 </div>
@@ -190,6 +222,11 @@ export default function ActivityTab({ taskId }: { taskId: number }) {
                     );
                 })}
             </div>
+            {error && <p role="alert" className="mt-3 text-xs text-red-700">{error}</p>}
+            {hasMore && <button type="button" onClick={loadMore} disabled={loadingMore}
+                className="mt-3 text-xs font-medium text-blue-600 dark:text-blue-400 disabled:opacity-50">
+                {loadingMore ? 'Loading history...' : 'Load more history'}
+            </button>}
         </div>
     );
 }

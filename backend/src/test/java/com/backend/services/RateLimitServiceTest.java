@@ -152,4 +152,43 @@ class RateLimitServiceTest {
                     .doesNotContainKey("stale@b.c");
         }
     }
+    @Test
+    void capsDistinctKeysWithoutEvictingExistingBudgets() throws Exception {
+        var properties = new AppProperties();
+        properties.getRateLimit().setLogin(1);
+        properties.getRateLimit().setMaxKeysPerBucket(2);
+        var limiter = new RateLimitService(properties);
+        assertThat(limiter.allow(RateLimitService.Bucket.LOGIN, "first")).isTrue();
+        assertThat(limiter.allow(RateLimitService.Bucket.LOGIN, "second")).isTrue();
+        assertThat(limiter.allow(RateLimitService.Bucket.LOGIN, "third")).isFalse();
+        assertThat(limiter.allow(RateLimitService.Bucket.LOGIN, "first")).isFalse();
+        assertThat(bucketContents(limiter, RateLimitService.Bucket.LOGIN)).hasSize(2);
+    }
+
+    @Test
+    void allowsExactlyTheBudgetUnderConcurrentRequests() throws Exception {
+        var limiter = withLoginLimit(30);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(8)) {
+            var tasks = java.util.stream.IntStream.range(0, 200)
+                    .<java.util.concurrent.Callable<Boolean>>mapToObj(i -> () -> limiter.allow(RateLimitService.Bucket.LOGIN, "shared"))
+                    .toList();
+            var accepted = 0;
+            for (var future : pool.invokeAll(tasks)) {
+                if (future.get()) accepted++;
+            }
+            assertThat(accepted).isEqualTo(30);
+        }
+    }
+
+    @Test
+    void normalizesLoginKeysIndependentlyOfTheSystemLocale() {
+        var original = java.util.Locale.getDefault();
+        try {
+            java.util.Locale.setDefault(java.util.Locale.forLanguageTag("tr-TR"));
+            assertThat(RateLimitService.loginKey("ip", " INFO@example.com ")).isEqualTo("ip|info@example.com");
+        } finally {
+            java.util.Locale.setDefault(original);
+        }
+    }
+
 }

@@ -1,0 +1,131 @@
+{
+  "checkedAt": "2026-10-15T10:16:58.810539+00:00",
+  "engine": "@axe-core/playwright in Chromium",
+  "tags": [
+    "wcag2a",
+    "wcag2aa",
+    "wcag21a",
+    "wcag21aa",
+    "wcag22aa",
+    "best-practice"
+  ],
+  "excludedRules": [],
+  "excludedElements": [],
+  "note": "Automatic checks plus keyboard focus-loop tests. Incomplete checks are retained; this is not WCAG certification.",
+  "screens": [
+    {
+      "screen": "login",
+      "violations": 0,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 23
+        }
+      ]
+    },
+    {
+      "screen": "dashboard-light",
+      "violations": 0,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 4
+        }
+      ]
+    },
+    {
+      "screen": "create-menu",
+      "violations": 0,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 13
+        }
+      ]
+    },
+    {
+      "screen": "notification-menu",
+      "violations": 0,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 29
+        }
+      ]
+    },
+    {
+      "screen": "dashboard-dark",
+      "violations": 0,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 14
+        }
+      ]
+    },
+    {
+      "screen": "projects-timeline",
+      "violations": 0,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 3
+        }
+      ]
+    },
+    {
+      "screen": "projects-list",
+      "violations": 0,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 124
+        }
+      ]
+    },
+    {
+      "screen": "task-dialog",
+      "violations": 0,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 133
+        }
+      ]
+    },
+    {
+      "screen": "account-dialog",
+      "violations": 0,
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "nodes": 1
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 125
+        }
+      ]
+    },
+    {
+      "screen": "mobile-list",
+      "violations": 0,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "screen": "mobile-menu",
+      "violations": 0,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    }
+  ]
+}

@@ -152,24 +152,24 @@ export const updateProfile = (payload: ProfilePayload, profilePicture?: File | n
 export const updateEmailPreferences = (preferences: EmailPreferencesPayload) =>
     api.patch<CurrentUser>('/api/users/me/email-preferences', preferences).then(body);
 
-export const getProjects = (page = 0, size = 100) =>
-    api.get<Paged<Project>>('/api/projects', { params: { page, size } }).then(body);
+export const getProjects = (page = 0, size = 100, signal?: AbortSignal) =>
+    api.get<Paged<Project>>('/api/projects', { params: { page, size }, signal }).then(body);
 
 const PROJECT_PAGE_SIZE = 100;
-const MAX_PROJECT_PAGES = 50;
+const PROJECT_PAGE_CONCURRENCY = 4;
 
-export const getAllProjects = async (): Promise<Project[]> => {
-    const first = await getProjects(0, PROJECT_PAGE_SIZE);
-    if (!first.hasNext) {
-        return first.content;
+export const getAllProjects = async (signal?: AbortSignal): Promise<Project[]> => {
+    const first = await getProjects(0, PROJECT_PAGE_SIZE, signal);
+    const projects = [...first.content];
+    // Keep all pages, with a bounded number of simultaneous requests.
+    for (let page = 1; page < first.totalPages; page += PROJECT_PAGE_CONCURRENCY) {
+        const pages = await Promise.all(Array.from(
+            { length: Math.min(PROJECT_PAGE_CONCURRENCY, first.totalPages - page) },
+            (_, offset) => getProjects(page + offset, PROJECT_PAGE_SIZE, signal),
+        ));
+        projects.push(...pages.flatMap(result => result.content));
     }
-    const wanted = Math.min(first.totalPages, MAX_PROJECT_PAGES);
-    if (first.totalPages > MAX_PROJECT_PAGES) {
-        console.warn('Loaded only the first %d of %d project pages', wanted, first.totalPages);
-    }
-    const rest = await Promise.all(
-        Array.from({ length: wanted - 1 }, (_, index) => getProjects(index + 1, PROJECT_PAGE_SIZE)));
-    return [first, ...rest].flatMap((page) => page.content);
+    return projects;
 };
 
 export const createProject = (payload: ProjectPayload, attachments: File[] = []) =>

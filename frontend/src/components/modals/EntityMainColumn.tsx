@@ -33,20 +33,21 @@ const EntityMainColumn = ({
         <div className="mb-6">
             <div className="flex items-center gap-2.5">
                 {entityKey && (
-                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-md text-xs font-mono font-semibold tracking-wide shrink-0">
+                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md text-xs font-mono font-semibold tracking-wide shrink-0">
                         {entityKey}
                     </span>
                 )}
                 <Field
                     type="text" id="summary" name="summary" maxLength={200}
+                    aria-label={namePlaceholder || 'Name'} aria-describedby="summary-error"
                     placeholder={namePlaceholder}
                     className="flex-1 px-0 py-1 bg-transparent border-0 text-lg font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 focus:outline-none transition-colors"
                 />
             </div>
             <div className="flex justify-between mt-1.5">
-                <ErrorMessage name="summary" component="div" className="text-red-500 text-xs" />
+                <div id="summary-error"><ErrorMessage name="summary" component="div" className="text-red-700 text-xs" /></div>
                 {(values.summary?.length ?? 0) > 160 && (
-                    <span className={`text-xs tabular-nums ${(values.summary?.length ?? 0) > 180 ? 'text-amber-500' : 'text-slate-400'}`}>
+                    <span className={`text-xs tabular-nums ${(values.summary?.length ?? 0) > 180 ? 'text-amber-800' : 'text-slate-600'}`}>
                         {values.summary?.length ?? 0}/200
                     </span>
                 )}
@@ -60,6 +61,7 @@ const EntityMainColumn = ({
                 placeholder={descPlaceholder} minHeight="200px"
                 characterLimit={5000} showCharacterCount
             />
+            <ErrorMessage name="description">{message => <div role="alert" className="mt-1 text-xs text-red-700">{message}</div>}</ErrorMessage>
         </div>
 
         <div className="mb-6">

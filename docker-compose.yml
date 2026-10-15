@@ -8,7 +8,7 @@ services:
     # The database port is deliberately not published. Only the backend needs it, and it
     # reaches the container over the compose network. To attach psql or a GUI client from the
     # host, publish it for that session only:
-    #   docker compose run --rm --publish 5432:5432 db
+    #   docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
     # or add a local, uncommitted docker-compose.override.yml with a ports mapping.
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -48,6 +48,9 @@ services:
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_CONNECT_TIMEOUT_MS:
+      MAIL_READ_TIMEOUT_MS:
+      MAIL_WRITE_TIMEOUT_MS:
       # No SPRING_PROFILES_ACTIVE: application.properties already carries the safe defaults
       # (Flyway on, ddl-auto=validate, secure cookies), so there is no profile to activate.
       # The bare `KEY:` form below passes the variable through only when it is actually set in
@@ -55,10 +58,12 @@ services:
       # empty string), so application.properties' own default applies. Same pattern as
       # INTERNAL_PROXIES above.
       UPLOAD_DIR:
+      FLYWAY_BASELINE_ON_MIGRATE:
       HIKARI_MIN_IDLE:
       HIKARI_MAX_POOL:
       OPT_ALPHA:
       OPT_BETA:
+      RATE_LIMIT_MAX_KEYS:
       RATE_LIMIT_WINDOW_MS:
       RATE_LIMIT_LOGIN:
       RATE_LIMIT_REGISTER:
@@ -98,7 +103,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

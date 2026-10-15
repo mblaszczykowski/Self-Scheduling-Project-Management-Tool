@@ -13,18 +13,18 @@ export const relativeDue = (
     progress: number,
     today: Date,
 ): RelativeDue => {
-    if (!dueDate) return { text: '—', cls: 'text-slate-400' };
+    if (!dueDate) return { text: '—', cls: 'text-slate-600' };
     if (isTaskComplete(status, progress)) {
-        return { text: formatShortDate(dueDate), cls: 'text-slate-500 dark:text-slate-400' };
+        return { text: formatShortDate(dueDate), cls: 'text-slate-600 dark:text-slate-300' };
     }
     const diff = daysBetween(today, dueDate);
-    if (diff < -1) return { text: `${Math.abs(diff)}d overdue`, cls: 'text-red-600 dark:text-red-400 font-semibold' };
-    if (diff === -1) return { text: 'Yesterday', cls: 'text-red-600 dark:text-red-400 font-semibold' };
-    if (diff === 0) return { text: 'Today', cls: 'text-amber-600 dark:text-amber-400 font-semibold' };
-    if (diff === 1) return { text: 'Tomorrow', cls: 'text-amber-600 dark:text-amber-400' };
-    if (diff <= 3) return { text: `in ${diff}d`, cls: 'text-amber-600 dark:text-amber-400' };
+    if (diff < -1) return { text: `${Math.abs(diff)}d overdue`, cls: 'text-red-700 dark:text-red-400 font-semibold' };
+    if (diff === -1) return { text: 'Yesterday', cls: 'text-red-700 dark:text-red-400 font-semibold' };
+    if (diff === 0) return { text: 'Today', cls: 'text-amber-800 dark:text-amber-400 font-semibold' };
+    if (diff === 1) return { text: 'Tomorrow', cls: 'text-amber-800 dark:text-amber-400' };
+    if (diff <= 3) return { text: `in ${diff}d`, cls: 'text-amber-800 dark:text-amber-400' };
     if (diff <= 7) return { text: `in ${diff}d`, cls: 'text-slate-700 dark:text-slate-300' };
-    return { text: formatShortDate(dueDate), cls: 'text-slate-500 dark:text-slate-400' };
+    return { text: formatShortDate(dueDate), cls: 'text-slate-600 dark:text-slate-300' };
 };
 
 export const getProgressColor = (task: EnrichedTask): string => {

@@ -391,4 +391,20 @@ class CsrfProtectionFilterTest {
             assertRejectedAsCsrfFailure();
         }
     }
+    @Test
+    void rejectsEmptyDoubleSubmitTokensAndRenewsAnEmptyCookieOnSafeRequests() throws Exception {
+        requestOf("POST", "/api/projects");
+        withCsrfCookie("");
+        request.addHeader(CSRF_HEADER_NAME, "");
+        invokeFilter();
+        assertRejectedAsCsrfFailure();
+
+        setUp();
+        requestOf("GET", "/api/projects");
+        withCsrfCookie("");
+        invokeFilter();
+        assertPassedThrough();
+        assertThat(issuedCsrfToken()).isNotBlank();
+    }
+
 }

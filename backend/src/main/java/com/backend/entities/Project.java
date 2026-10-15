@@ -2,6 +2,8 @@ package com.backend.entities;
 
 import jakarta.persistence.*;
 import org.hibernate.Hibernate;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -65,7 +67,9 @@ public class Project {
     )
     private Set<User> members = new HashSet<>();
 
-    @OneToMany(mappedBy = "project")
+    // Keep managed child states consistent with the existing PostgreSQL ON DELETE CASCADE.
+    @OneToMany(mappedBy = "project", cascade = CascadeType.REMOVE)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private List<Task> tasks = new ArrayList<>();
 
     @ManyToMany

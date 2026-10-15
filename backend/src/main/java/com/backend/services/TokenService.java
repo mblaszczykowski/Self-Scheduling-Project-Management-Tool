@@ -5,6 +5,7 @@ import com.backend.entities.RefreshToken;
 import com.backend.repositories.RefreshTokenRepository;
 import com.backend.repositories.UserRepository;
 import com.backend.util.SecureTokens;
+import com.backend.util.AfterCommit;
 import com.backend.web.CookieFactory;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -19,7 +20,6 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
@@ -45,22 +45,25 @@ public class TokenService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
     private final CookieFactory cookieFactory;
+    private final SseEmitterManager sseEmitterManager;
 
     public TokenService(SecretKey jwtSecretKey,
                         JwtProperties jwtProperties,
                         com.backend.config.AppProperties appProperties,
                         RefreshTokenRepository refreshTokenRepository,
                         UserRepository userRepository,
-                        CookieFactory cookieFactory) {
+                        CookieFactory cookieFactory,
+                        SseEmitterManager sseEmitterManager) {
         this.jwtSecretKey = jwtSecretKey;
         this.jwtProperties = jwtProperties;
         this.absoluteSessionMax = Duration.ofDays(appProperties.getSession().getAbsoluteMaxDays());
         this.refreshTokenRepository = refreshTokenRepository;
         this.userRepository = userRepository;
         this.cookieFactory = cookieFactory;
+        this.sseEmitterManager = sseEmitterManager;
     }
 
-    public String generateAccessToken(Integer userId) {
+    String generateAccessToken(Integer userId, String sessionTokenHash) {
         var now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(userId))
@@ -70,6 +73,7 @@ public class TokenService {
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(jwtProperties.accessTokenExpiration())))
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
+                .claim("sid", sessionTokenHash)
                 .signWith(jwtSecretKey, Jwts.SIG.HS256)
                 .compact();
     }
@@ -91,13 +95,20 @@ public class TokenService {
             if (!ACCESS_TOKEN_TYPE.equals(claims.get(TOKEN_TYPE_CLAIM, String.class))) {
                 return null;
             }
-            return Integer.parseInt(claims.getSubject());
+            var now = Instant.now();
+            var sessionTokenHash = claims.get("sid", String.class);
+            if (sessionTokenHash == null || claims.getExpiration() == null || claims.getIssuedAt() == null
+                    || claims.getIssuedAt().toInstant().isAfter(now.plus(jwtProperties.clockSkew()))) {
+                return null;
+            }
+            int userId = Integer.parseInt(claims.getSubject());
+            return userId > 0 && refreshTokenRepository.existsActiveSession(sessionTokenHash, userId,
+                    now, now.minus(absoluteSessionMax)) ? userId : null;
         } catch (JwtException | IllegalArgumentException e) {
             return null;
         }
     }
 
-    @Transactional(rollbackFor = Exception.class)
     private String issueRefreshTokenForNewSession(Integer userId) {
         var now = Instant.now();
         return persistRefreshToken(userId, UUID.randomUUID().toString(), now, now);
@@ -118,19 +129,19 @@ public class TokenService {
         if (refreshTokenRepository.markConsumedIfUnconsumed(stored.getTokenHash(), now) == 0) {
             log.warn("Refresh token replay detected for user {} (family {}) - revoking family",
                     stored.getUserId(), stored.getFamilyId());
-            refreshTokenRepository.deleteFamily(stored.getFamilyId());
+            revokeFamily(stored);
             return RotationResult.failed(INVALID_REFRESH_TOKEN);
         }
 
         if (stored.isExpired(now)) {
-            refreshTokenRepository.deleteFamily(stored.getFamilyId());
+            revokeFamily(stored);
             return RotationResult.failed(INVALID_REFRESH_TOKEN);
         }
 
         if (stored.getFamilyStartedAt().plus(absoluteSessionMax).isBefore(now)) {
             log.info("Session for user {} exceeded the absolute lifetime - requiring a fresh login",
                     stored.getUserId());
-            refreshTokenRepository.deleteFamily(stored.getFamilyId());
+            revokeFamily(stored);
             return RotationResult.failed("Session expired. Please sign in again.");
         }
 
@@ -158,16 +169,26 @@ public class TokenService {
             return;
         }
         refreshTokenRepository.findByTokenHash(hash(tokenValue))
-                .ifPresent(token -> refreshTokenRepository.deleteFamily(token.getFamilyId()));
+                .ifPresent(this::revokeFamily);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public int revokeAllSessionsForUser(Integer userId) {
         int revoked = refreshTokenRepository.deleteAllForUser(userId);
+        closeStreamsAfterCommit(userId);
         if (revoked > 0) {
             log.info("Revoked {} refresh token(s) for user {}", revoked, userId);
         }
         return revoked;
+    }
+
+    private void revokeFamily(RefreshToken token) {
+        refreshTokenRepository.deleteFamily(token.getFamilyId());
+        closeStreamsAfterCommit(token.getUserId());
+    }
+
+    private void closeStreamsAfterCommit(Integer userId) {
+        AfterCommit.run("close revoked notification streams", () -> sseEmitterManager.disconnectUser(userId));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -175,12 +196,13 @@ public class TokenService {
         return refreshTokenRepository.deleteExpired(Instant.now());
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public AuthTokens createAuthTokens(Integer userId) {
         return buildCookies(userId, issueRefreshTokenForNewSession(userId));
     }
 
     public AuthTokens buildCookies(Integer userId, String refreshTokenValue) {
-        var accessCookie = cookieFactory.build(ACCESS_TOKEN_COOKIE, generateAccessToken(userId),
+        var accessCookie = cookieFactory.build(ACCESS_TOKEN_COOKIE, generateAccessToken(userId, hash(refreshTokenValue)),
                 jwtProperties.accessTokenExpiration(), true);
         var refreshCookie = cookieFactory.build(REFRESH_TOKEN_COOKIE, refreshTokenValue,
                 jwtProperties.refreshTokenExpiration(), true);

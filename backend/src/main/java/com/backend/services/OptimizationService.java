@@ -14,11 +14,17 @@ import com.backend.scheduling.SchedulingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 @Service
 public class OptimizationService {
@@ -48,7 +54,7 @@ public class OptimizationService {
         if (outcome.isEmpty()) {
             var empty = new OptimizationMetricsDTO(0, 0, 0, 0, 0, 0, 0, true);
             return new OptimizationResultDTO(List.of(), empty, empty, 0,
-                    null, outcome.skippedKeys());
+                    null, outcome.skippedKeys(), run.previewToken());
         }
 
         var suggestions = buildSuggestions(input.tasks(), outcome);
@@ -60,17 +66,25 @@ public class OptimizationService {
                 toDto(outcome.chosenMetrics()),
                 shifted,
                 outcome.chosen().rule().label(),
-                outcome.skippedKeys());
+                outcome.skippedKeys(), run.previewToken());
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public int apply(ApplyOptimizationRequest request, Integer userId) {
         var run = derive(request.projectKeys(), request.alpha(), request.beta(),
                 request.horizonStart(), userId);
         var input = run.input();
         var outcome = run.outcome();
         var horizonStart = run.horizonStart();
+        if (request.previewToken() != null && !request.previewToken().equals(run.previewToken())) {
+            throw new ValidationException("The schedule has changed since it was previewed. "
+                    + "Re-run the optimization to review the current plan before applying it.");
+        }
         if (outcome.isEmpty()) {
             return 0;
+        }
+        if (!outcome.chosenMetrics().feasible()) {
+            throw new ValidationException("The proposed schedule is not feasible. Resolve fixed task conflicts first.");
         }
 
         var accepted = request.acceptedTaskKeys() == null || request.acceptedTaskKeys().isEmpty()
@@ -104,7 +118,7 @@ public class OptimizationService {
     }
 
     private record Run(OptimizationInputLoader.Input input, SchedulingService.Outcome outcome,
-                       LocalDate horizonStart) {}
+                       LocalDate horizonStart, String previewToken) {}
 
     private Run derive(List<String> projectKeys, Double requestedAlpha, Double requestedBeta,
                        LocalDate requestedHorizonStart, Integer userId) {
@@ -114,7 +128,54 @@ public class OptimizationService {
         var input = inputLoader.load(projectKeys, userId);
         return new Run(input,
                 schedulingService.optimize(input.tasks(), input.anchors(), horizonStart, alpha, beta),
-                horizonStart);
+                horizonStart, previewToken(input, projectKeys, userId, horizonStart, alpha, beta));
+    }
+
+    private static String previewToken(OptimizationInputLoader.Input input, List<String> projectKeys,
+                                       Integer userId, LocalDate horizonStart, double alpha, double beta) {
+        try {
+            var digest = MessageDigest.getInstance("SHA-256");
+            hashPart(digest, userId);
+            hashPart(digest, horizonStart);
+            hashPart(digest, alpha);
+            hashPart(digest, beta);
+            hashPart(digest, projectKeys.stream().distinct().count());
+            projectKeys.stream().distinct().sorted().forEach(key -> hashPart(digest, key));
+            hashTasks(digest, "tasks", input.tasks());
+            hashTasks(digest, "anchors", input.anchors());
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is unavailable", ex);
+        }
+    }
+
+    private static void hashTasks(MessageDigest digest, String kind, List<TaskDTO> tasks) {
+        hashPart(digest, kind);
+        hashPart(digest, tasks.size());
+        for (var task : tasks.stream().sorted(Comparator.comparing(TaskDTO::taskKey)).toList()) {
+            hashPart(digest, task.taskKey());
+            hashPart(digest, task.summary());
+            hashPart(digest, task.description());
+            hashPart(digest, task.assignee());
+            hashPart(digest, task.status());
+            hashPart(digest, task.priority());
+            hashPart(digest, task.progress());
+            hashPart(digest, task.startDate());
+            hashPart(digest, task.dueDate());
+            hashPart(digest, task.dependencyKeys().size());
+            task.dependencyKeys().stream().sorted().forEach(key -> hashPart(digest, key));
+        }
+    }
+
+    private static void hashPart(MessageDigest digest, Object value) {
+        if (value == null) {
+            digest.update((byte) 0);
+            return;
+        }
+        var bytes = value.toString().getBytes(StandardCharsets.UTF_8);
+        digest.update((byte) 1);
+        digest.update(java.nio.ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+        digest.update(bytes);
     }
 
     private LocalDate resolveHorizonStart(LocalDate requested) {

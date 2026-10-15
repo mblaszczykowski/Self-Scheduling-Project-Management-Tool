@@ -1,9 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { revokeFileUrl } from '../util/helpers';
 import { Attachment, AttachmentsState } from '../types';
 
 const useAttachments = () => {
     const [attachments, setAttachments] = useState<AttachmentsState>({ existing: [], new: [] });
+
+    const previousFilesRef = useRef<File[]>([]);
+    useEffect(() => {
+        previousFilesRef.current.filter(file => !attachments.new.includes(file)).forEach(revokeFileUrl);
+        previousFilesRef.current = attachments.new;
+    }, [attachments.new]);
+    useEffect(() => () => previousFilesRef.current.forEach(revokeFileUrl), []);
 
     const handleAddAttachments = useCallback((files: File[]) => {
         setAttachments(prev => ({ ...prev, new: [...prev.new, ...files] }));

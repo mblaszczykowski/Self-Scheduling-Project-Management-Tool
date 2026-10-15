@@ -20,7 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 1)
+@Order(Ordered.HIGHEST_PRECEDENCE + 2)
 public class RateLimitFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
@@ -81,7 +81,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private void reject(HttpServletResponse response, String clientIp, String path, String message)
             throws IOException {
         log.warn("Rate limit exceeded: client={} path={}", clientIp, path);
-        response.setHeader("Retry-After", String.valueOf(rateLimitService.getWindowMs() / 1000));
+        long windowMs = rateLimitService.getWindowMs();
+        long retrySeconds = windowMs / 1000 + (windowMs % 1000 == 0 ? 0 : 1);
+        response.setHeader("Retry-After", String.valueOf(Math.max(1, retrySeconds)));
         FilterResponseUtil.sendJsonError(response, HttpStatus.TOO_MANY_REQUESTS, message,
                 objectMapper, "RATE_LIMITED");
     }

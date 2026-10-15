@@ -14,7 +14,7 @@ import {
 } from './scheduleAnalysis';
 import { EnrichedTask, ProcessedProject } from '../types';
 
-const TODAY = new Date('2024-06-11');
+const TODAY = new Date(2024, 5, 11);
 
 let nextId = 1;
 

@@ -2,6 +2,8 @@ package com.backend.entities;
 
 import jakarta.persistence.*;
 import org.hibernate.Hibernate;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -80,8 +82,13 @@ public class Task {
     )
     private Set<Task> dependencies = new HashSet<>();
 
-    @OneToMany(mappedBy = "task")
+    @OneToMany(mappedBy = "task", cascade = CascadeType.REMOVE)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private List<Comment> comments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "task", cascade = CascadeType.REMOVE)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private List<TaskActivity> activities = new ArrayList<>();
 
     @ElementCollection
     @CollectionTable(name = "task_attachments", joinColumns = @JoinColumn(name = "task_id"))

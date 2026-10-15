@@ -15,7 +15,7 @@ interface LoginValues {
 }
 
 const validationSchema = Yup.object().shape({
-    email: Yup.string()
+    email: Yup.string().trim()
         .email('Invalid email address format.')
         .required('Email is required.'),
     password: Yup.string().required('Password is required.'),
@@ -39,7 +39,7 @@ function LoginForm({ onToggleForm }: { onToggleForm: () => void }) {
 
     const handleSubmit = async (values: LoginValues, { setSubmitting }: FormikHelpers<LoginValues>) => {
         try {
-            await login(values.email, values.password);
+            await login(values.email.trim().toLowerCase(), values.password);
             const fetchedUser = await getCurrentUser();
             setUser(fetchedUser);
             navigate(returnTo, { replace: true });
@@ -90,7 +90,7 @@ function LoginForm({ onToggleForm }: { onToggleForm: () => void }) {
                         {isSubmitting ? 'Signing in...' : 'Sign in'}
                     </button>
 
-                    <p className="text-center text-sm text-slate-500">
+                    <p className="text-center text-sm text-slate-600">
                         Don't have an account?{' '}
                         <button
                             type="button"

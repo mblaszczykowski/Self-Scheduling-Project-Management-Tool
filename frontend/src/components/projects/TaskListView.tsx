@@ -12,11 +12,11 @@ import { EnrichedTask } from '../../types';
 import { TaskListViewProps } from './types';
 
 const healthColor: Record<string, string> = {
-    'critical': 'text-red-600 dark:text-red-400',
-    'behind': 'text-amber-600 dark:text-amber-400',
-    'slight': 'text-slate-500 dark:text-slate-400',
-    'on-track': 'text-green-600 dark:text-green-400',
-    'not-started': 'text-slate-400 dark:text-slate-500',
+    'critical': 'text-red-700 dark:text-red-400',
+    'behind': 'text-amber-800 dark:text-amber-400',
+    'slight': 'text-slate-600 dark:text-slate-300',
+    'on-track': 'text-green-700 dark:text-green-400',
+    'not-started': 'text-slate-600 dark:text-slate-300',
 };
 
 const columns = [
@@ -54,14 +54,14 @@ const DepChip = ({ dep, onClick, overdue }: { dep: EnrichedTask; onClick: (dep: 
         onClick={(e) => { e.stopPropagation(); onClick(dep); }}
         className={`inline-flex items-center gap-1 text-[11px] font-mono px-1.5 py-0.5 rounded transition-all hover:shadow-sm hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
             overdue
-                ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 ring-1 ring-red-200 dark:ring-red-800 hover:bg-red-100 dark:hover:bg-red-950/60'
+                ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 ring-1 ring-red-200 dark:ring-red-800 hover:bg-red-100 dark:hover:bg-red-950/60'
                 : 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 ring-1 ring-blue-200 dark:ring-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/60'
         }`}
         title={`${dep.taskKey}: ${dep.summary} — ${dep.progress}% done${overdue ? ' (OVERDUE)' : ''}\nClick to open`}
     >
         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isTaskComplete(dep.status, dep.progress) ? 'bg-green-500' : overdue ? 'bg-red-500' : 'bg-blue-500'}`} />
         {dep.taskKey}
-        <span className="font-sans text-[10px] opacity-60">{dep.progress}%</span>
+        <span className="font-sans text-[10px]">{dep.progress}%</span>
     </button>
 );
 
@@ -112,8 +112,8 @@ const TaskListView = ({
             ? 'Try adjusting your filters to see more results.'
             : 'Create your first task to get started with tracking your work.';
         return (
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-grow flex flex-col">
-                <EmptyState variant={hasActiveFilters ? 'search' : 'table'} title={emptyTitle} description={emptyDescription} className="flex-grow" />
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden grow flex flex-col">
+                <EmptyState variant={hasActiveFilters ? 'search' : 'table'} title={emptyTitle} description={emptyDescription} className="grow" />
             </div>
         );
     }
@@ -121,8 +121,8 @@ const TaskListView = ({
     const now = new Date();
 
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-grow flex flex-col">
-            <div className="overflow-x-auto flex-grow">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden grow flex flex-col">
+            <div className="overflow-x-auto grow">
                 <table className="min-w-full">
                     <thead className="sticky top-0 z-10">
                         <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/90 backdrop-blur-sm">
@@ -138,7 +138,7 @@ const TaskListView = ({
                                 return (
                                     <th key={field}
                                         aria-sort={nonsortable ? undefined : isSorted ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-                                        className={`text-left text-[11px] font-semibold uppercase tracking-wider ${nonsortable ? 'px-4 py-2.5' : ''} select-none ${width} ${isSorted ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'} transition-colors`}>
+                                        className={`text-left text-[11px] font-semibold uppercase tracking-wider ${nonsortable ? 'px-4 py-2.5' : ''} select-none ${width} ${isSorted ? 'text-slate-800 dark:text-slate-200' : 'text-slate-600 dark:text-slate-300'} transition-colors`}>
                                         {nonsortable ? (
                                             <div className="flex items-center gap-1">{heading}</div>
                                         ) : (
@@ -179,17 +179,17 @@ const TaskListView = ({
 
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                            <span className={`text-xs font-bold font-mono ${task.isCritical ? 'text-red-600 dark:text-red-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                            <span className={`text-xs font-bold font-mono ${task.isCritical ? 'text-red-700 dark:text-red-400' : 'text-slate-600 dark:text-slate-300'}`}>
                                                 {task.taskKey}
                                             </span>
-                                            <span className="text-[10px] text-slate-300 dark:text-slate-600 font-medium">{task.projectKey}</span>
+                                            <span className="text-[10px] text-slate-600 dark:text-slate-300 font-medium">{task.projectKey}</span>
 
                                             {task.isCritical && (
-                                                <span className="text-[9px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-1.5 py-px rounded-full ring-1 ring-red-200/60 dark:ring-red-800/60"
+                                                <span className="text-[9px] font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-1.5 py-px rounded-full ring-1 ring-red-200/60 dark:ring-red-800/60"
                                                     title="On the critical path — any delay here delays the project">CRITICAL</span>
                                             )}
                                             {dependents > 0 && (
-                                                <span className="text-[10px] text-slate-400 dark:text-slate-500" title={`${dependents} task${dependents > 1 ? 's' : ''} depend on this`}>
+                                                <span className="text-[10px] text-slate-600 dark:text-slate-300" title={`${dependents} task${dependents > 1 ? 's' : ''} depend on this`}>
                                                     {dependents} downstream
                                                 </span>
                                             )}
@@ -226,22 +226,22 @@ const TaskListView = ({
                                                 <span className="text-sm text-slate-700 dark:text-slate-300 truncate">{task.assigneeName}</span>
                                             </div>
                                         ) : (
-                                            <span className="text-xs text-slate-300 dark:text-slate-600">Unassigned</span>
+                                            <span className="text-xs text-slate-600 dark:text-slate-300">Unassigned</span>
                                         )}
                                     </td>
 
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-1.5 text-xs tabular-nums">
-                                            <span className="text-slate-500 dark:text-slate-400">{task.startDate ? formatShortDate(task.startDate) : '—'}</span>
-                                            <span className="text-slate-300 dark:text-slate-600">→</span>
+                                            <span className="text-slate-600 dark:text-slate-300">{task.startDate ? formatShortDate(task.startDate) : '—'}</span>
+                                            <span className="text-slate-600 dark:text-slate-300">→</span>
                                             <span className={due.cls} title={task.dueDate ? formatShortDate(task.dueDate) : ''}>{due.text}</span>
                                         </div>
                                         <div className="flex items-center gap-2 mt-0.5">
                                             {task.duration > 0 && (
-                                                <span className="text-[10px] text-slate-400 dark:text-slate-500">{task.duration}d span</span>
+                                                <span className="text-[10px] text-slate-600 dark:text-slate-300">{task.duration}d span</span>
                                             )}
                                             {velocity !== null && (
-                                                <span className={`text-[10px] ${velocity > 15 ? 'text-amber-500 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`}
+                                                <span className={`text-[10px] ${velocity > 15 ? 'text-amber-800 dark:text-amber-400' : 'text-slate-600 dark:text-slate-300'}`}
                                                     title={`Need ${velocity}% progress per day to finish on time`}>
                                                     {velocity}%/day needed
                                                 </span>
@@ -262,7 +262,7 @@ const TaskListView = ({
                                                     style={{ width: `${Math.min(task.progress, 100)}%` }} />
                                             </div>
                                             <span className={`text-xs font-semibold tabular-nums w-8 text-right ${
-                                                isTaskComplete(task.status, task.progress) ? 'text-green-600 dark:text-green-400' : 'text-slate-600 dark:text-slate-300'
+                                                isTaskComplete(task.status, task.progress) ? 'text-green-700 dark:text-green-400' : 'text-slate-600 dark:text-slate-300'
                                             }`}>{task.progress}%</span>
                                         </div>
                                         {health && health.status !== 'on-track' && health.status !== 'not-started' && (
@@ -276,7 +276,7 @@ const TaskListView = ({
                                         <div className="space-y-1.5">
                                             {blocking && (
                                                 <div>
-                                                    <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 mr-1.5">Blocked by</span>
+                                                    <span className="text-[10px] font-semibold text-orange-800 dark:text-orange-400 mr-1.5">Blocked by</span>
                                                     <div className="inline-flex flex-wrap gap-1 mt-0.5">
                                                         {blocking.blockers.slice(0, 3).map(dep => (
                                                             <DepChip
@@ -287,7 +287,7 @@ const TaskListView = ({
                                                             />
                                                         ))}
                                                         {blocking.count > 3 && (
-                                                            <span className="text-[10px] text-slate-400 self-center">+{blocking.count - 3} more</span>
+                                                            <span className="text-[10px] text-slate-600 self-center">+{blocking.count - 3} more</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -295,44 +295,44 @@ const TaskListView = ({
 
                                             {!blocking && task.dependencies?.length > 0 && (
                                                 <div className="flex flex-wrap items-center gap-1">
-                                                    <span className="text-[10px] font-medium text-green-600 dark:text-green-400">Deps cleared</span>
+                                                    <span className="text-[10px] font-medium text-green-700 dark:text-green-400">Deps cleared</span>
                                                     {task.dependencies.slice(0, 2).map(d => {
                                                         const depTask = taskKeyToTaskMap?.get(d);
                                                         return depTask ? (
                                                             <DepChip key={d} dep={depTask} onClick={handleDepClick} overdue={false} />
                                                         ) : (
-                                                            <span key={d} className="text-[10px] font-mono text-green-600 dark:text-green-400">{d}</span>
+                                                            <span key={d} className="text-[10px] font-mono text-green-700 dark:text-green-400">{d}</span>
                                                         );
                                                     })}
-                                                    {task.dependencies.length > 2 && <span className="text-[10px] text-slate-400">+{task.dependencies.length - 2}</span>}
+                                                    {task.dependencies.length > 2 && <span className="text-[10px] text-slate-600">+{task.dependencies.length - 2}</span>}
                                                 </div>
                                             )}
 
                                             <div className="flex flex-wrap items-center gap-1.5">
                                                 {task.isDelayed && (
-                                                    <span className="text-[10px] font-semibold text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-1.5 py-px rounded-full">
+                                                    <span className="text-[10px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-1.5 py-px rounded-full">
                                                         {Math.abs(daysBetween(new Date(), task.dueDate))}d late
                                                     </span>
                                                 )}
                                                 {!task.isDelayed && task.isDelayedByDependency && !blocking && (
-                                                    <span className="text-[10px] font-medium text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 px-1.5 py-px rounded-full">
+                                                    <span className="text-[10px] font-medium text-orange-800 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 px-1.5 py-px rounded-full">
                                                         blocked
                                                     </span>
                                                 )}
                                                 {!task.isDelayed && !task.isDelayedByDependency && task.isUpcomingDeadline && (
-                                                    <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px rounded-full">
+                                                    <span className="text-[10px] font-medium text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px rounded-full">
                                                         due soon
                                                     </span>
                                                 )}
 
                                                 {task.labels?.length > 0 && task.labels.slice(0, 3).map((l, i) => (
-                                                    <span key={i} className="text-[10px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-px rounded-full">{l}</span>
+                                                    <span key={i} className="text-[10px] text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-1.5 py-px rounded-full">{l}</span>
                                                 ))}
-                                                {task.labels?.length > 3 && <span className="text-[10px] text-slate-400">+{task.labels.length - 3}</span>}
+                                                {task.labels?.length > 3 && <span className="text-[10px] text-slate-600">+{task.labels.length - 3}</span>}
                                             </div>
 
                                             {!task.dependencies?.length && !task.labels?.length && !task.isDelayed && !task.isUpcomingDeadline && (
-                                                <span className="text-[10px] text-slate-300 dark:text-slate-600">—</span>
+                                                <span className="text-[10px] text-slate-600 dark:text-slate-300">—</span>
                                             )}
                                         </div>
                                     </td>
@@ -344,9 +344,9 @@ const TaskListView = ({
             </div>
 
             <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-700/50 flex flex-wrap items-center gap-x-4 gap-y-1 bg-slate-50/50 dark:bg-slate-800/50">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-600 dark:text-slate-300">
                     <span className="font-semibold text-slate-700 dark:text-slate-300">{filteredTasks.length}</span> {filteredTasks.length === 1 ? 'task' : 'tasks'}
-                    {hasActiveFilters && <span className="text-slate-400"> (filtered)</span>}
+                    {hasActiveFilters && <span className="text-slate-600"> (filtered)</span>}
                 </p>
                 <FooterStats tasks={filteredTasks} />
             </div>
@@ -367,13 +367,13 @@ const FooterStats = React.memo(({ tasks }: { tasks: EnrichedTask[] }) => {
     }, [tasks]);
 
     const items = [
-        stats.critical > 0 && { label: `${stats.critical} critical`, cls: 'text-red-600 dark:text-red-400' },
-        stats.overdue > 0 && { label: `${stats.overdue} overdue`, cls: 'text-red-500 dark:text-red-400' },
-        stats.blocked > 0 && { label: `${stats.blocked} blocked`, cls: 'text-orange-600 dark:text-orange-400' },
+        stats.critical > 0 && { label: `${stats.critical} critical`, cls: 'text-red-700 dark:text-red-400' },
+        stats.overdue > 0 && { label: `${stats.overdue} overdue`, cls: 'text-red-700 dark:text-red-400' },
+        stats.blocked > 0 && { label: `${stats.blocked} blocked`, cls: 'text-orange-800 dark:text-orange-400' },
         stats.inProgress > 0 && { label: `${stats.inProgress} active`, cls: 'text-blue-600 dark:text-blue-400' },
-        stats.done > 0 && { label: `${stats.done} done`, cls: 'text-green-600 dark:text-green-400' },
-        stats.unassigned > 0 && { label: `${stats.unassigned} unassigned`, cls: 'text-slate-400' },
-        { label: `${stats.avgProgress}% avg`, cls: 'text-slate-500 dark:text-slate-400' },
+        stats.done > 0 && { label: `${stats.done} done`, cls: 'text-green-700 dark:text-green-400' },
+        stats.unassigned > 0 && { label: `${stats.unassigned} unassigned`, cls: 'text-slate-600' },
+        { label: `${stats.avgProgress}% avg`, cls: 'text-slate-600 dark:text-slate-300' },
     ].filter(Boolean) as { label: string; cls: string }[];
 
     return (

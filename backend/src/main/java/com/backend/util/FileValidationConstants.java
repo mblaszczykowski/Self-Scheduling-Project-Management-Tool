@@ -11,8 +11,9 @@ public final class FileValidationConstants {
     private FileValidationConstants() {}
 
     public static final int MAX_ATTACHMENTS_PER_REQUEST = 10;
+    public static final int MAX_ATTACHMENTS_PER_ENTITY = 50;
 
-    public static final int MAGIC_BYTE_PREFIX_LENGTH = 8;
+    public static final int MAGIC_BYTE_PREFIX_LENGTH = 12;
 
     public static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "jpg", "jpeg", "png", "gif", "webp",
@@ -63,6 +64,12 @@ public final class FileValidationConstants {
         return true;
     }
 
+    public static boolean isWebp(byte[] fileBytes) {
+        return startsWithMagicBytes(fileBytes, WEBP_RIFF_MAGIC) && fileBytes.length >= 12
+                && fileBytes[8] == 'W' && fileBytes[9] == 'E'
+                && fileBytes[10] == 'B' && fileBytes[11] == 'P';
+    }
+
     public static boolean isValidImageByMagicBytes(byte[] fileBytes) {
         if (fileBytes == null || fileBytes.length < 4) {
             return false;
@@ -70,6 +77,6 @@ public final class FileValidationConstants {
         return startsWithMagicBytes(fileBytes, JPEG_MAGIC) ||
                startsWithMagicBytes(fileBytes, PNG_MAGIC) ||
                startsWithMagicBytes(fileBytes, GIF_MAGIC) ||
-               startsWithMagicBytes(fileBytes, WEBP_RIFF_MAGIC);
+               isWebp(fileBytes);
     }
 }

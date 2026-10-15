@@ -27,7 +27,7 @@ const PropRow = ({ label, htmlFor, children }: { label: React.ReactNode; htmlFor
 const SidebarSection = ({ title, children }: { title?: React.ReactNode; children: React.ReactNode }) => (
     <div className="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 transition-colors hover:border-slate-300 dark:hover:border-slate-600">
         {title && (
-            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">{title}</div>
+            <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">{title}</div>
         )}
         <div className="space-y-0.5">{children}</div>
     </div>
@@ -57,7 +57,7 @@ const sidebarInputClass =
     + ' transition-colors placeholder-slate-400 dark:placeholder-slate-500';
 
 const SelectChevron = () => (
-    <HiOutlineChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 w-4 h-4 pointer-events-none opacity-60 group-hover/row:opacity-100 transition-all duration-150" />
+    <HiOutlineChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 dark:text-slate-300 w-4 h-4 pointer-events-none opacity-60 group-hover/row:opacity-100 transition-all duration-150" />
 );
 
 const ProgressRing = ({ value, size = 38, stroke = 3.5 }: { value: number; size?: number; stroke?: number }) => {
@@ -70,10 +70,10 @@ const ProgressRing = ({ value, size = 38, stroke = 3.5 }: { value: number; size?
                 className="text-slate-200 dark:text-slate-700/60" stroke="currentColor" />
             <circle cx={size/2} cy={size/2} r={r} fill="none" strokeWidth={stroke}
                 strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (value/100)*c}
-                className={`transition-all duration-500 ${done ? 'text-green-500' : 'text-blue-500 dark:text-blue-400'}`}
+                className={`transition-all duration-500 ${done ? 'text-green-700' : 'text-blue-500 dark:text-blue-400'}`}
                 stroke="currentColor" />
             <text x={size/2} y={size/2} textAnchor="middle" dominantBaseline="central"
-                className={`fill-current text-[10px] font-bold rotate-90 origin-center ${done ? 'text-green-600 dark:text-green-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                className={`fill-current text-[10px] font-bold rotate-90 origin-center ${done ? 'text-green-700 dark:text-green-400' : 'text-slate-700 dark:text-slate-200'}`}>
                 {value}
             </text>
         </svg>
@@ -84,9 +84,9 @@ const DueBadge = ({ date }: { date?: string }) => {
     if (!date) return null;
     const diff = daysBetween(new Date(), date);
     let text: string, cls: string;
-    if (diff < 0)        { text = `${Math.abs(diff)}d overdue`; cls = 'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/50'; }
-    else if (diff === 0)  { text = 'due today';  cls = 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/50'; }
-    else if (diff <= 3)   { text = `in ${diff}d`; cls = 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/50'; }
+    if (diff < 0)        { text = `${Math.abs(diff)}d overdue`; cls = 'bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/50'; }
+    else if (diff === 0)  { text = 'due today';  cls = 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/50'; }
+    else if (diff <= 3)   { text = `in ${diff}d`; cls = 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/50'; }
     else return null;
     return <span className={`ml-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${cls} animate-pulse`}>{text}</span>;
 };
@@ -145,10 +145,12 @@ const TaskForm = ({
     const { errors, touched } = useFormikContext<ModalFormValues>();
     const hasError = (name: 'projectKey' | 'startDate' | 'dueDate') => !!(touched[name] && errors[name]);
 
+    const selectedProject = projects.find(candidate => candidate.projectKey === values.projectKey) ?? project;
+
     const assignee = useMemo(() => {
-        if (!values.assignee || !project?.members) return null;
-        return project.members.find(m => m.email === values.assignee);
-    }, [values.assignee, project?.members]);
+        if (!values.assignee || !selectedProject?.members) return null;
+        return selectedProject.members.find(m => m.email === values.assignee);
+    }, [values.assignee, selectedProject?.members]);
 
     const depTasks = useMemo(() =>
         dependencies.map(k => ({ key: k, task: allTasks.find(t => t.taskKey === k) })),
@@ -182,7 +184,7 @@ const TaskForm = ({
                                         'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors '
                                         + (activeActivityTab === tab.key
                                             ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                                            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300')
+                                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300')
                                     }
                                 >
                                     {tab.label}
@@ -205,6 +207,10 @@ const TaskForm = ({
                         <div className="relative">
                             <Field as="select" id={idFor('projectKey')} name="projectKey"
                                 disabled={modalMode === 'edit'}
+                                onChange={(event: React.ChangeEvent<HTMLSelectElement>) => {
+                                    setFieldValue('projectKey', event.target.value);
+                                    setFieldValue('assignee', '');
+                                }}
                                 aria-invalid={hasError('projectKey')}
                                 aria-describedby={hasError('projectKey') ? idFor('projectKey-error') : undefined}
                                 className={`${sidebarSelectClass} ${modalMode === 'edit' ? 'opacity-60 cursor-default' : ''}`}
@@ -214,11 +220,11 @@ const TaskForm = ({
                             </Field>
                             <SelectChevron />
                         </div>
-                        <ErrorMessage name="projectKey" component="div" id={idFor('projectKey-error')} className="text-red-500 text-xs mt-0.5 pl-0.5" />
+                        <ErrorMessage name="projectKey" component="div" id={idFor('projectKey-error')} className="text-red-700 text-xs mt-0.5 pl-0.5" />
                     </PropRow>
 
                     <PropRow label="Status" htmlFor={idFor('status')}>
-                        <div className="relative cursor-pointer group/pill">
+                        <div className="relative cursor-pointer group/pill rounded-md focus-within:ring-2 focus-within:ring-blue-500">
                             <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${STATUS_CONFIG[values.status]?.pillBg || 'bg-slate-100'} ${STATUS_CONFIG[values.status]?.pillText || 'text-slate-600'}`}>
                                 <span className={`w-[7px] h-[7px] rounded-full ring-1 ring-current/20 ${STATUS_CONFIG[values.status]?.dot || 'bg-slate-400'}`} />
                                 {STATUS_CONFIG[values.status]?.label || values.status}
@@ -233,7 +239,7 @@ const TaskForm = ({
                     </PropRow>
 
                     <PropRow label="Priority" htmlFor={idFor('priority')}>
-                        <div className="relative cursor-pointer group/pill">
+                        <div className="relative cursor-pointer group/pill rounded-md focus-within:ring-2 focus-within:ring-blue-500">
                             <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 hover:ring-2 hover:ring-blue-500/25 hover:shadow-sm active:scale-[0.97] ${PRIORITY_CONFIG[values.priority]?.pillBg || 'bg-slate-100'} ${PRIORITY_CONFIG[values.priority]?.pillText || 'text-slate-600'}`}>
                                 <span className="text-xs leading-none">{PRIORITY_CONFIG[values.priority]?.icon}</span>
                                 {PRIORITY_CONFIG[values.priority]?.label || values.priority}
@@ -257,7 +263,7 @@ const TaskForm = ({
                             <Field as="select" id={idFor('assignee')} name="assignee"
                                 className={`${sidebarSelectClass} ${assignee ? 'pl-8' : ''}`}>
                                 <option value="">Unassigned</option>
-                                {project?.members?.map(u => <option key={u.id} value={u.email}>{u.firstname} {u.lastname}</option>)}
+                                {selectedProject?.members?.map(u => <option key={u.id} value={u.email}>{u.firstname} {u.lastname}</option>)}
                             </Field>
                             <SelectChevron />
                         </div>
@@ -267,7 +273,7 @@ const TaskForm = ({
                 <SidebarSection title="Schedule">
                     <div className="grid grid-cols-2 gap-3">
                         <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
-                            <label htmlFor={idFor('startDate')} className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide block mb-1">Start</label>
+                            <label htmlFor={idFor('startDate')} className="text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide block mb-1">Start</label>
                             <Field type="date" id={idFor('startDate')} name="startDate"
                                 aria-invalid={hasError('startDate')}
                                 aria-describedby={hasError('startDate') ? idFor('startDate-error') : undefined}
@@ -278,11 +284,11 @@ const TaskForm = ({
                                         setFieldValue('duration', Math.max(daysBetween(e.target.value, values.dueDate) + 1, 1));
                                 }}
                             />
-                            <ErrorMessage name="startDate" component="div" id={idFor('startDate-error')} className="text-red-500 text-xs mt-0.5" />
+                            <ErrorMessage name="startDate" component="div" id={idFor('startDate-error')} className="text-red-700 text-xs mt-0.5" />
                         </div>
                         <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
                             <div className="flex items-center gap-1 mb-1">
-                                <label htmlFor={idFor('dueDate')} className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide">Due</label>
+                                <label htmlFor={idFor('dueDate')} className="text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide">Due</label>
                                 <DueBadge date={values.dueDate} />
                             </div>
                             <Field type="date" id={idFor('dueDate')} name="dueDate"
@@ -295,7 +301,7 @@ const TaskForm = ({
                                         setFieldValue('duration', Math.max(daysBetween(values.startDate, e.target.value) + 1, 1));
                                 }}
                             />
-                            <ErrorMessage name="dueDate" component="div" id={idFor('dueDate-error')} className="text-red-500 text-xs mt-0.5" />
+                            <ErrorMessage name="dueDate" component="div" id={idFor('dueDate-error')} className="text-red-700 text-xs mt-0.5" />
                         </div>
                     </div>
 
@@ -311,7 +317,7 @@ const TaskForm = ({
                                     }
                                 }}
                             />
-                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">days</span>
+                            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">days</span>
                         </div>
                     </PropRow>
 
@@ -342,7 +348,7 @@ const TaskForm = ({
                         <Field type="text" id={idFor('labels')} name="labels" placeholder="Add labels..."
                             validate={validateLabels}
                             className={sidebarInputClass} />
-                        <ErrorMessage name="labels" component="div" className="text-red-500 text-xs mt-0.5 pl-0.5" />
+                        <ErrorMessage name="labels" component="div" className="text-red-700 text-xs mt-0.5 pl-0.5" />
                     </PropRow>
 
                     <div>
@@ -377,10 +383,11 @@ const TaskForm = ({
                                         >
                                             <span className={`w-[7px] h-[7px] rounded-full shrink-0 ring-1 ring-current/20 ${dotColor}`} />
                                             <span className="text-xs font-bold text-blue-600 dark:text-blue-400 font-mono">{key}</span>
-                                            <span className="text-xs text-slate-500 dark:text-slate-400 flex-1 truncate">{dt?.summary || ''}</span>
+                                            <span className="text-xs text-slate-600 dark:text-slate-300 flex-1 truncate">{dt?.summary || ''}</span>
                                             <button type="button"
+                                                aria-label={`Remove dependency ${key}`}
                                                 onClick={() => setDependencies(prev => prev.filter(k => k !== key))}
-                                                className="text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-all opacity-0 group-hover/dep:opacity-100 scale-90 group-hover/dep:scale-100"
+                                                className="min-h-6 min-w-6 inline-flex items-center justify-center focus-visible:opacity-100 text-slate-600 dark:text-slate-300 hover:text-red-500 dark:hover:text-red-400 transition-all opacity-0 group-hover/dep:opacity-100 scale-90 group-hover/dep:scale-100"
                                             >
                                                 <HiOutlineX className="w-3 h-3" />
                                             </button>
@@ -393,7 +400,7 @@ const TaskForm = ({
                 </SidebarSection>
 
                 {modalMode === 'edit' && (
-                    <div className="px-1 pt-2 flex items-center justify-between text-xs font-medium text-slate-400 dark:text-slate-500">
+                    <div className="px-1 pt-2 flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
                         <span>Created {values.created || '—'}</span>
                         <span className="w-px h-3 bg-slate-200 dark:bg-slate-700" />
                         <span>Updated {values.updated || '—'}</span>

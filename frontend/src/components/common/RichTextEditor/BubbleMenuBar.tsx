@@ -1,15 +1,10 @@
 import React, { useCallback } from 'react';
-import { TiptapBubbleMenu, Editor } from '@tiptap/react';
+import { Editor } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
 import { BUBBLE_MENU_ITEMS, BUBBLE_MENU_EXTRAS } from './toolbarConfig';
 import { promptAndSetLink, runItemCommand, isItemActive } from './editorActions';
 
 const bubbleMenuButtons = [...BUBBLE_MENU_ITEMS, ...BUBBLE_MENU_EXTRAS];
-
-const BubbleMenu = TiptapBubbleMenu as React.FC<{
-    editor: Editor;
-    className?: string;
-    children: React.ReactNode;
-}>;
 
 const BubbleMenuBar = ({ editor }: { editor: Editor | null }) => {
     const setLink = useCallback(() => promptAndSetLink(editor), [editor]);

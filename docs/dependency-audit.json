@@ -1,0 +1,34 @@
+{
+  "checkedAt": "2026-10-15",
+  "source": "OSV querybatch; Maven resolved compile/runtime dependencies",
+  "runtimeDependenciesChecked": 94,
+  "npm": {
+    "before": {
+      "critical": 4,
+      "high": 87,
+      "moderate": 19,
+      "low": 6,
+      "total": 116
+    },
+    "after": {
+      "critical": 0,
+      "high": 0,
+      "moderate": 0,
+      "low": 0,
+      "total": 0
+    }
+  },
+  "remainingMavenFindings": [
+    {
+      "dependency": "org.springframework:spring-webmvc:6.2.19",
+      "advisories": [
+        "GHSA-j9f9-w8pj-32f8",
+        "GHSA-pc63-qcmh-9cmg"
+      ]
+    }
+  ],
+  "applicability": {
+    "GHSA-j9f9-w8pj-32f8": "Not applicable to current JSON notification events: no SSE view fragment rendering.",
+    "GHSA-pc63-qcmh-9cmg": "Not applicable to current REST controllers: no XsltView and no wildcard mapping rendering an inferred view."
+  }
+}

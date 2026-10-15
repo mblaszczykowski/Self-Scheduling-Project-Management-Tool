@@ -154,8 +154,8 @@ const TimelineTaskBar = ({
                         <span
                             className={`text-[10px] font-bold truncate min-w-0 ${
                                 task.isCritical
-                                    ? 'text-red-600 dark:text-red-400'
-                                    : 'text-slate-500 dark:text-slate-400'
+                                    ? 'text-red-700 dark:text-red-400'
+                                    : 'text-slate-600 dark:text-slate-300'
                             }`}
                             title={task.taskKey}
                         >
@@ -171,14 +171,14 @@ const TimelineTaskBar = ({
                             <span
                                 className={`text-xs font-semibold font-mono ${
                                     task.isCritical
-                                        ? 'text-red-600 dark:text-red-400'
-                                        : 'text-slate-400 dark:text-slate-500'
+                                        ? 'text-red-700 dark:text-red-400'
+                                        : 'text-slate-600 dark:text-slate-300'
                                 }`}
                             >
                                 {task.taskKey}
                             </span>
                             {task.isCritical && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
                             )}
                             {task.status && (
                                 <span
@@ -200,7 +200,7 @@ const TimelineTaskBar = ({
                                         style={{ width: `${task.progress}%` }}
                                     />
                                 </div>
-                                <span className="text-xs font-medium text-slate-400 dark:text-slate-500 tabular-nums">
+                                <span className="text-xs font-medium text-slate-600 dark:text-slate-300 tabular-nums">
                                     {task.progress}%
                                 </span>
                             </div>
@@ -303,7 +303,7 @@ const TimelineTaskBar = ({
                             top: -14
                         }}
                     >
-                        <span className="text-[10px] py-0.5 px-1.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-medium flex items-center gap-0.5 border border-amber-200/60 dark:border-amber-800/60">
+                        <span className="text-[10px] py-0.5 px-1.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400 font-medium flex items-center gap-0.5 border border-amber-200/60 dark:border-amber-800/60">
                             <AlertTriangleFilledIcon />
                             delayed
                         </span>

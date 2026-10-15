@@ -65,6 +65,7 @@ const DashboardPage = () => {
                 onCreateTask={() => openModal('task', 'create')}
             />
 
+            <main id="main-content" tabIndex={-1} aria-busy={projectsLoading}>
             {projectsLoading && <DashboardSkeleton />}
 
             {!projectsLoading && projectsError && (
@@ -131,6 +132,8 @@ const DashboardPage = () => {
                     </div>
                 </>
             )}
+
+            </main>
 
             {modalOpen && modalType && modalMode && (
                 <Suspense fallback={null}>

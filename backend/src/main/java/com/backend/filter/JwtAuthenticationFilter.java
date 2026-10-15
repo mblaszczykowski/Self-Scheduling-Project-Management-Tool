@@ -19,7 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 2)
+@Order(Ordered.HIGHEST_PRECEDENCE + 4)
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
@@ -54,7 +54,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             log.error("Unexpected failure while authenticating {} {}",
                     request.getMethod(), request.getRequestURI(), e);
-            reject(request, response, "Authentication failed", "token processing error");
+            response.setHeader("Retry-After", "30");
+            FilterResponseUtil.sendJsonError(response, HttpStatus.SERVICE_UNAVAILABLE,
+                    "Authentication is temporarily unavailable. Please try again shortly.",
+                    objectMapper, "AUTH_UNAVAILABLE");
             return;
         }
 

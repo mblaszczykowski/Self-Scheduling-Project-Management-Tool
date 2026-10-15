@@ -46,11 +46,11 @@ interface EmptyStateProps {
 const TONES: Record<'neutral' | 'danger', { well: string; icon: string }> = {
     neutral: {
         well: 'bg-slate-100 dark:bg-slate-800',
-        icon: 'text-slate-400 dark:text-slate-500',
+        icon: 'text-slate-600 dark:text-slate-300',
     },
     danger: {
         well: 'bg-red-50 dark:bg-red-900/20',
-        icon: 'text-red-500 dark:text-red-400',
+        icon: 'text-red-700 dark:text-red-400',
     },
 };
 
@@ -88,11 +88,11 @@ const EmptyState = ({
             {/* Each branch names its own colour: two competing text-* classes in one list resolve
                 by stylesheet order, not by the order they are written here. */}
             <h3 className={compact
-                ? 'text-xs font-medium text-slate-500 dark:text-slate-400'
+                ? 'text-xs font-medium text-slate-600 dark:text-slate-300'
                 : 'text-lg font-semibold mb-1 text-slate-900 dark:text-white'
             }>{displayTitle}</h3>
             {displayDescription && (
-                <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-sm mb-4">{displayDescription}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300 text-center max-w-sm mb-4">{displayDescription}</p>
             )}
             {action && actionLabel && (
                 <button

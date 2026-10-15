@@ -4,8 +4,8 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
 const TODAY_PCT = 52;
 
 const STATUS_PILL: Record<string, { label: string; color: string }> = {
-    DONE:        { label: 'Done',        color: 'bg-green-50 text-green-600' },
-    IN_PROGRESS: { label: 'In Progress', color: 'bg-amber-50 text-amber-600' },
+    DONE:        { label: 'Done',        color: 'bg-green-50 text-green-700' },
+    IN_PROGRESS: { label: 'In Progress', color: 'bg-amber-50 text-amber-800' },
     TODO:        { label: 'To Do',       color: 'bg-blue-50 text-blue-600' },
 };
 
@@ -79,7 +79,7 @@ export const GanttChart = () => {
                                 : '0 1px 3px rgba(37,99,235,0.3)',
                         }}
                     >
-                        <svg width="10" height="10" viewBox="0 0 11 11" fill="none" className={`flex-shrink-0 transition-transform duration-300 ${showOptimization ? 'rotate-90' : ''}`}>
+                        <svg width="10" height="10" viewBox="0 0 11 11" fill="none" className={`shrink-0 transition-transform duration-300 ${showOptimization ? 'rotate-90' : ''}`}>
                             <path d="M5.5 1v9M1 5.5h9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity="0.5" />
                             <circle cx="5.5" cy="5.5" r="3" stroke="currentColor" strokeWidth="1.2" fill="none" />
                             <circle cx="5.5" cy="5.5" r="1" fill="currentColor" />
@@ -111,7 +111,7 @@ export const GanttChart = () => {
                 </div>
 
                 <div className="today-line absolute top-0 bottom-0 w-px z-10 pointer-events-none" style={{ left: `calc(${SIDEBAR_W}px + (100% - ${SIDEBAR_W}px) * ${TODAY_PCT} / 100)`, background: 'linear-gradient(to bottom, #ef4444, #ef444430)' }}>
-                    <div className="absolute -top-0 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[6px] font-bold px-1 py-px rounded-b tracking-wide">TODAY</div>
+                    <div className="absolute -top-0 left-1/2 -translate-x-1/2 bg-red-700 text-white text-[6px] font-bold px-1 py-px rounded-b tracking-wide">TODAY</div>
                 </div>
 
                 {PROJECTS.map((project) => {
@@ -124,20 +124,20 @@ export const GanttChart = () => {
                                 onClick={() => toggleProject(project.key)}
                             >
                                 <div className="border-r border-slate-200 px-3 flex items-center gap-2" style={{ width: SIDEBAR_W, minWidth: SIDEBAR_W }}>
-                                    <div className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors flex-shrink-0">
+                                    <div className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors shrink-0">
                                         <ChevronIcon expanded={isExpanded} />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-1.5">
-                                            <span className="text-[9px] font-bold text-slate-500">{project.key}</span>
+                                            <span className="text-[9px] font-bold text-slate-600">{project.key}</span>
                                             <span className="text-[10px] font-medium text-slate-800 truncate">{project.name}</span>
                                         </div>
                                         <div className="flex items-center gap-1.5 mt-0.5">
                                             <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden max-w-[60px]">
                                                 <div className="h-full bg-slate-700 rounded-full transition-all" style={{ width: `${project.progress}%` }} />
                                             </div>
-                                            <span className="text-[8px] text-slate-500">{project.progress}%</span>
-                                            <span className="text-[8px] text-slate-400">&middot; {project.tasks.length} tasks</span>
+                                            <span className="text-[8px] text-slate-600">{project.progress}%</span>
+                                            <span className="text-[8px] text-slate-600">&middot; {project.tasks.length} tasks</span>
                                         </div>
                                     </div>
                                 </div>
@@ -161,14 +161,14 @@ export const GanttChart = () => {
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-[9px] text-slate-700 truncate leading-tight">{task.name}</p>
                                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                                    <span className={`text-[8px] font-bold ${task.critical ? 'text-red-600' : 'text-slate-500'}`}>{task.key}</span>
-                                                    {task.critical && <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
+                                                    <span className={`text-[8px] font-bold ${task.critical ? 'text-red-700' : 'text-slate-600'}`}>{task.key}</span>
+                                                    {task.critical && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />}
                                                     {status && <span className={`text-[7px] py-px px-1 rounded font-medium leading-none ${status.color}`}>{status.label}</span>}
                                                     <div className="flex items-center gap-1 ml-auto">
                                                         <div className="w-8 h-1 bg-slate-200 rounded-full overflow-hidden">
                                                             <div className="h-full bg-slate-500 rounded-full" style={{ width: `${task.progress}%` }} />
                                                         </div>
-                                                        <span className="text-[7px] font-medium text-slate-500">{task.progress}%</span>
+                                                        <span className="text-[7px] font-medium text-slate-600">{task.progress}%</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -264,7 +264,7 @@ export const GanttChart = () => {
                     </span>
                 )}
                 {!showOptimization && (
-                    <span className="ml-auto text-red-600 font-semibold hidden sm:inline">{criticalTasks} on critical path</span>
+                    <span className="ml-auto text-red-700 font-semibold hidden sm:inline">{criticalTasks} on critical path</span>
                 )}
             </div>
         </div>

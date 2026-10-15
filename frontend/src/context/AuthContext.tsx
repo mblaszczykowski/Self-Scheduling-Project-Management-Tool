@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { logout } from '../util/api';
 import { CurrentUser } from '../types';
 
@@ -21,16 +22,14 @@ export const AuthProvider = ({ children, initialUser }: {
     initialUser: CurrentUser | null;
 }) => {
     const [user, setUser] = useState<CurrentUser | null>(initialUser);
+    const queryClient = useQueryClient();
 
     const handleLogout = useCallback(async () => {
-        try {
-            await logout();
-        } catch (err) {
-            console.error('Logout request failed', err);
-        } finally {
-            setUser(null);
-        }
-    }, []);
+        await logout();
+        await queryClient.cancelQueries();
+        queryClient.clear();
+        setUser(null);
+    }, [queryClient]);
 
     const value = useMemo(() => ({ user, setUser, handleLogout }), [user, handleLogout]);
 

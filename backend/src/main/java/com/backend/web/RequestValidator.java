@@ -1,5 +1,6 @@
 package com.backend.web;
 
+import com.backend.exception.ValidationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolationException;
@@ -19,6 +20,9 @@ public class RequestValidator {
 
     public <T> T parseAndValidate(String json, Class<T> type) throws JsonProcessingException {
         var obj = objectMapper.readValue(json, type);
+        if (obj == null) {
+            throw new ValidationException("Request body must be a JSON object");
+        }
         var violations = validator.validate(obj);
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);

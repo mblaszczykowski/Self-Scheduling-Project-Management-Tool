@@ -65,12 +65,12 @@ const ConfirmDialog = ({
     const variantStyles = {
         danger: {
             iconBg: 'bg-red-100 dark:bg-red-950/40',
-            iconColor: 'text-red-600 dark:text-red-400',
+            iconColor: 'text-red-700 dark:text-red-400',
             confirmBg: 'bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400'
         },
         warning: {
             iconBg: 'bg-amber-100 dark:bg-amber-950/40',
-            iconColor: 'text-amber-600 dark:text-amber-400',
+            iconColor: 'text-amber-800 dark:text-amber-400',
             confirmBg: 'bg-amber-600 hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-400'
         }
     };
@@ -101,7 +101,7 @@ const ConfirmDialog = ({
                             <h3 id={titleId} className="text-base font-semibold text-slate-900 dark:text-slate-100">
                                 {title}
                             </h3>
-                            <p id={descriptionId} className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                            <p id={descriptionId} className="text-sm text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
                                 {message}
                             </p>
                         </div>

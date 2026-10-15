@@ -82,11 +82,12 @@ public class AuthService {
     }
 
     private void validateLoginRequest(LoginRequest request) {
-        if (ValidationUtil.isNullOrEmpty(request.email())
+        if (request == null || ValidationUtil.isNullOrEmpty(request.email())
                 || ValidationUtil.isNullOrEmpty(request.password())) {
             throw new ValidationException("Email and password are required");
         }
-        if (!ValidationUtil.isValidEmail(request.email())) {
+        ValidationUtil.validatePasswordLength(request.password());
+        if (!ValidationUtil.isValidEmail(UserService.normalizeEmail(request.email()))) {
             throw new ValidationException("Invalid email format");
         }
     }

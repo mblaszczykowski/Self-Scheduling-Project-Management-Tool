@@ -1,8 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+/* Preserve Tailwind 3 border defaults during the tooling migration. */
+@layer base {
+  *, ::before, ::after { border-color: var(--color-gray-200, currentColor); }
+}
 
 @layer utilities {
   @keyframes fadeInSlide {
@@ -189,4 +193,29 @@ code {
 
 .dark .Toastify__toast--warning .Toastify__progress-bar {
   background: #f59e0b !important;
+}
+
+
+.skip-link {
+  position: fixed;
+  top: -100px;
+  left: 1rem;
+  z-index: 100;
+  border-radius: .5rem;
+  padding: .75rem 1rem;
+  color: white;
+  background: #0f172a;
+}
+.skip-link:focus { top: .5rem; }
+:where(button, a, input, select, textarea, [role="button"]):focus-visible {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

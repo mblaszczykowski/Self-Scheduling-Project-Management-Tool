@@ -238,8 +238,8 @@ class SchedulingInvariantsTest {
         }
 
         @Test
-        @DisplayName("progress shortens the remaining work")
-        void progressShortensRemainingWork() {
+        @DisplayName("progress does not repeatedly shrink the task estimate")
+        void progressPreservesTheEstimate() {
             var almostDone = List.of(task("P-1").from("2026-02-02").to("2026-02-11")
                     .progress(90).build());
             var untouched = List.of(task("P-1").from("2026-02-02").to("2026-02-11")
@@ -248,7 +248,7 @@ class SchedulingInvariantsTest {
             int remaining = span(scheduling.optimize(almostDone, List.of(), TODAY, 0.8, 0.2));
             int full = span(scheduling.optimize(untouched, List.of(), TODAY, 0.8, 0.2));
 
-            assertThat(remaining).isEqualTo(1);
+            assertThat(remaining).isEqualTo(10);
             assertThat(full).isEqualTo(10);
         }
 
@@ -284,7 +284,7 @@ class SchedulingInvariantsTest {
         @DisplayName("stays within [0, 1] even for a badly over-committed portfolio")
         void objectiveIsBounded() {
             var tasks = new ArrayList<com.backend.dtos.TaskDTO>();
-            for (int i = 1; i <= 60; i++) {
+            for (int i = 1; i <= 30; i++) {
                 tasks.add(task("P-" + i).from("2026-01-05").to("2026-04-04")
                         .assignedTo("only@x").priority(TaskPriority.HIGHEST).build());
             }
@@ -610,4 +610,59 @@ class SchedulingInvariantsTest {
             }
         }
     }
+
+    @Test
+    void currentMetricsReportDependencyViolationsEvenWithoutResourceConflicts() {
+        var tasks = List.of(task("P-1").build(), task("P-2").dependsOn("P-1").build());
+
+        var result = scheduling.optimize(tasks, List.of(), TODAY, 0.8, 0.2);
+
+        assertThat(result.currentMetrics().resourceConflicts()).isZero();
+        assertThat(result.currentMetrics().feasible()).isFalse();
+        assertThat(result.chosenMetrics().feasible()).isTrue();
+    }
+
+    @Test
+    void refusesTasksBeyondConfiguredHorizonBeforeAllocatingResourceCalendars() {
+        var tasks = List.of(task("P-1").from("9999-01-01").to("9999-12-31")
+                .assignedTo("dev").build());
+
+        assertThatThrownBy(() -> scheduling.optimize(tasks, List.of(), TODAY, 0.8, 0.2))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("horizon");
+    }
+
+    @Test
+    void refusesResourcePlansWhoseCombinedWorkExceedsTheHorizon() {
+        var tasks = List.of(
+                task("P-1").from("2026-01-05").to("2031-01-05").assignedTo("dev").build(),
+                task("P-2").from("2026-01-05").to("2031-01-05").assignedTo("dev").build());
+
+        assertThatThrownBy(() -> scheduling.optimize(tasks, List.of(), TODAY, 0.8, 0.2))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("horizon");
+    }
+
+    @Test
+    void refusesUnboundedOptimizationInputs() {
+        var tooMany = Collections.nCopies(5001, task("P-1").build());
+        assertThatThrownBy(() -> scheduling.optimize(tooMany, List.of(), TODAY, 0.8, 0.2))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("5000");
+    }
+
+    @Test
+    void rejectsNonFiniteWeights() {
+        assertThatThrownBy(() -> scheduling.optimize(List.of(task("P-1").build()), List.of(),
+                TODAY, Double.NaN, 0.2)).isInstanceOf(ValidationException.class);
+    }
+
+
+    @Test
+    void unscheduledPredecessorsCannotBeSilentlyIgnored() {
+        var dateless = new com.backend.dtos.TaskDTO(1, 1, "P-1", "P", "Undated", null,
+                TaskStatus.TODO, null, null, null, List.of(), List.of(), null, null,
+                List.of(), null, null, 0, TaskPriority.MEDIUM);
+        assertThatThrownBy(() -> scheduling.optimize(List.of(dateless, task("P-2").dependsOn("P-1").build()),
+                List.of(), TODAY, 0.8, 0.2)).isInstanceOf(ValidationException.class)
+                .hasMessageContaining("predecessor has no complete date range");
+    }
+
 }

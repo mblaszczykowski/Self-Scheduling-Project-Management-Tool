@@ -31,7 +31,7 @@ const fmtNum = (v: number, decimals = 1): string => {
 };
 
 const Arrow = () => (
-    <svg width="12" height="7" viewBox="0 0 12 7" className="text-slate-300 dark:text-slate-600 flex-shrink-0 mx-0.5">
+    <svg width="12" height="7" viewBox="0 0 12 7" className="text-slate-600 dark:text-slate-300 shrink-0 mx-0.5">
         <path d="M0 3.5h9M7.5 1L10 3.5l-2.5 2.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
 );
@@ -48,14 +48,14 @@ interface BeforeAfterProps {
 const BeforeAfter = ({ label, before, after, unit = '', lowerIsBetter = true, infeasible = false }: BeforeAfterProps) => {
     const improved = lowerIsBetter ? after < before : after > before;
     const unchanged = Math.abs(after - before) < 0.01;
-    const afterColor = unchanged ? 'text-slate-500 dark:text-slate-400'
-        : improved ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400';
+    const afterColor = unchanged ? 'text-slate-600 dark:text-slate-300'
+        : improved ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-400';
 
     return (
         <div className="flex flex-col items-center gap-0.5">
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{label}</span>
+            <span className="text-[10px] text-slate-600 dark:text-slate-300 font-medium">{label}</span>
             <div className="flex items-center gap-0.5 tabular-nums">
-                <span className={`text-xs ${infeasible ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400 dark:text-slate-500'}`}>
+                <span className={`text-xs ${infeasible ? 'text-slate-600 dark:text-slate-300' : 'text-slate-600 dark:text-slate-300'}`}>
                     {infeasible ? 'n/a' : <>{fmtNum(before)}{unit}</>}
                 </span>
                 <Arrow />
@@ -77,9 +77,9 @@ interface StatCardProps {
 
 const StatCard = ({ value, label, sublabel, accent = 'emerald', delay = 0 }: StatCardProps) => {
     const colors: Record<StatAccent, string> = {
-        emerald: 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+        emerald: 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 text-emerald-700 dark:text-emerald-400',
         blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/20 text-blue-600 dark:text-blue-400',
-        amber: 'from-amber-500/10 to-amber-500/5 border-amber-500/20 text-amber-600 dark:text-amber-400',
+        amber: 'from-amber-500/10 to-amber-500/5 border-amber-500/20 text-amber-800 dark:text-amber-400',
         slate: 'from-slate-100 to-slate-50 dark:from-slate-700 dark:to-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300',
     };
     return (
@@ -147,7 +147,7 @@ const OptimizationMetrics = ({
                     <div className="flex items-start justify-between gap-6">
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-1">
-                                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center flex-shrink-0">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center shrink-0">
                                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                                         <path d="M3 9.5L7 13.5L15 4.5" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                     </svg>
@@ -159,14 +159,14 @@ const OptimizationMetrics = ({
                                         </h3>
                                         {chosenRule && (
                                             <span
-                                                className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-slate-600"
+                                                className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600"
                                                 title="Several ordering rules were tried; this one produced the best schedule."
                                             >
                                                 {chosenRule}
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    <p className="text-sm text-slate-600 dark:text-slate-300">
                                         {suggestionsCount} of {suggestions?.length || 0} tasks rescheduled
                                         {summary.affectedPeople > 0 && (
                                             <> &middot; {summary.affectedPeople} {summary.affectedPeople === 1 ? 'person' : 'people'} affected</>
@@ -188,7 +188,7 @@ const OptimizationMetrics = ({
 
                             {infeasible && (
                                 <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0 text-amber-500">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0 text-amber-800">
                                         <path d="M7 1L13 12H1L7 1Z" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinejoin="round"/>
                                         <circle cx="7" cy="9.5" r="0.6" fill="currentColor"/>
                                         <line x1="7" y1="5" x2="7" y2="8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
@@ -200,7 +200,7 @@ const OptimizationMetrics = ({
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2 flex-shrink-0 pt-0.5">
+                        <div className="flex items-center gap-2 shrink-0 pt-0.5">
                             <div className="flex items-center gap-1.5 mr-2">
                                 <div className="w-4 h-1 rounded-full"
                                     style={{
@@ -208,7 +208,7 @@ const OptimizationMetrics = ({
                                         border: '1px dashed rgba(99,102,241,0.7)',
                                     }}
                                 />
-                                <span className="text-[10px] text-slate-400">= suggested</span>
+                                <span className="text-[10px] text-slate-600">= suggested</span>
                             </div>
                             <button
                                 onClick={onAccept}
@@ -239,7 +239,7 @@ const OptimizationMetrics = ({
                             <button
                                 onClick={onReject}
                                 disabled={isApplying}
-                                className="text-sm px-4 py-2 rounded-lg font-medium transition-all text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600"
+                                className="text-sm px-4 py-2 rounded-lg font-medium transition-all text-slate-600 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600"
                             >
                                 Dismiss
                             </button>
@@ -287,7 +287,7 @@ const OptimizationMetrics = ({
                             style={{ animation: `optFadeUp 0.4s 350ms cubic-bezier(0.22, 1, 0.36, 1) both` }}
                         >
                             <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-xs text-slate-500 dark:text-slate-400">On-time delivery</span>
+                                <span className="text-xs text-slate-600 dark:text-slate-300">On-time delivery</span>
                                 <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{onTimePct}%</span>
                             </div>
                             <div className="h-2.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -304,7 +304,7 @@ const OptimizationMetrics = ({
                                 />
                             </div>
                             {lateAfter > 0 && (
-                                <p className="text-xs text-amber-600 mt-1">
+                                <p className="text-xs text-amber-800 mt-1">
                                     {lateAfter} {lateAfter === 1 ? 'task' : 'tasks'} still late — consider adjusting deadlines or adding resources
                                 </p>
                             )}
@@ -351,7 +351,7 @@ const OptimizationMetrics = ({
                     <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                         <button
                             onClick={() => setShowDetails(p => !p)}
-                            className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors flex items-center gap-1.5 px-1 py-0.5 -ml-1 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                            className="text-xs text-slate-600 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-200 transition-colors flex items-center gap-1.5 px-1 py-0.5 -ml-1 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50"
                         >
                             <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
                                 className={`transition-transform duration-200 ${showDetails ? 'rotate-90' : ''}`}
@@ -363,7 +363,7 @@ const OptimizationMetrics = ({
 
                         {showDetails && summary.shifted.length > 0 && (
                             <div className="mt-3 rounded-lg border border-slate-100 dark:border-slate-700 overflow-hidden">
-                                <div className="grid grid-cols-[1fr_120px_120px_55px_50px_130px] gap-3 px-4 py-2 bg-slate-50 dark:bg-slate-700/50 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-slate-700">
+                                <div className="grid grid-cols-[1fr_120px_120px_55px_50px_130px] gap-3 px-4 py-2 bg-slate-50 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide border-b border-slate-100 dark:border-slate-700">
                                     <span>Task</span>
                                     <span>Current</span>
                                     <span>Proposed</span>
@@ -384,36 +384,36 @@ const OptimizationMetrics = ({
                                                     style={{ animation: `optFadeUp 0.25s ${80 + i * 30}ms cubic-bezier(0.22, 1, 0.36, 1) both` }}
                                                 >
                                                     <div className="flex items-center gap-2 min-w-0">
-                                                        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 flex-shrink-0">{s.taskKey}</span>
+                                                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 shrink-0">{s.taskKey}</span>
                                                         <span className="text-sm text-slate-700 dark:text-slate-200 truncate">{s.summary}</span>
                                                         {s.isCritical && (
-                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-50 dark:bg-red-950/40 text-red-500 dark:text-red-400 font-semibold flex-shrink-0 border border-red-100 dark:border-red-900/50">
+                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 font-semibold shrink-0 border border-red-100 dark:border-red-900/50">
                                                                 Critical
                                                             </span>
                                                         )}
                                                         {s.priorityWeight >= 8 && (
-                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-bold flex-shrink-0 border border-amber-200 dark:border-amber-800/60">
+                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400 font-bold shrink-0 border border-amber-200 dark:border-amber-800/60">
                                                                 High priority
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">
+                                                    <span className="text-xs text-slate-600 dark:text-slate-300 tabular-nums">
                                                         {fmtDate(s.originalStartDate)} – {fmtDate(s.originalDueDate)}
                                                     </span>
                                                     <span className="text-xs text-blue-600 dark:text-blue-400 font-medium tabular-nums">
                                                         {fmtDate(s.suggestedStartDate)} – {fmtDate(s.suggestedDueDate)}
                                                     </span>
                                                     <span className={`text-xs font-semibold tabular-nums text-right ${
-                                                        shift > 0 ? 'text-amber-600 dark:text-amber-400' : shift < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
+                                                        shift > 0 ? 'text-amber-800 dark:text-amber-400' : shift < 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'
                                                     }`}>
                                                         {shift > 0 ? '+' : ''}{shift}d
                                                     </span>
                                                     <span className={`text-xs tabular-nums text-right ${
-                                                        s.tardinessDays > 0 ? 'text-red-500 dark:text-red-400 font-semibold' : 'text-slate-300 dark:text-slate-600'
+                                                        s.tardinessDays > 0 ? 'text-red-700 dark:text-red-400 font-semibold' : 'text-slate-600 dark:text-slate-300'
                                                     }`}>
                                                         {s.tardinessDays > 0 ? `+${s.tardinessDays}d` : '—'}
                                                     </span>
-                                                    <span className="text-xs text-slate-500 dark:text-slate-400 truncate text-right" title={s.assignee || 'Unassigned'}>
+                                                    <span className="text-xs text-slate-600 dark:text-slate-300 truncate text-right" title={s.assignee || 'Unassigned'}>
                                                         {s.assignee ? formatAssigneeName(s.assignee) : '—'}
                                                     </span>
                                                 </div>

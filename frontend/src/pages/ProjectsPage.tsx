@@ -34,7 +34,7 @@ const ProjectsPage = () => {
     const location = useLocation();
     const { user } = useAuth();
     const {
-        projects, projectsError, updateTaskSchedule, retryProjects,
+        projects, projectsLoading, projectsError, updateTaskSchedule, retryProjects,
     } = useProjects();
     const handleLogout = useLogout();
 
@@ -92,8 +92,12 @@ const ProjectsPage = () => {
         }));
     }, [setSortState]);
 
+    const optimizationProjects = useMemo(() => projectKeyFilter
+        ? processedProjects.filter(project => project.projectKey === projectKeyFilter)
+        : processedProjects, [processedProjects, projectKeyFilter]);
+
     const { optimization, handleOptimize, handleAcceptOptimization, handleRejectOptimization } =
-        useScheduleOptimization({ processedProjects, onApplied: retryProjects });
+        useScheduleOptimization({ processedProjects: optimizationProjects, onApplied: retryProjects });
 
     useKeyboardShortcuts(modalOpen ? [] : [
         { key: 'n', handler: () => openModal('task', 'create') },
@@ -207,7 +211,7 @@ const ProjectsPage = () => {
                 onCreateTask={openCreateTask}
             />
 
-            <div className="flex-grow flex flex-col">
+            <main id="main-content" tabIndex={-1} aria-busy={projectsLoading} className="grow flex flex-col">
                 {projectsError && (
                     <div className="mx-6 lg:mx-10 mt-3 flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                         <span className="text-sm text-red-700 dark:text-red-300">{projectsError}</span>
@@ -222,10 +226,10 @@ const ProjectsPage = () => {
                 )}
 
                 <div className="px-6 lg:px-10 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-fade-in-slide">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                         <div className="flex items-center gap-2.5 shrink-0 mr-1">
                             <h1 className="text-sm font-semibold text-slate-900 dark:text-white">Projects</h1>
-                            <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">
+                            <span className="text-xs text-slate-600 dark:text-slate-300 tabular-nums">
                                 {allTasks.length} tasks
                             </span>
                         </div>
@@ -263,12 +267,13 @@ const ProjectsPage = () => {
                                     type="button"
                                     onClick={() => setMode(mode)}
                                     aria-pressed={viewState.mode === mode}
+                                    aria-label={mode === 'timeline' ? 'Timeline' : 'List'}
                                     className={
                                         'py-1.5 px-3 text-sm font-medium rounded-md transition-all duration-200 '
                                         + (mode === 'timeline' ? 'hidden sm:flex ' : '')
                                         + (viewState.mode === mode
                                             ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200')
+                                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-200')
                                     }
                                 >
                                     <span className="flex items-center gap-1.5">
@@ -283,7 +288,7 @@ const ProjectsPage = () => {
                     </div>
                 </div>
 
-                <div className="px-6 lg:px-10 pt-4 pb-6 flex-grow flex flex-col">
+                <div className="px-6 lg:px-10 pt-4 pb-6 grow flex flex-col">
                     {optimization.result && viewState.mode === 'timeline' && (
                         <OptimizationMetrics
                             originalMetrics={optimization.result.originalMetrics}
@@ -298,7 +303,9 @@ const ProjectsPage = () => {
                         />
                     )}
 
-                    {viewState.mode === 'list' ? (
+                    {projectsLoading ? (
+                        <div role="status" className="py-16 text-center text-sm text-slate-600 dark:text-slate-300">Loading projects...</div>
+                    ) : viewState.mode === 'list' ? (
                         <ErrorBoundary level="section" resetKey={viewState.mode}>
                             <TaskListView
                                 filteredTasks={filteredTasks}
@@ -362,7 +369,7 @@ const ProjectsPage = () => {
                         />
                     </Suspense>
                 )}
-            </div>
+            </main>
         </div>
     );
 };

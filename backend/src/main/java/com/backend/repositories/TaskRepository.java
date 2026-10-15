@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TaskRepository extends JpaRepository<Task, Integer> {
+    long countByProjectIdIn(List<Integer> projectIds);
+
     @EntityGraph(value = "Task.withDetails", type = EntityGraph.EntityGraphType.FETCH)
     @Query("SELECT t FROM Task t WHERE t.project.id = :projectId ORDER BY t.taskNumber")
     List<Task> findByProjectIdWithDetails(@Param("projectId") Integer projectId);

@@ -103,6 +103,16 @@ class ValidationUtilTest {
     @DisplayName("validatePassword")
     class ValidatePasswordTests {
         @Test
+        void rejectsPasswordsOverBcryptByteLimitIncludingUnicode() {
+            assertThatThrownBy(() -> ValidationUtil.validatePassword("A1!" + "a".repeat(70)))
+                    .isInstanceOf(ValidationException.class).hasMessageContaining("72 bytes");
+            assertThatThrownBy(() -> ValidationUtil.validatePassword("A1!" + "ą".repeat(35)))
+                    .isInstanceOf(ValidationException.class).hasMessageContaining("72 bytes");
+            assertThatCode(() -> ValidationUtil.validatePassword("Aa1!" + "ą".repeat(34)))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
         @DisplayName("should accept valid password")
         void shouldAcceptValidPassword() {
             assertThatCode(() -> ValidationUtil.validatePassword("ValidPass123!")).doesNotThrowAnyException();
@@ -146,7 +156,7 @@ class ValidationUtilTest {
             String longPassword = "A1!" + "a".repeat(126);
             assertThatThrownBy(() -> ValidationUtil.validatePassword(longPassword))
                     .isInstanceOf(ValidationException.class)
-                    .hasMessage("Password must not exceed 128 characters");
+                    .hasMessage("Password must not exceed 72 bytes in UTF-8");
         }
 
         @Test
@@ -210,9 +220,9 @@ class ValidationUtilTest {
         }
 
         @Test
-        @DisplayName("should accept password at maximum length (128 chars)")
+        @DisplayName("should accept password at maximum length (72 bytes)")
         void shouldAcceptMaxLength() {
-            String maxPassword = "Aa1!" + "a".repeat(124);
+            String maxPassword = "Aa1!" + "a".repeat(68);
             assertThatCode(() -> ValidationUtil.validatePassword(maxPassword)).doesNotThrowAnyException();
         }
     }

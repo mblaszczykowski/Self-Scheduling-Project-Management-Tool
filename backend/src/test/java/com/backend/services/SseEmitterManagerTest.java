@@ -97,4 +97,31 @@ class SseEmitterManagerTest {
         return new NotificationDTO(1, "message", java.time.Instant.now(), false,
                 com.backend.entities.NotificationType.TASK_UPDATED, null);
     }
+    @Test
+    void enforcesTheCapDuringConcurrentRegistrations() throws Exception {
+        var created = new java.util.ArrayList<SseEmitter>();
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(8)) {
+            var tasks = java.util.stream.IntStream.range(0, 100)
+                    .<java.util.concurrent.Callable<SseEmitter>>mapToObj(i -> () -> manager.createEmitter(1)).toList();
+            for (var future : pool.invokeAll(tasks)) created.add(future.get());
+        }
+        var tracked = emitters().get(1);
+        assertThat(tracked).hasSize(2);
+        for (var emitter : created) {
+            assertThat(isCompleted(emitter)).isEqualTo(!tracked.contains(emitter));
+        }
+    }
+
+    @Test
+    void disconnectingAUserCompletesEveryStreamWithoutTouchingOthers() throws Exception {
+        var first = manager.createEmitter(1);
+        var second = manager.createEmitter(1);
+        var other = manager.createEmitter(2);
+        manager.disconnectUser(1);
+        assertThat(emitters()).doesNotContainKey(1).containsKey(2);
+        assertThat(isCompleted(first)).isTrue();
+        assertThat(isCompleted(second)).isTrue();
+        assertThat(isCompleted(other)).isFalse();
+    }
+
 }

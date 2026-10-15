@@ -1,14 +1,8 @@
 import React from 'react';
-import { TiptapFloatingMenu, Editor } from '@tiptap/react';
+import { Editor } from '@tiptap/react';
+import { FloatingMenu } from '@tiptap/react/menus';
 import { FLOATING_MENU_ITEMS } from './toolbarConfig';
 import { runItemCommand } from './editorActions';
-
-const FloatingMenu = TiptapFloatingMenu as React.FC<{
-    editor: Editor;
-    options?: { placement?: string };
-    className?: string;
-    children: React.ReactNode;
-}>;
 
 const FloatingMenuBar = ({ editor }: { editor: Editor | null }) => {
     if (!editor) return null;

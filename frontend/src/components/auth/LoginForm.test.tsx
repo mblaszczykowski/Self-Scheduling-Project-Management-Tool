@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import LoginForm from './LoginForm';
@@ -30,10 +31,10 @@ const LocationDisplay = () => {
 };
 
 const renderLoginAt = (pathWithQuery: string) => {
-    const queryIndex = pathWithQuery.indexOf('?');
-    window.location.search = queryIndex === -1 ? '' : pathWithQuery.slice(queryIndex);
+    window.history.replaceState({}, '', pathWithQuery);
 
     render(
+        <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={[pathWithQuery]}>
             <AuthProvider initialUser={null}>
                 <LocationDisplay />
@@ -43,7 +44,8 @@ const renderLoginAt = (pathWithQuery: string) => {
                     <Route path="/projects" element={<div>Projects page</div>} />
                 </Routes>
             </AuthProvider>
-        </MemoryRouter>,
+        </MemoryRouter>
+        </QueryClientProvider>,
     );
 };
 
@@ -62,7 +64,7 @@ describe('LoginForm redirect', () => {
     });
 
     afterEach(() => {
-        window.location.search = '';
+        window.history.replaceState({}, '', '/');
         jest.clearAllMocks();
     });
 
@@ -80,8 +82,8 @@ describe('LoginForm redirect', () => {
 
         await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/dashboard'));
         expect(screen.getByTestId('location')).not.toHaveTextContent('evil.com');
-        expect(window.location.assign).not.toHaveBeenCalled();
-        expect(window.location.replace).not.toHaveBeenCalled();
+        expect(window.location.origin).toBe('http://localhost');
+        expect(window.location.href).not.toContain('http://evil.com');
     });
 
     test('a protocol-relative ?next=//evil.com falls back to /dashboard', async () => {
@@ -90,7 +92,7 @@ describe('LoginForm redirect', () => {
 
         await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/dashboard'));
         expect(screen.getByTestId('location')).not.toHaveTextContent('evil.com');
-        expect(window.location.assign).not.toHaveBeenCalled();
-        expect(window.location.replace).not.toHaveBeenCalled();
+        expect(window.location.origin).toBe('http://localhost');
+        expect(window.location.href).not.toContain('http://evil.com');
     });
 });

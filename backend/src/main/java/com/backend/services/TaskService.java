@@ -42,6 +42,7 @@ public class TaskService {
     private final EntityMapper entityMapper;
     private final AccessGuard accessGuard;
     private final SchedulingService schedulingService;
+    private final DependencyGraphLock dependencyGraphLock;
 
     public TaskService(TaskRepository taskRepository,
                        ProjectRepository projectRepository,
@@ -51,7 +52,8 @@ public class TaskService {
                        NotificationService notificationService,
                        EntityMapper entityMapper,
                        AccessGuard accessGuard,
-                       SchedulingService schedulingService) {
+                       SchedulingService schedulingService,
+                       DependencyGraphLock dependencyGraphLock) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
         this.fileStorageService = fileStorageService;
@@ -61,11 +63,15 @@ public class TaskService {
         this.entityMapper = entityMapper;
         this.accessGuard = accessGuard;
         this.schedulingService = schedulingService;
+        this.dependencyGraphLock = dependencyGraphLock;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public TaskDTO createTask(String projectKey, TaskRequest request, Integer userId,
                               List<MultipartFile> files) {
+        if (request.dependencyKeys() != null && !request.dependencyKeys().isEmpty()) {
+            dependencyGraphLock.tasks();
+        }
         var project = projectRepository.findByProjectKeyWithLock(projectKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
         accessGuard.requireAccess(project, userId);
@@ -106,6 +112,9 @@ public class TaskService {
     @Transactional(rollbackFor = Exception.class)
     public TaskDTO updateTask(String projectKey, String taskKey, TaskRequest request,
                               Integer userId, List<MultipartFile> files) {
+        if (request.dependencyKeys() != null && !request.dependencyKeys().isEmpty()) {
+            dependencyGraphLock.tasks();
+        }
         var project = accessGuard.getAccessibleProject(projectKey, userId);
         var task = requireTaskInProject(taskKey, project);
         var author = userService.getRequiredUserById(userId);
@@ -197,7 +206,8 @@ public class TaskService {
             applied++;
 
             var assignee = task.getAssignee();
-            if (assignee != null && !assignee.getId().equals(userId)) {
+            if (assignee != null && task.getProject().hasAccess(assignee.getId())
+                    && !assignee.getId().equals(userId)) {
                 pending.add(new NotificationService.Pending(assignee,
                         "Your task dates were updated by schedule optimization",
                         NotificationType.TASK_UPDATED,
@@ -215,7 +225,7 @@ public class TaskService {
         var task = requireTaskInProject(taskKey, project);
 
         var assignee = task.getAssignee();
-        if (assignee != null && !assignee.getId().equals(userId)) {
+        if (assignee != null && project.hasAccess(assignee.getId()) && !assignee.getId().equals(userId)) {
             notificationService.createNotification(assignee,
                     "Task '" + task.getSummary() + "' has been deleted",
                     NotificationType.TASK_DELETED, null);
@@ -299,7 +309,8 @@ public class TaskService {
 
     private void notifyAssignee(Task task, Integer actorId, String message, NotificationType type) {
         var assignee = task.getAssignee();
-        if (assignee == null || assignee.getId().equals(actorId)) {
+        if (assignee == null || !task.getProject().hasAccess(assignee.getId())
+                || assignee.getId().equals(actorId)) {
             return;
         }
         notificationService.createNotification(assignee, message, type,

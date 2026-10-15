@@ -456,4 +456,13 @@ class UserServiceTest {
                     .hasMessage("User not found");
         }
     }
+    @Test
+    void rejectsNamesThatBecomeTooShortAfterTrimming() {
+        var registration = new UserRegistrationRequest(" a ", "Valid", "valid@example.com", "Password1!");
+        assertThatThrownBy(() -> userService.registerUser(registration))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("First name");
+        verifyNoInteractions(tokenService);
+        verify(userRepository, never()).save(any());
+    }
+
 }

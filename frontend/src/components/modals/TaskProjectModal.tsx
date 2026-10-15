@@ -49,6 +49,8 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
     const formikRef = useRef<FormikProps<ModalFormValues>>(null);
     const [emailError, setEmailError] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const savingRef = useRef(false);
+    const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [uiState, setUiState] = useState({
         isVisible: false, deleteConfirmOpen: false,
         closeConfirmOpen: false, isDirty: false,
@@ -67,31 +69,36 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
     }, []);
 
     useEffect(() => {
+        const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = ''; };
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+        };
     }, []);
 
     const handleCloseAttempt = useCallback(() => {
+        if (savingRef.current || uiState.closeConfirmOpen || uiState.deleteConfirmOpen) return;
         const isDirty = formikRef.current?.dirty || uiState.isDirty;
         if (isDirty) {
             setUiState(prev => ({ ...prev, closeConfirmOpen: true }));
         } else {
             setUiState(prev => ({ ...prev, isVisible: false }));
-            setTimeout(onClose, 200);
+            closeTimerRef.current = setTimeout(onClose, 200);
         }
-    }, [onClose, uiState.isDirty]);
+    }, [onClose, uiState.isDirty, uiState.closeConfirmOpen, uiState.deleteConfirmOpen]);
 
     const handleForceClose = useCallback(() => {
         setUiState(prev => ({ ...prev, closeConfirmOpen: false, isVisible: false }));
-        setTimeout(onClose, 150);
+        closeTimerRef.current = setTimeout(onClose, 150);
     }, [onClose]);
 
     useClickOutside(modalRef, handleCloseAttempt);
 
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') { handleCloseAttempt(); return; }
             if (uiState.deleteConfirmOpen || uiState.closeConfirmOpen) return;
+            if (e.key === 'Escape') { handleCloseAttempt(); return; }
             if (modalRef.current) trapFocus(modalRef.current, e);
         };
         document.addEventListener('keydown', onKeyDown);
@@ -99,11 +106,12 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
     }, [handleCloseAttempt, uiState.deleteConfirmOpen, uiState.closeConfirmOpen]);
 
     const handleSubmit = async (values: ModalFormValues, { setSubmitting }: FormikHelpers<ModalFormValues>) => {
-        if (isSaving) return;
+        if (savingRef.current) return;
+        savingRef.current = true;
         setIsSaving(true);
         try {
             if (modalType === 'task') {
-                const projectKey = project?.projectKey || task?.projectKey || values.projectKey;
+                const projectKey = modalMode === 'create' ? values.projectKey : task?.projectKey;
                 if (!projectKey) {
                     showToast('Please select a project', 'error');
                     setIsSaving(false);
@@ -111,13 +119,13 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                     return;
                 }
                 const payload: TaskPayload = {
-                    summary: values.summary,
+                    summary: values.summary.trim(),
                     description: values.description,
                     status: values.status,
                     startDate: values.startDate,
                     dueDate: values.dueDate,
                     assignee: values.assignee,
-                    labels: values.labels.trim() ? values.labels.split(/\s+/) : [],
+                    labels: values.labels.trim() ? Array.from(new Set(values.labels.trim().split(/\s+/))) : [],
                     dependencyKeys: dependencies.map(String),
                     progress: values.progress,
                     priority: values.priority,
@@ -134,7 +142,7 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
             } else {
                 const payload: ProjectPayload = {
                     projectKey: (project?.projectKey ?? values.projectKey).toUpperCase(),
-                    summary: values.summary,
+                    summary: values.summary.trim(),
                     description: values.description,
                     memberEmails: values.memberEmails,
                     dependencies,
@@ -154,11 +162,15 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
             showToast(getErrorMessage(err, 'Failed to save'), 'error');
         } finally {
             setSubmitting(false);
+            savingRef.current = false;
             setIsSaving(false);
         }
     };
 
     const handleDeleteConfirm = async () => {
+        if (savingRef.current) return;
+        savingRef.current = true;
+        setIsSaving(true);
         setUiState(prev => ({ ...prev, deleteConfirmOpen: false }));
         try {
             if (modalType === 'task' && modalMode === 'edit') {
@@ -173,6 +185,9 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
             handleForceClose();
         } catch (err) {
             showToast(getErrorMessage(err, 'Failed to delete'), 'error');
+        } finally {
+            savingRef.current = false;
+            setIsSaving(false);
         }
     };
 
@@ -307,14 +322,16 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                     </Formik>
                 </div>
 
-                <div className="flex-shrink-0 px-5 py-2.5 border-t border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/50 rounded-b-xl flex items-center gap-2">
+                <div className="shrink-0 px-5 py-2.5 border-t border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/50 rounded-b-xl flex items-center gap-2">
                     {modalMode === 'edit' && (
                         <button
                             type="button"
+                            disabled={isSaving}
+                            aria-label={`Delete ${modalType}`}
                             onClick={() => setUiState(prev => ({
                                 ...prev, deleteConfirmOpen: true,
                             }))}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
                         >
                             <HiOutlineTrash className="w-3.5 h-3.5" />
                             Delete
@@ -324,7 +341,8 @@ const TaskProjectModal = ({ modalType, modalMode, project, task, onClose }: Task
                     <button
                         type="button"
                         onClick={handleCloseAttempt}
-                        className="px-3.5 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                        disabled={isSaving}
+                        className="px-3.5 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
                     >
                         Cancel
                     </button>

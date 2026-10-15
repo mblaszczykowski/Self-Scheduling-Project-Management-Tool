@@ -1,5 +1,6 @@
 package com.backend.scheduling;
 
+import com.backend.exception.ValidationException;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
@@ -11,7 +12,14 @@ public final class SchedulingSupport {
             return 1;
         }
         long days = ChronoUnit.DAYS.between(startDate, dueDate);
-        return Math.max(1, (int) days + 1);
+        return Math.max(1, checkedDays(days + 1));
+    }
+
+    public static int checkedDays(long days) {
+        if (days > Integer.MAX_VALUE || days < Integer.MIN_VALUE) {
+            throw new ValidationException("Task dates exceed the supported scheduling range");
+        }
+        return (int) days;
     }
 
     public static int remainingDurationDays(int totalDuration, Integer progressPercent) {

@@ -46,7 +46,7 @@ public class FileController {
                     .header(HttpHeaders.CONTENT_TYPE,
                             contentType != null ? contentType : "application/octet-stream")
                     .header("X-Content-Type-Options", "nosniff")
-                    .header("Cache-Control", "private, max-age=3600")
+                    .header("Cache-Control", "private, no-store")
                     .body(resource);
         } catch (IOException ex) {
             throw new ResourceNotFoundException("File not found");
@@ -58,6 +58,7 @@ public class FileController {
                 .orElseThrow(() -> new ResourceNotFoundException("File not found"));
         var projectId = ownership.getProjectId();
         if (projectId == null) {
+            accessGuard.requireProfileAccess(ownership.getUploadedBy(), userId);
             return;
         }
         accessGuard.requireProjectAccessById(projectId, userId);

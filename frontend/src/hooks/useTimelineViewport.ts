@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { MS_PER_DAY } from '../util/helpers';
+import { MS_PER_DAY, dayIndex, daysBetween } from '../util/helpers';
 import { TIMELINE_CONSTANTS } from '../config/timelineConstants';
 import { OptimizationSuggestion, ProcessedProject } from '../types';
 
@@ -8,8 +8,8 @@ const MIN_MONTHS = 4;
 
 const timeOf = (date?: string | null): number | null => {
     if (!date) return null;
-    const parsed = new Date(date).getTime();
-    return Number.isNaN(parsed) ? null : parsed;
+    const day = dayIndex(date);
+    return day === null ? null : day * MS_PER_DAY;
 };
 
 interface Options {
@@ -61,8 +61,8 @@ export function useTimelineViewport({ processedProjects, suggestions }: Options)
         } else {
             const earliest = new Date(dates.reduce((a, b) => Math.min(a, b)));
             const latest = new Date(dates.reduce((a, b) => Math.max(a, b)));
-            timelineStart = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
-            timelineEnd = new Date(latest.getFullYear(), latest.getMonth() + 1, 0);
+            timelineStart = new Date(earliest.getUTCFullYear(), earliest.getUTCMonth(), 1);
+            timelineEnd = new Date(latest.getUTCFullYear(), latest.getUTCMonth() + 1, 0);
 
             const monthSpan = (timelineEnd.getFullYear() - timelineStart.getFullYear()) * 12
                 + (timelineEnd.getMonth() - timelineStart.getMonth()) + 1;
@@ -73,7 +73,7 @@ export function useTimelineViewport({ processedProjects, suggestions }: Options)
         }
 
         const totalDays =
-            Math.round((timelineEnd.getTime() - timelineStart.getTime()) / MS_PER_DAY) + 1;
+            daysBetween(timelineStart, timelineEnd) + 1;
         const timelineWidth = totalDays * DAY_WIDTH + TIMELINE_END_PADDING;
 
         return { timelineStart, timelineEnd, timelineWidth };
@@ -83,7 +83,7 @@ export function useTimelineViewport({ processedProjects, suggestions }: Options)
         const timeline = timelineRef.current;
         if (!timeline) return;
         const daysFromStart =
-            Math.round((Date.now() - bounds.timelineStart.getTime()) / MS_PER_DAY);
+            daysBetween(bounds.timelineStart, new Date());
         const target = Math.max(0, daysFromStart * DAY_WIDTH - timeline.clientWidth / 2);
         timeline.scrollTo({ left: target, behavior: 'smooth' });
     }, [bounds.timelineStart]);

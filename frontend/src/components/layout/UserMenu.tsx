@@ -27,7 +27,7 @@ export default function UserMenu({
 
             <button
                 type="button"
-                className="p-2 inline-flex items-center rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="p-2 inline-flex items-center rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 onClick={onLogoutClick}
                 title="Log out"
                 aria-label="Log out"

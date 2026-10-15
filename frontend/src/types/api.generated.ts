@@ -3,916 +3,1456 @@
  * Do not make direct changes to the file.
  */
 
-
 export interface paths {
-  "/api/users/me": {
-    get: operations["getCurrentUser"];
-    put: operations["updateProfile"];
-  };
-  "/api/tasks/{taskId}/comments/{commentId}": {
-    put: operations["updateComment"];
-    delete: operations["deleteComment"];
-  };
-  "/api/projects/{projectKey}": {
-    get: operations["getProject"];
-    put: operations["updateProject"];
-    delete: operations["deleteProject"];
-  };
-  "/api/projects/{projectKey}/tasks/{taskKey}": {
-    put: operations["updateTask"];
-    delete: operations["deleteTask"];
-  };
-  "/api/users": {
-    post: operations["register"];
-  };
-  "/api/tasks/{taskId}/comments": {
-    get: operations["getComments"];
-    post: operations["addComment"];
-  };
-  "/api/tasks/{taskId}/comments/{commentId}/reactions": {
-    post: operations["reactToComment"];
-  };
-  "/api/projects": {
-    get: operations["getProjects"];
-    post: operations["createProject"];
-  };
-  "/api/projects/{projectKey}/tasks": {
-    post: operations["createTask"];
-  };
-  "/api/optimization/simulate": {
-    post: operations["simulate"];
-  };
-  "/api/optimization/apply": {
-    post: operations["apply"];
-  };
-  "/api/notifications/mark-as-read": {
-    post: operations["markAsRead"];
-  };
-  "/api/notifications/mark-all-read": {
-    post: operations["markAllRead"];
-  };
-  "/api/auth/refresh": {
-    post: operations["refresh"];
-  };
-  "/api/auth/logout": {
-    post: operations["logout"];
-  };
-  "/api/auth/login": {
-    post: operations["login"];
-  };
-  "/api/users/me/email-preferences": {
-    patch: operations["updateEmailPreferences"];
-  };
-  "/api/projects/{projectKey}/tasks/{taskKey}/schedule": {
-    patch: operations["updateSchedule"];
-  };
-  "/files/{fileName}": {
-    get: operations["serveFile"];
-  };
-  "/api/users/lookup": {
-    get: operations["lookupByEmail"];
-  };
-  "/api/tasks/{taskId}/activities": {
-    get: operations["getActivities"];
-  };
-  "/api/search": {
-    get: operations["search"];
-  };
-  "/api/notifications": {
-    get: operations["getNotifications"];
-  };
-  "/api/notifications/unread-count": {
-    get: operations["getUnreadCount"];
-  };
-  "/api/notifications/stream": {
-    get: operations["streamNotifications"];
-  };
+    "/api/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCurrentUser"];
+        put: operations["updateProfile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{taskId}/comments/{commentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateComment"];
+        post?: never;
+        delete: operations["deleteComment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProject"];
+        put: operations["updateProject"];
+        post?: never;
+        delete: operations["deleteProject"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectKey}/tasks/{taskKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateTask"];
+        post?: never;
+        delete: operations["deleteTask"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{taskId}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getComments"];
+        put?: never;
+        post: operations["addComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{taskId}/comments/{commentId}/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reactToComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProjects"];
+        put?: never;
+        post: operations["createProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectKey}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/optimization/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["simulate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/optimization/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/mark-as-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markAsRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/mark-all-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markAllRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/me/email-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateEmailPreferences"];
+        trace?: never;
+    };
+    "/api/projects/{projectKey}/tasks/{taskKey}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateSchedule"];
+        trace?: never;
+    };
+    "/files/{fileName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["serveFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["lookupByEmail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{taskId}/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getActivities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUnreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["streamNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
-
 export type webhooks = Record<string, never>;
-
 export interface components {
-  schemas: {
-    CurrentUserDTO: {
-      /** Format: int32 */
-      id?: number;
-      firstname?: string;
-      lastname?: string;
-      email?: string;
-      profilePicture?: string;
-      emailNotificationsEnabled?: boolean;
-      emailOnTaskAssigned?: boolean;
-      emailOnCommentReply?: boolean;
-      emailOnProjectInvitation?: boolean;
+    schemas: {
+        CurrentUserDTO: {
+            /** Format: int32 */
+            id?: number;
+            firstname?: string;
+            lastname?: string;
+            email?: string;
+            profilePicture?: string;
+            emailNotificationsEnabled?: boolean;
+            emailOnTaskAssigned?: boolean;
+            emailOnCommentReply?: boolean;
+            emailOnProjectInvitation?: boolean;
+        };
+        CommentDTO: {
+            /** Format: int32 */
+            id?: number;
+            /** Format: int32 */
+            taskId?: number;
+            /** Format: int32 */
+            authorId?: number;
+            authorName?: string;
+            authorProfilePicture?: string;
+            content?: string;
+            /** Format: date-time */
+            timestamp?: string;
+            /** Format: date-time */
+            editedAt?: string;
+            attachments?: string[];
+            /** Format: int32 */
+            likeCount?: number;
+            /** Format: int32 */
+            dislikeCount?: number;
+            likedByCurrentUser?: boolean;
+            dislikedByCurrentUser?: boolean;
+            replies?: components["schemas"]["CommentDTO"][];
+        };
+        ProjectDTO: {
+            /** Format: int32 */
+            id?: number;
+            projectKey?: string;
+            summary?: string;
+            description?: string;
+            tasks?: components["schemas"]["TaskDTO"][];
+            members?: components["schemas"]["UserDTO"][];
+            attachments?: string[];
+            owner?: components["schemas"]["UserDTO"];
+            dependencies?: string[];
+            /** Format: date-time */
+            created?: string;
+            /** Format: date-time */
+            updated?: string;
+        };
+        TaskDTO: {
+            /** Format: int32 */
+            id?: number;
+            /** Format: int32 */
+            taskNumber?: number;
+            taskKey?: string;
+            projectKey?: string;
+            summary?: string;
+            description?: string;
+            /** @enum {string} */
+            status?: "BACKLOG" | "GATHERING_INTEREST" | "TODO" | "WITHDRAWN" | "IN_PROGRESS" | "TO_REVIEW" | "TO_TEST" | "IN_TEST" | "READY_TO_MERGE" | "READY_TO_DEPLOY" | "RELEASED" | "DONE";
+            /** Format: date */
+            startDate?: string;
+            /** Format: date */
+            dueDate?: string;
+            assignee?: string;
+            labels?: string[];
+            dependencyKeys?: string[];
+            isCritical?: boolean;
+            /** Format: int32 */
+            totalFloat?: number;
+            attachments?: string[];
+            /** Format: date-time */
+            created?: string;
+            /** Format: date-time */
+            updated?: string;
+            /** Format: int32 */
+            progress?: number;
+            /** @enum {string} */
+            priority?: "LOWEST" | "LOW" | "MEDIUM" | "HIGH" | "HIGHEST";
+        };
+        UserDTO: {
+            /** Format: int32 */
+            id?: number;
+            firstname?: string;
+            lastname?: string;
+            email?: string;
+            profilePicture?: string;
+        };
+        UserRegistrationRequest: {
+            firstname: string;
+            lastname: string;
+            /** Format: email */
+            email: string;
+            password: string;
+        };
+        LoginResponse: {
+            message?: string;
+            /** Format: int32 */
+            userId?: number;
+            email?: string;
+            name?: string;
+        };
+        OptimizationRequest: {
+            projectKeys: string[];
+            /** Format: double */
+            alpha?: number;
+            /** Format: double */
+            beta?: number;
+            /** Format: date */
+            horizonStart?: string;
+        };
+        OptimizationMetricsDTO: {
+            /** Format: double */
+            weightedTardiness?: number;
+            /** Format: int32 */
+            makespan?: number;
+            /** Format: double */
+            objectiveValue?: number;
+            /** Format: int32 */
+            totalTasks?: number;
+            /** Format: int32 */
+            tasksOnTime?: number;
+            /** Format: int32 */
+            tasksLate?: number;
+            /** Format: int32 */
+            resourceConflicts?: number;
+            feasible?: boolean;
+        };
+        OptimizationResultDTO: {
+            suggestions?: components["schemas"]["TaskScheduleSuggestionDTO"][];
+            originalMetrics?: components["schemas"]["OptimizationMetricsDTO"];
+            optimizedMetrics?: components["schemas"]["OptimizationMetricsDTO"];
+            /** Format: int32 */
+            tasksShifted?: number;
+            chosenRule?: string;
+            skippedTaskKeys?: string[];
+            previewToken?: string;
+        };
+        TaskScheduleSuggestionDTO: {
+            taskKey?: string;
+            projectKey?: string;
+            summary?: string;
+            assignee?: string;
+            /** Format: date */
+            originalStartDate?: string;
+            /** Format: date */
+            originalDueDate?: string;
+            /** Format: date */
+            suggestedStartDate?: string;
+            /** Format: date */
+            suggestedDueDate?: string;
+            /** Format: int32 */
+            priorityWeight?: number;
+            /** Format: int32 */
+            tardinessDays?: number;
+            isCritical?: boolean;
+            wasShifted?: boolean;
+        };
+        ApplyOptimizationRequest: {
+            projectKeys: string[];
+            /** Format: double */
+            alpha?: number;
+            /** Format: double */
+            beta?: number;
+            /** Format: date */
+            horizonStart?: string;
+            acceptedTaskKeys?: string[];
+            previewToken?: string;
+        };
+        AppliedSchedule: {
+            /** Format: int32 */
+            tasksUpdated?: number;
+        };
+        UnreadCount: {
+            /** Format: int64 */
+            count?: number;
+        };
+        MessageResponse: {
+            message?: string;
+        };
+        LoginRequest: {
+            /** Format: email */
+            email: string;
+            password: string;
+        };
+        EmailPreferencesRequest: {
+            emailNotificationsEnabled?: boolean;
+            emailOnTaskAssigned?: boolean;
+            emailOnCommentReply?: boolean;
+            emailOnProjectInvitation?: boolean;
+        };
+        TaskScheduleRequest: {
+            /** Format: date */
+            startDate: string;
+            /** Format: date */
+            dueDate: string;
+        };
+        PagedResponseCommentDTO: {
+            content?: components["schemas"]["CommentDTO"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            hasNext?: boolean;
+        };
+        PagedResponseTaskActivityDTO: {
+            content?: components["schemas"]["TaskActivityDTO"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            hasNext?: boolean;
+        };
+        TaskActivityDTO: {
+            /** Format: int32 */
+            id?: number;
+            /** @enum {string} */
+            type?: "CREATED" | "STATUS_CHANGED" | "PRIORITY_CHANGED" | "ASSIGNEE_CHANGED" | "PROGRESS_CHANGED" | "DATES_CHANGED" | "SUMMARY_CHANGED" | "DESCRIPTION_CHANGED" | "LABELS_CHANGED" | "DEPENDENCIES_CHANGED" | "ATTACHMENTS_CHANGED" | "COMMENT_ADDED" | "COMMENT_EDITED" | "COMMENT_DELETED";
+            fieldName?: string;
+            oldValue?: string;
+            newValue?: string;
+            authorName?: string;
+            authorProfilePicture?: string;
+            /** Format: date-time */
+            timestamp?: string;
+        };
+        CommentResult: {
+            /** Format: int32 */
+            commentId?: number;
+            /** Format: int32 */
+            taskId?: number;
+            taskKey?: string;
+            authorName?: string;
+            snippet?: string;
+        };
+        ProjectResult: {
+            projectKey?: string;
+            summary?: string;
+            description?: string;
+        };
+        SearchResultDTO: {
+            projects?: components["schemas"]["ProjectResult"][];
+            tasks?: components["schemas"]["TaskResult"][];
+            comments?: components["schemas"]["CommentResult"][];
+        };
+        TaskResult: {
+            taskKey?: string;
+            projectKey?: string;
+            summary?: string;
+            status?: string;
+            priority?: string;
+            assigneeName?: string;
+        };
+        PagedResponseProjectDTO: {
+            content?: components["schemas"]["ProjectDTO"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            hasNext?: boolean;
+        };
+        NotificationDTO: {
+            /** Format: int32 */
+            id?: number;
+            message?: string;
+            /** Format: date-time */
+            timestamp?: string;
+            isRead?: boolean;
+            /** @enum {string} */
+            type?: "PROJECT_INVITATION" | "PROJECT_UPDATED" | "MEMBER_REMOVED" | "TASK_ASSIGNED" | "TASK_UPDATED" | "TASK_COMMENT" | "TASK_DELETED" | "COMMENT_REPLY" | "COMMENT_REACTION";
+            link?: string;
+        };
+        PagedResponseNotificationDTO: {
+            content?: components["schemas"]["NotificationDTO"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            hasNext?: boolean;
+        };
     };
-    CommentDTO: {
-      /** Format: int32 */
-      id?: number;
-      /** Format: int32 */
-      taskId?: number;
-      /** Format: int32 */
-      authorId?: number;
-      authorName?: string;
-      authorProfilePicture?: string;
-      content?: string;
-      /** Format: date-time */
-      timestamp?: string;
-      /** Format: date-time */
-      editedAt?: string;
-      attachments?: string[];
-      /** Format: int32 */
-      likeCount?: number;
-      /** Format: int32 */
-      dislikeCount?: number;
-      likedByCurrentUser?: boolean;
-      dislikedByCurrentUser?: boolean;
-      replies?: components["schemas"]["CommentDTO"][];
-    };
-    ProjectDTO: {
-      /** Format: int32 */
-      id?: number;
-      projectKey?: string;
-      summary?: string;
-      description?: string;
-      tasks?: components["schemas"]["TaskDTO"][];
-      members?: components["schemas"]["UserDTO"][];
-      attachments?: string[];
-      owner?: components["schemas"]["UserDTO"];
-      dependencies?: string[];
-      /** Format: date-time */
-      created?: string;
-      /** Format: date-time */
-      updated?: string;
-    };
-    TaskDTO: {
-      /** Format: int32 */
-      id?: number;
-      /** Format: int32 */
-      taskNumber?: number;
-      taskKey?: string;
-      projectKey?: string;
-      summary?: string;
-      description?: string;
-      /** @enum {string} */
-      status?: "BACKLOG" | "GATHERING_INTEREST" | "TODO" | "WITHDRAWN" | "IN_PROGRESS" | "TO_REVIEW" | "TO_TEST" | "IN_TEST" | "READY_TO_MERGE" | "READY_TO_DEPLOY" | "RELEASED" | "DONE";
-      /** Format: date */
-      startDate?: string;
-      /** Format: date */
-      dueDate?: string;
-      assignee?: string;
-      labels?: string[];
-      dependencyKeys?: string[];
-      isCritical?: boolean;
-      /** Format: int32 */
-      totalFloat?: number;
-      attachments?: string[];
-      /** Format: date-time */
-      created?: string;
-      /** Format: date-time */
-      updated?: string;
-      /** Format: int32 */
-      progress?: number;
-      /** @enum {string} */
-      priority?: "LOWEST" | "LOW" | "MEDIUM" | "HIGH" | "HIGHEST";
-    };
-    UserDTO: {
-      /** Format: int32 */
-      id?: number;
-      firstname?: string;
-      lastname?: string;
-      email?: string;
-      profilePicture?: string;
-    };
-    UserRegistrationRequest: {
-      firstname?: string;
-      lastname?: string;
-      email?: string;
-      password?: string;
-    };
-    LoginResponse: {
-      message?: string;
-      /** Format: int32 */
-      userId?: number;
-      email?: string;
-      name?: string;
-    };
-    OptimizationRequest: {
-      projectKeys?: string[];
-      /** Format: double */
-      alpha?: number;
-      /** Format: double */
-      beta?: number;
-      /** Format: date */
-      horizonStart?: string;
-    };
-    OptimizationMetricsDTO: {
-      /** Format: double */
-      weightedTardiness?: number;
-      /** Format: int32 */
-      makespan?: number;
-      /** Format: double */
-      objectiveValue?: number;
-      /** Format: int32 */
-      totalTasks?: number;
-      /** Format: int32 */
-      tasksOnTime?: number;
-      /** Format: int32 */
-      tasksLate?: number;
-      /** Format: int32 */
-      resourceConflicts?: number;
-      feasible?: boolean;
-    };
-    OptimizationResultDTO: {
-      suggestions?: components["schemas"]["TaskScheduleSuggestionDTO"][];
-      originalMetrics?: components["schemas"]["OptimizationMetricsDTO"];
-      optimizedMetrics?: components["schemas"]["OptimizationMetricsDTO"];
-      /** Format: int32 */
-      tasksShifted?: number;
-      chosenRule?: string;
-      skippedTaskKeys?: string[];
-    };
-    TaskScheduleSuggestionDTO: {
-      taskKey?: string;
-      projectKey?: string;
-      summary?: string;
-      assignee?: string;
-      /** Format: date */
-      originalStartDate?: string;
-      /** Format: date */
-      originalDueDate?: string;
-      /** Format: date */
-      suggestedStartDate?: string;
-      /** Format: date */
-      suggestedDueDate?: string;
-      /** Format: int32 */
-      priorityWeight?: number;
-      /** Format: int32 */
-      tardinessDays?: number;
-      isCritical?: boolean;
-      wasShifted?: boolean;
-    };
-    ApplyOptimizationRequest: {
-      projectKeys?: string[];
-      /** Format: double */
-      alpha?: number;
-      /** Format: double */
-      beta?: number;
-      /** Format: date */
-      horizonStart?: string;
-      acceptedTaskKeys?: string[];
-    };
-    AppliedSchedule: {
-      /** Format: int32 */
-      tasksUpdated?: number;
-    };
-    UnreadCount: {
-      /** Format: int64 */
-      count?: number;
-    };
-    MessageResponse: {
-      message?: string;
-    };
-    LoginRequest: {
-      email?: string;
-      password?: string;
-    };
-    EmailPreferencesRequest: {
-      emailNotificationsEnabled?: boolean;
-      emailOnTaskAssigned?: boolean;
-      emailOnCommentReply?: boolean;
-      emailOnProjectInvitation?: boolean;
-    };
-    TaskScheduleRequest: {
-      /** Format: date */
-      startDate: string;
-      /** Format: date */
-      dueDate: string;
-    };
-    PagedResponseCommentDTO: {
-      content?: components["schemas"]["CommentDTO"][];
-      /** Format: int32 */
-      page?: number;
-      /** Format: int32 */
-      size?: number;
-      /** Format: int64 */
-      totalElements?: number;
-      /** Format: int32 */
-      totalPages?: number;
-      hasNext?: boolean;
-    };
-    PagedResponseTaskActivityDTO: {
-      content?: components["schemas"]["TaskActivityDTO"][];
-      /** Format: int32 */
-      page?: number;
-      /** Format: int32 */
-      size?: number;
-      /** Format: int64 */
-      totalElements?: number;
-      /** Format: int32 */
-      totalPages?: number;
-      hasNext?: boolean;
-    };
-    TaskActivityDTO: {
-      /** Format: int32 */
-      id?: number;
-      /** @enum {string} */
-      type?: "CREATED" | "STATUS_CHANGED" | "PRIORITY_CHANGED" | "ASSIGNEE_CHANGED" | "PROGRESS_CHANGED" | "DATES_CHANGED" | "SUMMARY_CHANGED" | "DESCRIPTION_CHANGED" | "LABELS_CHANGED" | "DEPENDENCIES_CHANGED" | "ATTACHMENTS_CHANGED" | "COMMENT_ADDED" | "COMMENT_EDITED" | "COMMENT_DELETED";
-      fieldName?: string;
-      oldValue?: string;
-      newValue?: string;
-      authorName?: string;
-      authorProfilePicture?: string;
-      /** Format: date-time */
-      timestamp?: string;
-    };
-    CommentResult: {
-      /** Format: int32 */
-      commentId?: number;
-      /** Format: int32 */
-      taskId?: number;
-      taskKey?: string;
-      authorName?: string;
-      snippet?: string;
-    };
-    ProjectResult: {
-      projectKey?: string;
-      summary?: string;
-      description?: string;
-    };
-    SearchResultDTO: {
-      projects?: components["schemas"]["ProjectResult"][];
-      tasks?: components["schemas"]["TaskResult"][];
-      comments?: components["schemas"]["CommentResult"][];
-    };
-    TaskResult: {
-      taskKey?: string;
-      projectKey?: string;
-      summary?: string;
-      status?: string;
-      priority?: string;
-      assigneeName?: string;
-    };
-    PagedResponseProjectDTO: {
-      content?: components["schemas"]["ProjectDTO"][];
-      /** Format: int32 */
-      page?: number;
-      /** Format: int32 */
-      size?: number;
-      /** Format: int64 */
-      totalElements?: number;
-      /** Format: int32 */
-      totalPages?: number;
-      hasNext?: boolean;
-    };
-    NotificationDTO: {
-      /** Format: int32 */
-      id?: number;
-      message?: string;
-      /** Format: date-time */
-      timestamp?: string;
-      isRead?: boolean;
-      /** @enum {string} */
-      type?: "PROJECT_INVITATION" | "PROJECT_UPDATED" | "MEMBER_REMOVED" | "TASK_ASSIGNED" | "TASK_UPDATED" | "TASK_COMMENT" | "TASK_DELETED" | "COMMENT_REPLY" | "COMMENT_REACTION";
-      link?: string;
-    };
-    PagedResponseNotificationDTO: {
-      content?: components["schemas"]["NotificationDTO"][];
-      /** Format: int32 */
-      page?: number;
-      /** Format: int32 */
-      size?: number;
-      /** Format: int64 */
-      totalElements?: number;
-      /** Format: int32 */
-      totalPages?: number;
-      hasNext?: boolean;
-    };
-  };
-  responses: never;
-  parameters: never;
-  requestBodies: never;
-  headers: never;
-  pathItems: never;
+    responses: never;
+    parameters: never;
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
 }
-
 export type $defs = Record<string, never>;
-
-export type external = Record<string, never>;
-
 export interface operations {
-
-  getCurrentUser: {
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["CurrentUserDTO"];
+    getCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-    };
-  };
-  updateProfile: {
-    requestBody?: {
-      content: {
-        "multipart/form-data": {
-          profile: string;
-          /** Format: binary */
-          profilePicture?: string;
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CurrentUserDTO"];
+                };
+            };
         };
-      };
     };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["CurrentUserDTO"];
+    updateProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-    };
-  };
-  updateComment: {
-    parameters: {
-      path: {
-        taskId: number;
-        commentId: number;
-      };
-    };
-    requestBody: {
-      content: {
-        "multipart/form-data": {
-          content: string;
-          attachments?: string[];
+        requestBody?: {
+            content: {
+                "multipart/form-data": number;
+            };
         };
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["CommentDTO"];
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CurrentUserDTO"];
+                };
+            };
         };
-      };
     };
-  };
-  deleteComment: {
-    parameters: {
-      path: {
-        taskId: number;
-        commentId: number;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: never;
-      };
-    };
-  };
-  getProject: {
-    parameters: {
-      path: {
-        projectKey: string;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["ProjectDTO"];
+    updateComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: number;
+                commentId: number;
+            };
+            cookie?: never;
         };
-      };
-    };
-  };
-  updateProject: {
-    parameters: {
-      path: {
-        projectKey: string;
-      };
-    };
-    requestBody?: {
-      content: {
-        "multipart/form-data": {
-          projectDTO: string;
-          attachments?: string[];
+        requestBody: {
+            content: {
+                "multipart/form-data": number;
+            };
         };
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["ProjectDTO"];
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CommentDTO"];
+                };
+            };
         };
-      };
     };
-  };
-  deleteProject: {
-    parameters: {
-      path: {
-        projectKey: string;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: never;
-      };
-    };
-  };
-  updateTask: {
-    parameters: {
-      path: {
-        projectKey: string;
-        taskKey: string;
-      };
-    };
-    requestBody?: {
-      content: {
-        "multipart/form-data": {
-          taskDTO: string;
-          attachments?: string[];
+    deleteComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: number;
+                commentId: number;
+            };
+            cookie?: never;
         };
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["TaskDTO"];
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
-      };
     };
-  };
-  deleteTask: {
-    parameters: {
-      path: {
-        projectKey: string;
-        taskKey: string;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: never;
-      };
-    };
-  };
-  register: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["UserRegistrationRequest"];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["LoginResponse"];
+    getProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectKey: string;
+            };
+            cookie?: never;
         };
-      };
-    };
-  };
-  getComments: {
-    parameters: {
-      query?: {
-        page?: number;
-        size?: number;
-      };
-      path: {
-        taskId: number;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["PagedResponseCommentDTO"];
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProjectDTO"];
+                };
+            };
         };
-      };
     };
-  };
-  addComment: {
-    parameters: {
-      query?: {
-        parentCommentId?: number;
-      };
-      path: {
-        taskId: number;
-      };
-    };
-    requestBody: {
-      content: {
-        "multipart/form-data": {
-          content: string;
-          attachments?: string[];
+    updateProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectKey: string;
+            };
+            cookie?: never;
         };
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["CommentDTO"];
+        requestBody?: {
+            content: {
+                "multipart/form-data": number;
+            };
         };
-      };
-    };
-  };
-  reactToComment: {
-    parameters: {
-      query: {
-        type: "LIKE" | "DISLIKE";
-      };
-      path: {
-        taskId: number;
-        commentId: number;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["CommentDTO"];
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProjectDTO"];
+                };
+            };
         };
-      };
     };
-  };
-  getProjects: {
-    parameters: {
-      query?: {
-        page?: number;
-        size?: number;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["PagedResponseProjectDTO"];
+    deleteProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectKey: string;
+            };
+            cookie?: never;
         };
-      };
-    };
-  };
-  createProject: {
-    requestBody?: {
-      content: {
-        "multipart/form-data": {
-          projectDTO: string;
-          attachments?: string[];
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
-      };
     };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["ProjectDTO"];
+    updateTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectKey: string;
+                taskKey: string;
+            };
+            cookie?: never;
         };
-      };
-    };
-  };
-  createTask: {
-    parameters: {
-      path: {
-        projectKey: string;
-      };
-    };
-    requestBody?: {
-      content: {
-        "multipart/form-data": {
-          taskDTO: string;
-          attachments?: string[];
+        requestBody?: {
+            content: {
+                "multipart/form-data": number;
+            };
         };
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["TaskDTO"];
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TaskDTO"];
+                };
+            };
         };
-      };
     };
-  };
-  simulate: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["OptimizationRequest"];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["OptimizationResultDTO"];
+    deleteTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectKey: string;
+                taskKey: string;
+            };
+            cookie?: never;
         };
-      };
-    };
-  };
-  apply: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ApplyOptimizationRequest"];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["AppliedSchedule"];
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
-      };
     };
-  };
-  markAsRead: {
-    requestBody: {
-      content: {
-        "application/json": number[];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: never;
-      };
-    };
-  };
-  markAllRead: {
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["UnreadCount"];
+    register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-    };
-  };
-  refresh: {
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["MessageResponse"];
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserRegistrationRequest"];
+            };
         };
-      };
-    };
-  };
-  logout: {
-    responses: {
-      /** @description OK */
-      200: {
-        content: never;
-      };
-    };
-  };
-  login: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["LoginRequest"];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["LoginResponse"];
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LoginResponse"];
+                };
+            };
         };
-      };
     };
-  };
-  updateEmailPreferences: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["EmailPreferencesRequest"];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["CurrentUserDTO"];
+    getComments: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                taskId: number;
+            };
+            cookie?: never;
         };
-      };
-    };
-  };
-  updateSchedule: {
-    parameters: {
-      path: {
-        projectKey: string;
-        taskKey: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["TaskScheduleRequest"];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["TaskDTO"];
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagedResponseCommentDTO"];
+                };
+            };
         };
-      };
     };
-  };
-  serveFile: {
-    parameters: {
-      path: {
-        fileName: string;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": string;
+    addComment: {
+        parameters: {
+            query?: {
+                parentCommentId?: number;
+            };
+            header?: never;
+            path: {
+                taskId: number;
+            };
+            cookie?: never;
         };
-      };
-    };
-  };
-  lookupByEmail: {
-    parameters: {
-      query: {
-        email: string;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["UserDTO"];
+        requestBody: {
+            content: {
+                "multipart/form-data": number;
+            };
         };
-      };
-    };
-  };
-  getActivities: {
-    parameters: {
-      query?: {
-        page?: number;
-        size?: number;
-      };
-      path: {
-        taskId: number;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["PagedResponseTaskActivityDTO"];
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CommentDTO"];
+                };
+            };
         };
-      };
     };
-  };
-  search: {
-    parameters: {
-      query: {
-        q: string;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["SearchResultDTO"];
+    reactToComment: {
+        parameters: {
+            query: {
+                type: "LIKE" | "DISLIKE";
+            };
+            header?: never;
+            path: {
+                taskId: number;
+                commentId: number;
+            };
+            cookie?: never;
         };
-      };
-    };
-  };
-  getNotifications: {
-    parameters: {
-      query?: {
-        page?: number;
-        size?: number;
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["PagedResponseNotificationDTO"];
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CommentDTO"];
+                };
+            };
         };
-      };
     };
-  };
-  getUnreadCount: {
-    responses: {
-      /** @description OK */
-      200: {
-        content: {
-          "*/*": components["schemas"]["UnreadCount"];
+    getProjects: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-    };
-  };
-  streamNotifications: {
-    responses: {
-      /** @description Stream of notification events */
-      200: {
-        content: {
-          "text/event-stream": components["schemas"]["NotificationDTO"];
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagedResponseProjectDTO"];
+                };
+            };
         };
-      };
     };
-  };
+    createProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": number;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProjectDTO"];
+                };
+            };
+        };
+    };
+    createTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": number;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TaskDTO"];
+                };
+            };
+        };
+    };
+    simulate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptimizationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OptimizationResultDTO"];
+                };
+            };
+        };
+    };
+    apply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyOptimizationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AppliedSchedule"];
+                };
+            };
+        };
+    };
+    markAsRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": number[];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    markAllRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UnreadCount"];
+                };
+            };
+        };
+    };
+    refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MessageResponse"];
+                };
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LoginResponse"];
+                };
+            };
+        };
+    };
+    updateEmailPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailPreferencesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CurrentUserDTO"];
+                };
+            };
+        };
+    };
+    updateSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectKey: string;
+                taskKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TaskDTO"];
+                };
+            };
+        };
+    };
+    serveFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileName: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    lookupByEmail: {
+        parameters: {
+            query: {
+                email: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserDTO"];
+                };
+            };
+        };
+    };
+    getActivities: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                taskId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagedResponseTaskActivityDTO"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SearchResultDTO"];
+                };
+            };
+        };
+    };
+    getNotifications: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagedResponseNotificationDTO"];
+                };
+            };
+        };
+    };
+    getUnreadCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UnreadCount"];
+                };
+            };
+        };
+    };
+    streamNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stream of notification events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["NotificationDTO"];
+                };
+            };
+        };
+    };
 }

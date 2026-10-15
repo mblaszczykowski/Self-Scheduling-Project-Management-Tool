@@ -59,7 +59,7 @@ export function useProjectsPageState() {
     });
 
     useEffect(() => {
-        const { openFilterDropdown, searchQuery, ...toSave } = filterState;
+        const { openFilterDropdown: _openFilterDropdown, searchQuery: _searchQuery, ...toSave } = filterState;
         const timer = setTimeout(() => {
             save('flowlink_filters', toSave);
         }, 400);
@@ -71,7 +71,7 @@ export function useProjectsPageState() {
     }, [sortState]);
 
     useEffect(() => {
-        const { expandedProjects, ...toSave } = viewState;
+        const { expandedProjects: _expandedProjects, ...toSave } = viewState;
         save('flowlink_view', toSave);
     }, [viewState]);
 

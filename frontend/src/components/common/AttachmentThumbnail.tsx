@@ -68,8 +68,8 @@ const AttachmentThumbnail = ({
                             }
                         >
                             {fileType === 'pdf'
-                                ? <HiOutlineDocumentText className="w-3 h-3 text-red-500" />
-                                : <HiOutlineDocument className="w-3 h-3 text-slate-400" />}
+                                ? <HiOutlineDocumentText className="w-3 h-3 text-red-700" />
+                                : <HiOutlineDocument className="w-3 h-3 text-slate-600" />}
                             <span className="text-[10px] text-slate-600 dark:text-slate-300 truncate max-w-[60px]">
                                 {fileName}
                             </span>
@@ -105,13 +105,13 @@ const AttachmentThumbnail = ({
             ) : fileType === 'pdf' ? (
                 <PreviewTarget fileName={fileName} onOpen={handleOpen}
                     className="flex items-center gap-2 px-3 py-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:shadow-md hover:border-red-300 transition-all">
-                    <HiOutlineDocumentText className="w-4 h-4 text-red-500" />
+                    <HiOutlineDocumentText className="w-4 h-4 text-red-700" />
                     <span className="text-xs text-slate-700 dark:text-slate-200 truncate max-w-[90px] font-medium">{fileName}</span>
                 </PreviewTarget>
             ) : (
                 <PreviewTarget fileName={fileName} onOpen={handleOpen}
                     className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-md hover:border-slate-300 transition-all">
-                    <HiOutlineDocument className="w-4 h-4 text-slate-500" />
+                    <HiOutlineDocument className="w-4 h-4 text-slate-600" />
                     <span className="text-xs text-slate-700 dark:text-slate-200 truncate max-w-[90px] font-medium">{fileName}</span>
                 </PreviewTarget>
             )}

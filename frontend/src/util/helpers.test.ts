@@ -106,14 +106,9 @@ describe('daysBetween', () => {
     test('is signed', () => {
         expect(daysBetween('2024-01-08', '2024-01-01')).toBe(-7);
     });
-    test('mixing a live instant with a date-only string stays correct in a UTC-negative timezone', () => {
-        const originalTz = process.env.TZ;
-        process.env.TZ = 'America/New_York';
-        try {
-            expect(daysBetween(new Date('2024-06-20T03:30:00Z'), '2024-06-20')).toBe(0);
-        } finally {
-            process.env.TZ = originalTz;
-        }
+    test('compares the local calendar day of a live instant with date-only API values', () => {
+        expect(daysBetween(new Date(2024, 5, 20, 3, 30), '2024-06-20')).toBe(0);
+        expect(daysBetween(new Date(2024, 5, 19, 23, 30), '2024-06-20')).toBe(1);
     });
 });
 
@@ -199,7 +194,6 @@ describe('safeNextPath', () => {
         '/.//evil.com',
         '/a/../..//evil.com',
         'https://evil.com/login',
-        // eslint-disable-next-line no-script-url -- the point of the test is that this is refused
         'javascript:alert(1)',
     ])('refuses to hand the session off to %s', (hostile) => {
         expect(safeNextPath(`?next=${encodeURIComponent(hostile)}`)).toBe('/dashboard');
@@ -252,4 +246,10 @@ describe('missing dates', () => {
         expect(position.marginLeft).toBe(4 * TIMELINE_CONSTANTS.DAY_WIDTH);
         expect(position.width).toBe(4 * TIMELINE_CONSTANTS.DAY_WIDTH);
     });
+});
+
+
+test('date-only labels preserve the named calendar day across time zones', () => {
+    expect(formatShortDate('2026-10-01')).toBe('Oct 1');
+    expect(formatLongDate('2026-10-01')).toContain('Thursday, October 1');
 });

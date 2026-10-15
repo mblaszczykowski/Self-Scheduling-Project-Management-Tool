@@ -38,14 +38,34 @@ public final class ScheduleEvaluator {
         double objective = ScheduleObjective.value(weightedTardiness, makespan, horizon, alpha, beta);
 
         return new ScheduleMetrics(weightedTardiness, makespan, objective,
-                totalTasks, tasksLate, conflicts, conflicts == 0);
+                totalTasks, tasksLate, conflicts, conflicts == 0 && respectsPrecedence(schedule, graph));
+    }
+
+    private static boolean respectsPrecedence(Schedule schedule, PrecedenceGraph graph) {
+        for (var task : graph.tasks().values()) {
+            if (task.fixed()) {
+                continue;
+            }
+            var placement = schedule.placements().get(task.key());
+            if (placement == null) {
+                return false;
+            }
+            for (var predecessor : graph.knownPredecessorsOf(task.key())) {
+                var previous = schedule.placements().get(predecessor);
+                if (previous == null || previous.end() > placement.start()) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static int countResourceConflicts(Schedule schedule, PrecedenceGraph graph) {
         var byAssignee = new HashMap<String, List<Placement>>();
         for (var placement : schedule.all()) {
             var task = graph.task(placement.key());
-            if (task == null || !task.hasAssignee() || placement.start() >= placement.end()) {
+            if (task == null || !task.hasAssignee() || placement.start() >= placement.end()
+                    || placement.end() <= 0) {
                 continue;
             }
             byAssignee.computeIfAbsent(task.assignee(), key -> new ArrayList<>()).add(placement);

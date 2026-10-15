@@ -14,7 +14,10 @@ sequenceDiagram
     rect rgb(240, 240, 240)
     Note over B,F: every subsequent request
     B->>F: GET /api/... (Cookie: accessToken)
-    F->>F: verify JWT, set request attribute
+    F->>F: verify JWT signature and claims
+    F->>DB: session sid record still active?
+    DB-->>F: active session
+    F->>F: set request attribute
     F-->>B: 200 OK
     end
 

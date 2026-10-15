@@ -51,6 +51,8 @@ const RichTextEditor = ({
 }: RichTextEditorProps) => {
     const extensions = useMemo(() => [
         StarterKit.configure({
+            link: false,
+            underline: false,
             heading: { levels: [1, 2, 3, 4] },
             codeBlock: {
                 HTMLAttributes: {
@@ -120,7 +122,7 @@ const RichTextEditor = ({
             : []),
     ], [placeholder, characterLimit, showCharacterCount]);
 
-    const editor = useEditor({
+    const editorInstance = useEditor({
         extensions,
         content: value,
         onUpdate: ({ editor }) => {
@@ -129,15 +131,20 @@ const RichTextEditor = ({
         },
         editorProps: {
             attributes: {
+                role: 'textbox',
+                'aria-multiline': 'true',
+                'aria-label': 'Description',
                 class: `prose prose-slate dark:prose-invert prose-sm max-w-none focus:outline-none px-4 py-3 ${className}`,
                 style: `min-height: ${minHeight}; max-height: ${maxHeight}; overflow-y: auto;`,
             },
         },
     });
 
+    const editor = editorInstance && !editorInstance.isDestroyed ? editorInstance : null;
+
     useEffect(() => {
-        if (editor && value !== editor.getHTML()) {
-            editor.commands.setContent(value || '');
+        if (editor && !editor.isDestroyed && value !== editor.getHTML()) {
+            editor.commands.setContent(value || '', { emitUpdate: false });
         }
     }, [editor, value]);
 
@@ -150,16 +157,16 @@ const RichTextEditor = ({
             <EditorContent editor={editor} />
             {(showCharacterCount || characterLimit) && editor && (
                 <div className="px-4 py-2.5 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between text-xs">
-                    <span className="text-slate-500 dark:text-slate-400 font-medium">
+                    <span className="text-slate-600 dark:text-slate-300 font-medium">
                         {editor.storage.characterCount.characters()} characters
-                        {characterLimit && <span className="text-slate-400 dark:text-slate-500"> / {characterLimit}</span>}
+                        {characterLimit && <span className="text-slate-600 dark:text-slate-300"> / {characterLimit}</span>}
                     </span>
                     {characterLimit && (
                         <span
                             className={`font-semibold transition-colors duration-150 ${
                                 editor.storage.characterCount.characters() > characterLimit
-                                    ? 'text-red-600'
-                                    : 'text-emerald-600'
+                                    ? 'text-red-700'
+                                    : 'text-emerald-700'
                             }`}
                         >
                             {characterLimit - editor.storage.characterCount.characters()} remaining

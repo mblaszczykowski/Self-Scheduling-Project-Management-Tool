@@ -18,15 +18,15 @@ interface RegisterValues {
 }
 
 const validationSchema = Yup.object().shape({
-    firstname: Yup.string()
+    firstname: Yup.string().trim()
         .min(2, 'First name must be at least 2 characters.')
         .max(50, 'Max length is 50.')
         .required('First name is required.'),
-    lastname: Yup.string()
+    lastname: Yup.string().trim()
         .min(2, 'Last name must be at least 2 characters.')
         .max(50, 'Max length is 50.')
         .required('Last name is required.'),
-    email: Yup.string()
+    email: Yup.string().trim()
         .email('Invalid email address format.')
         .max(255, 'Max length is 255.')
         .required('Email is required.'),
@@ -41,14 +41,14 @@ const PasswordRequirements = ({ id, password }: { id: string; password: string }
 
     return (
         <div id={id} className="mt-2 p-2.5 bg-slate-50/80 rounded-lg border border-slate-100">
-            <p className="text-[10px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Requirements</p>
+            <p className="text-[10px] font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Requirements</p>
             <div className="grid grid-cols-2 gap-0.5">
                 {requirements.map((req, i) => (
                     <div key={i} className="flex items-center gap-1.5">
-                        <span className={`text-xs ${req.met ? 'text-green-600' : 'text-slate-400'}`}>
+                        <span className={`text-xs ${req.met ? 'text-green-700' : 'text-slate-600'}`}>
                             {req.met ? '✓' : '○'}
                         </span>
-                        <span className={`text-xs ${req.met ? 'text-green-600' : 'text-slate-500'}`}>
+                        <span className={`text-xs ${req.met ? 'text-green-700' : 'text-slate-600'}`}>
                             {req.label}
                         </span>
                     </div>
@@ -67,7 +67,7 @@ function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
 
     const handleSubmit = async (values: RegisterValues, { setSubmitting }: FormikHelpers<RegisterValues>) => {
         try {
-            await register(values);
+            await register({ ...values, firstname: values.firstname.trim(), lastname: values.lastname.trim(), email: values.email.trim().toLowerCase() });
             const userData = await checkUserAuth();
             setUser(userData);
             navigate(returnTo, { replace: true });
@@ -145,7 +145,7 @@ function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
                         {isSubmitting ? 'Creating account...' : 'Create account'}
                     </button>
 
-                    <p className="text-center text-sm text-slate-500">
+                    <p className="text-center text-sm text-slate-600">
                         Already have an account?{' '}
                         <button
                             type="button"

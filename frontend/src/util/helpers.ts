@@ -72,9 +72,17 @@ export const formatDateTime = (dateString?: string | null): string => {
     return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleString('en-US');
 };
 
+const parseDisplayDate = (date: DateInput): Date => {
+    // A date-only API value names a calendar day, not midnight in UTC.
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)));
+    }
+    return new Date(date);
+};
+
 export const formatShortDate = (date: MaybeDate): string => {
     if (date === null || date === undefined) return NO_DATE;
-    const parsed = new Date(date);
+    const parsed = parseDisplayDate(date);
     if (Number.isNaN(parsed.getTime())) return NO_DATE;
     return parsed.toLocaleDateString('en-US', {
         month: 'short',
@@ -84,7 +92,7 @@ export const formatShortDate = (date: MaybeDate): string => {
 
 export const formatLongDate = (date: MaybeDate): string => {
     if (date === null || date === undefined) return NO_DATE;
-    const parsed = new Date(date);
+    const parsed = parseDisplayDate(date);
     if (Number.isNaN(parsed.getTime())) return NO_DATE;
     return parsed.toLocaleDateString('en-US', {
         weekday: 'long',
@@ -210,7 +218,7 @@ export interface PriorityStyle {
 }
 
 export const STATUS_CONFIG: Record<TaskStatus, StatusStyle> = {
-    'BACKLOG': { label: 'Backlog', color: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400', dot: 'bg-slate-400', hex: '#94a3b8' , pillBg: 'bg-slate-100 dark:bg-slate-800', pillText: 'text-slate-600 dark:text-slate-400' },
+    'BACKLOG': { label: 'Backlog', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300', dot: 'bg-slate-400', hex: '#94a3b8' , pillBg: 'bg-slate-100 dark:bg-slate-800', pillText: 'text-slate-600 dark:text-slate-300' },
     'TODO': { label: 'To Do', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800', dot: 'bg-blue-500', hex: '#3b82f6' , pillBg: 'bg-blue-50 dark:bg-blue-950/60', pillText: 'text-blue-700 dark:text-blue-300' },
     'IN_PROGRESS': { label: 'In Progress', color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-800', dot: 'bg-amber-500', hex: '#f59e0b' , pillBg: 'bg-amber-50 dark:bg-amber-950/60', pillText: 'text-amber-700 dark:text-amber-300' },
     'IN_TEST': { label: 'In Test', color: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:ring-sky-800', dot: 'bg-sky-500', hex: '#0ea5e9' , pillBg: 'bg-sky-50 dark:bg-sky-950/60', pillText: 'text-sky-700 dark:text-sky-300' },
@@ -219,35 +227,35 @@ export const STATUS_CONFIG: Record<TaskStatus, StatusStyle> = {
     'READY_TO_MERGE': { label: 'Ready to Merge', color: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300', dot: 'bg-teal-500', hex: '#14b8a6' , pillBg: 'bg-teal-50 dark:bg-teal-950/60', pillText: 'text-teal-700 dark:text-teal-300' },
     'READY_TO_DEPLOY': { label: 'Ready to Deploy', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300', dot: 'bg-emerald-500', hex: '#10b981' , pillBg: 'bg-emerald-50 dark:bg-emerald-950/60', pillText: 'text-emerald-700 dark:text-emerald-300' },
     'DONE': { label: 'Done', color: 'bg-green-100 text-green-800 font-medium dark:bg-green-950 dark:text-green-300', dot: 'bg-green-500', hex: '#22c55e' , pillBg: 'bg-green-50 dark:bg-green-950/60', pillText: 'text-green-700 dark:text-green-300' },
-    'RELEASED': { label: 'Released', color: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400', dot: 'bg-green-600', hex: '#16a34a' , pillBg: 'bg-green-50 dark:bg-green-950/60', pillText: 'text-green-700 dark:text-green-400' },
-    'WITHDRAWN': { label: 'Withdrawn', color: 'bg-red-50 text-red-600 line-through dark:bg-red-950 dark:text-red-400', dot: 'bg-red-500', hex: '#ef4444' , pillBg: 'bg-red-50 dark:bg-red-950/60', pillText: 'text-red-600 dark:text-red-400' },
+    'RELEASED': { label: 'Released', color: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400', dot: 'bg-green-600', hex: '#16a34a' , pillBg: 'bg-green-50 dark:bg-green-950/60', pillText: 'text-green-700 dark:text-green-400' },
+    'WITHDRAWN': { label: 'Withdrawn', color: 'bg-red-50 text-red-700 line-through dark:bg-red-950 dark:text-red-400', dot: 'bg-red-500', hex: '#ef4444' , pillBg: 'bg-red-50 dark:bg-red-950/60', pillText: 'text-red-700 dark:text-red-400' },
     'GATHERING_INTEREST': { label: 'Gathering Interest', color: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:ring-orange-800', dot: 'bg-orange-500', hex: '#f97316' , pillBg: 'bg-orange-50 dark:bg-orange-950/60', pillText: 'text-orange-700 dark:text-orange-300' },
 };
 
 export const PRIORITY_CONFIG: Record<TaskPriority, PriorityStyle> = {
-    'LOWEST': { label: 'Lowest', icon: '↓↓', color: 'bg-slate-100 text-slate-600', hex: '#94a3b8' , pillBg: 'bg-slate-100 dark:bg-slate-800', pillText: 'text-slate-600 dark:text-slate-400' },
+    'LOWEST': { label: 'Lowest', icon: '↓↓', color: 'bg-slate-100 text-slate-600', hex: '#94a3b8' , pillBg: 'bg-slate-100 dark:bg-slate-800', pillText: 'text-slate-600 dark:text-slate-300' },
     'LOW': { label: 'Low', icon: '↓', color: 'bg-blue-50 text-blue-600', hex: '#3b82f6' , pillBg: 'bg-blue-50 dark:bg-blue-950/60', pillText: 'text-blue-700 dark:text-blue-300' },
-    'MEDIUM': { label: 'Medium', icon: '—', color: 'bg-amber-50 text-amber-600', hex: '#f59e0b' , pillBg: 'bg-amber-50 dark:bg-amber-950/60', pillText: 'text-amber-700 dark:text-amber-300' },
-    'HIGH': { label: 'High', icon: '↑', color: 'bg-orange-50 text-orange-600', hex: '#f97316' , pillBg: 'bg-orange-50 dark:bg-orange-950/60', pillText: 'text-orange-700 dark:text-orange-300' },
-    'HIGHEST': { label: 'Highest', icon: '↑↑', color: 'bg-red-50 text-red-600', hex: '#ef4444' , pillBg: 'bg-red-50 dark:bg-red-950/60', pillText: 'text-red-700 dark:text-red-300' },
+    'MEDIUM': { label: 'Medium', icon: '—', color: 'bg-amber-50 text-amber-800', hex: '#f59e0b' , pillBg: 'bg-amber-50 dark:bg-amber-950/60', pillText: 'text-amber-700 dark:text-amber-300' },
+    'HIGH': { label: 'High', icon: '↑', color: 'bg-orange-50 text-orange-800', hex: '#f97316' , pillBg: 'bg-orange-50 dark:bg-orange-950/60', pillText: 'text-orange-700 dark:text-orange-300' },
+    'HIGHEST': { label: 'Highest', icon: '↑↑', color: 'bg-red-50 text-red-700', hex: '#ef4444' , pillBg: 'bg-red-50 dark:bg-red-950/60', pillText: 'text-red-700 dark:text-red-300' },
 };
 
 export const getAvatarColor = (user?: AvatarSubject | string | null): string => {
     const colors = [
         'from-slate-600 to-slate-700',
-        'from-blue-600 to-blue-700',
-        'from-sky-600 to-sky-700',
-        'from-blue-500 to-blue-600',
-        'from-emerald-600 to-emerald-700',
-        'from-teal-600 to-teal-700',
-        'from-cyan-600 to-cyan-700',
-        'from-rose-600 to-rose-700',
-        'from-amber-600 to-amber-700',
-        'from-lime-600 to-lime-700',
-        'from-fuchsia-600 to-fuchsia-700',
-        'from-orange-600 to-orange-700',
-        'from-pink-600 to-pink-700',
-        'from-red-600 to-red-700',
+        'from-blue-700 to-blue-800',
+        'from-sky-700 to-sky-800',
+        'from-blue-700 to-blue-800',
+        'from-emerald-700 to-emerald-800',
+        'from-teal-700 to-teal-800',
+        'from-cyan-700 to-cyan-800',
+        'from-rose-700 to-rose-800',
+        'from-amber-800 to-amber-900',
+        'from-lime-800 to-lime-900',
+        'from-fuchsia-700 to-fuchsia-800',
+        'from-orange-800 to-orange-900',
+        'from-pink-700 to-pink-800',
+        'from-red-700 to-red-800',
     ];
 
     const identifier = typeof user === 'string' ? user : (user?.email || user?.firstname || '');

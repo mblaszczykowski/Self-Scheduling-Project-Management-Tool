@@ -8,5 +8,6 @@ public record OptimizationResultDTO(
         OptimizationMetricsDTO optimizedMetrics,
         int tasksShifted,
         String chosenRule,
-        List<String> skippedTaskKeys
+        List<String> skippedTaskKeys,
+        String previewToken
 ) {}

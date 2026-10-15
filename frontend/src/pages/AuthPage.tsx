@@ -28,7 +28,7 @@ export default function AuthPage({ show }: { show: AuthFormMode }) {
                     <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
                         <div className="w-3.5 h-3.5 bg-white rounded" />
                     </div>
-                    <span className="text-sm font-semibold text-[var(--text-primary)] tracking-tight">Flowlink</span>
+                    <span className="text-sm font-semibold text-[var(--text-primary)] tracking-tight">FlowLink</span>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -37,7 +37,7 @@ export default function AuthPage({ show }: { show: AuthFormMode }) {
                         className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
                             showForm === 'login'
                                 ? 'text-slate-900'
-                                : 'text-slate-500 hover:text-slate-700'
+                                : 'text-slate-600 hover:text-slate-700'
                         }`}
                     >
                         Sign in
@@ -55,7 +55,7 @@ export default function AuthPage({ show }: { show: AuthFormMode }) {
                 </div>
             </nav>
 
-            <div className="relative z-10 px-6 lg:px-12 pt-8 lg:pt-12 pb-8">
+            <main id="main-content" tabIndex={-1} className="relative z-10 px-6 lg:px-12 pt-8 lg:pt-12 pb-8">
                 <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row gap-10 lg:gap-14 items-start">
                     <div className="flex-1 min-w-0">
                         <h1 className="auth-heading anim-in anim-d2 text-[clamp(2.2rem,4.5vw,3.5rem)] leading-[1.08] tracking-tight text-[var(--text-primary)] mb-4">
@@ -64,7 +64,7 @@ export default function AuthPage({ show }: { show: AuthFormMode }) {
                         </h1>
                         <p className="anim-in anim-d3 text-sm text-[var(--text-secondary)] leading-relaxed mb-8 max-w-lg">
                             Built-in RCPSP solver analyzes dependencies, resources, and deadlines
-                            to find the optimal schedule — then shows you exactly what to shift
+                            to find an improved schedule — then shows you exactly what to shift
                             with ghost-bar previews you can accept in one click.
                         </p>
 
@@ -103,12 +103,12 @@ export default function AuthPage({ show }: { show: AuthFormMode }) {
                             )}
 
                             <p className="text-[10px] text-[var(--text-muted)] mt-5 text-center leading-relaxed">
-                                By continuing, you agree to our Terms of Service and Privacy Policy.
+                                Plan projects, track progress, and review schedule suggestions in one workspace.
                             </p>
                         </div>
                     </div>
                 </div>
-            </div>
+            </main>
         </div>
     );
 }

@@ -69,7 +69,7 @@ const ProjectForm = ({
                 <div className="space-y-5">
                     {modalMode === 'create' && (
                         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-                            <label htmlFor="projectKey" className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
+                            <label htmlFor="projectKey" className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-2">
                                 Project Key <span className="text-red-400">*</span>
                             </label>
                             <Field
@@ -85,19 +85,19 @@ const ProjectForm = ({
                                     `${inputClass} uppercase font-mono tracking-wider`
                                 }
                             />
-                            <p className="text-xs text-slate-400 mt-1.5">
+                            <p className="text-xs text-slate-600 mt-1.5">
                                 Max 10 characters
                             </p>
                             <ErrorMessage
                                 name="projectKey"
                                 component="div"
-                                className="text-red-500 text-xs mt-1.5 font-medium"
+                                className="text-red-700 text-xs mt-1.5 font-medium"
                             />
                         </div>
                     )}
 
                     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Team Members</label>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-3">Team Members</label>
                         {values.memberEmails.length > 0 && (
                             <ul className="space-y-2 mb-3">
                                 {values.memberEmails.map((email) => {
@@ -120,13 +120,13 @@ const ProjectForm = ({
                                                     <div className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">
                                                         {known ? `${known.firstname} ${known.lastname}` : email}
                                                         {isMemberOwner && (
-                                                            <span className="ml-1.5 text-xs text-slate-400 dark:text-slate-500">
+                                                            <span className="ml-1.5 text-xs text-slate-600 dark:text-slate-300">
                                                                 (Owner)
                                                             </span>
                                                         )}
                                                     </div>
                                                     {known && (
-                                                        <div className="text-xs text-slate-400 dark:text-slate-500 truncate">
+                                                        <div className="text-xs text-slate-600 dark:text-slate-300 truncate">
                                                             {email}
                                                         </div>
                                                     )}
@@ -143,7 +143,7 @@ const ProjectForm = ({
                                                         ),
                                                     )}
                                                     className={
-                                                        'text-xs text-red-500 dark:text-red-400 opacity-0'
+                                                        'text-xs text-red-700 dark:text-red-400 opacity-0'
                                                         + ' group-hover:opacity-100 focus-visible:opacity-100 font-medium'
                                                         + ' transition-opacity'
                                                     }
@@ -181,14 +181,14 @@ const ProjectForm = ({
                             </div>
                         )}
                         {emailError && (
-                            <div className="text-red-500 text-xs mt-2 font-medium">
+                            <div className="text-red-700 text-xs mt-2 font-medium">
                                 {emailError}
                             </div>
                         )}
                     </div>
 
                     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Dependencies</label>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-3">Dependencies</label>
                         {dependencies.length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-3">
                                 {dependencies.map(depKey => {
@@ -204,14 +204,15 @@ const ProjectForm = ({
                                                 + ' text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold'
                                             }
                                         >
-                                            <HiOutlineFolder className="w-3 h-3 text-slate-500" />
+                                            <HiOutlineFolder className="w-3 h-3 text-slate-600" />
                                             {depProject?.projectKey || depKey}
                                             <button
                                                 type="button"
+                                                aria-label={`Remove dependency ${depKey}`}
                                                 onClick={() => setDependencies(
                                                     prev => prev.filter(d => d !== depKey),
                                                 )}
-                                                className="text-slate-400 hover:text-red-500 transition-colors"
+                                                className="min-h-6 min-w-6 inline-flex items-center justify-center text-slate-600 hover:text-red-500 transition-colors"
                                             >
                                                 <HiOutlineX className="w-3 h-3" />
                                             </button>
@@ -241,7 +242,7 @@ const ProjectForm = ({
                                     ))}
                             </select>
                             <HiOutlineChevronDown
-                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none"
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-600 w-4 h-4 pointer-events-none"
                             />
                         </div>
                     </div>

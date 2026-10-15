@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useRef, useState } from 'react';
+import React, { Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HiOutlineExclamationCircle } from 'react-icons/hi';
@@ -9,11 +9,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProjectsProvider } from './context/ProjectsContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import { ThemeProvider } from './context/ThemeContext';
-import { checkUserAuth } from './util/api';
+import { useSessionBootstrap } from './hooks/useSessionBootstrap';
 import PageTransition from './components/common/PageTransition';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import EmptyState from './components/common/EmptyState';
-import { CurrentUser } from './types';
 
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = React.lazy(() => import('./pages/ProjectsPage'));
@@ -25,13 +24,13 @@ const queryClient = new QueryClient({
 });
 
 const LoadingSpinner = () => (
-    <div className="flex justify-center items-center h-screen bg-slate-50 dark:bg-slate-900">
+    <div role="status" aria-label="Loading application" className="flex justify-center items-center h-screen bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
             <div className="w-10 h-10 bg-slate-900 dark:bg-white rounded-xl flex items-center justify-center mx-auto mb-4">
                 <div className="w-5 h-5 bg-white dark:bg-slate-900 rounded" />
             </div>
             <div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-white mx-auto" />
-            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading</p>
+            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">Loading</p>
         </div>
     </div>
 );
@@ -42,9 +41,9 @@ const NotFoundPage = () => {
     const [target, label] = user ? ['/dashboard', 'Back to dashboard'] : ['/login', 'Go to sign in'];
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <main id="main-content" tabIndex={-1} className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
             <div className="text-center">
-                <p className="text-xs font-semibold tracking-[0.2em] text-slate-400 dark:text-slate-500">404</p>
+                <p className="text-xs font-semibold tracking-[0.2em] text-slate-600 dark:text-slate-300">404</p>
                 <EmptyState
                     icon={HiOutlineExclamationCircle}
                     title="Page not found"
@@ -53,7 +52,7 @@ const NotFoundPage = () => {
                     actionLabel={label}
                 />
             </div>
-        </div>
+        </main>
     );
 };
 
@@ -79,6 +78,7 @@ const PublicRoute = ({ children, redirectTo = '/dashboard' }: {
 function AppRoutes() {
     return (
         <div className="App min-h-screen bg-slate-50 dark:bg-slate-900">
+            <a className="skip-link" href="#main-content">Skip to main content</a>
             <ToastContainer
                 position="top-right"
                 autoClose={2500}
@@ -157,29 +157,19 @@ function AppRoutes() {
 }
 
 function App() {
-    const [initialUser, setInitialUser] = useState<CurrentUser | null>(null);
-    const [authChecked, setAuthChecked] = useState(false);
-    const authCheckInitiated = useRef(false);
-
-    useEffect(() => {
-        if (authCheckInitiated.current) return;
-        authCheckInitiated.current = true;
-
-        const checkAuth = async () => {
-            try {
-                const userData = await checkUserAuth();
-                setInitialUser(userData);
-            } catch {
-                setInitialUser(null);
-            } finally {
-                setAuthChecked(true);
-            }
-        };
-
-        checkAuth();
-    }, []);
-
-    if (!authChecked) return <LoadingSpinner />;
+    const { user: initialUser, loading, error, retry } = useSessionBootstrap();
+    if (loading) return <LoadingSpinner />;
+    if (error) return (
+        <main role="alert" className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+            <EmptyState
+                icon={HiOutlineExclamationCircle}
+                title="Unable to open your workspace"
+                description={error}
+                action={retry}
+                actionLabel="Try again"
+            />
+        </main>
+    );
 
     return (
         <QueryClientProvider client={queryClient}>

@@ -262,6 +262,7 @@ export interface OptimizationMetrics {
 }
 
 export interface OptimizationResult {
+    previewToken?: string;
     suggestions: OptimizationSuggestion[];
     originalMetrics: OptimizationMetrics;
     optimizedMetrics: OptimizationMetrics;
@@ -278,6 +279,7 @@ export interface OptimizationRequest {
 }
 
 export interface ApplyOptimizationRequest extends OptimizationRequest {
+    previewToken?: string;
     acceptedTaskKeys?: string[];
 }
 

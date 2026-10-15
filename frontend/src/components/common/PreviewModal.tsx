@@ -61,8 +61,8 @@ const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
             <div className={`relative bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-[90vw] max-h-[90vh] overflow-hidden transition-all duration-300 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`} onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate max-w-md">{preview.fileName}</h3>
-                    <button onClick={handleClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Close" aria-label="Close">
-                        <HiOutlineX className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                    <button type="button" onClick={handleClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Close" aria-label="Close">
+                        <HiOutlineX className="w-5 h-5 text-slate-600 dark:text-slate-300" />
                     </button>
                 </div>
                 <div className="p-5 bg-slate-50 dark:bg-slate-900">
@@ -71,10 +71,10 @@ const PreviewModal = ({ preview, onClose }: PreviewModalProps) => {
                     ) : (
                         <div className="flex flex-col items-center justify-center gap-3 min-w-[20rem] px-10 py-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
                             {preview.fileType === 'pdf'
-                                ? <HiOutlineDocumentText className="w-10 h-10 text-red-500" />
-                                : <HiOutlineDocument className="w-10 h-10 text-slate-400" />}
+                                ? <HiOutlineDocumentText className="w-10 h-10 text-red-700" />
+                                : <HiOutlineDocument className="w-10 h-10 text-slate-600" />}
                             <p className="text-sm font-medium text-slate-700 dark:text-slate-200 text-center break-all">{preview.fileName}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
+                            <p className="text-xs text-slate-600 dark:text-slate-300 text-center">
                                 This file can&apos;t be previewed inline — use Download below to view it.
                             </p>
                         </div>

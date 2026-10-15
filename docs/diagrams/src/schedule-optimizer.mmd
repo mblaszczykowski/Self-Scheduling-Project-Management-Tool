@@ -13,5 +13,5 @@ flowchart TD
     R4 --> Eval
     R5 --> Eval
     Eval --> Pick["lowest Z wins"]
-    Pick --> Simulate["POST /optimization/simulate<br/>preview only"]
-    Pick --> Apply["POST /optimization/apply<br/>recomputed server-side, then persisted"]
+    Pick --> Simulate["POST /api/optimization/simulate<br/>preview + input token"]
+    Pick --> Apply["POST /api/optimization/apply<br/>check token + recompute + persist atomically"]

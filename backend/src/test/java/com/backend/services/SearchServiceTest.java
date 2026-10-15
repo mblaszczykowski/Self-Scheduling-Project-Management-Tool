@@ -104,4 +104,19 @@ class SearchServiceTest {
         var expected = "%" + "!%".repeat(100) + "%";
         assertThat(capturedProjectPattern()).isEqualTo(expected);
     }
+
+    @Test
+    void searchSnippetsDecodeHtmlEntitiesAndSeparateParagraphs() {
+        var user = com.backend.TestEntityFactory.createUser(1, "user@example.com");
+        var project = com.backend.TestEntityFactory.createProject(10, "P", user);
+        var task = com.backend.TestEntityFactory.createTask(100, 1, project);
+        var comment = new com.backend.entities.Comment(task, user, null,
+                "<p>Research &amp; development</p><p>&lt;next&gt;</p>", List.of());
+        comment.setId(50);
+        when(commentRepository.searchAccessible(anyInt(), anyString(), any())).thenReturn(List.of(comment));
+
+        assertThat(searchService.search(USER_ID, "research").comments().getFirst().snippet())
+                .isEqualTo("Research & development <next>");
+    }
+
 }

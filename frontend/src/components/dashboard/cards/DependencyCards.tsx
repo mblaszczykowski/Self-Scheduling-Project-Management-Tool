@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Bar } from 'react-chartjs-2';
 import { ChartOptions } from 'chart.js';
-import { ChartCard, ICON_WELL_CLASS, chartOptions, useChartTickColor } from '../ChartComponents';
+import { ChartCard, ICON_WELL_CLASS, chartOptions, useChartDataColor, useChartTickColor } from '../ChartComponents';
 import { formatAssigneeName } from '../../../util/helpers';
 import { LightningIcon, BlockedIcon, TrendingUpIcon, UsersIcon } from '../../common/Icons';
 import EmptyState from '../../common/EmptyState';
@@ -28,10 +28,10 @@ export const CriticalPathTimelineCard = ({ timeline }: { timeline: CriticalPathP
                                 {project.criticalPathDays}d
                             </span>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
                             <span>{project.criticalTaskCount} critical tasks</span>
                             {project.delayedCritical > 0 && (
-                                <span className="text-red-600 dark:text-red-400 font-medium">
+                                <span className="text-red-700 dark:text-red-400 font-medium">
                                     {project.delayedCritical} delayed
                                 </span>
                             )}
@@ -64,7 +64,7 @@ export const DependencyChainCard = ({ analysis }: { analysis: DependencyChainAna
                     <div className="text-4xl font-bold text-slate-900 dark:text-white mb-1">
                         {analysis.longestChainLength}
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                    <div className="text-xs text-slate-600 dark:text-slate-300">
                         Longest dependency chain
                     </div>
                 </div>
@@ -72,13 +72,13 @@ export const DependencyChainCard = ({ analysis }: { analysis: DependencyChainAna
                     isDeep ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-slate-100 dark:bg-slate-700'
                 }`}>
                     <LightningIcon className={`w-7 h-7 ${
-                        isDeep ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'
+                        isDeep ? 'text-amber-800 dark:text-amber-400' : 'text-slate-600 dark:text-slate-300'
                     }`} />
                 </div>
             </div>
             {analysis.bottlenecks.length > 0 ? (
                 <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
-                    <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
+                    <p className="text-[10px] font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-2">
                         Bottleneck tasks (most dependents)
                     </p>
                     <div className="space-y-2">
@@ -88,26 +88,26 @@ export const DependencyChainCard = ({ analysis }: { analysis: DependencyChainAna
                                 <div className="flex items-center gap-1.5 min-w-0">
                                     <span className="font-mono font-medium text-slate-800 dark:text-slate-200">{bottleneck.taskKey}</span>
                                     {bottleneck.isCritical && (
-                                        <span className="text-[9px] text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-950/60 px-1 py-px rounded font-medium">C</span>
+                                        <span className="text-[9px] text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/60 px-1 py-px rounded font-medium">C</span>
                                     )}
-                                    <span className="text-slate-400 dark:text-slate-500 truncate">{bottleneck.summary}</span>
+                                    <span className="text-slate-600 dark:text-slate-300 truncate">{bottleneck.summary}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                                    <span className="text-slate-500 dark:text-slate-400">{bottleneck.progress}%</span>
+                                    <span className="text-slate-600 dark:text-slate-300">{bottleneck.progress}%</span>
                                     <span className="font-semibold text-slate-700 dark:text-slate-300">{bottleneck.dependentCount} downstream</span>
                                 </div>
                             </Link>
                         ))}
                     </div>
                     {isDeep && (
-                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-2">
+                        <p className="text-[10px] text-amber-800 dark:text-amber-400 mt-2">
                             Deep chains amplify delays. Consider parallelizing work.
                         </p>
                     )}
                 </div>
             ) : (
                 <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">No active bottleneck tasks</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-300">No active bottleneck tasks</p>
                 </div>
             )}
         </ChartCard>
@@ -124,14 +124,14 @@ export const BlockedTasksCard = ({ blocked }: { blocked: BlockedTasks }) => {
                     <div className="text-4xl font-bold text-slate-900 dark:text-white mb-1">
                         {blocked.blockedTasks.length}
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                    <div className="text-xs text-slate-600 dark:text-slate-300">
                         {blocked.blockedCriticalTasks.length} are critical
                     </div>
                 </div>
                 <div className={`${ICON_WELL_CLASS} ${
                     hasBlocked ? 'bg-red-100 dark:bg-red-900/30' : 'bg-slate-100 dark:bg-slate-700'
                 }`}>
-                    <BlockedIcon className={`w-7 h-7 ${hasBlocked ? 'text-red-600 dark:text-red-400' : 'text-slate-400 dark:text-slate-500'}`} />
+                    <BlockedIcon className={`w-7 h-7 ${hasBlocked ? 'text-red-700 dark:text-red-400' : 'text-slate-600 dark:text-slate-300'}`} />
                 </div>
             </div>
             {hasBlocked && (
@@ -144,10 +144,10 @@ export const BlockedTasksCard = ({ blocked }: { blocked: BlockedTasks }) => {
                                         {task.taskKey}
                                     </div>
                                     {task.isCritical && (
-                                        <span className="text-xs text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-950/60 px-1.5 py-0.5 rounded">Critical</span>
+                                        <span className="text-xs text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/60 px-1.5 py-0.5 rounded">Critical</span>
                                     )}
                                 </div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                <div className="text-xs text-slate-600 dark:text-slate-300 truncate">
                                     {task.summary}
                                 </div>
                             </Link>
@@ -168,12 +168,12 @@ export const CrossProjectDepsCard = ({ dependencies }: { dependencies: CrossProj
                         <div className="text-sm font-semibold text-slate-900 dark:text-white">
                             {project.projectKey}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                        <div className="text-xs text-slate-600 dark:text-slate-300">
                             Depends on {project.dependencyCount} project{project.dependencyCount > 1 ? 's' : ''}
                         </div>
                         <div className="pl-3 border-l-2 border-slate-200 dark:border-slate-700">
                             {project.dependsOn.slice(0, 2).map(dependency => (
-                                <div key={dependency.key} className="text-xs text-slate-600 dark:text-slate-400 truncate">
+                                <div key={dependency.key} className="text-xs text-slate-600 dark:text-slate-300 truncate">
                                     {'→'} {dependency.key}
                                 </div>
                             ))}
@@ -188,6 +188,7 @@ export const CrossProjectDepsCard = ({ dependencies }: { dependencies: CrossProj
 );
 
 export const TeamWorkloadBarCard = ({ load }: { load: AssigneeLoad[] }) => {
+    const dataColor = useChartDataColor();
     const tickColor = useChartTickColor();
 
     if (load.length === 0) {
@@ -248,8 +249,8 @@ export const TeamWorkloadBarCard = ({ load }: { load: AssigneeLoad[] }) => {
             {
                 label: 'Normal',
                 data: load.map(entry => entry.total - entry.critical),
-                backgroundColor: 'rgba(71, 85, 105, 0.7)',
-                hoverBackgroundColor: 'rgba(51, 65, 85, 1)',
+                backgroundColor: dataColor,
+                hoverBackgroundColor: dataColor,
                 borderRadius: 4,
                 borderSkipped: false,
             },

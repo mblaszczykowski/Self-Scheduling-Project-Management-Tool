@@ -15,6 +15,7 @@ import com.backend.repositories.CommentRepository;
 import com.backend.security.AccessGuard;
 import com.backend.util.AfterCommit;
 import com.backend.util.HtmlSanitizer;
+import com.backend.util.FileValidationConstants;
 import com.backend.util.ValidationUtil;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -22,15 +23,19 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.jsoup.Jsoup;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
 
 @Service
 public class CommentService {
+    // Bound both recursive DTO rendering and the number of queries needed for a thread.
+    private static final int MAX_REPLY_DEPTH = 20;
     private final CommentRepository commentRepository;
     private final CommentReactionRepository commentReactionRepository;
     private final UserService userService;
@@ -63,7 +68,7 @@ public class CommentService {
         var task = accessGuard.getAccessibleTaskById(taskId, userId);
         var ids = commentRepository.findTopLevelCommentIds(task.getId(), pageable);
         if (ids.isEmpty()) {
-            return Page.empty(pageable);
+            return new PageImpl<>(List.of(), pageable, ids.getTotalElements());
         }
         var topLevel = commentRepository.findTopLevelCommentsWithDetails(ids.getContent());
         var repliesByParentId = batchLoadReplies(topLevel);
@@ -87,10 +92,12 @@ public class CommentService {
                     || !parentComment.getTask().getProject().hasAccess(userId)) {
                 throw new ResourceNotFoundException("Parent comment not found");
             }
+            validateReplyDepth(parentComment);
         }
 
+        var sanitized = sanitize(content);
         var attachments = fileStorageService.storeFiles(files, task.getProject().getId(), userId);
-        var comment = new Comment(task, author, parentComment, sanitize(content), attachments);
+        var comment = new Comment(task, author, parentComment, sanitized, attachments);
         var savedComment = commentRepository.save(comment);
 
         taskActivityService.logCommentAdded(task, author);
@@ -103,6 +110,10 @@ public class CommentService {
     public CommentDTO updateComment(Integer taskId, Integer commentId, Integer userId, String content,
                                     List<MultipartFile> files) {
         var comment = requireOwnEditableComment(taskId, commentId, userId);
+        if ((long) comment.getAttachments().size() + (files == null ? 0 : files.size())
+                > FileValidationConstants.MAX_ATTACHMENTS_PER_ENTITY) {
+            throw new ValidationException("A comment cannot have more than 50 attachments");
+        }
         comment.setContent(sanitize(content));
         comment.setEditedAt(Instant.now());
         comment.addAttachments(fileStorageService.storeFiles(
@@ -153,7 +164,8 @@ public class CommentService {
             isNewReaction = true;
         }
 
-        if (isNewReaction && !comment.getAuthor().getId().equals(userId)) {
+        if (isNewReaction && comment.getTask().getProject().hasAccess(comment.getAuthor().getId())
+                && !comment.getAuthor().getId().equals(userId)) {
             notificationService.createNotification(comment.getAuthor(),
                     "Someone reacted to your comment on task: " + comment.getTask().getSummary(),
                     NotificationType.COMMENT_REACTION,
@@ -179,19 +191,39 @@ public class CommentService {
     }
 
     private static String sanitize(String content) {
-        return HtmlSanitizer.sanitizeComment(content);
+        if (content == null || content.length() > ValidationUtil.MAX_COMMENT_LENGTH) {
+            throw new ValidationException("Invalid comment content");
+        }
+        var sanitized = HtmlSanitizer.sanitizeComment(content);
+        var parsed = Jsoup.parseBodyFragment(sanitized);
+        if (parsed.text().replace('\u00a0', ' ').isBlank() && parsed.select("img[src]").isEmpty()) {
+            throw new ValidationException("Comment content cannot be empty");
+        }
+        return sanitized;
+    }
+
+    private static void validateReplyDepth(Comment parent) {
+        var visited = new HashSet<Integer>();
+        int depth = 0;
+        for (var current = parent; current != null; current = current.getParentComment()) {
+            if (++depth > MAX_REPLY_DEPTH || !visited.add(current.getId())) {
+                throw new ValidationException("A comment thread cannot exceed " + MAX_REPLY_DEPTH + " reply levels");
+            }
+        }
     }
 
     private void notifyAboutNewComment(Task task, Comment parentComment, User author, Integer commentId) {
         var pending = new ArrayList<NotificationService.Pending>(2);
         var link = NotificationService.taskCommentLink(task.getTaskKey(), commentId);
 
-        if (parentComment != null && !parentComment.getAuthor().getId().equals(author.getId())) {
+        if (parentComment != null && task.getProject().hasAccess(parentComment.getAuthor().getId())
+                && !parentComment.getAuthor().getId().equals(author.getId())) {
             pending.add(new NotificationService.Pending(parentComment.getAuthor(),
                     "Someone replied to your comment on task: " + task.getSummary(),
                     NotificationType.COMMENT_REPLY, link));
         }
-        if (task.getAssignee() != null && !task.getAssignee().getId().equals(author.getId())) {
+        if (task.getAssignee() != null && task.getProject().hasAccess(task.getAssignee().getId())
+                && !task.getAssignee().getId().equals(author.getId())) {
             pending.add(new NotificationService.Pending(task.getAssignee(),
                     "New comment on task: " + task.getSummary(),
                     NotificationType.TASK_COMMENT, link));
@@ -201,7 +233,9 @@ public class CommentService {
 
     private Map<Integer, List<Comment>> batchLoadReplies(List<Comment> topLevelComments) {
         var repliesByParent = new HashMap<Integer, List<Comment>>();
+        var visited = new HashSet<Integer>();
         var parentIds = topLevelComments.stream().map(Comment::getId).toList();
+        visited.addAll(parentIds);
 
         while (!parentIds.isEmpty()) {
             var replies = commentRepository.findRepliesByParentIdsWithDetails(parentIds);
@@ -209,6 +243,9 @@ public class CommentService {
                 break;
             }
             for (var reply : replies) {
+                if (!visited.add(reply.getId())) {
+                    throw new ValidationException("Circular comment thread detected");
+                }
                 repliesByParent
                         .computeIfAbsent(reply.getParentComment().getId(), key -> new ArrayList<>())
                         .add(reply);

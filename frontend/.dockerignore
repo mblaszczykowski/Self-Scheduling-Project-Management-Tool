@@ -2,3 +2,12 @@ node_modules/
 build/
 .git
 *.md
+
+# Local secrets and verification artifacts are never build inputs.
+.env
+.env.*
+.DS_Store
+*.log
+coverage/
+playwright-report/
+test-results/

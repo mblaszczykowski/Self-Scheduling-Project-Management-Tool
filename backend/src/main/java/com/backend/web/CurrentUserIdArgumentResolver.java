@@ -1,6 +1,6 @@
 package com.backend.web;
 
-import com.backend.exception.AuthorizationException;
+import com.backend.exception.UnauthenticatedException;
 import com.backend.services.TokenService;
 import org.springframework.core.MethodParameter;
 import org.springframework.stereotype.Component;
@@ -26,7 +26,7 @@ public class CurrentUserIdArgumentResolver implements HandlerMethodArgumentResol
         var userId = webRequest.getAttribute(TokenService.USER_ID_ATTRIBUTE,
                 RequestAttributes.SCOPE_REQUEST);
         if (userId == null) {
-            throw new AuthorizationException("User not authenticated");
+            throw new UnauthenticatedException("User not authenticated");
         }
         return userId;
     }

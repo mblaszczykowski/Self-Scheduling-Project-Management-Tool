@@ -18,4 +18,10 @@ public record TaskScheduleRequest(
     public boolean isDateRangeOrdered() {
         return startDate == null || dueDate == null || !dueDate.isBefore(startDate);
     }
+
+    @JsonIgnore
+    @AssertTrue(message = "Task dates must use years between 0001 and 9999")
+    public boolean isDateRangeSupported() {
+        return TaskRequest.supportedDate(startDate) && TaskRequest.supportedDate(dueDate);
+    }
 }

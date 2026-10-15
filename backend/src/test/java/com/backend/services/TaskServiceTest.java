@@ -95,7 +95,7 @@ class TaskServiceTest {
     void setUp() {
         taskService = new TaskService(taskRepository, projectRepository, fileStorageService,
                 userService, taskActivityService, notificationService, entityMapper, accessGuard,
-                schedulingService);
+                schedulingService, mock(DependencyGraphLock.class));
 
         owner = TestEntityFactory.createUser(1, "owner@example.com");
         member = TestEntityFactory.createUser(2, "member@example.com");

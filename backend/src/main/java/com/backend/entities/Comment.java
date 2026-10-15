@@ -1,6 +1,8 @@
 package com.backend.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -43,7 +45,12 @@ public class Comment {
     @JoinColumn(name = "parent_comment_id")
     private Comment parentComment;
 
+    @OneToMany(mappedBy = "parentComment", cascade = CascadeType.REMOVE)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Set<Comment> replies = new HashSet<>();
+
     @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Set<CommentReaction> reactions = new HashSet<>();
 
     @ElementCollection(fetch = FetchType.LAZY)

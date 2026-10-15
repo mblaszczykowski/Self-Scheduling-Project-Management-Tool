@@ -1,0 +1,47 @@
+{
+  "capturedAt": "2026-10-15T10:19:39.882Z",
+  "source": "production Docker Compose images with demo-seed.sql",
+  "desktopViewport": {
+    "width": 1600,
+    "height": 1100
+  },
+  "mobileViewport": {
+    "width": 390,
+    "height": 844
+  },
+  "browser": "156.0.8078.4",
+  "originalMetrics": {
+    "weightedTardiness": 268,
+    "makespan": 37,
+    "objectiveValue": 0.05168253873481208,
+    "totalTasks": 40,
+    "tasksOnTime": 35,
+    "tasksLate": 5,
+    "resourceConflicts": 22,
+    "feasible": false
+  },
+  "optimizedMetrics": {
+    "weightedTardiness": 2011,
+    "makespan": 49,
+    "objectiveValue": 0.10898498372988626,
+    "totalTasks": 40,
+    "tasksOnTime": 7,
+    "tasksLate": 33,
+    "resourceConflicts": 0,
+    "feasible": true
+  },
+  "chosenRule": "Weighted urgency + fan-out",
+  "tasksShifted": 33,
+  "screenshots": [
+    "login",
+    "dashboard",
+    "dashboard-dark",
+    "timeline",
+    "schedule-optimizer",
+    "list",
+    "task-detail",
+    "account",
+    "mobile-list",
+    "mobile-menu"
+  ]
+}

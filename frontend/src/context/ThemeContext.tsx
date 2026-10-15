@@ -17,8 +17,12 @@ export const useTheme = (): ThemeContextValue => {
 };
 
 const getInitialTheme = (): Theme => {
-    const stored = localStorage.getItem('flowlink_theme');
-    if (stored === 'dark' || stored === 'light') return stored;
+    try {
+        const stored = localStorage.getItem('flowlink_theme');
+        if (stored === 'dark' || stored === 'light') return stored;
+    } catch {
+        // Private browsing and browser policies may disable storage.
+    }
     if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
     return 'light';
 };
@@ -34,7 +38,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
             root.classList.remove('dark');
         }
-        localStorage.setItem('flowlink_theme', theme);
+        try { localStorage.setItem('flowlink_theme', theme); } catch { /* The theme still works without persistence. */ }
         const timer = setTimeout(() => root.classList.remove('theme-transitioning'), 200);
         return () => clearTimeout(timer);
     }, [theme]);

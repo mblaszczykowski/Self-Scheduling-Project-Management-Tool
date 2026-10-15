@@ -114,7 +114,7 @@ public final class SsgsDecoder {
             return from;
         }
         int candidate = from;
-        for (int guard = 0; guard < maxHorizonDays; guard++) {
+        while ((long) candidate + duration <= maxHorizonDays) {
             int nextBusy = busyDays.nextSetBit(candidate);
             if (nextBusy < 0 || nextBusy >= candidate + duration) {
                 return candidate;
@@ -128,6 +128,10 @@ public final class SsgsDecoder {
     private void place(ScheduleTask task, int start,
                        Map<String, Placement> placements,
                        Map<String, BitSet> resourceUsage) {
+        if ((long) start + task.duration() > maxHorizonDays) {
+            throw new ValidationException("Cannot schedule within the configured horizon of "
+                    + maxHorizonDays + " days");
+        }
         placements.put(task.key(), toPlacement(task, start));
         if (!task.hasAssignee()) {
             return;

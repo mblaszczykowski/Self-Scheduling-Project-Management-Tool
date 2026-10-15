@@ -15,6 +15,8 @@ const useKeyboardShortcuts = (shortcuts: Shortcut[]) => {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.defaultPrevented || e.isComposing || e.repeat) return;
+            if (document.querySelector('[aria-modal="true"]')) return;
             const target = e.target as HTMLElement;
             if (
                 target.tagName === 'INPUT' ||

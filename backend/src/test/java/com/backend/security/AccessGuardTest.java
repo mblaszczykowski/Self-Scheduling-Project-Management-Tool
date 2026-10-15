@@ -329,4 +329,15 @@ class AccessGuardTest {
                     .hasMessage("User not authorized to modify this comment");
         }
     }
+    @Test
+    void restrictsProfilePicturesToOwnerAndProjectPartners() {
+        assertThatCode(() -> accessGuard.requireProfileAccess(1, 1)).doesNotThrowAnyException();
+        when(projectRepository.doUsersShareProject(2, 1)).thenReturn(true);
+        assertThatCode(() -> accessGuard.requireProfileAccess(1, 2)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> accessGuard.requireProfileAccess(1, 3))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> accessGuard.requireProfileAccess(null, 1))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
 }

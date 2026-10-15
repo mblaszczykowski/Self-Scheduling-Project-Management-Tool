@@ -34,9 +34,9 @@ interface EmailPrefs {
 const emptyToUndefined = (value: string) => (value === '' ? undefined : value);
 
 const buildValidationSchema = (initialEmail: string) => Yup.object().shape({
-    firstname: Yup.string().required('First name is required'),
-    lastname: Yup.string().required('Last name is required'),
-    email: Yup.string().email('Invalid email').required('Email is required'),
+    firstname: Yup.string().trim().min(2).max(50).required('First name is required'),
+    lastname: Yup.string().trim().min(2).max(50).required('Last name is required'),
+    email: Yup.string().trim().email('Invalid email').max(255).required('Email is required'),
     newPassword: withPasswordComplexity(Yup.string().transform(emptyToUndefined)),
     currentPassword: Yup.string()
         .transform(emptyToUndefined)
@@ -69,7 +69,7 @@ const EmailToggle = ({ label, description, checked, onChange, disabled }: EmailT
     <label className={`flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-800/50' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
         <div className="flex-1 mr-3">
             <span className="block text-sm font-medium text-slate-800 dark:text-slate-200">{label}</span>
-            {description && <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{description}</span>}
+            {description && <span className="block text-xs text-slate-600 dark:text-slate-300 mt-0.5">{description}</span>}
         </div>
         <div className="relative inline-flex items-center">
             <input
@@ -103,6 +103,8 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
     });
     const [emailPrefsSaving, setEmailPrefsSaving] = useState(false);
     const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+    const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const profileSavingRef = useRef(false);
     const formikRef = useRef<FormikProps<AccountFormValues>>(null);
 
     const emailTogglesDisabled = emailPrefsSaving || !emailPrefs.emailNotificationsEnabled;
@@ -111,22 +113,27 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
     useEffect(() => {
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = previousOverflow; };
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+        };
     }, []);
 
     const handleForceClose = React.useCallback(() => {
         setCloseConfirmOpen(false);
         setIsVisible(false);
-        setTimeout(onClose, 200);
+        if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = setTimeout(onClose, 200);
     }, [onClose, setIsVisible]);
 
     const handleCloseAttempt = React.useCallback(() => {
+        if (profileSavingRef.current || emailPrefsSaving) return;
         if (formikRef.current?.dirty) {
             setCloseConfirmOpen(true);
         } else {
             handleForceClose();
         }
-    }, [handleForceClose]);
+    }, [handleForceClose, emailPrefsSaving]);
 
     const initialValues: AccountFormValues = {
         firstname: user.firstname,
@@ -142,11 +149,13 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
         values: AccountFormValues,
         { setSubmitting, setErrors }: FormikHelpers<AccountFormValues>,
     ) => {
+        if (profileSavingRef.current || emailPrefsSaving) return;
+        profileSavingRef.current = true;
         try {
             const updatedUser = await updateProfile({
-                firstname: values.firstname,
-                lastname: values.lastname,
-                email: values.email,
+                firstname: values.firstname.trim(),
+                lastname: values.lastname.trim(),
+                email: values.email.trim().toLowerCase(),
                 currentPassword: values.currentPassword || undefined,
                 newPassword: values.newPassword || undefined,
             }, values.profilePicture);
@@ -166,11 +175,13 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                 showToast(getErrorMessage(err, 'Could not update your account'), 'error');
             }
         } finally {
+            profileSavingRef.current = false;
             setSubmitting(false);
         }
     };
 
     const handleEmailPrefToggle = async (key: keyof EmailPrefs) => {
+        if (emailPrefsSaving || profileSavingRef.current) return;
         const updated = { ...emailPrefs, [key]: !emailPrefs[key] };
         setEmailPrefs(updated);
         setEmailPrefsSaving(true);
@@ -179,6 +190,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
             onUpdateUser?.(updatedUser);
         } catch (err) {
             setEmailPrefs(emailPrefs);
+            showToast(getErrorMessage(err, 'Could not update email preferences'), 'error');
         } finally {
             setEmailPrefsSaving(false);
         }
@@ -239,7 +251,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                             title="Close"
                         >
-                            <HiOutlineX className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                            <HiOutlineX className="h-5 w-5 text-slate-600 dark:text-slate-300" />
                         </button>
                     </div>
                 </div>
@@ -271,7 +283,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                                                 type="file"
                                                 accept={IMAGE_ACCEPT}
                                                 onChange={(e) => handleProfilePictureChange(e, setFieldValue)}
-                                                className="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4
+                                                className="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-4 file:py-2 file:px-4
                                                 file:rounded-lg file:border-0 file:text-sm file:font-medium
                                                 file:bg-slate-900 file:text-white hover:file:bg-slate-800
                                                 dark:file:bg-white dark:file:text-slate-900 dark:hover:file:bg-slate-100
@@ -292,7 +304,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                                             name="firstname"
                                             className={inputClass}
                                         />
-                                        <ErrorMessage name="firstname" component="div" className="text-red-500 text-xs mt-1" />
+                                        <ErrorMessage name="firstname" component="div" className="text-red-700 text-xs mt-1" />
                                     </div>
                                     <div>
                                         <label htmlFor="lastname" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
@@ -304,7 +316,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                                             name="lastname"
                                             className={inputClass}
                                         />
-                                        <ErrorMessage name="lastname" component="div" className="text-red-500 text-xs mt-1" />
+                                        <ErrorMessage name="lastname" component="div" className="text-red-700 text-xs mt-1" />
                                     </div>
                                 </div>
 
@@ -318,7 +330,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                                         name="email"
                                         className={inputClass}
                                     />
-                                    <ErrorMessage name="email" component="div" className="text-red-500 text-xs mt-1" />
+                                    <ErrorMessage name="email" component="div" className="text-red-700 text-xs mt-1" />
                                 </div>
 
                                 <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
@@ -332,9 +344,10 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                                                 type="password"
                                                 id="currentPassword"
                                                 name="currentPassword"
+                                                autoComplete="current-password"
                                                 className={inputClass}
                                             />
-                                            <ErrorMessage name="currentPassword" component="div" className="text-red-500 text-xs mt-1" />
+                                            <ErrorMessage name="currentPassword" component="div" className="text-red-700 text-xs mt-1" />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
@@ -345,9 +358,10 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                                                     type="password"
                                                     id="newPassword"
                                                     name="newPassword"
+                                                    autoComplete="new-password"
                                                     className={inputClass}
                                                 />
-                                                <ErrorMessage name="newPassword" component="div" className="text-red-500 text-xs mt-1" />
+                                                <ErrorMessage name="newPassword" component="div" className="text-red-700 text-xs mt-1" />
                                             </div>
                                             <div>
                                                 <label htmlFor="confirmNewPassword" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
@@ -357,9 +371,10 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                                                     type="password"
                                                     id="confirmNewPassword"
                                                     name="confirmNewPassword"
+                                                    autoComplete="new-password"
                                                     className={inputClass}
                                                 />
-                                                <ErrorMessage name="confirmNewPassword" component="div" className="text-red-500 text-xs mt-1" />
+                                                <ErrorMessage name="confirmNewPassword" component="div" className="text-red-700 text-xs mt-1" />
                                             </div>
                                         </div>
                                     </div>
@@ -373,28 +388,28 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                                             description="Master toggle for all email notifications"
                                             checked={emailPrefs.emailNotificationsEnabled}
                                             onChange={() => handleEmailPrefToggle('emailNotificationsEnabled')}
-                                            disabled={emailPrefsSaving}
+                                            disabled={emailPrefsSaving || !!formikRef.current?.isSubmitting}
                                         />
                                         <EmailToggle
                                             label="Task assignments & updates"
                                             description="Get notified when you are assigned to or a task changes"
                                             checked={emailPrefs.emailOnTaskAssigned}
                                             onChange={() => handleEmailPrefToggle('emailOnTaskAssigned')}
-                                            disabled={emailTogglesDisabled}
+                                            disabled={emailTogglesDisabled || !!formikRef.current?.isSubmitting}
                                         />
                                         <EmailToggle
                                             label="Comment replies & reactions"
                                             description="Get notified about replies and reactions to your comments"
                                             checked={emailPrefs.emailOnCommentReply}
                                             onChange={() => handleEmailPrefToggle('emailOnCommentReply')}
-                                            disabled={emailTogglesDisabled}
+                                            disabled={emailTogglesDisabled || !!formikRef.current?.isSubmitting}
                                         />
                                         <EmailToggle
                                             label="Project invitations & updates"
                                             description="Get notified about project invitations and changes"
                                             checked={emailPrefs.emailOnProjectInvitation}
                                             onChange={() => handleEmailPrefToggle('emailOnProjectInvitation')}
-                                            disabled={emailTogglesDisabled}
+                                            disabled={emailTogglesDisabled || !!formikRef.current?.isSubmitting}
                                         />
                                     </div>
                                 </div>
@@ -409,7 +424,7 @@ const AccountModal = ({ user, onClose, onUpdateUser }: AccountModalProps) => {
                                     </button>
                                     <button
                                         type="submit"
-                                        disabled={isSubmitting}
+                                        disabled={isSubmitting || emailPrefsSaving}
                                         className="flex-1 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-all text-sm font-medium disabled:opacity-50"
                                     >
                                         {isSubmitting ? 'Saving...' : 'Save Changes'}

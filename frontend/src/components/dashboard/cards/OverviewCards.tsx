@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { ChartOptions } from 'chart.js';
-import { ChartCard, ICON_WELL_CLASS, chartOptions, useChartSurfaceColor, useChartTickColor } from '../ChartComponents';
+import { ChartCard, ICON_WELL_CLASS, chartOptions, useChartDataColor, useChartSurfaceColor, useChartTickColor } from '../ChartComponents';
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '../../../util/helpers';
 import { ChartBarIcon, TrendingUpIcon } from '../../common/Icons';
 import EmptyState from '../../common/EmptyState';
@@ -51,13 +51,13 @@ export const StatusDistributionCard = ({ distribution }: { distribution: StatusC
     return (
         <ChartCard title="Status Distribution" subtitle="Tasks by current status">
             <div className="h-48 flex items-center justify-center">
-                <Doughnut data={data} options={doughnutOptions} />
+                <Doughnut data={data} options={doughnutOptions} role="img" aria-label="Task status distribution" />
             </div>
             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 grid grid-cols-2 gap-x-4 gap-y-1">
                 {distribution.map(entry => (
                     <div key={entry.status} className="flex items-center gap-1.5 text-xs">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_CONFIG[entry.status].hex }} />
-                        <span className="text-slate-600 dark:text-slate-400 truncate">{STATUS_CONFIG[entry.status].label}</span>
+                        <span className="text-slate-600 dark:text-slate-300 truncate">{STATUS_CONFIG[entry.status].label}</span>
                         <span className="font-semibold text-slate-800 dark:text-slate-200 ml-auto">{entry.count}</span>
                     </div>
                 ))}
@@ -91,13 +91,13 @@ export const PriorityDistributionCard = ({ distribution }: { distribution: Prior
     return (
         <ChartCard title="Priority Distribution" subtitle="Tasks by priority level">
             <div className="h-48 flex items-center justify-center">
-                <Doughnut data={data} options={doughnutOptions} />
+                <Doughnut data={data} options={doughnutOptions} role="img" aria-label="Task priority distribution" />
             </div>
             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex flex-wrap gap-x-4 gap-y-1 justify-center">
                 {distribution.map(entry => (
                     <div key={entry.priority} className="flex items-center gap-1.5 text-xs">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: PRIORITY_CONFIG[entry.priority].hex }} />
-                        <span className="text-slate-600 dark:text-slate-400">{PRIORITY_CONFIG[entry.priority].label}</span>
+                        <span className="text-slate-600 dark:text-slate-300">{PRIORITY_CONFIG[entry.priority].label}</span>
                         <span className="font-semibold text-slate-800 dark:text-slate-200">{entry.count}</span>
                     </div>
                 ))}
@@ -107,6 +107,7 @@ export const PriorityDistributionCard = ({ distribution }: { distribution: Prior
 };
 
 export const ProjectProgressCard = ({ completion }: { completion: ProjectCompletion[] }) => {
+    const dataColor = useChartDataColor();
     const tickColor = useChartTickColor();
 
     const options = useMemo<ChartOptions<'bar'>>(() => ({
@@ -137,8 +138,8 @@ export const ProjectProgressCard = ({ completion }: { completion: ProjectComplet
                             labels: completion.map(p => p.projectKey),
                             datasets: [{
                                 data: completion.map(p => p.completionPercentage),
-                                backgroundColor: 'rgba(71, 85, 105, 0.8)',
-                                hoverBackgroundColor: 'rgba(51, 65, 85, 1)',
+                                backgroundColor: dataColor,
+                                hoverBackgroundColor: dataColor,
                                 borderRadius: 6,
                                 borderSkipped: false,
                             }],
@@ -155,6 +156,7 @@ export const ProjectProgressCard = ({ completion }: { completion: ProjectComplet
 };
 
 export const CompletionTrendCard = ({ trend }: { trend: CompletionWeek[] }) => {
+    const dataColor = useChartDataColor();
     const surfaceColor = useChartSurfaceColor();
     const tickColor = useChartTickColor();
 
@@ -188,11 +190,11 @@ export const CompletionTrendCard = ({ trend }: { trend: CompletionWeek[] }) => {
         datasets: [{
             label: 'Completed',
             data: trend.map(week => week.count),
-            borderColor: 'rgba(71, 85, 105, 0.9)',
+            borderColor: dataColor,
             backgroundColor: 'rgba(71, 85, 105, 0.1)',
             fill: true,
             tension: 0.35,
-            pointBackgroundColor: '#475569',
+            pointBackgroundColor: dataColor,
             pointBorderColor: surfaceColor,
             pointBorderWidth: 2,
             pointRadius: 4,
@@ -214,8 +216,8 @@ export const CompletionTrendCard = ({ trend }: { trend: CompletionWeek[] }) => {
 };
 
 const IMPACT_COLORS: Record<FactorImpact, string> = {
-    high: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
-    medium: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
+    high: 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
+    medium: 'text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
 };
 
 const RING_SIZE = 56;
@@ -230,9 +232,9 @@ export const OptimizationOpportunityCard = ({ opportunity }: { opportunity: Opti
     const bgColor = score >= 70 ? 'bg-red-100 dark:bg-red-900/30'
         : score >= 40 ? 'bg-amber-100 dark:bg-amber-900/30'
         : score >= 15 ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-green-100 dark:bg-green-900/30';
-    const textColor = score >= 70 ? 'text-red-600 dark:text-red-400'
-        : score >= 40 ? 'text-amber-600 dark:text-amber-400'
-        : score >= 15 ? 'text-blue-600 dark:text-blue-400' : 'text-green-600 dark:text-green-400';
+    const textColor = score >= 70 ? 'text-red-700 dark:text-red-400'
+        : score >= 40 ? 'text-amber-800 dark:text-amber-400'
+        : score >= 15 ? 'text-blue-600 dark:text-blue-400' : 'text-green-700 dark:text-green-400';
     const headline = score >= 70 ? 'High opportunity'
         : score >= 40 ? 'Moderate opportunity'
         : score >= 15 ? 'Low opportunity' : 'Schedule is healthy';
@@ -256,14 +258,14 @@ export const OptimizationOpportunityCard = ({ opportunity }: { opportunity: Opti
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className={`text-sm font-semibold ${textColor} mb-0.5`}>{headline}</div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{recommendation}</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{recommendation}</p>
                 </div>
             </div>
             {factors.length > 0 && (
                 <div className="space-y-1.5 pt-3 border-t border-slate-100 dark:border-slate-700">
                     {factors.map(factor => (
                         <div key={factor.label} className="flex items-center justify-between">
-                            <span className="text-xs text-slate-600 dark:text-slate-400">{factor.label}</span>
+                            <span className="text-xs text-slate-600 dark:text-slate-300">{factor.label}</span>
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{factor.value}</span>
                                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${IMPACT_COLORS[factor.impact]}`}>

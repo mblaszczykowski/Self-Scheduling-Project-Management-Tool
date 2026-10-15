@@ -49,11 +49,12 @@ public final class ScheduleModel {
         boolean completed = dto.status() != null && TERMINAL_STATUSES.contains(dto.status());
         boolean fixed = forceFixed || completed;
 
-        int duration = fixed ? totalDuration
-                : SchedulingSupport.remainingDurationDays(totalDuration, dto.progress());
+        // Dates describe the estimated duration. Progress is reported separately: deriving
+        // duration from it here would shrink the persisted estimate on every apply.
+        int duration = totalDuration;
 
-        int originalStart = (int) ChronoUnit.DAYS.between(horizonStart, dto.startDate());
-        int dueOffset = (int) ChronoUnit.DAYS.between(horizonStart, dto.dueDate()) + 1;
+        int originalStart = SchedulingSupport.checkedDays(ChronoUnit.DAYS.between(horizonStart, dto.startDate()));
+        int dueOffset = SchedulingSupport.checkedDays(ChronoUnit.DAYS.between(horizonStart, dto.dueDate()) + 1);
 
         int releaseOffset = fixed ? originalStart : Math.max(0, originalStart);
 

@@ -6,7 +6,7 @@ export const SectionHeader = ({ title, subtitle }: { title: string; subtitle?: s
     <div className="flex items-start justify-between mb-6">
         <div>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{title}</h2>
-            {subtitle && <p className="text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
+            {subtitle && <p className="text-sm text-slate-600 dark:text-slate-300">{subtitle}</p>}
         </div>
     </div>
 );
@@ -20,7 +20,7 @@ export const ChartCard = ({ title, subtitle, children, className = "" }: { title
         } ${className}`}>
             <div className="mb-5">
                 <h4 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h4>
-                {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{subtitle}</p>}
+                {subtitle && <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{subtitle}</p>}
             </div>
             {children}
         </div>
@@ -28,6 +28,8 @@ export const ChartCard = ({ title, subtitle, children, className = "" }: { title
 };
 
 export const ICON_WELL_CLASS = 'w-14 h-14 rounded-xl flex items-center justify-center shrink-0';
+
+export const useChartDataColor = (): string => (useTheme().theme === 'dark' ? '#cbd5e1' : '#475569');
 
 export const useChartSurfaceColor = (): string => (useTheme().theme === 'dark' ? '#1e293b' : '#ffffff');
 

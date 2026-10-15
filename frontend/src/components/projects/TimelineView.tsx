@@ -45,12 +45,12 @@ const TimelineView = ({
             ? 'Try adjusting your filters to see more results.'
             : 'Create your first project to see it on the timeline.';
         return (
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-grow flex flex-col">
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden grow flex flex-col">
                 <EmptyState
                     variant={hasActiveFilters ? 'search' : 'timeline'}
                     title={emptyTitle}
                     description={emptyDescription}
-                    className="flex-grow"
+                    className="grow"
                 />
             </div>
         );
@@ -72,7 +72,7 @@ const TimelineView = ({
                 headerRef={headerRef}
                 syncScroll={syncScroll}
             />
-            <div className="space-y-3 overflow-auto flex-grow relative" ref={timelineRef} onScroll={syncScroll}>
+            <div className="space-y-3 overflow-auto grow relative" ref={timelineRef} onScroll={syncScroll}>
                 <DependencyOverlay
                     containerRef={timelineRef}
                     allTasks={allTasks}

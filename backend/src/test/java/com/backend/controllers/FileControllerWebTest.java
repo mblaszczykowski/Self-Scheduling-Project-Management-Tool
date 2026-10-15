@@ -107,7 +107,8 @@ class FileControllerWebTest {
                             .requestAttr(TokenService.USER_ID_ATTRIBUTE, USER_ID))
                     .andExpect(status().isOk())
                     .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("attachment")))
-                    .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+                    .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                    .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "private, no-store"));
 
             verify(accessGuard).requireProjectAccessById(PROJECT_ID, USER_ID);
         }
@@ -124,7 +125,18 @@ class FileControllerWebTest {
                             .requestAttr(TokenService.USER_ID_ATTRIBUTE, USER_ID))
                     .andExpect(status().isOk());
 
-            verifyNoInteractions(accessGuard);
+            verify(accessGuard).requireProfileAccess(1, USER_ID);
+        }
+
+        @Test
+        void refusesAnUnrelatedUsersProfilePicture() throws Exception {
+            when(fileStorageService.findOwnership("avatar.png"))
+                    .thenReturn(Optional.of(new StoredFile("avatar.png", null, 1)));
+            doThrow(new ResourceNotFoundException("File not found"))
+                    .when(accessGuard).requireProfileAccess(1, USER_ID);
+            mockMvc.perform(get("/files/avatar.png").requestAttr(TokenService.USER_ID_ATTRIBUTE, USER_ID))
+                    .andExpect(status().isNotFound());
+            verify(fileStorageService, never()).getFilePath(anyString());
         }
 
         @Test

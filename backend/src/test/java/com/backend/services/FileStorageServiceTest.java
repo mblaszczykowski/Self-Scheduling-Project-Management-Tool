@@ -42,6 +42,7 @@ class FileStorageServiceTest {
     private static final Integer PROJECT_ID = 10;
 
     @Mock private StoredFileRepository storedFileRepository;
+    @Mock private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     private Path uploadDir;
     private AppProperties properties;
@@ -54,13 +55,13 @@ class FileStorageServiceTest {
         properties.getStorage().setUploadDir(uploadDir.toString());
         var multipartProperties = new MultipartProperties();
         multipartProperties.setMaxFileSize(DataSize.ofMegabytes(5));
-        fileStorage = new FileStorageService(properties, storedFileRepository, multipartProperties);
+        fileStorage = new FileStorageService(properties, storedFileRepository, multipartProperties, transactionManager);
     }
 
     private FileStorageService fileStorageWithMaxSize(DataSize maxSize) {
         var multipartProperties = new MultipartProperties();
         multipartProperties.setMaxFileSize(maxSize);
-        return new FileStorageService(properties, storedFileRepository, multipartProperties);
+        return new FileStorageService(properties, storedFileRepository, multipartProperties, transactionManager);
     }
 
     private static MockMultipartFile multipartFile(String originalFilename, String contentType, byte[] content) {
@@ -194,12 +195,12 @@ class FileStorageServiceTest {
     @DisplayName("Sweeping unreferenced files")
     class SweepingUnreferencedFiles {
         @Test
-        @DisplayName("a file with an ownership row survives regardless of age")
-        void fileWithOwnershipRowSurvives() throws IOException {
+        @DisplayName("a file referenced by an entity survives regardless of age")
+        void fileWithActualReferenceSurvives() throws IOException {
             var owned = uploadDir.resolve("owned.png");
             Files.writeString(owned, "content");
             ageFile(owned, Duration.ofDays(2));
-            when(storedFileRepository.findAllStoredNames()).thenReturn(Set.of("owned.png"));
+            when(storedFileRepository.findAllReferencedUrls()).thenReturn(Set.of("/files/owned.png"));
 
             var deleted = fileStorage.deleteUnreferencedFiles(Duration.ofHours(1));
 
@@ -213,7 +214,7 @@ class FileStorageServiceTest {
             var orphan = uploadDir.resolve("orphan.png");
             Files.writeString(orphan, "content");
             ageFile(orphan, Duration.ofDays(2));
-            when(storedFileRepository.findAllStoredNames()).thenReturn(Set.of());
+            when(storedFileRepository.findAllReferencedUrls()).thenReturn(Set.of());
 
             var deleted = fileStorage.deleteUnreferencedFiles(Duration.ofHours(1));
 
@@ -226,7 +227,7 @@ class FileStorageServiceTest {
         void youngUnreferencedFileSurvives() throws IOException {
             var inFlight = uploadDir.resolve("in-flight.png");
             Files.writeString(inFlight, "content");
-            when(storedFileRepository.findAllStoredNames()).thenReturn(Set.of());
+            when(storedFileRepository.findAllReferencedUrls()).thenReturn(Set.of());
 
             var deleted = fileStorage.deleteUnreferencedFiles(Duration.ofHours(1));
 
@@ -240,7 +241,7 @@ class FileStorageServiceTest {
             var vanishedDir = uploadDir.resolve("vanished");
             var props = new AppProperties();
             props.getStorage().setUploadDir(vanishedDir.toString());
-            var service = new FileStorageService(props, storedFileRepository, new MultipartProperties());
+            var service = new FileStorageService(props, storedFileRepository, new MultipartProperties(), transactionManager);
             Files.delete(vanishedDir);
 
             assertThat(service.deleteUnreferencedFiles(Duration.ofHours(1))).isZero();
@@ -332,4 +333,78 @@ class FileStorageServiceTest {
 
         org.mockito.Mockito.verify(storedFileRepository).deleteByStoredNameIn(Set.of("gone.png"));
     }
+    @Test
+    void cleansUpPhysicalFileWhenMetadataSaveFails() throws IOException {
+        when(storedFileRepository.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("rejected"));
+        var upload = multipartFile("report.txt", "text/plain", "content".getBytes(StandardCharsets.UTF_8));
+        assertThatThrownBy(() -> fileStorage.storeFile(upload, PROJECT_ID, 1))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        try (var entries = Files.list(uploadDir)) {
+            assertThat(entries).isEmpty();
+        }
+    }
+
+    @Test
+    void cleansUpPhysicalUploadOnTransactionRollback() {
+        var upload = multipartFile("report.txt", "text/plain", "content".getBytes(StandardCharsets.UTF_8));
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            var url = fileStorage.storeFile(upload, PROJECT_ID, 1);
+            var path = uploadDir.resolve(FileStorageService.extractFileName(url));
+            assertThat(path).exists();
+            org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(sync -> sync.afterCompletion(org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK));
+            assertThat(path).doesNotExist();
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void preservesFilesStillReferencedByAnotherEntity() throws IOException {
+        var path = uploadDir.resolve("shared.txt");
+        Files.writeString(path, "shared");
+        when(storedFileRepository.isReferenced("/files/shared.txt")).thenReturn(true);
+        fileStorage.deleteFile("/files/shared.txt");
+        assertThat(path).exists();
+        verify(storedFileRepository, never()).deleteByStoredNameIn(anyCollection());
+    }
+
+    @Test
+    void rejectsRiffAudioMasqueradingAsWebp() {
+        var wave = multipartFile("fake.webp", "image/webp", "RIFF0000WAVEfmt ".getBytes(StandardCharsets.US_ASCII));
+        assertThatThrownBy(() -> fileStorage.storeFile(wave, PROJECT_ID, 1))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("doesn't match declared type");
+        var webp = multipartFile("valid.webp", "image/webp", "RIFF0000WEBPVP8 ".getBytes(StandardCharsets.US_ASCII));
+        assertThat(fileStorage.storeFile(webp, PROJECT_ID, 1)).endsWith(".webp");
+    }
+
+    @Test
+    void rejectsNonCanonicalAndNullAttachmentUrls() {
+        for (var url : List.of("report.pdf", "/files/../report.pdf", "/files/a/b.pdf", "https://example.com/a.pdf")) {
+            assertThatThrownBy(() -> fileStorage.requireAttachmentsBelongTo(PROJECT_ID, List.of(url)))
+                    .isInstanceOf(ValidationException.class);
+        }
+        assertThatThrownBy(() -> fileStorage.requireAttachmentsBelongTo(PROJECT_ID, java.util.Arrays.asList((String) null)))
+                .isInstanceOf(ValidationException.class);
+        org.mockito.Mockito.verifyNoInteractions(storedFileRepository);
+    }
+
+    @Test
+    void rejectsSymbolicLinksWhenServingUploads() throws IOException {
+        var target = uploadDir.resolve("private.txt");
+        Files.writeString(target, "content");
+        Files.createSymbolicLink(uploadDir.resolve("link.txt"), target);
+        assertThatThrownBy(() -> fileStorage.getFilePath("link.txt")).isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void rejectsAnOverfullCombinedAttachmentListBeforeWritingAnyFiles() {
+        var declared = java.util.Collections.nCopies(50, "/files/existing.txt");
+        var upload = multipartFile("next.txt", "text/plain", "next".getBytes(StandardCharsets.UTF_8));
+        assertThatThrownBy(() -> fileStorage.resolveAttachments(PROJECT_ID, declared, List.of(upload), 1))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("Maximum 50");
+        org.mockito.Mockito.verifyNoInteractions(storedFileRepository);
+    }
+
 }

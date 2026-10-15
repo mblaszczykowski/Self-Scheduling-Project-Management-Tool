@@ -12,6 +12,11 @@ import java.util.Optional;
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
+    @Query("SELECT COUNT(r) > 0 FROM RefreshToken r WHERE r.tokenHash = :tokenHash "
+            + "AND r.user.id = :userId AND r.expiryDate > :now AND r.familyStartedAt > :sessionCutoff")
+    boolean existsActiveSession(@Param("tokenHash") String tokenHash, @Param("userId") Integer userId,
+                                @Param("now") Instant now, @Param("sessionCutoff") Instant sessionCutoff);
+
     @Modifying
     @Query("UPDATE RefreshToken r SET r.consumedAt = :now WHERE r.tokenHash = :tokenHash AND r.consumedAt IS NULL")
     int markConsumedIfUnconsumed(@Param("tokenHash") String tokenHash, @Param("now") Instant now);

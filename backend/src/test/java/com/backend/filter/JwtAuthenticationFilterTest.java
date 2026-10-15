@@ -62,6 +62,8 @@ class JwtAuthenticationFilterTest {
                 "POST, /api/users",
                 "GET,  /error",
                 "GET,  /actuator/health",
+                "GET,  /actuator/health/liveness",
+                "GET,  /actuator/health/readiness",
                 "GET,  /swagger-ui.html",
                 "GET,  /swagger-ui/index.html",
                 "GET,  /v3/api-docs",
@@ -172,8 +174,8 @@ class JwtAuthenticationFilterTest {
         }
 
         @Test
-        @DisplayName("a failure while validating becomes a 401, not a leaked 500")
-        void validationFailureBecomesUnauthorized() throws Exception {
+        @DisplayName("an infrastructure failure is a retryable 503 and does not impersonate invalid credentials")
+        void validationFailureBecomesServiceUnavailable() throws Exception {
             given("GET", "/api/projects");
             when(tokenService.extractTokenFromRequest(request))
                     .thenThrow(new RuntimeException("boom"));
@@ -181,8 +183,9 @@ class JwtAuthenticationFilterTest {
             filter.doFilterInternal(request, response, filterChain);
 
             verify(filterChain, never()).doFilter(any(), any());
-            assertThat(response.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
-            assertThat(response.getContentAsString()).doesNotContain("boom");
+            assertThat(response.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+            assertThat(response.getHeader("Retry-After")).isEqualTo("30");
+            assertThat(response.getContentAsString()).contains("AUTH_UNAVAILABLE").doesNotContain("boom");
         }
     }
 

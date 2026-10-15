@@ -85,7 +85,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
-        log.warn("Constraint violation on write: {}", ex.getMostSpecificCause().getMessage());
+        log.warn("Database integrity constraint rejected a write ({})",
+                ex.getMostSpecificCause().getClass().getSimpleName());
         return build(HttpStatus.CONFLICT, "Conflict",
                 "That change conflicts with existing data. Please reload and try again.");
     }

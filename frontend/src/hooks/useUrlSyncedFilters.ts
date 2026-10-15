@@ -41,29 +41,20 @@ export function useUrlSyncedFilters({
 
     useEffect(() => {
         const params = new URLSearchParams(location.search);
-        if (params.get('critical') === 'true') {
-            setFilterState(prev => prev.filters.criticality === 'Critical'
-                ? prev
-                : { ...prev, filters: { ...prev.filters, criticality: 'Critical' } });
-        }
-        if (params.get('delayed') === 'true') {
-            setFilterState(prev => prev.filters.delayed === 'Delayed'
-                ? prev
-                : { ...prev, filters: { ...prev.filters, delayed: 'Delayed' } });
-        }
-        if (params.get('upcomingDeadline') === 'true') {
-            setFilterState(prev => prev.filters.delayed === 'Upcoming deadline'
-                ? prev
-                : { ...prev, filters: { ...prev.filters, delayed: 'Upcoming deadline' } });
-        }
-        if (params.get('delayedByDependency') === 'true') {
-            setFilterState(prev => prev.filters.delayed === 'Delayed by dependency'
-                ? prev
-                : { ...prev, filters: { ...prev.filters, delayed: 'Delayed by dependency' } });
-        }
-        if (params.get('assignedToMe') === 'true') {
-            setFilterState(prev => prev.assignedToMe ? prev : { ...prev, assignedToMe: true });
-        }
+        setFilterState(prev => {
+            const filters = { ...prev.filters };
+            if (params.get('critical') === 'true') filters.criticality = 'Critical';
+            else if (params.get('critical') === 'false') filters.criticality = 'Non-Critical';
+            else delete filters.criticality;
+            if (params.get('delayedByDependency') === 'true') filters.delayed = 'Delayed by dependency';
+            else if (params.get('upcomingDeadline') === 'true') filters.delayed = 'Upcoming deadline';
+            else if (params.get('delayed') === 'true') filters.delayed = 'Delayed';
+            else if (params.get('timeStatus') === 'onTime') filters.delayed = 'On Time';
+            else delete filters.delayed;
+            const assignedToMe = params.get('assignedToMe') === 'true';
+            if (JSON.stringify(filters) === JSON.stringify(prev.filters) && assignedToMe === prev.assignedToMe) return prev;
+            return { ...prev, filters, assignedToMe };
+        });
 
         const selectedIssue = params.get('selectedIssue');
         if (!selectedIssue) {
@@ -105,11 +96,14 @@ export function useUrlSyncedFilters({
         }));
         const params = new URLSearchParams(location.search);
         if (field === 'criticality') {
-            value === 'Critical' ? params.set('critical', 'true') : params.delete('critical');
+            if (value === 'Critical') params.set('critical', 'true');
+            else if (value === 'Non-Critical') params.set('critical', 'false');
+            else params.delete('critical');
         }
         if (field === 'delayed') {
-            ['delayed', 'upcomingDeadline', 'delayedByDependency'].forEach(k => params.delete(k));
-            if (value === 'Delayed') params.set('delayed', 'true');
+            ['delayed', 'upcomingDeadline', 'delayedByDependency', 'timeStatus'].forEach(k => params.delete(k));
+            if (value === 'On Time') params.set('timeStatus', 'onTime');
+            else if (value === 'Delayed') params.set('delayed', 'true');
             else if (value === 'Upcoming deadline') params.set('upcomingDeadline', 'true');
             else if (value === 'Delayed by dependency') params.set('delayedByDependency', 'true');
         }

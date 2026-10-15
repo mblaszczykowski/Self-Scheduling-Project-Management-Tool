@@ -76,7 +76,7 @@ export default function CreateMenu({
                             onClick={handleCreateProject}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                         >
-                            <HiOutlineFolderOpen className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                            <HiOutlineFolderOpen className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                             <span>New Project</span>
                         </button>
                         <button
@@ -84,7 +84,7 @@ export default function CreateMenu({
                             onClick={handleCreateTask}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                         >
-                            <HiOutlineClipboardList className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                            <HiOutlineClipboardList className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                             <span>New Task</span>
                         </button>
                     </div>

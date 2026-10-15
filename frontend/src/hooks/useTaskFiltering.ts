@@ -99,7 +99,7 @@ const applyAssignedToMeFilter = (
 const applySearchFilter = (tasks: EnrichedTask[], searchQuery: string): EnrichedTask[] => {
     if (!searchQuery?.trim()) return tasks;
 
-    const query = searchQuery.toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
     return tasks.filter(task => (task.summary || '').toLowerCase().includes(query));
 };
 

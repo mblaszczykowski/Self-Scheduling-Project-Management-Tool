@@ -58,6 +58,7 @@ public class TaskActivityService {
         logChange(task, author, TaskActivityType.SUMMARY_CHANGED, "summary",
                 before.summary(), after.summary());
         logChange(task, author, TaskActivityType.DESCRIPTION_CHANGED, "description",
+                before.description(), after.description(),
                 summarize(before.description()), summarize(after.description()));
         logChange(task, author, TaskActivityType.LABELS_CHANGED, "labels",
                 joinList(before.labels()), joinList(after.labels()));

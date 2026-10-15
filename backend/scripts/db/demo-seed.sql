@@ -1,5 +1,17 @@
 BEGIN;
 
+-- Demo reset is allowed only in a dedicated demo database. Reserved project keys or an
+-- email domain are not proof of ownership of a user's real data.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM users WHERE lower(email) NOT IN
+      ('demo@flowlink.dev','daniel.brooks@flowlink.dev','priya.sharma@flowlink.dev','marcus.webb@flowlink.dev'))
+     OR EXISTS (SELECT 1 FROM projects p JOIN users u ON u.id = p.owner_id
+                WHERE p.project_key NOT IN ('ECOM','MAPP','B2B') OR lower(u.email) <> 'demo@flowlink.dev') THEN
+    RAISE EXCEPTION 'Demo seed requires a dedicated database containing only the demo accounts and projects';
+  END IF;
+END $$;
+
 DELETE FROM comment_attachments
 WHERE comment_id IN (
   SELECT c.id FROM comments c
@@ -17,7 +29,7 @@ WHERE project_id IN (
   SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'));
 
 DELETE FROM comment_reactions
-WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev')
+WHERE user_id IN (SELECT id FROM users WHERE lower(email) IN ('demo@flowlink.dev','daniel.brooks@flowlink.dev','priya.sharma@flowlink.dev','marcus.webb@flowlink.dev'))
    OR comment_id IN (
      SELECT c.id FROM comments c
        JOIN tasks t ON c.task_id = t.id
@@ -25,16 +37,16 @@ WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev')
      WHERE p.project_key IN ('ECOM','MAPP','B2B'));
 
 DELETE FROM comments
-WHERE author_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev')
+WHERE author_id IN (SELECT id FROM users WHERE lower(email) IN ('demo@flowlink.dev','daniel.brooks@flowlink.dev','priya.sharma@flowlink.dev','marcus.webb@flowlink.dev'))
    OR task_id IN (
      SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
      WHERE p.project_key IN ('ECOM','MAPP','B2B'));
 
 DELETE FROM notifications
-WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev');
+WHERE user_id IN (SELECT id FROM users WHERE lower(email) IN ('demo@flowlink.dev','daniel.brooks@flowlink.dev','priya.sharma@flowlink.dev','marcus.webb@flowlink.dev'));
 
 DELETE FROM task_activities
-WHERE author_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev')
+WHERE author_id IN (SELECT id FROM users WHERE lower(email) IN ('demo@flowlink.dev','daniel.brooks@flowlink.dev','priya.sharma@flowlink.dev','marcus.webb@flowlink.dev'))
    OR task_id IN (
      SELECT t.id FROM tasks t JOIN projects p ON t.project_id = p.id
      WHERE p.project_key IN ('ECOM','MAPP','B2B'));
@@ -52,18 +64,18 @@ WHERE project_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP'
 
 DELETE FROM project_members
 WHERE project_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'))
-   OR user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev');
+   OR user_id IN (SELECT id FROM users WHERE lower(email) IN ('demo@flowlink.dev','daniel.brooks@flowlink.dev','priya.sharma@flowlink.dev','marcus.webb@flowlink.dev'));
 
 DELETE FROM project_dependencies
 WHERE project_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'))
    OR dependency_id IN (SELECT id FROM projects WHERE project_key IN ('ECOM','MAPP','B2B'));
 
 DELETE FROM refresh_tokens
-WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@flowlink.dev');
+WHERE user_id IN (SELECT id FROM users WHERE lower(email) IN ('demo@flowlink.dev','daniel.brooks@flowlink.dev','priya.sharma@flowlink.dev','marcus.webb@flowlink.dev'));
 
 DELETE FROM projects WHERE project_key IN ('ECOM','MAPP','B2B');
 
-DELETE FROM users WHERE email LIKE '%@flowlink.dev';
+DELETE FROM users WHERE lower(email) IN ('demo@flowlink.dev','daniel.brooks@flowlink.dev','priya.sharma@flowlink.dev','marcus.webb@flowlink.dev');
 
 INSERT INTO users (first_name, last_name, email, password,
                    email_notifications_enabled, email_on_task_assigned,
@@ -593,7 +605,7 @@ WHERE u.email = 'demo@flowlink.dev'
                     AND n.message = 'Task ECOM-3 was updated (status: IN_PROGRESS, progress: 50%)');
 
 UPDATE users SET version = 0
-WHERE version IS NULL AND email LIKE '%@flowlink.dev';
+WHERE version IS NULL AND lower(email) IN ('demo@flowlink.dev','daniel.brooks@flowlink.dev','priya.sharma@flowlink.dev','marcus.webb@flowlink.dev');
 
 UPDATE projects SET version = 0
 WHERE version IS NULL AND project_key IN ('ECOM','MAPP','B2B');

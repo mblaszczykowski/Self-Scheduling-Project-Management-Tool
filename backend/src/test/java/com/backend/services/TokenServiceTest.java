@@ -51,6 +51,9 @@ class TokenServiceTest {
     @Mock
     private CookieFactory cookieFactory;
 
+    @Mock
+    private SseEmitterManager sseEmitterManager;
+
     private JwtProperties jwtProperties;
     private TokenService tokenService;
 
@@ -79,7 +82,7 @@ class TokenServiceTest {
         var appProperties = new AppProperties();
         appProperties.getSession().setAbsoluteMaxDays(absoluteMaxDays);
         return new TokenService(deriveKey(properties.secret()), properties, appProperties,
-                refreshTokenRepository, userRepository, cookieFactory);
+                refreshTokenRepository, userRepository, cookieFactory, sseEmitterManager);
     }
 
     private static String rawToken(SecretKey key, String issuer, String audience, String type,
@@ -92,6 +95,7 @@ class TokenServiceTest {
                 .issuedAt(Date.from(issuedAt))
                 .expiration(Date.from(expiresAt))
                 .claim("type", type)
+                .claim("sid", "session-hash")
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
@@ -102,9 +106,34 @@ class TokenServiceTest {
         @Test
         @DisplayName("round-trips a freshly generated token back to its user id")
         void roundTripsAFreshToken() {
-            var token = tokenService.generateAccessToken(42);
+            when(refreshTokenRepository.existsActiveSession(anyString(), org.mockito.ArgumentMatchers.eq(42), any(), any()))
+                    .thenReturn(true);
+            var token = tokenService.generateAccessToken(42, "session-hash");
 
             assertThat(tokenService.validateTokenAndGetUserId(token)).isEqualTo(42);
+        }
+
+        @Test
+        @DisplayName("rejects a valid JWT immediately after its server-side session is revoked")
+        void rejectsRevokedSessions() {
+            var token = tokenService.generateAccessToken(42, "session-hash");
+            when(refreshTokenRepository.existsActiveSession(anyString(), org.mockito.ArgumentMatchers.eq(42), any(), any()))
+                    .thenReturn(true, false);
+            assertThat(tokenService.validateTokenAndGetUserId(token)).isEqualTo(42);
+            assertThat(tokenService.validateTokenAndGetUserId(token)).isNull();
+        }
+
+        @Test
+        @DisplayName("rejects signed tokens issued in the future and non-positive subjects")
+        void rejectsInvalidIssuedAtAndSubject() {
+            var now = Instant.now();
+            assertThat(tokenService.validateTokenAndGetUserId(rawToken(deriveKey(SECRET), ISSUER,
+                    AUDIENCE, "access", now.plusSeconds(3600), now.plusSeconds(7200), "42"))).isNull();
+            assertThat(tokenService.validateTokenAndGetUserId(rawToken(deriveKey(SECRET), ISSUER,
+                    AUDIENCE, "access", now, now.plusSeconds(900), "0"))).isNull();
+            assertThat(tokenService.validateTokenAndGetUserId(rawToken(deriveKey(SECRET), ISSUER,
+                    AUDIENCE, "access", now, now.plusSeconds(900), "-1"))).isNull();
+            org.mockito.Mockito.verifyNoInteractions(refreshTokenRepository);
         }
 
         @Test
@@ -183,7 +212,7 @@ class TokenServiceTest {
         @Test
         @DisplayName("rejects a tampered token")
         void rejectsATamperedToken() {
-            var token = tokenService.generateAccessToken(42);
+            var token = tokenService.generateAccessToken(42, "session-hash");
             var tampered = token.substring(0, token.length() - 1)
                     + (token.charAt(token.length() - 1) == 'a' ? 'b' : 'a');
 
@@ -193,7 +222,7 @@ class TokenServiceTest {
         @Test
         @DisplayName("mints an access token whose lifetime matches the configured expiration exactly")
         void accessTokenLifetimeMatchesConfiguration() {
-            var token = tokenService.generateAccessToken(42);
+            var token = tokenService.generateAccessToken(42, "session-hash");
 
             var claims = Jwts.parser()
                     .verifyWith(deriveKey(SECRET))

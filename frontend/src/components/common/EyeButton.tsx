@@ -10,7 +10,7 @@ function EyeButton({ showPassword, setShowPassword }: EyeButtonProps) {
     return (
         <button
             type="button"
-            className="absolute top-3.5 right-3 text-slate-500 hover:text-slate-700 transition-colors"
+            className="absolute top-2.5 right-2 h-7 w-7 flex items-center justify-center text-slate-600 hover:text-slate-700 transition-colors"
             onClick={() => setShowPassword(!showPassword)}
             aria-label={showPassword ? 'Hide password' : 'Show password'}
         >

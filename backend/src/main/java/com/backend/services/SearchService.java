@@ -9,7 +9,6 @@ import com.backend.repositories.CommentRepository;
 import com.backend.repositories.ProjectRepository;
 import com.backend.repositories.TaskRepository;
 import org.jsoup.Jsoup;
-import org.jsoup.safety.Safelist;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,7 +89,7 @@ public class SearchService {
     }
 
     private static String snippet(String htmlContent) {
-        var plainText = Jsoup.clean(htmlContent, Safelist.none());
+        var plainText = htmlContent == null ? "" : Jsoup.parseBodyFragment(htmlContent).text();
         return plainText.length() > SNIPPET_LENGTH
                 ? plainText.substring(0, SNIPPET_LENGTH) + "..."
                 : plainText;

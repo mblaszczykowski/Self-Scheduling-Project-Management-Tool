@@ -2,17 +2,23 @@ package com.backend.scheduling;
 
 import com.backend.config.AppProperties;
 import com.backend.dtos.TaskDTO;
+import com.backend.entities.TaskStatus;
+import com.backend.exception.ValidationException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 @Service
 public class SchedulingService {
+    private static final Set<TaskStatus> TERMINAL_STATUSES =
+            Set.of(TaskStatus.DONE, TaskStatus.RELEASED, TaskStatus.WITHDRAWN);
     private final SsgsDecoder decoder;
     private final int minHorizonDays;
 
@@ -25,12 +31,37 @@ public class SchedulingService {
 
     public Outcome optimize(List<TaskDTO> tasks, List<TaskDTO> anchors,
                             LocalDate horizonStart, double alpha, double beta) {
+        if ((long) tasks.size() + anchors.size() > 5000) {
+            throw new ValidationException("At most 5000 tasks can be optimized at once");
+        }
+        if (!Double.isFinite(alpha) || !Double.isFinite(beta)
+                || alpha < 0 || alpha > 1 || beta < 0 || beta > 1) {
+            throw new ValidationException("Optimization weights must be between 0 and 1");
+        }
         var model = ScheduleModel.build(tasks, anchors, horizonStart);
         if (model.scheduleTasks().isEmpty()) {
             return Outcome.empty(horizonStart, model.skippedKeys());
         }
 
         var graph = PrecedenceGraph.of(model.scheduleTasks());
+        var allTasks = new HashMap<String, TaskDTO>();
+        Stream.concat(tasks.stream(), anchors.stream()).forEach(task -> allTasks.put(task.taskKey(), task));
+        for (var task : graph.tasks().values()) {
+            if (task.fixed()) {
+                continue;
+            }
+            for (var predecessorKey : task.predecessors()) {
+                if (graph.task(predecessorKey) != null) {
+                    continue;
+                }
+                var predecessor = allTasks.get(predecessorKey);
+                if (predecessor == null || predecessor.status() == null
+                        || !TERMINAL_STATUSES.contains(predecessor.status())) {
+                    throw new ValidationException("Cannot optimize task " + task.key()
+                            + ": a predecessor has no complete date range");
+                }
+            }
+        }
         var horizon = ScheduleObjective.Horizon.of(graph.tasks().values(), minHorizonDays);
 
         var current = decoder.asPlanned(graph);
@@ -39,15 +70,29 @@ public class SchedulingService {
         var metricsByRule = new LinkedHashMap<PriorityRule, ScheduleMetrics>();
         Schedule best = null;
         ScheduleMetrics bestMetrics = null;
+        ValidationException horizonFailure = null;
 
         for (var rule : SsgsDecoder.candidateRules()) {
-            var candidate = decoder.decode(graph, rule, horizon);
+            Schedule candidate;
+            try {
+                candidate = decoder.decode(graph, rule, horizon);
+            } catch (ValidationException ex) {
+                horizonFailure = ex;
+                continue;
+            }
             var metrics = ScheduleEvaluator.evaluate(candidate, graph, horizon, alpha, beta);
             metricsByRule.put(rule, metrics);
-            if (bestMetrics == null || metrics.objectiveValue() < bestMetrics.objectiveValue()) {
+            if (bestMetrics == null
+                    || metrics.feasible() && !bestMetrics.feasible()
+                    || metrics.feasible() == bestMetrics.feasible()
+                    && metrics.objectiveValue() < bestMetrics.objectiveValue()) {
                 best = candidate;
                 bestMetrics = metrics;
             }
+        }
+        if (best == null) {
+            throw horizonFailure != null ? horizonFailure
+                    : new ValidationException("Cannot generate a schedule within the configured horizon");
         }
 
         return new Outcome(horizonStart, graph, current, currentMetrics, best, bestMetrics,

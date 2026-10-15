@@ -74,7 +74,7 @@ const TimelineProjectRow = ({
                             <div className="flex items-center gap-2.5">
                                 <button
                                     onClick={() => onToggleExpand(project.projectKey)}
-                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 transition-colors flex-shrink-0"
+                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 transition-colors shrink-0"
                                     title={isExpanded ? 'Collapse tasks' : 'Expand tasks'}
                                     aria-label={isExpanded ? 'Collapse tasks' : 'Expand tasks'}
                                 >
@@ -114,17 +114,17 @@ const TimelineProjectRow = ({
                                                 style={{ width: `${project.projectProgress}%` }}
                                             />
                                         </div>
-                                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">
+                                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300 tabular-nums">
                                             {project.projectProgress}%
                                         </span>
-                                        <span className="text-xs text-slate-400 dark:text-slate-500">
+                                        <span className="text-xs text-slate-600 dark:text-slate-300">
                                             {project.tasks?.length || 0} tasks
                                         </span>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => onOpenTaskModal(project, null)}
-                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
                                     title="Add task"
                                     aria-label="Add task"
                                 >

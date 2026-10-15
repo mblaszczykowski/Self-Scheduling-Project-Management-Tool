@@ -11,6 +11,8 @@ import UserMenu from './UserMenu';
 import ConfirmDialog from '../modals/ConfirmDialog';
 import MobileMenu from './MobileMenu';
 import SearchBar from './SearchBar';
+import { showToast } from '../../util/toast';
+import { getErrorMessage } from '../../util/helpers';
 
 const NavLink = ({ to, active, children }: { to: string; active: boolean; children: React.ReactNode }) => (
     <Link
@@ -18,7 +20,7 @@ const NavLink = ({ to, active, children }: { to: string; active: boolean; childr
         className={
             active
                 ? 'py-1.5 px-3.5 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-medium rounded-lg transition-colors'
-                : 'py-1.5 px-3.5 text-slate-500 dark:text-slate-400 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors'
+                : 'py-1.5 px-3.5 text-slate-600 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors'
         }
     >
         {children}
@@ -53,7 +55,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
         try {
             await markAllAsRead();
         } catch (err) {
-            console.error('Could not mark notifications as read', err);
+            showToast(getErrorMessage(err, 'Could not mark notifications as read'), 'error');
         }
     }, [markAllAsRead]);
 
@@ -61,7 +63,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
         try {
             await markAsRead([notificationId]);
         } catch (err) {
-            console.error('Could not mark the notification as read', err);
+            showToast(getErrorMessage(err, 'Could not mark the notification as read'), 'error');
         }
     }, [markAsRead]);
 
@@ -78,7 +80,7 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
                         <div className="w-8 h-8 bg-slate-900 dark:bg-white rounded-lg flex items-center justify-center">
                             <div className="w-4 h-4 bg-white dark:bg-slate-900 rounded" />
                         </div>
-                        <span className="ml-2.5 text-base font-semibold text-slate-900 dark:text-white tracking-tight">Flowlink</span>
+                        <span className="ml-2.5 text-base font-semibold text-slate-900 dark:text-white tracking-tight">FlowLink</span>
                     </Link>
 
                     <div className="hidden xl:flex items-center gap-1">
@@ -104,11 +106,11 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
                         aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                     >
                         {theme === 'dark' ? (
-                            <svg className="w-[18px] h-[18px] text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg className="w-[18px] h-[18px] text-amber-800" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                             </svg>
                         ) : (
-                            <svg className="w-[18px] h-[18px] text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg className="w-[18px] h-[18px] text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                             </svg>
                         )}
@@ -137,9 +139,9 @@ export default function Header({ onLogout, onCreateProject, onCreateTask }: Head
                         className="xl:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 dark:focus-visible:ring-white transition-colors"
                     >
                         {mobileMenuOpen ? (
-                            <HiOutlineX className="h-5 w-5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                            <HiOutlineX className="h-5 w-5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                         ) : (
-                            <HiOutlineMenu className="h-5 w-5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                            <HiOutlineMenu className="h-5 w-5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                         )}
                     </button>
                 </div>

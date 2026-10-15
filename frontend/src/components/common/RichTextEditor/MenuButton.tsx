@@ -17,7 +17,7 @@ export const MenuButton = ({ onClick, isActive, disabled, children, title }: Men
         className={`p-1.5 rounded-md transition-colors duration-100 text-sm leading-none ${
             isActive
                 ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
         } disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent`}
     >
         {children}

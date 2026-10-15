@@ -4,10 +4,10 @@ FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
 
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
-
 COPY src ./src
-RUN mvn package -DskipTests -B
+# Reuse downloaded artifacts without resolving unused optional database/plugin BOMs.
+# CI runs the full test suite before building this image.
+RUN --mount=type=cache,target=/root/.m2 mvn package -Dmaven.test.skip=true -B
 
 # Stage 2: Run
 FROM eclipse-temurin:21-jre

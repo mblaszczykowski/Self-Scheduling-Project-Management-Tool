@@ -38,7 +38,7 @@ const TimelineHeader = ({
                 const weekendClass = isWeekend ? 'bg-slate-50/80 dark:bg-slate-800/30' : '';
                 const todayClass = isToday
                     ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold rounded-md'
-                    : 'text-slate-400 dark:text-slate-500';
+                    : 'text-slate-600 dark:text-slate-300';
                 return (
                     <div
                         key={`${currentYear}-${currentMonth}-${i}`}
@@ -81,7 +81,7 @@ const TimelineHeader = ({
             >
                 <button
                     onClick={onSidebarToggle}
-                    className="p-2 ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                    className="p-2 ml-2 text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                     aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
@@ -89,7 +89,7 @@ const TimelineHeader = ({
                 </button>
                 {!sidebarCollapsed && (
                     <div className="flex items-center gap-2 pr-3">
-                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500 tabular-nums">
+                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300 tabular-nums">
                             {processedProjects.length} projects
                         </span>
                         <button
@@ -111,7 +111,7 @@ const TimelineHeader = ({
                             >
                                 {optimization.loading ? (
                                     <>
-                                        <svg className="animate-spin h-3 w-3 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                                        <svg className="animate-spin h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                         </svg>
@@ -119,7 +119,7 @@ const TimelineHeader = ({
                                     </>
                                 ) : (
                                     <>
-                                        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" className="flex-shrink-0 transition-transform group-hover:rotate-90 duration-300">
+                                        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" className="shrink-0 transition-transform group-hover:rotate-90 duration-300">
                                             <path d="M5.5 1v9M1 5.5h9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity="0.5"/>
                                             <circle cx="5.5" cy="5.5" r="3" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                                             <circle cx="5.5" cy="5.5" r="1" fill="currentColor"/>

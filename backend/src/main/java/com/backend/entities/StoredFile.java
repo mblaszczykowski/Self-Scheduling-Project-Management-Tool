@@ -39,5 +39,7 @@ public class StoredFile {
 
     public String getStoredName() { return storedName; }
 
+    public Integer getUploadedBy() { return uploadedBy; }
+
     public Integer getProjectId() { return projectId; }
 }

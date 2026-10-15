@@ -10,6 +10,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,7 +22,10 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.LinkOption;
+import java.util.Locale;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -40,11 +47,15 @@ public class FileStorageService {
     private final Path fileStorageLocation;
     private final StoredFileRepository storedFileRepository;
     private final DataSize maxFileSize;
+    private final TransactionTemplate cleanupTransaction;
 
     public FileStorageService(AppProperties appProperties, StoredFileRepository storedFileRepository,
-                              MultipartProperties multipartProperties) {
+                              MultipartProperties multipartProperties,
+                              PlatformTransactionManager transactionManager) {
         this.storedFileRepository = storedFileRepository;
         this.maxFileSize = multipartProperties.getMaxFileSize();
+        this.cleanupTransaction = new TransactionTemplate(transactionManager);
+        this.cleanupTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.fileStorageLocation = Paths.get(appProperties.getStorage().getUploadDir())
                 .toAbsolutePath().normalize();
         try {
@@ -64,8 +75,15 @@ public class FileStorageService {
         }
         var extensions = files.stream().map(this::validateAndExtractExtension).toList();
         var stored = new ArrayList<String>(files.size());
-        for (int i = 0; i < files.size(); i++) {
-            stored.add(writeFile(files.get(i), extensions.get(i), projectId, uploaderId));
+        try {
+            for (int i = 0; i < files.size(); i++) {
+                stored.add(writeFile(files.get(i), extensions.get(i), projectId, uploaderId));
+            }
+        } catch (RuntimeException ex) {
+            if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+                deleteFilesSilently(stored);
+            }
+            throw ex;
         }
         return stored;
     }
@@ -79,12 +97,28 @@ public class FileStorageService {
         var targetLocation = resolveAndValidatePath(safeFileName);
 
         try (var input = file.getInputStream()) {
-            Files.copy(input, targetLocation, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(input, targetLocation);
         } catch (IOException ex) {
+            deletePhysicalFileQuietly(targetLocation);
             throw new FileStorageException("Could not store file. Please try again");
         }
 
-        storedFileRepository.save(new StoredFile(safeFileName, projectId, uploaderId));
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status != STATUS_COMMITTED) {
+                        deletePhysicalFileQuietly(targetLocation);
+                    }
+                }
+            });
+        }
+        try {
+            storedFileRepository.save(new StoredFile(safeFileName, projectId, uploaderId));
+        } catch (RuntimeException ex) {
+            deletePhysicalFileQuietly(targetLocation);
+            throw ex;
+        }
         return URL_PREFIX + safeFileName;
     }
 
@@ -92,12 +126,20 @@ public class FileStorageService {
         return storedFileRepository.findByStoredName(storedName);
     }
 
+    @Transactional
     public void requireAttachmentsBelongTo(Integer projectId, Collection<String> attachmentUrls) {
         if (attachmentUrls == null || attachmentUrls.isEmpty()) {
             return;
         }
         var names = attachmentUrls.stream()
-                .map(FileStorageService::extractFileName)
+                .map(url -> {
+                    if (url == null || !url.startsWith(URL_PREFIX)) {
+                        throw new ValidationException("Invalid attachment URL");
+                    }
+                    var name = extractFileName(url);
+                    rejectPathTraversalAttempts(name);
+                    return name;
+                })
                 .collect(Collectors.toSet());
 
         var known = storedFileRepository.findByStoredNameIn(names);
@@ -115,10 +157,16 @@ public class FileStorageService {
         }
     }
 
+    @Transactional
     public List<String> resolveAttachments(Integer projectId, List<String> declared,
                                            List<MultipartFile> newFiles, Integer uploaderId) {
+        int attachmentCount = (declared == null ? 0 : declared.size()) + (newFiles == null ? 0 : newFiles.size());
+        if (attachmentCount > FileValidationConstants.MAX_ATTACHMENTS_PER_ENTITY) {
+            throw new ValidationException("Maximum " + FileValidationConstants.MAX_ATTACHMENTS_PER_ENTITY
+                    + " attachments per item");
+        }
         requireAttachmentsBelongTo(projectId, declared);
-        var merged = new ArrayList<>(declared);
+        var merged = new ArrayList<>(declared == null ? List.<String>of() : declared);
         merged.addAll(storeFiles(newFiles, projectId, uploaderId));
         return merged;
     }
@@ -127,12 +175,21 @@ public class FileStorageService {
         var fileName = extractFileName(filePath);
         rejectPathTraversalAttempts(fileName);
         var resolvedPath = resolveAndValidatePath(fileName);
-        try {
-            Files.deleteIfExists(resolvedPath);
-        } catch (IOException ex) {
-            throw new FileStorageException("Could not delete file");
-        }
-        storedFileRepository.deleteByStoredNameIn(Set.of(fileName));
+        cleanupTransaction.executeWithoutResult(status -> {
+            // The same row is held with a shared lock while a transaction validates/reuses this
+            // URL. Acquire the exclusive lock before reading references so concurrent attaches
+            // have committed (or will find no ownership row after this cleanup commits).
+            storedFileRepository.findByStoredNameForUpdate(fileName);
+            if (storedFileRepository.isReferenced(URL_PREFIX + fileName)) {
+                return;
+            }
+            try {
+                Files.deleteIfExists(resolvedPath);
+            } catch (IOException ex) {
+                throw new FileStorageException("Could not delete file");
+            }
+            storedFileRepository.deleteByStoredNameIn(Set.of(fileName));
+        });
     }
 
     public void deleteFilesSilently(Collection<String> filePaths) {
@@ -161,12 +218,13 @@ public class FileStorageService {
         if (!Files.isDirectory(fileStorageLocation)) {
             return 0;
         }
-        var referenced = storedFileRepository.findAllStoredNames();
+        var referenced = storedFileRepository.findAllReferencedUrls();
         var cutoff = Instant.now().minus(minimumAge);
         int deleted = 0;
         try (var entries = Files.list(fileStorageLocation)) {
-            for (var path : entries.toList()) {
-                if (deleteIfUnreferencedAndStale(path, referenced, cutoff)) {
+            var iterator = entries.iterator();
+            while (iterator.hasNext()) {
+                if (deleteIfUnreferencedAndStale(iterator.next(), referenced, cutoff)) {
                     deleted++;
                 }
             }
@@ -179,14 +237,17 @@ public class FileStorageService {
     private boolean deleteIfUnreferencedAndStale(Path path, Set<String> referenced, Instant cutoff) {
         try {
             var name = path.getFileName().toString();
-            if (!Files.isRegularFile(path) || referenced.contains(name)) {
+            if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) || referenced.contains(URL_PREFIX + name)) {
                 return false;
             }
             if (Files.getLastModifiedTime(path).toInstant().isAfter(cutoff)) {
                 return false;
             }
-            return Files.deleteIfExists(path);
-        } catch (IOException e) {
+            // Check again against committed references before deleting, then remove stale ownership
+            // metadata too. A row left behind by an earlier failed cleanup is not a live attachment.
+            deleteFile(URL_PREFIX + name);
+            return !Files.exists(path);
+        } catch (IOException | RuntimeException e) {
             log.warn("Could not sweep upload {}: {}", path.getFileName(), e.getMessage());
             return false;
         }
@@ -194,7 +255,19 @@ public class FileStorageService {
 
     public Path getFilePath(String fileName) {
         rejectPathTraversalAttempts(fileName);
-        return resolveAndValidatePath(fileName);
+        var path = resolveAndValidatePath(fileName);
+        if (Files.isSymbolicLink(path)) {
+            throw new ValidationException("Invalid file path");
+        }
+        return path;
+    }
+
+    private static void deletePhysicalFileQuietly(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException ex) {
+            log.warn("Could not clean up failed upload {}", path.getFileName(), ex);
+        }
     }
 
     public static String extractFileName(String filePath) {
@@ -205,14 +278,14 @@ public class FileStorageService {
     }
 
     private String validateAndExtractExtension(MultipartFile file) {
-        if (file.isEmpty()) {
+        if (file == null || file.isEmpty()) {
             throw new ValidationException("Cannot store empty file");
         }
         var originalFileName = file.getOriginalFilename();
         if (originalFileName == null || originalFileName.isBlank()) {
             throw new ValidationException("Invalid filename");
         }
-        var extension = extractExtension(originalFileName).toLowerCase();
+        var extension = extractExtension(originalFileName).toLowerCase(Locale.ROOT);
         if (!FileValidationConstants.ALLOWED_EXTENSIONS.contains(extension)) {
             throw new ValidationException("File type not allowed: " + extension);
         }
@@ -222,13 +295,14 @@ public class FileStorageService {
         }
         var expectedMagic = FileValidationConstants.MAGIC_BYTES_BY_EXTENSION.get(extension);
         if (expectedMagic != null) {
-            validateMagicBytes(file, expectedMagic);
+            validateMagicBytes(file, extension, expectedMagic);
         }
         return extension;
     }
 
     private void rejectPathTraversalAttempts(String fileName) {
-        if (fileName.isEmpty() || fileName.contains("/") || fileName.contains("\\")
+        if (fileName == null || fileName.isBlank() || fileName.indexOf(0) >= 0
+                || fileName.contains("/") || fileName.contains("\\")
                 || fileName.contains("..")) {
             throw new ValidationException("Invalid filename");
         }
@@ -250,14 +324,15 @@ public class FileStorageService {
         return filename.substring(lastDot + 1);
     }
 
-    private void validateMagicBytes(MultipartFile file, byte[] expectedMagicBytes) {
+    private void validateMagicBytes(MultipartFile file, String extension, byte[] expectedMagicBytes) {
         byte[] header;
         try {
             header = FileValidationConstants.readHeader(file);
         } catch (UncheckedIOException e) {
             throw new FileStorageException("Could not validate file content");
         }
-        if (!FileValidationConstants.startsWithMagicBytes(header, expectedMagicBytes)) {
+        if (!FileValidationConstants.startsWithMagicBytes(header, expectedMagicBytes)
+                || ("webp".equals(extension) && !FileValidationConstants.isWebp(header))) {
             throw new ValidationException("File content doesn't match declared type");
         }
     }

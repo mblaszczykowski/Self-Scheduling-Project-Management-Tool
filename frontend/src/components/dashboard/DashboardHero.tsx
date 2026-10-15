@@ -40,12 +40,12 @@ const DashboardHero = ({ user, criticalCount, delayedCount, upcomingCriticalCoun
                 <div className="max-w-[1400px] mx-auto">
                     <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
                         <div>
-                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Dashboard</p>
+                            <p className="text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-2">Dashboard</p>
                             <h1 className="text-3xl lg:text-4xl font-semibold text-slate-900 dark:text-white mb-2">
                                 Welcome back, {user?.firstname || 'User'}
                             </h1>
                             <p className="text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                                <CalendarIcon className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                                <CalendarIcon className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                                 {todayFormatted}
                             </p>
                         </div>
@@ -54,14 +54,14 @@ const DashboardHero = ({ user, criticalCount, delayedCount, upcomingCriticalCoun
                             <QuickActionButton
                                 onClick={() => navigate('/projects?critical=true')}
                                 icon={AlertTriangleIcon}
-                                iconColor="text-red-500"
+                                iconColor="text-red-700"
                                 label="Critical"
                                 count={criticalCount}
                             />
                             <QuickActionButton
                                 onClick={() => navigate('/projects?delayed=true')}
                                 icon={ClockIcon}
-                                iconColor="text-amber-500"
+                                iconColor="text-amber-800"
                                 label="Delayed"
                                 count={delayedCount}
                             />

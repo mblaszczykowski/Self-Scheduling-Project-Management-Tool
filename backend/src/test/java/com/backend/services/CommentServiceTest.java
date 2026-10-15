@@ -803,4 +803,76 @@ class CommentServiceTest {
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }
+
+    @Test
+    void anOutOfRangePagePreservesTheActualCommentCount() {
+        var pageable = PageRequest.of(5, 10);
+        when(accessGuard.getAccessibleTaskById(100, 1)).thenReturn(task);
+        when(commentRepository.findTopLevelCommentIds(100, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 17));
+
+        var result = commentService.getCommentsByTask(100, 1, pageable);
+
+        assertThat(result.getTotalElements()).isEqualTo(17);
+        assertThat(result.getContent()).isEmpty();
+        verify(commentRepository, never()).findTopLevelCommentsWithDetails(anyCollection());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"<script>alert(1)</script>", "<p><br></p>", "<p>&nbsp;</p>", "   "})
+    void commentsThatAreEmptyAfterSanitizationAreRejectedBeforeFilesAreStored(String content) {
+        when(accessGuard.getAccessibleTaskById(100, 1)).thenReturn(task);
+        when(userService.getRequiredUserById(1)).thenReturn(author);
+
+        assertThatThrownBy(() -> commentService.addComment(100, 1, content, oneUpload(), null))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("empty");
+        verifyNoInteractions(fileStorageService);
+        verify(commentRepository, never()).save(any());
+    }
+
+    @Test
+    void deepRepliesAreRejectedBeforeTheyCanOverflowRenderingOrExhaustQueries() {
+        Comment parent = null;
+        for (int i = 1; i <= 21; i++) {
+            var next = TestEntityFactory.createComment(i, task, otherUser);
+            next.setParentComment(parent);
+            parent = next;
+        }
+        when(accessGuard.getAccessibleTaskById(100, 1)).thenReturn(task);
+        when(userService.getRequiredUserById(1)).thenReturn(author);
+        when(commentRepository.findById(21)).thenReturn(Optional.of(parent));
+
+        assertThatThrownBy(() -> commentService.addComment(100, 1, "Reply", List.of(), 21))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("20 reply levels");
+        verify(commentRepository, never()).save(any());
+    }
+
+    @Test
+    void formerMembersReceiveNeitherReplyNorTaskCommentNotifications() {
+        var parent = TestEntityFactory.createComment(50, task, otherUser);
+        project.replaceMembers(List.of(author));
+        task.setAssignee(assignee);
+        when(accessGuard.getAccessibleTaskById(100, 1)).thenReturn(task);
+        when(userService.getRequiredUserById(1)).thenReturn(author);
+        when(commentRepository.findById(50)).thenReturn(Optional.of(parent));
+        commentIsSavedWithId(501);
+
+        commentService.addComment(100, 1, "Confidential update", List.of(), 50);
+
+        verifyNoInteractions(notificationRepository, emailService, sseEmitterManager);
+    }
+
+
+    @Test
+    void repeatedEditsCannotExceedTheCommentAttachmentLimit() {
+        var comment = TestEntityFactory.createComment(50, task, author);
+        comment.addAttachments(java.util.stream.IntStream.range(0, 50)
+                .mapToObj(i -> "/files/" + i + ".pdf").toList());
+        when(commentRepository.findByIdWithTaskAndProject(50)).thenReturn(Optional.of(comment));
+
+        assertThatThrownBy(() -> commentService.updateComment(100, 50, 1, "Updated", oneUpload()))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("50 attachments");
+        verifyNoInteractions(fileStorageService);
+    }
+
 }

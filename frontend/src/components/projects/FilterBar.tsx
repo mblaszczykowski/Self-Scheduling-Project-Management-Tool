@@ -7,7 +7,7 @@ import {
 } from '../common/Icons';
 import { FilterBarProps } from './types';
 
-const iconClass = "w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0";
+const iconClass = "w-3.5 h-3.5 text-slate-600 dark:text-slate-300 shrink-0";
 
 const STATUS_ICON = <CheckCircleIcon className={iconClass} />;
 const ASSIGNEE_ICON = <UserIcon className={iconClass} />;
@@ -112,7 +112,7 @@ const FilterBar = ({
         'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-colors '
         + (isActive
             ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-medium'
-            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200');
+            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200');
 
     const dropdownOptionClass = (isActive: boolean) =>
         'w-full px-3.5 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors '
@@ -142,7 +142,7 @@ const FilterBar = ({
                     {openFilterDropdown === 'project' && (
                         <div className={`${dropdownClass} min-w-[200px] max-h-72 overflow-y-auto`}>
                             <div className="px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-700">
-                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Project</span>
+                                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">Project</span>
                             </div>
                             <div className="py-1">
                                 <button
@@ -185,7 +185,7 @@ const FilterBar = ({
                             {openFilterDropdown === field && (
                                 <div className={`${dropdownClass} min-w-[180px] max-h-72 overflow-y-auto`}>
                                     <div className="px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-700">
-                                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
+                                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">{label}</span>
                                     </div>
                                     <div className="py-1">
                                         <button
@@ -224,7 +224,7 @@ const FilterBar = ({
                         {openFilterDropdown === field && (
                             <div className={`${dropdownClass} p-3`}>
                                 <div className="mb-2.5">
-                                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
+                                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">{label}</span>
                                 </div>
                                 <input
                                     type="date"
@@ -267,7 +267,7 @@ const FilterBar = ({
                     {openFilterDropdown === 'search' && (
                         <div className={`${dropdownClass} p-3`}>
                             <div className="mb-2.5">
-                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Search</span>
+                                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">Search</span>
                             </div>
                             <input
                                 type="text"
@@ -303,7 +303,7 @@ const FilterBar = ({
                             onMouseEnter={(e) => handleButtonMouseEnter(e, 'Clear all filters')}
                             onMouseLeave={onFilterTooltipHide}
                             aria-label="Clear all filters"
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
                         >
                             <CloseIcon />
                             <span className="hidden sm:inline">Clear</span>

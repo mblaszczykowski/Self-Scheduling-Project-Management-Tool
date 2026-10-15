@@ -32,7 +32,8 @@ class OptimizationInputLoaderTest {
 
     @BeforeEach
     void setUp() {
-        loader = new OptimizationInputLoader(projectRepository, taskRepository, new EntityMapper());
+        loader = new OptimizationInputLoader(projectRepository, taskRepository, new EntityMapper(),
+                org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class));
     }
 
     @Nested
@@ -145,4 +146,35 @@ class OptimizationInputLoaderTest {
             assertThat(loader.load(List.of("P"), USER_ID).anchors()).isEmpty();
         }
     }
+
+    @Test
+    void rejectsOutsideAnchorsWhenAccessToTheirProjectWasRevoked() {
+        var owner = TestEntityFactory.createUser(USER_ID, "owner@example.com");
+        var anotherOwner = TestEntityFactory.createUser(99, "other@example.com");
+        var project = TestEntityFactory.createProject(1, "P", owner);
+        var secretProject = TestEntityFactory.createProject(2, "SECRET", anotherOwner);
+        var dependency = TestEntityFactory.createTask(20, 1, secretProject);
+        var task = TestEntityFactory.createTask(10, 1, project);
+        task.replaceDependencies(List.of(dependency));
+        when(projectRepository.findByProjectKeyIn(List.of("P"))).thenReturn(List.of(project));
+        when(taskRepository.findByProjectIdsWithDetails(List.of(1))).thenReturn(List.of(task));
+        when(taskRepository.findAllByIdInWithDetails(List.of(20))).thenReturn(List.of(dependency));
+
+        assertThatThrownBy(() -> loader.load(List.of("P"), USER_ID))
+                .isInstanceOf(ResourceNotFoundException.class).hasMessageContaining("dependency projects");
+    }
+
+
+    @Test
+    void limitsPortfolioSizeBeforeLoadingEveryTaskAndItsRelationships() {
+        var owner = TestEntityFactory.createUser(USER_ID, "owner@example.com");
+        var project = TestEntityFactory.createProject(1, "P", owner);
+        when(projectRepository.findByProjectKeyIn(List.of("P"))).thenReturn(List.of(project));
+        when(taskRepository.countByProjectIdIn(List.of(1))).thenReturn(5001L);
+
+        assertThatThrownBy(() -> loader.load(List.of("P"), USER_ID))
+                .isInstanceOf(com.backend.exception.ValidationException.class).hasMessageContaining("5000");
+        org.mockito.Mockito.verify(taskRepository, org.mockito.Mockito.never()).findByProjectIdsWithDetails(org.mockito.ArgumentMatchers.any());
+    }
+
 }

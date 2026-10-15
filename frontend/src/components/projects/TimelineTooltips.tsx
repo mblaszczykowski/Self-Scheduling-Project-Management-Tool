@@ -17,9 +17,9 @@ export const TaskTooltip = ({ tooltip }: { tooltip: TooltipState }) => {
             }}
         >
             <div className="font-semibold mb-1 max-w-[200px] truncate">{content.title}</div>
-            <div className="text-slate-300 space-y-0.5">
+            <div className="text-slate-600 space-y-0.5">
                 <div className="flex items-center gap-2">
-                    <span className="text-slate-400">{content.subtitle}</span>
+                    <span className="text-slate-600">{content.subtitle}</span>
                     {content.type === 'task' && (
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${content.isCritical ? 'bg-red-500/30 text-red-300' : 'bg-slate-700'}`}>
                             {content.isCritical ? 'Critical' : content.status}

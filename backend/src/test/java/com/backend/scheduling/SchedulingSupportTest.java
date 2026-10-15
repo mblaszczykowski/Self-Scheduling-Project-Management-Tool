@@ -47,4 +47,12 @@ class SchedulingSupportTest {
     void nullProgressMeansUntouched() {
         assertThat(SchedulingSupport.remainingDurationDays(7, null)).isEqualTo(7);
     }
+
+    @Test
+    void extremeDatesAreRejectedInsteadOfOverflowingToAShortDuration() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                SchedulingSupport.inclusiveDurationDays(LocalDate.MIN, LocalDate.MAX))
+                .isInstanceOf(com.backend.exception.ValidationException.class);
+    }
+
 }

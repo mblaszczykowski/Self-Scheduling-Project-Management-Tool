@@ -220,4 +220,44 @@ class OptimizationServiceTest {
             assertThat(result.optimizedMetrics().feasible()).isTrue();
         }
     }
+
+    @Test
+    void repeatedApplyWithUnchangedProgressDoesNotKeepShrinkingTheDates() {
+        var original = new TaskDTO(null, null, "P-1", "P", "P-1", null, TaskStatus.IN_PROGRESS,
+                TODAY.minusDays(10), TODAY.minusDays(1), "dev@x", List.of(), List.of(),
+                null, null, List.of(), null, null, 50, TaskPriority.MEDIUM);
+        when(inputLoader.load(List.of("P"), USER_ID))
+                .thenReturn(new OptimizationInputLoader.Input(List.of(original), List.of()));
+        when(taskService.applySchedule(any(), anyInt())).thenAnswer(invocation -> {
+            List<TaskService.ScheduleChange> changes = invocation.getArgument(0);
+            var change = changes.getFirst();
+            var persisted = new TaskDTO(null, null, "P-1", "P", "P-1", null, TaskStatus.IN_PROGRESS,
+                    change.startDate(), change.dueDate(), "dev@x", List.of(), List.of(),
+                    null, null, List.of(), null, null, 50, TaskPriority.MEDIUM);
+            when(inputLoader.load(List.of("P"), USER_ID))
+                    .thenReturn(new OptimizationInputLoader.Input(List.of(persisted), List.of()));
+            return changes.size();
+        });
+
+        assertThat(optimization.apply(applyRequest(null), USER_ID)).isEqualTo(1);
+        assertThat(optimization.apply(applyRequest(null), USER_ID)).isZero();
+        var suggestion = optimization.simulate(simulateRequest(), USER_ID).suggestions().getFirst();
+        assertThat(suggestion.suggestedStartDate()).isEqualTo(TODAY);
+        assertThat(suggestion.suggestedDueDate()).isEqualTo(TODAY.plusDays(9));
+    }
+
+    @Test
+    void infeasibleFixedConflictsCannotBeApplied() {
+        var day = TODAY.plusDays(1).toString();
+        var due = TODAY.plusDays(5).toString();
+        var tasks = List.of(fixedTask("P-1", day, due, "dev@x"),
+                fixedTask("P-2", day, due, "dev@x"), task("P-3", day, due, "dev@x", List.of()));
+        when(inputLoader.load(List.of("P"), USER_ID))
+                .thenReturn(new OptimizationInputLoader.Input(tasks, List.of()));
+
+        assertThatThrownBy(() -> optimization.apply(applyRequest(null), USER_ID))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("not feasible");
+        verify(taskService, never()).applySchedule(any(), anyInt());
+    }
+
 }

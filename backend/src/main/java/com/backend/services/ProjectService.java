@@ -17,6 +17,7 @@ import com.backend.services.RateLimitService.Bucket;
 import com.backend.util.AfterCommit;
 import com.backend.util.GraphCycles;
 import com.backend.util.HtmlSanitizer;
+import com.backend.util.FileValidationConstants;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ public class ProjectService {
     private final NotificationService notificationService;
     private final EmailService emailService;
     private final RateLimitService rateLimitService;
+    private final DependencyGraphLock dependencyGraphLock;
 
     public ProjectService(ProjectRepository projectRepository,
                           UserService userService,
@@ -55,7 +57,8 @@ public class ProjectService {
                           AccessGuard accessGuard,
                           NotificationService notificationService,
                           EmailService emailService,
-                          RateLimitService rateLimitService) {
+                          RateLimitService rateLimitService,
+                          DependencyGraphLock dependencyGraphLock) {
         this.projectRepository = projectRepository;
         this.userService = userService;
         this.taskRepository = taskRepository;
@@ -66,6 +69,7 @@ public class ProjectService {
         this.notificationService = notificationService;
         this.emailService = emailService;
         this.rateLimitService = rateLimitService;
+        this.dependencyGraphLock = dependencyGraphLock;
     }
 
     @Transactional(readOnly = true)
@@ -86,6 +90,9 @@ public class ProjectService {
 
     @Transactional(rollbackFor = Exception.class)
     public ProjectDTO createProject(ProjectRequest request, Integer userId, List<MultipartFile> attachments) {
+        if (request.dependencies() != null && !request.dependencies().isEmpty()) {
+            dependencyGraphLock.projects();
+        }
         if (projectRepository.existsByProjectKey(request.projectKey())) {
             throw new ValidationException("Project key already exists: " + request.projectKey());
         }
@@ -117,7 +124,13 @@ public class ProjectService {
     @Transactional(rollbackFor = Exception.class)
     public ProjectDTO updateProject(String projectKey, ProjectRequest request, Integer userId,
                                     List<MultipartFile> attachments) {
+        if (request.dependencies() != null && !request.dependencies().isEmpty()) {
+            dependencyGraphLock.projects();
+        }
         var project = accessGuard.getOwnedProject(projectKey, userId);
+        if (!Objects.equals(projectKey, request.projectKey())) {
+            throw new ValidationException("Project key cannot be changed");
+        }
         var owner = project.getOwner();
 
         var description = HtmlSanitizer.sanitizeRichText(request.description());
@@ -152,6 +165,14 @@ public class ProjectService {
                     .forEach(removedMembers::add);
 
             project.replaceMembers(resolution.members());
+            if (!removedMembers.isEmpty()) {
+                var removedIds = removedMembers.stream().map(User::getId).collect(Collectors.toSet());
+                for (var task : taskRepository.findByProjectIdWithDetails(project.getId())) {
+                    if (task.getAssignee() != null && removedIds.contains(task.getAssignee().getId())) {
+                        task.setAssignee(null);
+                    }
+                }
+            }
         }
 
         if (request.dependencies() != null) {
@@ -163,6 +184,10 @@ public class ProjectService {
             updatedAttachments = fileStorageService.resolveAttachments(
                     project.getId(), declared, attachments, userId);
         } else {
+            if ((long) previousAttachments.size() + (attachments == null ? 0 : attachments.size())
+                    > FileValidationConstants.MAX_ATTACHMENTS_PER_ENTITY) {
+                throw new ValidationException("A project cannot have more than 50 attachments");
+            }
             updatedAttachments = new ArrayList<>(previousAttachments);
             updatedAttachments.addAll(fileStorageService.storeFiles(attachments, project.getId(), userId));
         }

@@ -44,7 +44,7 @@ const FormField = ({
             />
             {rightElement}
         </div>
-        <ErrorMessage name={name} component="span" id={`${id}-error`} className="text-red-500 text-xs mt-1 block" />
+        <ErrorMessage name={name} component="span" id={`${id}-error`} className="text-red-700 text-xs mt-1 block" />
     </div>
 );
 

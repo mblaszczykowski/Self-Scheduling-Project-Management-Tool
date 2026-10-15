@@ -149,14 +149,14 @@ class ProjectControllerWebTest {
         }
 
         @Test
-        @DisplayName("answers 403 rather than resolving a null caller when the request carries no user id")
-        void answers403WhenTheRequestCarriesNoUserId() throws Exception {
+        @DisplayName("answers 401 rather than resolving a null caller when the request carries no user id")
+        void answers401WhenTheRequestCarriesNoUserId() throws Exception {
             mockMvc.perform(multipart("/api/projects")
                             .file(projectPart("""
                                     {"projectKey":"NEW","summary":"Sample summary"}""")))
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.status").value(403))
-                    .andExpect(jsonPath("$.error").value("Forbidden"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.error").value("Unauthorized"))
                     .andExpect(jsonPath("$.message").value("User not authenticated"));
 
             verifyNoInteractions(projectService);
@@ -192,10 +192,10 @@ class ProjectControllerWebTest {
         }
 
         @Test
-        @DisplayName("answers 403 when the request carries no user id")
-        void answers403WhenTheRequestCarriesNoUserId() throws Exception {
+        @DisplayName("answers 401 when the request carries no user id")
+        void answers401WhenTheRequestCarriesNoUserId() throws Exception {
             mockMvc.perform(delete("/api/projects/{projectKey}", "PROJ"))
-                    .andExpect(status().isForbidden())
+                    .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.message").value("User not authenticated"));
 
             verify(projectService, never()).deleteProject(anyString(), anyInt());
@@ -276,10 +276,10 @@ class ProjectControllerWebTest {
         }
 
         @Test
-        @DisplayName("answers 403 when the request carries no user id")
-        void answers403WhenTheRequestCarriesNoUserId() throws Exception {
+        @DisplayName("answers 401 when the request carries no user id")
+        void answers401WhenTheRequestCarriesNoUserId() throws Exception {
             mockMvc.perform(get("/api/projects"))
-                    .andExpect(status().isForbidden())
+                    .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.message").value("User not authenticated"));
 
             verifyNoInteractions(projectService);

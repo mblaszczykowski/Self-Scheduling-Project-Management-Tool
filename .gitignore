@@ -27,3 +27,7 @@ uploads/
 
 # Logs
 *.log
+
+# Browser verification artifacts
+frontend/playwright-report/
+frontend/test-results/

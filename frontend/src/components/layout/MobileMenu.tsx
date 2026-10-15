@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Link, Location } from 'react-router-dom';
 import { BoxIcon, ClipboardIcon, UserIcon, LogoutIcon } from '../common/Icons';
+import SearchBar from './SearchBar';
 import { useClickOutside } from '../../hooks/useClickOutside';
 
 interface MobileMenuProps {
@@ -34,6 +35,7 @@ export default function MobileMenu({
     return (
         <nav ref={menuRef} id="mobile-menu" role="navigation" aria-label="Mobile navigation" className="xl:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-[slideDown_0.2s_ease-out]">
             <div className="px-6 py-4 space-y-1">
+                <div className="pb-3"><SearchBar /></div>
                 <MobileNavLink to="/dashboard" isActive={location.pathname === '/dashboard'} onClick={onClose}>Dashboard</MobileNavLink>
                 <MobileNavLink to="/projects" isActive={location.pathname === '/projects'} onClick={onClose}>Projects</MobileNavLink>
 
@@ -69,12 +71,12 @@ function MobileNavLink({ to, isActive, onClick, children }: { to: string; isActi
 
 function MobileMenuButton({ onClick, icon, variant, children }: { onClick: () => void; icon: React.ReactNode; variant?: 'danger'; children: React.ReactNode }) {
     const baseClass = variant === 'danger'
-        ? 'w-full flex items-center gap-3 py-2.5 px-3 text-red-600 dark:text-red-400 text-sm font-medium rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors'
+        ? 'w-full flex items-center gap-3 py-2.5 px-3 text-red-700 dark:text-red-400 text-sm font-medium rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors'
         : 'w-full flex items-center gap-3 py-2.5 px-3 text-slate-700 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors';
 
     return (
         <button onClick={onClick} className={baseClass}>
-            <span className={variant === 'danger' ? '' : 'text-slate-400'}>{icon}</span>
+            <span className={variant === 'danger' ? '' : 'text-slate-600'}>{icon}</span>
             {children}
         </button>
     );

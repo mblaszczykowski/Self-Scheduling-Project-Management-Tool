@@ -7,7 +7,7 @@ const btnBase = [
 ].join(' ');
 
 const normalBtn = `${btnBase} text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-600`;
-const dangerBtn = `${btnBase} text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800`;
+const dangerBtn = `${btnBase} text-red-700 dark:text-red-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800`;
 
 const TableMenu = ({ editor }: { editor: Editor | null }) => {
     if (!editor || !editor.isActive('table')) return null;
@@ -54,7 +54,7 @@ const TableMenu = ({ editor }: { editor: Editor | null }) => {
                 type="button"
                 onClick={chain('deleteTable')}
                 className={
-                    'px-4 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400'
+                    'px-4 py-1.5 text-xs font-semibold text-red-700 dark:text-red-400'
                     + ' hover:text-white dark:hover:text-white'
                     + ' bg-white dark:bg-slate-800 hover:bg-red-600 dark:hover:bg-red-600'
                     + ' border border-red-300 dark:border-red-800'

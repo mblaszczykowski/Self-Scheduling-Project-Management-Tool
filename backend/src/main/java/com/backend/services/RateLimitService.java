@@ -7,8 +7,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class RateLimitService {
@@ -45,14 +45,27 @@ public class RateLimitService {
         int max = limitFor(bucket);
         long now = System.currentTimeMillis();
         var bucketMap = buckets.get(bucket);
-        var entry = bucketMap.compute(key, (k, existing) -> {
-            if (existing == null || now - existing.windowStart > config.getWindowMs()) {
-                return new Entry(now);
+        synchronized (bucketMap) {
+            var entry = bucketMap.get(key);
+            if (entry == null) {
+                // Preserve existing budgets when the key space is saturated; evicting live entries
+                // would let an attacker reset limits by flooding the limiter with new addresses.
+                if (bucketMap.size() >= config.getMaxKeysPerBucket()) {
+                    return false;
+                }
+                bucketMap.put(key, new Entry(now));
+                return true;
             }
-            existing.count.incrementAndGet();
-            return existing;
-        });
-        return entry.count.get() <= max;
+            if (now - entry.windowStart >= config.getWindowMs()) {
+                bucketMap.put(key, new Entry(now));
+                return true;
+            }
+            if (entry.count >= max) {
+                return false;
+            }
+            entry.count++;
+            return true;
+        }
     }
 
     public void reset(Bucket bucket, String key) {
@@ -62,7 +75,7 @@ public class RateLimitService {
     }
 
     public static String loginKey(String clientIp, String email) {
-        var normalized = email == null ? "" : email.toLowerCase().trim();
+        var normalized = email == null ? "" : email.toLowerCase(Locale.ROOT).trim();
         return clientIp + "|" + normalized;
     }
 
@@ -81,7 +94,7 @@ public class RateLimitService {
     public void cleanupExpiredEntries() {
         try {
             long now = System.currentTimeMillis();
-            long expiryThreshold = config.getWindowMs() * 2;
+            long expiryThreshold = config.getWindowMs();
             buckets.values().forEach(bucket ->
                     bucket.entrySet().removeIf(e -> now - e.getValue().windowStart > expiryThreshold));
         } catch (Exception e) {
@@ -91,11 +104,11 @@ public class RateLimitService {
 
     private static final class Entry {
         final long windowStart;
-        final AtomicInteger count;
+        int count;
 
         Entry(long windowStart) {
             this.windowStart = windowStart;
-            this.count = new AtomicInteger(1);
+            this.count = 1;
         }
     }
 }

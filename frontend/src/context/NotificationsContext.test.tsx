@@ -155,4 +155,27 @@ describe('NotificationsContext', () => {
 
         expect(invalidateSpy).not.toHaveBeenCalled();
     });
+    test('duplicate SSE delivery never duplicates an item or increments unread twice', async () => {
+        const { wrapper } = createWrapper();
+        const { result } = renderHook(() => useNotifications(), { wrapper });
+        await waitFor(() => expect(mockedGetNotifications).toHaveBeenCalled());
+        const stream = FakeEventSource.instances[FakeEventSource.instances.length - 1];
+        const pushed = notification({ type: 'TASK_COMMENT' });
+        act(() => {
+            stream.emit('notification', pushed);
+            stream.emit('notification', pushed);
+        });
+        expect(result.current.notifications).toHaveLength(1);
+        expect(result.current.unreadCount).toBe(1);
+    });
+
+    test('a read notification delivered by SSE does not increment unread', async () => {
+        const { wrapper } = createWrapper();
+        const { result } = renderHook(() => useNotifications(), { wrapper });
+        await waitFor(() => expect(mockedGetNotifications).toHaveBeenCalled());
+        const stream = FakeEventSource.instances[FakeEventSource.instances.length - 1];
+        act(() => { stream.emit('notification', notification({ type: 'TASK_COMMENT', isRead: true })); });
+        expect(result.current.unreadCount).toBe(0);
+    });
+
 });

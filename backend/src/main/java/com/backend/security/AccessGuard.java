@@ -69,6 +69,14 @@ public class AccessGuard {
         return task;
     }
 
+    @Transactional(readOnly = true)
+    public void requireProfileAccess(Integer profileOwnerId, Integer requesterId) {
+        if (profileOwnerId == null || (!profileOwnerId.equals(requesterId)
+                && !projectRepository.doUsersShareProject(requesterId, profileOwnerId))) {
+            throw new ResourceNotFoundException("File not found");
+        }
+    }
+
     public void requireCommentOwnership(Comment comment, Integer userId) {
         if (!comment.getAuthor().getId().equals(userId)) {
             throw new AuthorizationException("User not authorized to modify this comment");

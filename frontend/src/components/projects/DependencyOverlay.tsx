@@ -266,7 +266,7 @@ const DependencyOverlay = ({
                     <circle cx="3" cy="3" r="2" fill="#94a3b8" />
                 </marker>
             </defs>
-            {arrows.map(({ id, d, sx, sy }) => (
+            {arrows.map(({ id, d }) => (
                 <React.Fragment key={id}>
                     <path
                         d={d}

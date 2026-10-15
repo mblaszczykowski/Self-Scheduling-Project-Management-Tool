@@ -235,8 +235,8 @@ class TaskActivityServiceTest {
         }
 
         @Test
-        @DisplayName("does not log a description edit that happens to keep the same length")
-        void doesNotDetectASameLengthDescriptionEdit() {
+        @DisplayName("detects description edits even when their lengths match")
+        void detectsASameLengthDescriptionEdit() {
             var before = new Snap();
             before.description = "Twelve chars";
             var after = new Snap();
@@ -244,7 +244,8 @@ class TaskActivityServiceTest {
 
             taskActivityService.logFieldChanges(task, author, before.build(), after.build());
 
-            verify(taskActivityRepository, never()).save(any());
+            assertThat(loggedActivities()).extracting(TaskActivity::getType)
+                    .containsExactly(TaskActivityType.DESCRIPTION_CHANGED);
         }
 
         @Test

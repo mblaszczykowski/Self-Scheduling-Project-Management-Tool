@@ -43,7 +43,7 @@ that is reachable from the internet.
 Priority mix across the 45 tasks: 5 HIGHEST, 9 HIGH, 18 MEDIUM, 9 LOW, 4 LOWEST. Nine statuses are
 represented — `BACKLOG` (31, the bulk of the planned work), `IN_PROGRESS` (3), plus one each of
 `GATHERING_INTEREST`, `TODO`, `TO_REVIEW`, `TO_TEST`, `IN_TEST` and `READY_TO_MERGE`, and 5 `DONE`
-— so the list and board views show more than a single column.
+— so the list and timeline views show more than a single column.
 
 The projects:
 
@@ -52,6 +52,8 @@ The projects:
 3. **B2B** — partner wholesale API, 15 tasks from requirements through to a public API v1.0.
 
 ## Prerequisites
+
+Use a dedicated demo database. The script refuses to run when it finds accounts outside the four listed above, other project keys, or a reserved project owned by another account.
 
 The database must already have the schema. Flyway creates it on the first backend start, so run the
 application once (or `docker compose up`) before seeding.
@@ -64,22 +66,16 @@ constraints silently undoes a migration.
 ### psql
 
 ```bash
-psql -U postgres -d flowlink -f backend/scripts/db/demo-seed.sql
+psql -v ON_ERROR_STOP=1 -U postgres -d flowlink -f backend/scripts/db/demo-seed.sql
 ```
 
-Run it from the repository root — the path above is relative to it. If the backend runs under
-Docker Compose, the database port is not published, so either publish it for one session:
+Run it from the repository root. In Docker Compose, pipe the file into the already running database; the command uses its configured role and database and stops on the first SQL error:
 
 ```bash
-docker compose run --rm --publish 5432:5432 db
-psql -h localhost -U postgres -d flowlink -f backend/scripts/db/demo-seed.sql
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backend/scripts/db/demo-seed.sql
 ```
 
-or pipe the file straight into the running container:
-
-```bash
-docker compose exec -T db psql -U postgres -d flowlink < backend/scripts/db/demo-seed.sql
-```
+For a host GUI, use a local compose override with `127.0.0.1:5432:5432` under `db.ports`, then recreate the service. Starting `compose run db` would create a second PostgreSQL process sharing the data volume.
 
 ### A GUI client
 
@@ -88,7 +84,7 @@ Open `demo-seed.sql` in DataGrip, DBeaver or pgAdmin and execute it as a script 
 
 ## Re-running and resetting
 
-The script is idempotent. Section 0 deletes everything it owns — the `@flowlink.dev` accounts and
+The script is idempotent. Section 0 resets the four explicitly listed demo accounts and
 the `ECOM` / `MAPP` / `B2B` projects with all their tasks, dependencies, comments, reactions,
 notifications, attachments and activity history — before re-inserting it. The whole thing runs in
 one transaction, so a failure leaves the database untouched.
@@ -101,7 +97,7 @@ That makes the demo repeatable:
 3. Apply the suggestions. The schedule in the database changes.
 4. Run the script again to return to step 1.
 
-It only touches its own rows. Other accounts and projects in the same database are left alone.
+It is intended exclusively for a demo database. Other accounts or projects cause a fail-fast error before any reset; the transaction leaves their rows intact.
 
 ## Changing the password
 
@@ -138,7 +134,7 @@ Signed in as `demo@flowlink.dev`:
 If you change an entity or add a migration, re-check this script. Two things it has to keep in
 step with the schema:
 
-- Columns that became `NOT NULL` (for example `projects.created` / `projects.updated` in `V3`) must
+- Columns that became `NOT NULL` (for example `projects.created` / `projects.updated` in `V1__baseline.sql`) must
   be supplied by the INSERT — a plain INSERT does not run the entity's `@PrePersist`.
 - `@Version` columns must not be left NULL. Section 11 sets them to `0`, which is what Hibernate
   writes for a newly persisted entity; a NULL version makes the application fail the first time it

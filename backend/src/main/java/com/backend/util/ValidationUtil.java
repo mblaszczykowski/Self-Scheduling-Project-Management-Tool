@@ -2,8 +2,11 @@ package com.backend.util;
 
 import com.backend.exception.ValidationException;
 import java.util.regex.Pattern;
+import java.nio.charset.StandardCharsets;
 
 public final class ValidationUtil {
+
+    public static final int MAX_PASSWORD_BYTES = 72;
 
     public static final int MAX_COMMENT_LENGTH = 10000;
 
@@ -42,9 +45,7 @@ public final class ValidationUtil {
             throw new ValidationException("Password must be at least 8 characters long");
         }
 
-        if (password.length() > 128) {
-            throw new ValidationException("Password must not exceed 128 characters");
-        }
+        validatePasswordLength(password);
 
         if (!password.matches(".*[A-Z].*")) {
             throw new ValidationException("Password must contain at least one uppercase letter");
@@ -64,6 +65,12 @@ public final class ValidationUtil {
 
         if (password.contains(" ")) {
             throw new ValidationException("Password must not contain spaces");
+        }
+    }
+
+    public static void validatePasswordLength(String password) {
+        if (password != null && password.getBytes(StandardCharsets.UTF_8).length > MAX_PASSWORD_BYTES) {
+            throw new ValidationException("Password must not exceed 72 bytes in UTF-8");
         }
     }
 

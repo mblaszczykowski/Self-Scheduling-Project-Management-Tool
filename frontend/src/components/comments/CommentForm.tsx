@@ -16,7 +16,7 @@ export interface CommentFormValues {
 }
 
 interface CommentFormProps {
-    onSubmit: (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, attachments: File[]) => void;
+    onSubmit: (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, attachments: File[]) => Promise<boolean>;
     initialContent?: string;
     buttonText: string;
     onCancel: () => void;
@@ -76,10 +76,12 @@ const CommentForm = ({
         setLocalAttachments(prev => prev.filter(f => f !== attachment));
     };
 
-    const handleFormSubmit = (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>) => {
-        onSubmit(values, actions, localAttachments);
-        localAttachments.forEach(revokeFileUrl);
-        setLocalAttachments([]);
+    const handleFormSubmit = async (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>) => {
+        const saved = await onSubmit({ ...values, content: values.content.trim() }, actions, localAttachments);
+        if (saved) {
+            localAttachments.forEach(revokeFileUrl);
+            setLocalAttachments([]);
+        }
     };
 
     return (
@@ -96,6 +98,7 @@ const CommentForm = ({
                     <Field
                         as="textarea"
                         id={textareaId}
+                        aria-describedby={`${textareaId}-error`}
                         name="content"
                         rows={2}
                         maxLength={MAX_COMMENT_LENGTH}
@@ -106,17 +109,15 @@ const CommentForm = ({
                                 : 'Write a comment...'
                         }
                         onKeyDown={(e: React.KeyboardEvent) => {
-                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                            if (!isSubmitting && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                                 e.preventDefault();
                                 formikSubmit();
                             }
                         }}
                     />
-                    <ErrorMessage
-                        name="content"
-                        component="div"
-                        className="text-red-500 text-xs"
-                    />
+                    <div id={`${textareaId}-error`}>
+                        <ErrorMessage name="content" component="div" className="text-red-700 text-xs" />
+                    </div>
 
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
@@ -135,7 +136,7 @@ const CommentForm = ({
                                 className="relative cursor-pointer flex items-center justify-center w-6 h-6 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-within:ring-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400"
                                 title="Attach file"
                             >
-                                <HiOutlinePlus className="w-3 h-3 text-slate-400" />
+                                <HiOutlinePlus className="w-3 h-3 text-slate-600" />
                                 <span className="sr-only">Attach file</span>
                                 <input
                                     type="file"
@@ -151,7 +152,8 @@ const CommentForm = ({
                             <button
                                 type="button"
                                 onClick={onCancel}
-                                className="px-2.5 py-1 text-xs font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg transition-colors"
+                                disabled={isSubmitting}
+                                className="px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg transition-colors"
                             >
                                 Cancel
                             </button>

@@ -94,7 +94,7 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
     }
 
     private static String readCsrfCookie(HttpServletRequest request) {
-        return CookieFactory.read(request, CSRF_COOKIE_NAME).orElse(null);
+        return CookieFactory.read(request, CSRF_COOKIE_NAME).filter(token -> !token.isBlank()).orElse(null);
     }
 
     private static String generateCsrfToken() {

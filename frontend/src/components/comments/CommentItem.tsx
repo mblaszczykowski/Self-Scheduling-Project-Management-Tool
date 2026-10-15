@@ -25,13 +25,14 @@ const ReactionButton = ({ type, active, disabled, activeClass, count, icon: Icon
 
     return (
         <button
+                        type="button"
             onClick={onClick}
             aria-label={active ? `Remove ${label.toLowerCase()}` : label}
             className={
                 'flex items-center gap-0.5 text-xs transition-colors '
                 + (active
                     ? activeClass
-                    : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-600 dark:hover:text-slate-300')
             }
             disabled={disabled}
         >
@@ -50,8 +51,8 @@ export interface CommentItemProps {
     highlightCommentId: number | null;
     onSetEditingComment: (c: Comment | null) => void;
     onSetReplyingCommentId: (id: number | null) => void;
-    onHandleUpdateComment: (comment: Comment, values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, attachments: File[]) => void;
-    onHandleAddComment: (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, parentCommentId: number | null, attachments: File[]) => void;
+    onHandleUpdateComment: (comment: Comment, values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, attachments: File[]) => Promise<boolean>;
+    onHandleAddComment: (values: CommentFormValues, actions: FormikHelpers<CommentFormValues>, parentCommentId: number | null, attachments: File[]) => Promise<boolean>;
     onHandleDeleteComment: (commentId: number) => void;
     onHandleReactToComment: (commentId: number, reactionType: ReactionType) => void | Promise<void>;
     renderAttachmentPreview: (attachment: string, idx: number) => React.ReactNode;
@@ -99,7 +100,7 @@ const CommentItem = React.memo(({
 
     const authorParts = splitFullName(comment.authorName);
 
-    const actionBtnClass = 'text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors';
+    const actionBtnClass = 'text-xs text-slate-600 dark:text-slate-300 hover:text-slate-600 dark:hover:text-slate-300 transition-colors';
 
     return (
         <div
@@ -116,7 +117,7 @@ const CommentItem = React.memo(({
                     user={authorParts}
                     profilePicture={comment.authorProfilePicture}
                     size="xs"
-                    className="flex-shrink-0 mt-0.5"
+                    className="shrink-0 mt-0.5"
                 />
 
                 <div className="flex-1 min-w-0">
@@ -141,7 +142,7 @@ const CommentItem = React.memo(({
                                         {comment.authorName}
                                     </span>
                                     <span
-                                        className="text-xs text-slate-400 dark:text-slate-500"
+                                        className="text-xs text-slate-600 dark:text-slate-300"
                                         title={new Date(comment.timestamp).toLocaleString('en-US')}
                                     >
                                         {formatDistanceToNow(
@@ -150,7 +151,7 @@ const CommentItem = React.memo(({
                                         )}
                                     </span>
                                     {comment.editedAt && (
-                                        <span className="text-xs text-slate-300 dark:text-slate-600">edited</span>
+                                        <span className="text-xs text-slate-600 dark:text-slate-300">edited</span>
                                     )}
                                 </div>
                                 <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
@@ -180,32 +181,37 @@ const CommentItem = React.memo(({
                                     type="DISLIKE"
                                     active={comment.dislikedByCurrentUser}
                                     disabled={reactionPending}
-                                    activeClass="text-red-500 font-medium"
+                                    activeClass="text-red-700 font-medium"
                                     count={comment.dislikeCount}
                                     icon={ThumbsDownIcon}
                                     onClick={() => handleReact('DISLIKE')}
                                 />
                                 {level < MAX_REPLY_DEPTH ? (
                                     <button
+                        type="button"
                                         onClick={() => onSetReplyingCommentId(comment.id)}
                                         className={actionBtnClass}
                                     >
                                         Reply
                                     </button>
                                 ) : (
-                                    <span className="text-xs text-slate-300 dark:text-slate-600 italic">max depth</span>
+                                    <span className="text-xs text-slate-600 dark:text-slate-300 italic">max depth</span>
                                 )}
                                 {isOwner && (
                                     <>
                                         <button
+                        type="button"
+                                            aria-label="Edit comment"
                                             onClick={() => onSetEditingComment(comment)}
                                             className={actionBtnClass}
                                         >
                                             Edit
                                         </button>
                                         <button
+                        type="button"
+                                            aria-label="Delete comment"
                                             onClick={() => onHandleDeleteComment(comment.id)}
-                                            className={actionBtnClass + ' hover:!text-red-500'}
+                                            className={actionBtnClass + ' hover:!text-red-700'}
                                         >
                                             Delete
                                         </button>

@@ -23,7 +23,8 @@ public final class PublicEndpoints {
         if (JWT_EXEMPT_ENDPOINTS.contains(path)) {
             return !USERS.equals(path) || "POST".equalsIgnoreCase(method);
         }
-        return ERROR.equals(path) || ACTUATOR_HEALTH.equals(path) || isApiDocsPath(path);
+        return ERROR.equals(path) || (ACTUATOR_HEALTH.equals(path) || (ACTUATOR_HEALTH + "/liveness").equals(path)
+                || (ACTUATOR_HEALTH + "/readiness").equals(path)) || isApiDocsPath(path);
     }
 
     private static boolean isApiDocsPath(String path) {

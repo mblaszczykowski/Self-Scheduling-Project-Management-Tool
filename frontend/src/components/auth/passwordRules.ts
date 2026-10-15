@@ -36,13 +36,15 @@ export const PASSWORD_RULES: PasswordRule[] = [
     },
 ];
 
-export const PASSWORD_MAX_LENGTH = 128;
+export const PASSWORD_MAX_LENGTH = 72;
 
 export const withPasswordComplexity = (schema: Yup.StringSchema): Yup.StringSchema =>
     PASSWORD_RULES.reduce(
         (acc, rule) => acc.test(rule.label, rule.message, (v) => v === undefined || rule.test(v)),
         schema,
     )
+        .test('utf8-byte-limit', 'Password must not exceed 72 UTF-8 bytes.',
+            (v) => v === undefined || new Blob([v]).size <= PASSWORD_MAX_LENGTH)
         .max(PASSWORD_MAX_LENGTH, `Password must not exceed ${PASSWORD_MAX_LENGTH} characters.`)
         .test(
             'no-spaces',

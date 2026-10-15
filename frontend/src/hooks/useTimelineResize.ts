@@ -72,7 +72,7 @@ export const useTimelineResize = ({ onResizeMove, onResizeEnd, onResizeCancel, d
             if (!drag || event.pointerId !== drag.pointerId) return;
             const deltaDays = Math.round((event.clientX - drag.anchorX) / dayWidth);
             if (deltaDays === 0) return;
-            drag.anchorX = event.clientX;
+            drag.anchorX += deltaDays * dayWidth;
             callbacksRef.current.onResizeMove(drag.taskKey, drag.projectKey, drag.side, deltaDays);
         };
 
